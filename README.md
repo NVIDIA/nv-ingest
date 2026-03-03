@@ -4,42 +4,44 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-> [!Note]
-> **Default branch:** The repository default branch is **`main`** (development). For the latest **release** branch and tagged releases, use the [releases](https://github.com/NVIDIA/nv-ingest/releases) page or select a release branch (for example, `release/26.1.2`) from the branch dropdown.For **Documentation:**, see: [https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/](https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/).
+**Important: The default branch is main, which tracks active development and may be ahead of the latest supported release.**
 
-# What is NeMo Retriever Extraction?
+For the latest stable release:
 
-NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
-NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
+Use the latest release/* branch (for example, release/26.1.2) from the branch dropdown.
+
+See the corresponding NeMo Retriever Library documentation at https://docs.nvidia.com/nemo/retriever/latest/extraction/overview/
+
+# NeMo Retriever Library
+
+NeMo Retriever Library is a scalable, performance-oriented document content and metadata extraction microservice. It uses specialized NVIDIA NIM microservices 
 to find, contextualize, and extract text, tables, charts and infographics that you can use in downstream generative applications.
 
 > [!Note]
 > NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
-From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
-and optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NeMo Retriever Library enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. From there, NeMo Retriever Library can optionally manage computation of embeddings for the extracted content, and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 > [!Note]
 > Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
-The following diagram shows the Nemo Retriever extraction pipeline.
+The following diagram shows the NeMo Retriever Library pipeline.
 
 ![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
 
 ## Table of Contents
-1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
+1. [NeMo Retriever Library](#nemo-retriever-library)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#library-mode-quickstart)
 4. [Benchmarking](#benchmarking)
-5. [GitHub Repository Structure](#nv-ingest-repository-structure)
+5. [GitHub Repository Structure](#github-repository-structure)
 6. [Notices](#notices)
 
 
-## What NeMo Retriever Extraction Is
+## What is NeMo Retriever Library?
 
-NeMo Retriever Extraction is a library and microservice service that does the following:
+The NeMo Retriever Library is a library and microservice framework designed to perform the following functions::
 
 - Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
@@ -69,15 +71,15 @@ NeMo Retriever Extraction supports the following file types:
 - `wav`
 
 
-### What NeMo Retriever Extraction Isn't
+### What NeMo Retriever Library Isn't
 
-NeMo Retriever extraction does not do the following:
+NeMo Retriever Library does not do the following:
 
 - Run a static pipeline or fixed set of operations on every submitted document.
 - Act as a wrapper for any specific document parsing library.
 
 
-For more information, see the [full NeMo Retriever Extraction documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+For more information, refer to the [NeMo Retriever Library documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
 ## Documentation Resources
 
@@ -113,7 +115,7 @@ uv venv --python 3.12 nvingest && \
   uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2 milvus-lite==2.4.12
 ```
 
-Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
+Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](docs/docs/extraction/ngc-api-key.md).
 
 ```
 export NVIDIA_API_KEY=nvapi-...
