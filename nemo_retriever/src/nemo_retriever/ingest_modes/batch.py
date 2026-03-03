@@ -254,9 +254,24 @@ class _BatchEmbedActor:
             self._model = None
             return
 
-        # When using vLLM offline, no local HF model; embed_text_main_text_embed uses vLLM.
+        # When using vLLM offline, create one LLM per actor and reuse for all batches.
         if self._kwargs.get("embed_use_vllm_offline"):
             self._model = None
+            from nemo_retriever.text_embed.vllm_offline import create_vllm_llm
+
+            embed_model = (
+                self._kwargs.get("embed_model_path")
+                or self._kwargs.get("embed_model_name")
+                or self._kwargs.get("model_name")
+                or ""
+            )
+            self._vllm_llm = create_vllm_llm(
+                str(embed_model),
+                dimensions=self._kwargs.get("dimensions"),
+                gpu_memory_utilization=float(self._kwargs.get("gpu_memory_utilization", 0.45)),
+                enforce_eager=bool(self._kwargs.get("enforce_eager", False)),
+                compile_cache_dir=self._kwargs.get("compile_cache_dir"),
+            )
             return
 
         device = self._kwargs.get("device")
@@ -295,7 +310,10 @@ class _BatchEmbedActor:
     def __call__(self, batch_df: Any) -> Any:
         from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
 
-        return embed_text_main_text_embed(batch_df, model=self._model, **self._kwargs)
+        kwargs = dict(self._kwargs)
+        if getattr(self, "_vllm_llm", None) is not None:
+            kwargs["vllm_llm"] = self._vllm_llm
+        return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
 
 
 class BatchIngestor(Ingestor):

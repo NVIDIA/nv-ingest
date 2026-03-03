@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import List, Optional
+from typing import Any, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,100 @@ def _default_compile_cache_dir() -> Optional[str]:
     return None
 
 
+def create_vllm_llm(
+    model: str,
+    *,
+    dimensions: Optional[int] = None,
+    tensor_parallel_size: int = 1,
+    dtype: str = "float32",
+    trust_remote_code: bool = True,
+    max_model_len: Optional[int] = None,
+    gpu_memory_utilization: float = 0.45,
+    enforce_eager: bool = False,
+    compile_cache_dir: Optional[str] = None,
+) -> Any:
+    """
+    Create and return a vLLM LLM instance for embedding (pooling runner).
+    Caller can reuse it across many embed batches to avoid repeated model load and CUDA graph capture.
+    """
+    try:
+        from vllm import LLM
+    except ImportError as e:
+        raise RuntimeError(
+            "vLLM offline embedding requires the vllm package. "
+            "Install with: pip install vllm>=0.11.0 or uv pip install -e '.[vllm]'"
+        ) from e
+
+    if not enforce_eager:
+        cache_dir = compile_cache_dir if compile_cache_dir is not None else _default_compile_cache_dir()
+        if cache_dir:
+            os.makedirs(cache_dir, mode=0o700, exist_ok=True)
+            os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
+            os.environ["TRITON_CACHE_DIR"] = cache_dir
+            logger.debug("vLLM offline: using compile cache dir %s", cache_dir)
+
+    pooler_config = None
+    try:
+        from vllm.config.pooler import PoolerConfig
+
+        try:
+            pooler_config = PoolerConfig(seq_pooling_type="MEAN", dimensions=dimensions)
+        except TypeError:
+            pooler_config = PoolerConfig(pooling_type="MEAN", dimensions=dimensions)
+    except Exception:
+        pooler_config = None
+
+    kwargs: dict = {
+        "model": model,
+        "trust_remote_code": trust_remote_code,
+        "tensor_parallel_size": tensor_parallel_size,
+        "dtype": dtype,
+        "runner": "pooling",
+        "gpu_memory_utilization": gpu_memory_utilization,
+        "enforce_eager": enforce_eager,
+    }
+    if max_model_len is not None:
+        kwargs["max_model_len"] = max_model_len
+    if pooler_config is not None:
+        kwargs["pooler_config"] = pooler_config
+
+    return LLM(**kwargs)
+
+
+def embed_with_vllm_llm(
+    prompts: List[str],
+    llm: Any,
+    *,
+    batch_size: int = 256,
+    prefix: Optional[str] = None,
+) -> List[List[float]]:
+    """
+    Compute embeddings using an existing vLLM LLM instance (no new model load).
+    Use this when the caller holds a shared LLM (e.g. one per Ray actor).
+    """
+    if prefix:
+        prompts = [str(prefix) + p for p in prompts]
+    if not prompts:
+        return []
+
+    all_embeddings: List[List[float]] = []
+    for i in range(0, len(prompts), max(1, batch_size)):
+        batch = prompts[i : i + max(1, batch_size)]
+        outputs = llm.embed(batch)
+        for out in outputs:
+            emb = getattr(getattr(out, "outputs", None), "embedding", None)
+            if emb is not None:
+                if hasattr(emb, "tolist"):
+                    all_embeddings.append(emb.tolist())
+                elif isinstance(emb, list):
+                    all_embeddings.append([float(x) for x in emb])
+                else:
+                    all_embeddings.append(list(emb))
+            else:
+                all_embeddings.append([])
+    return all_embeddings
+
+
 def embed_via_vllm_offline(
     prompts: List[str],
     *,
@@ -64,7 +158,7 @@ def embed_via_vllm_offline(
     dtype: str = "float32",
     trust_remote_code: bool = True,
     max_model_len: Optional[int] = None,
-    gpu_memory_utilization: float = 0.8,
+    gpu_memory_utilization: float = 0.45,
     enforce_eager: bool = False,
     compile_cache_dir: Optional[str] = None,
 ) -> List[List[float]]:
@@ -93,7 +187,8 @@ def embed_via_vllm_offline(
     max_model_len : int, optional
         Max sequence length; default uses model config.
     gpu_memory_utilization : float
-        Fraction of GPU memory for vLLM (default 0.8). Lower if other processes use GPU.
+        Fraction of GPU memory for vLLM (default 0.45). Kept low to avoid OOM; increase
+        (e.g. 0.6–0.8) for better throughput once stable.
     enforce_eager : bool
         If False (default), use torch.compile/CUDAGraphs for speed. If True, disable for
         stability. When False, set compile_cache_dir (or use auto /dev/shm) to avoid
@@ -109,76 +204,18 @@ def embed_via_vllm_offline(
     list of list of float
         One embedding vector per prompt, in order.
     """
-    try:
-        from vllm import LLM
-    except ImportError as e:
-        raise RuntimeError(
-            "vLLM offline embedding requires the vllm package. "
-            "Install with: pip install vllm>=0.11.0 or uv pip install -e '.[vllm]'"
-        ) from e
-
-    # When using torch.compile (enforce_eager=False), avoid /tmp for inductor/triton
-    # so we don't hit "failed to map segment from shared object" (e.g. /tmp on NFS).
-    if not enforce_eager:
-        cache_dir = compile_cache_dir if compile_cache_dir is not None else _default_compile_cache_dir()
-        if cache_dir:
-            os.makedirs(cache_dir, mode=0o700, exist_ok=True)
-            os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
-            os.environ["TRITON_CACHE_DIR"] = cache_dir
-            logger.debug("vLLM offline: using compile cache dir %s", cache_dir)
-
-    if prefix:
-        prompts = [str(prefix) + p for p in prompts]
-    if not prompts:
-        return []
-
-    # Build pooler config for MEAN pooling (required for llama-nemotron-embed-1b-v2).
-    pooler_config = None
-    try:
-        from vllm.config.pooler import PoolerConfig
-
-        # vLLM 0.16+ uses seq_pooling_type; older versions may use pooling_type
-        try:
-            pooler_config = PoolerConfig(seq_pooling_type="MEAN", dimensions=dimensions)
-        except TypeError:
-            pooler_config = PoolerConfig(pooling_type="MEAN", dimensions=dimensions)
-    except Exception:
-        pooler_config = None
-
-    kwargs: dict = {
-        "model": model,
-        "trust_remote_code": trust_remote_code,
-        "tensor_parallel_size": tensor_parallel_size,
-        "dtype": dtype,
-        "runner": "pooling",
-        "gpu_memory_utilization": gpu_memory_utilization,
-        "enforce_eager": enforce_eager,
-    }
-    if max_model_len is not None:
-        kwargs["max_model_len"] = max_model_len
-    # vLLM 0.16+ passes pooler_config to LLM() directly; older used override_pooler_config in kwargs
-    if pooler_config is not None:
-        kwargs["pooler_config"] = pooler_config
-
-    llm = LLM(**kwargs)
-
-    all_embeddings: List[List[float]] = []
-    for i in range(0, len(prompts), max(1, batch_size)):
-        batch = prompts[i : i + max(1, batch_size)]
-        outputs = llm.embed(batch)
-        for out in outputs:
-            emb = getattr(getattr(out, "outputs", None), "embedding", None)
-            if emb is not None:
-                if hasattr(emb, "tolist"):
-                    all_embeddings.append(emb.tolist())
-                elif isinstance(emb, list):
-                    all_embeddings.append([float(x) for x in emb])
-                else:
-                    all_embeddings.append(list(emb))
-            else:
-                all_embeddings.append([])
-
-    return all_embeddings
+    llm = create_vllm_llm(
+        model,
+        dimensions=dimensions,
+        tensor_parallel_size=tensor_parallel_size,
+        dtype=dtype,
+        trust_remote_code=trust_remote_code,
+        max_model_len=max_model_len,
+        gpu_memory_utilization=gpu_memory_utilization,
+        enforce_eager=enforce_eager,
+        compile_cache_dir=compile_cache_dir,
+    )
+    return embed_with_vllm_llm(prompts, llm, batch_size=batch_size, prefix=prefix)
 
 
-__all__ = ["embed_via_vllm_offline"]
+__all__ = ["create_vllm_llm", "embed_via_vllm_offline", "embed_with_vllm_llm"]

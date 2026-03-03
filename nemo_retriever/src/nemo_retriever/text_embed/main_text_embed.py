@@ -524,25 +524,37 @@ def _vllm_offline_runner(
     model: str,
     batch_size: int = 64,
     dimensions: Optional[int] = None,
+    llm: Optional[Any] = None,
 ) -> dict:
     """
     Request embeddings using vLLM offline Python API (no server).
+    If llm is provided (e.g. from a batch actor), reuse it and skip model load/CUDA capture.
     Returns the same {"embeddings": [...], "info_msgs": [...]} shape as _vllm_compat_runner.
     """
-    from nemo_retriever.text_embed.vllm_offline import embed_via_vllm_offline
-
     flat_prompts: List[str] = []
     for batch in prompts:
         flat_prompts.extend(batch)
     if not flat_prompts:
         return {"embeddings": [], "info_msgs": []}
-    vectors = embed_via_vllm_offline(
-        flat_prompts,
-        model=model,
-        batch_size=batch_size,
-        prefix="passage: ",
-        dimensions=dimensions,
-    )
+    if llm is not None:
+        from nemo_retriever.text_embed.vllm_offline import embed_with_vllm_llm
+
+        vectors = embed_with_vllm_llm(
+            flat_prompts,
+            llm,
+            batch_size=batch_size,
+            prefix="passage: ",
+        )
+    else:
+        from nemo_retriever.text_embed.vllm_offline import embed_via_vllm_offline
+
+        vectors = embed_via_vllm_offline(
+            flat_prompts,
+            model=model,
+            batch_size=batch_size,
+            prefix="passage: ",
+            dimensions=dimensions,
+        )
     embeddings = [v if v else None for v in vectors]
     return {"embeddings": embeddings, "info_msgs": [None] * len(embeddings)}
 
@@ -732,6 +744,7 @@ def create_text_embeddings_for_df(
                     model=str(embed_model),
                     batch_size=int(task_config.get("local_batch_size") or transform_config.batch_size),
                     dimensions=dimensions,
+                    llm=task_config.get("vllm_llm"),
                 )
             elif endpoint_url and task_config.get("use_vllm_compat"):
                 content_embeddings = _vllm_compat_runner(

@@ -243,6 +243,7 @@ def _embed_group(
     use_vllm_compat: bool = False,
     use_vllm_offline: bool = False,
     embed_model_path: Optional[str] = None,
+    vllm_llm: Any = None,
 ) -> pd.DataFrame:
     """Embed a single modality group via ``create_text_embeddings_for_df``.
 
@@ -303,6 +304,8 @@ def _embed_group(
         task_config["use_vllm_offline"] = True
         task_config["embed_model_name"] = resolved_model_name
         task_config["embed_model_path"] = embed_model_path
+        if vllm_llm is not None:
+            task_config["vllm_llm"] = vllm_llm
     out_df, _ = create_text_embeddings_for_df(
         group_df,
         task_config=task_config,
@@ -323,6 +326,7 @@ def embed_text_main_text_embed(
     embed_use_vllm_compat: bool = False,
     embed_use_vllm_offline: bool = False,
     embed_model_path: Optional[str] = None,
+    vllm_llm: Any = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -391,6 +395,7 @@ def embed_text_main_text_embed(
                 use_vllm_compat=bool(embed_use_vllm_compat),
                 use_vllm_offline=bool(embed_use_vllm_offline),
                 embed_model_path=embed_model_path,
+                vllm_llm=vllm_llm,
             )
         else:
             # Multiple modalities: group, embed each, reassemble in original order.
@@ -412,6 +417,7 @@ def embed_text_main_text_embed(
                     use_vllm_compat=bool(embed_use_vllm_compat),
                     use_vllm_offline=bool(embed_use_vllm_offline),
                     embed_model_path=embed_model_path,
+                    vllm_llm=vllm_llm,
                 )
                 parts.append(part)
             out_df = pd.concat(parts).sort_index()
