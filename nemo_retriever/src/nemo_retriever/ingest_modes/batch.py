@@ -927,7 +927,7 @@ class BatchIngestor(Ingestor):
             num_cpus=embed_cpus_per_actor,
             num_gpus=0.1,
             # compute=rd.ActorPoolStrategy(size=embed_workers),
-            compute=rd.ActorPoolStrategy(min_size=1, max_size=10),
+            compute=rd.ActorPoolStrategy(min_size=1, max_size=4),
             fn_constructor_kwargs={"params": resolved},
         )
 
