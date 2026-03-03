@@ -30,8 +30,6 @@ on:
         required: true
       NEMOTRON_PARSE_MODEL_NAME:
         required: true
-      NGC_API_KEY:
-        required: true
       NVIDIA_API_KEY:
         required: true
       PADDLE_HTTP_ENDPOINT:
@@ -72,6 +70,7 @@ jobs:
           uv venv .venv
           source .venv/bin/activate
           uv pip install -e ./src -e ./api -e ./client
+          # block pulling in breaking changes in pypdfium2 v5
           uv pip install \
             opencv-python \
             llama-index-embeddings-nvidia \
@@ -80,7 +79,7 @@ jobs:
             'milvus-lite==2.4.12' \
             'nvidia-riva-client==2.20.0' \
             'unstructured-client>=0.25.9' \
-            'pypdfium2<5' \ # block pulling in breaking changes in pypdfium2 v5
+            'pypdfium2<5' \
             tritonclient \
             markitdown \
             glom
@@ -91,7 +90,6 @@ jobs:
           AUDIO_INFER_PROTOCOL: http
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
           NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
-          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           OCR_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
           OCR_INFER_PROTOCOL: http
@@ -109,4 +107,4 @@ jobs:
           source .venv/bin/activate
           echo 'Running integration tests...'
           unset LD_LIBRARY_PATH
-          python -m pytest -rsx tests/integration
+          python -m pytest -rsx -m integration tests/integration
