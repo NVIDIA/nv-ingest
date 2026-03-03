@@ -76,6 +76,10 @@ def maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_config
     if callable(task_config.get("embedder")):
         return
 
+    # When vLLM offline is requested, do not inject HF embedder; create_text_embeddings_for_df will use vLLM offline.
+    if task_config.get("use_vllm_offline"):
+        return
+
     # Resolve endpoint_url with explicit None override support.
     if "endpoint_url" in task_config:
         endpoint_url = task_config.get("endpoint_url")

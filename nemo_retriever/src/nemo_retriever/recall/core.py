@@ -49,6 +49,10 @@ class RecallConfig:
     # When True and an HTTP embedding endpoint is set, use vLLM-compatible minimal
     # payload (no input_type/truncate). Set this when the endpoint is a vLLM server.
     embedding_use_vllm_compat: bool = False
+    # When True and no endpoint is set, use vLLM offline Python API for query embeddings.
+    embedding_use_vllm_offline: bool = False
+    # Optional override for vLLM model path/id when using embedding_use_vllm_offline.
+    embedding_vllm_model_path: Optional[str] = None
 
 
 def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -126,6 +130,23 @@ def _embed_queries_vllm_http(
         endpoint_url=endpoint,
         model_name=model,
         api_key=(api_key or "").strip() or None,
+        batch_size=batch_size,
+        prefix="query: ",
+    )
+
+
+def _embed_queries_vllm_offline(
+    queries: List[str],
+    *,
+    model_path_or_id: str,
+    batch_size: int = 256,
+) -> List[List[float]]:
+    """Embed queries via vLLM offline Python API (no server)."""
+    from nemo_retriever.text_embed.vllm_offline import embed_via_vllm_offline
+
+    return embed_via_vllm_offline(
+        queries,
+        model=model_path_or_id,
         batch_size=batch_size,
         prefix="query: ",
     )
@@ -338,6 +359,13 @@ def retrieve_and_score(
                 api_key=cfg.embedding_api_key,
                 grpc=bool(use_grpc),
             )
+    elif cfg.embedding_use_vllm_offline:
+        model_path = cfg.embedding_vllm_model_path or cfg.embedding_model
+        vectors = _embed_queries_vllm_offline(
+            queries,
+            model_path_or_id=model_path,
+            batch_size=int(cfg.local_hf_batch_size),
+        )
     else:
         vectors = _embed_queries_local_hf(
             queries,

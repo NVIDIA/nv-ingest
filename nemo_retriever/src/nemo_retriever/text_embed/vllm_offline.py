@@ -1,0 +1,184 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""
+vLLM offline batched embedding inference.
+
+Uses vLLM's Python API (LLM with task="embed" / runner="pooling" and llm.embed())
+to compute embeddings without running a vLLM server. Use this when you want
+the same embedding model (e.g. llama-nemotron-embed-1b-v2) with vLLM's batched
+inference and no HTTP server.
+
+Troubleshooting enforce_eager=False (torch.compile):
+  If you see "failed to map segment from shared object", the cache dir is on a
+  filesystem that does not allow executing shared libs (e.g. noexec mount). /tmp
+  and /dev/shm are often noexec on Linux. We auto-pick a dir under /run/user/<uid>
+  (if present), then ~/.cache/vllm/torch_compile_inductor, then /dev/shm. Set
+  compile_cache_dir to a path on a non-noexec filesystem if needed, or use
+  enforce_eager=True.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+def _default_compile_cache_dir() -> Optional[str]:
+    """Return a cache dir for torch inductor/triton that supports loading shared libs (no noexec).
+    Prefer /run/user/<uid> (often exec-enabled tmpfs), then ~/.cache, then /dev/shm.
+    Avoid /tmp and /dev/shm when they are mounted noexec (common on Linux)."""
+    candidates: List[tuple[str, str]] = []
+    uid = os.getuid() if hasattr(os, "getuid") else 0
+    run_user = f"/run/user/{uid}"
+    if os.path.isdir(run_user) and os.access(run_user, os.W_OK):
+        candidates.append((run_user, os.path.join(run_user, "vllm_torch_compile")))
+    cache_home = os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache")
+    vllm_cache = os.path.join(cache_home, "vllm", "torch_compile_inductor")
+    if cache_home:
+        candidates.append((cache_home, vllm_cache))
+    shm = "/dev/shm"
+    if os.path.isdir(shm) and os.access(shm, os.W_OK):
+        candidates.append((shm, os.path.join(shm, f"vllm_torch_compile_{uid}")))
+    for _parent, path in candidates:
+        try:
+            os.makedirs(path, mode=0o700, exist_ok=True)
+            return path
+        except OSError:
+            continue
+    return None
+
+
+def embed_via_vllm_offline(
+    prompts: List[str],
+    *,
+    model: str,
+    batch_size: int = 256,
+    prefix: Optional[str] = None,
+    dimensions: Optional[int] = None,
+    tensor_parallel_size: int = 1,
+    dtype: str = "float32",
+    trust_remote_code: bool = True,
+    max_model_len: Optional[int] = None,
+    gpu_memory_utilization: float = 0.8,
+    enforce_eager: bool = False,
+    compile_cache_dir: Optional[str] = None,
+) -> List[List[float]]:
+    """
+    Compute embeddings via vLLM's offline Python API (no server).
+
+    Parameters
+    ----------
+    prompts : list of str
+        Texts to embed. If prefix is set, each prompt is prefixed (e.g. "query: " or "passage: ").
+    model : str
+        HuggingFace model id (e.g. nvidia/llama-nemotron-embed-1b-v2) or local path
+        to a clone that uses vLLM config (e.g. config_vllm.json for this model).
+    batch_size : int
+        Max prompts per llm.embed() call (vLLM may batch internally as well).
+    prefix : str, optional
+        Prefix to prepend to each prompt (e.g. "passage: ", "query: ").
+    dimensions : int, optional
+        Optional embedding dimension (Matryoshka); if supported by model and vLLM.
+    tensor_parallel_size : int
+        Number of GPUs for tensor parallelism.
+    dtype : str
+        Model dtype (e.g. "float32", "float16").
+    trust_remote_code : bool
+        Passed to LLM when loading the model.
+    max_model_len : int, optional
+        Max sequence length; default uses model config.
+    gpu_memory_utilization : float
+        Fraction of GPU memory for vLLM (default 0.8). Lower if other processes use GPU.
+    enforce_eager : bool
+        If False (default), use torch.compile/CUDAGraphs for speed. If True, disable for
+        stability. When False, set compile_cache_dir (or use auto /dev/shm) to avoid
+        "failed to map segment from shared object" when /tmp is NFS or noexec.
+    compile_cache_dir : str, optional
+        Directory for PyTorch inductor/Triton JIT cache. Must be on a filesystem that
+        supports loading shared libs (e.g. local disk or /dev/shm). If None and
+        enforce_eager is False, we set TORCHINDUCTOR_CACHE_DIR and TRITON_CACHE_DIR to
+        a path under /dev/shm when available, so /tmp is not used.
+
+    Returns
+    -------
+    list of list of float
+        One embedding vector per prompt, in order.
+    """
+    try:
+        from vllm import LLM
+    except ImportError as e:
+        raise RuntimeError(
+            "vLLM offline embedding requires the vllm package. "
+            "Install with: pip install vllm>=0.11.0 or uv pip install -e '.[vllm]'"
+        ) from e
+
+    # When using torch.compile (enforce_eager=False), avoid /tmp for inductor/triton
+    # so we don't hit "failed to map segment from shared object" (e.g. /tmp on NFS).
+    if not enforce_eager:
+        cache_dir = compile_cache_dir if compile_cache_dir is not None else _default_compile_cache_dir()
+        if cache_dir:
+            os.makedirs(cache_dir, mode=0o700, exist_ok=True)
+            os.environ["TORCHINDUCTOR_CACHE_DIR"] = cache_dir
+            os.environ["TRITON_CACHE_DIR"] = cache_dir
+            logger.debug("vLLM offline: using compile cache dir %s", cache_dir)
+
+    if prefix:
+        prompts = [str(prefix) + p for p in prompts]
+    if not prompts:
+        return []
+
+    # Build pooler config for MEAN pooling (required for llama-nemotron-embed-1b-v2).
+    pooler_config = None
+    try:
+        from vllm.config.pooler import PoolerConfig
+
+        # vLLM 0.16+ uses seq_pooling_type; older versions may use pooling_type
+        try:
+            pooler_config = PoolerConfig(seq_pooling_type="MEAN", dimensions=dimensions)
+        except TypeError:
+            pooler_config = PoolerConfig(pooling_type="MEAN", dimensions=dimensions)
+    except Exception:
+        pooler_config = None
+
+    kwargs: dict = {
+        "model": model,
+        "trust_remote_code": trust_remote_code,
+        "tensor_parallel_size": tensor_parallel_size,
+        "dtype": dtype,
+        "runner": "pooling",
+        "gpu_memory_utilization": gpu_memory_utilization,
+        "enforce_eager": enforce_eager,
+    }
+    if max_model_len is not None:
+        kwargs["max_model_len"] = max_model_len
+    # vLLM 0.16+ passes pooler_config to LLM() directly; older used override_pooler_config in kwargs
+    if pooler_config is not None:
+        kwargs["pooler_config"] = pooler_config
+
+    llm = LLM(**kwargs)
+
+    all_embeddings: List[List[float]] = []
+    for i in range(0, len(prompts), max(1, batch_size)):
+        batch = prompts[i : i + max(1, batch_size)]
+        outputs = llm.embed(batch)
+        for out in outputs:
+            emb = getattr(getattr(out, "outputs", None), "embedding", None)
+            if emb is not None:
+                if hasattr(emb, "tolist"):
+                    all_embeddings.append(emb.tolist())
+                elif isinstance(emb, list):
+                    all_embeddings.append([float(x) for x in emb])
+                else:
+                    all_embeddings.append(list(emb))
+            else:
+                all_embeddings.append([])
+
+    return all_embeddings
+
+
+__all__ = ["embed_via_vllm_offline"]
