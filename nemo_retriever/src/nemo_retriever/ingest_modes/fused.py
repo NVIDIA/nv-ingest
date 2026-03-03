@@ -208,11 +208,7 @@ class FusedIngestor(BatchIngestor):
             embed_batch_size = int(kwargs.get("embed_batch_size", 256))
             embed_cpus_per_actor = float(kwargs.get("embed_cpus_per_actor", 1))
             self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
-            _row_fn = (
-                collapse_content_to_page_rows
-                if resolved.embed_granularity == "page"
-                else explode_content_to_rows
-            )
+            _row_fn = collapse_content_to_page_rows if resolved.embed_granularity == "page" else explode_content_to_rows
             self._rd_dataset = self._rd_dataset.map_batches(
                 _row_fn,
                 batch_size=embed_batch_size,
