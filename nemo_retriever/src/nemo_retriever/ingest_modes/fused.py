@@ -18,6 +18,7 @@ import ray.data as rd
 
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
+from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
 
 from ..pdf.extract import PDFExtractionActor
 from ..pdf.split import PDFSplitActor
@@ -35,6 +36,7 @@ def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None
         "invoke_url",
         "page_elements_invoke_url",
         "ocr_invoke_url",
+        "table_structure_invoke_url",
         "embedding_endpoint",
         "embed_invoke_url",
     )
@@ -63,7 +65,14 @@ class _FusedModelActor:
             "num_detections_column": str(kwargs.get("num_detections_column", "page_elements_v3_num_detections")),
             "counts_by_label_column": str(kwargs.get("counts_by_label_column", "page_elements_v3_counts_by_label")),
         }
+        from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
+
         self._extract_tables = bool(kwargs.get("extract_tables", False))
+        self._use_table_structure = bool(kwargs.get("use_table_structure", False))
+        validate_table_structure_flags(
+            self._use_table_structure,
+            str(kwargs.get("table_output_format", "pseudo_markdown")),
+        )
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
         self._embed_kwargs = {
@@ -86,6 +95,11 @@ class _FusedModelActor:
 
         self._page_elements_model = NemotronPageElementsV3()
         self._ocr_model = NemotronOCRV1()
+        self._table_structure_model = None
+        if self._extract_tables and self._use_table_structure:
+            from nemo_retriever.model.local import NemotronTableStructureV1
+
+            self._table_structure_model = NemotronTableStructureV1()
         self._embed_model = LlamaNemotronEmbed1BV2Embedder(
             device=str(device) if device else None,
             hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
@@ -100,13 +114,31 @@ class _FusedModelActor:
             model=self._page_elements_model,
             **self._detect_kwargs,
         )
-        ocred = ocr_page_elements(
-            detected,
-            model=self._ocr_model,
-            extract_tables=self._extract_tables,
-            extract_charts=self._extract_charts,
-            extract_infographics=self._extract_infographics,
-        )
+
+        if self._extract_tables and self._use_table_structure:
+            # Tables go through combined table-structure + OCR stage.
+            detected = table_structure_ocr_page_elements(
+                detected,
+                table_structure_model=self._table_structure_model,
+                ocr_model=self._ocr_model,
+            )
+            # Charts/infographics still go through OCR-only.
+            ocred = ocr_page_elements(
+                detected,
+                model=self._ocr_model,
+                extract_tables=False,
+                extract_charts=self._extract_charts,
+                extract_infographics=self._extract_infographics,
+            )
+        else:
+            ocred = ocr_page_elements(
+                detected,
+                model=self._ocr_model,
+                extract_tables=self._extract_tables,
+                extract_charts=self._extract_charts,
+                extract_infographics=self._extract_infographics,
+            )
+
         exploded = explode_content_to_rows(ocred, text_column=str(self._embed_kwargs["text_column"]))
         embedded = embed_text_main_text_embed(exploded, model=self._embed_model, **self._embed_kwargs)
         return embedded
@@ -144,6 +176,8 @@ class FusedIngestor(BatchIngestor):
         self._tasks.append(("extract", dict(kwargs)))
         self._fused_extract_flags = {
             "extract_tables": bool(kwargs.get("extract_tables", False)),
+            "use_table_structure": bool(kwargs.get("use_table_structure", False)),
+            "table_output_format": str(kwargs.get("table_output_format", "pseudo_markdown")),
             "extract_charts": bool(kwargs.get("extract_charts", False)),
             "extract_infographics": bool(kwargs.get("extract_infographics", False)),
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),

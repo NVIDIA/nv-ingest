@@ -189,6 +189,21 @@ def main(
         "--structured-elements-modality",
         help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
     ),
+    use_table_structure: bool = typer.Option(
+        False,
+        "--use-table-structure",
+        help="Enable the combined table-structure + OCR stage for tables (requires extract_tables).",
+    ),
+    table_output_format: Optional[str] = typer.Option(
+        None,
+        "--table-output-format",
+        help="Table output format: 'pseudo_markdown' (OCR-only) or 'markdown' (table-structure + OCR). Defaults to 'markdown' when table-structure is enabled, 'pseudo_markdown' otherwise.",
+    ),
+    table_structure_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--table-structure-invoke-url",
+        help="Optional remote endpoint URL for table-structure model inference (used when --table-output-format=markdown).",
+    ),
 ) -> None:
     _ = input_type
 
@@ -267,6 +282,9 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_table_structure=use_table_structure,
+                    **({"table_output_format": table_output_format} if table_output_format is not None else {}),
+                    table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
@@ -308,6 +326,9 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_table_structure=use_table_structure,
+                    **({"table_output_format": table_output_format} if table_output_format is not None else {}),
+                    table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
