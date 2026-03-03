@@ -6,6 +6,8 @@
 Unit tests for EmbedParams._normalize_modality and IMAGE_MODALITIES constant.
 """
 
+import warnings
+
 import pytest
 
 from nemo_retriever.params.models import EmbedParams, IMAGE_MODALITIES
@@ -52,3 +54,42 @@ def test_image_modalities_constant():
     """IMAGE_MODALITIES is a frozenset containing the three image-related modalities."""
     assert IMAGE_MODALITIES == {"image", "text_image", "image_text"}
     assert isinstance(IMAGE_MODALITIES, frozenset)
+
+
+# ===================================================================
+# embed_granularity
+# ===================================================================
+
+
+class TestEmbedParamsGranularity:
+    def test_default_is_element(self):
+        params = EmbedParams()
+        assert params.embed_granularity == "element"
+
+    def test_page_accepted(self):
+        params = EmbedParams(embed_granularity="page")
+        assert params.embed_granularity == "page"
+
+    def test_invalid_value_rejected(self):
+        with pytest.raises(Exception):
+            EmbedParams(embed_granularity="invalid")
+
+    def test_warning_on_per_type_modality_with_page(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            EmbedParams(
+                embed_granularity="page",
+                text_elements_modality="image",
+            )
+            assert len(w) == 1
+            assert "ignored" in str(w[0].message).lower()
+
+    def test_no_warning_on_element_granularity_with_overrides(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            EmbedParams(
+                embed_granularity="element",
+                text_elements_modality="image",
+                structured_elements_modality="text_image",
+            )
+            assert len(w) == 0
