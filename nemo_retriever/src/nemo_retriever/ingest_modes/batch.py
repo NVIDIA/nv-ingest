@@ -445,7 +445,6 @@ class BatchIngestor(Ingestor):
             detect_workers=user_detect_workers,
             gpu_stage_count=gpu_stage_count,
         )
-        cpu_only_stage_num_gpus = float(worker_heuristic.cpu_only_stage_num_gpus)
         gpu_page_elements = float(kwargs.pop("gpu_page_elements", worker_heuristic.page_elements_num_gpus))
         gpu_ocr = float(kwargs.pop("gpu_ocr", worker_heuristic.detect_num_gpus))
         gpu_embed = float(kwargs.pop("gpu_embed", worker_heuristic.embed_num_gpus))
@@ -607,7 +606,6 @@ class BatchIngestor(Ingestor):
             DocToPdfConversionActor,
             batch_size=1,
             num_cpus=1,
-            num_gpus=cpu_only_stage_num_gpus,
             batch_format="pandas",
         )
 
@@ -623,7 +621,6 @@ class BatchIngestor(Ingestor):
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
             num_cpus=1,
-            num_gpus=cpu_only_stage_num_gpus,
             batch_format="pandas",
         )
 
@@ -634,7 +631,6 @@ class BatchIngestor(Ingestor):
             batch_size=pdf_extract_batch_size,
             batch_format="pandas",
             num_cpus=pdf_extract_num_cpus,
-            num_gpus=cpu_only_stage_num_gpus,
             compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
         )
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
@@ -740,7 +736,6 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": TextChunkParams(**self._extract_txt_kwargs)},
         )
         return self
@@ -764,7 +759,6 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
         )
         return self
@@ -802,7 +796,6 @@ class BatchIngestor(Ingestor):
             batch_size=audio_chunk_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -810,7 +803,6 @@ class BatchIngestor(Ingestor):
             batch_size=asr_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=self._cpu_only_stage_num_gpus,
             fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
@@ -905,7 +897,6 @@ class BatchIngestor(Ingestor):
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=cpu_only_stage_num_gpus,
         )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
