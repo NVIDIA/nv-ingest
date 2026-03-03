@@ -10,8 +10,8 @@ import os
 import subprocess
 import tempfile
 import traceback
-from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
+from nemo_retriever.utils.operator import AbstractOperator
 
 import pandas as pd
 
@@ -136,16 +136,20 @@ def convert_batch_to_pdf(batch_df: Any) -> pd.DataFrame:
     return pd.DataFrame(out_rows)
 
 
-@dataclass(slots=True)
-class DocToPdfConversionActor:
-    """Ray Data actor that converts DOCX/PPTX batches to PDF.
+class DocToPdfConversionActor(AbstractOperator):
+    """Ray Data operator that converts DOCX/PPTX batches to PDF.
 
-    Used with ``ray.data.Dataset.map_batches`` in the same style as
-    ``PDFSplitActor``.
+    Splits work into `pre_process` / `process` / `post_process` so it
+    conforms to the `AbstractOperator` contract used by batch operators.
     """
 
-    def __init__(self) -> None:
-        pass
+    def pre_process(self, batch_df: Any) -> Any:
+        # validate input type early
+        return batch_df
 
-    def __call__(self, batch_df: Any) -> Any:
+    def process(self, batch_df: Any) -> Any:
         return convert_batch_to_pdf(batch_df)
+
+    def post_process(self, result: Any) -> Any:
+        # no-op post processing for now
+        return result

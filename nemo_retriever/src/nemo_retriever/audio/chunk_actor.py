@@ -20,6 +20,7 @@ import pandas as pd
 
 from nemo_retriever.audio.media_interface import MediaInterface
 from nemo_retriever.audio.media_interface import is_media_available
+from nemo_retriever.utils.operator import AbstractOperator
 from nemo_retriever.params import AudioChunkParams
 
 logger = logging.getLogger(__name__)
@@ -28,7 +29,7 @@ logger = logging.getLogger(__name__)
 CHUNK_COLUMNS = ["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "bytes"]
 
 
-class MediaChunkActor:
+class MediaChunkActor(AbstractOperator):
     """
     Ray Data map_batches callable: DataFrame with path, bytes -> DataFrame of chunk rows.
 
@@ -44,7 +45,10 @@ class MediaChunkActor:
         self._params = params or AudioChunkParams()
         self._interface = MediaInterface()
 
-    def __call__(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+    def pre_process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return batch_df
+
+    def process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
             return pd.DataFrame(columns=CHUNK_COLUMNS)
 
@@ -66,6 +70,9 @@ class MediaChunkActor:
         if not out_rows:
             return pd.DataFrame(columns=CHUNK_COLUMNS)
         return pd.DataFrame(out_rows)
+
+    def post_process(self, result: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return result
 
 
 def _chunk_one(source_path: str, params: AudioChunkParams, interface: MediaInterface) -> List[Dict[str, Any]]:

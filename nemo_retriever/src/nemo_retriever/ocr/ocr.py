@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
 from nemo_retriever.nim.nim import invoke_image_inference_batches
+from nemo_retriever.utils.operator import AbstractOperator
 
 try:
     from PIL import Image
@@ -558,7 +559,7 @@ def ocr_page_elements(
 # ---------------------------------------------------------------------------
 
 
-class OCRActor:
+class OCRActor(AbstractOperator):
     """
     Ray-friendly callable that initializes Nemotron OCR v1 once per actor.
 
@@ -618,8 +619,10 @@ class OCRActor:
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)
         self._extract_infographics = bool(extract_infographics)
+    def pre_process(self, batch_df: Any, **kwargs: Any) -> Any:
+        return batch_df
 
-    def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
+    def process(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:
             return ocr_page_elements(
                 batch_df,
@@ -634,7 +637,6 @@ class OCRActor:
                 **override_kwargs,
             )
         except BaseException as e:
-            # Never let the Ray UDF raise — return a DataFrame with error metadata.
             if isinstance(batch_df, pd.DataFrame):
                 out = batch_df.copy()
                 payload = _error_payload(stage="actor_call", exc=e)
@@ -645,3 +647,6 @@ class OCRActor:
                 out["ocr_v1"] = [payload for _ in range(n)]
                 return out
             return [{"ocr_v1": _error_payload(stage="actor_call", exc=e)}]
+
+    def post_process(self, result: Any, **kwargs: Any) -> Any:
+        return result

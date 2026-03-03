@@ -15,9 +15,10 @@ import pandas as pd
 from nemo_retriever.params import HtmlChunkParams
 
 from .convert import html_bytes_to_chunks_df
+from nemo_retriever.utils.operator import AbstractOperator
 
 
-class HtmlSplitActor:
+class HtmlSplitActor(AbstractOperator):
     """
     Ray Data map_batches callable: DataFrame with bytes, path -> DataFrame of chunks.
 
@@ -26,8 +27,10 @@ class HtmlSplitActor:
 
     def __init__(self, params: HtmlChunkParams | None = None) -> None:
         self._params = params or HtmlChunkParams()
+    def pre_process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return batch_df
 
-    def __call__(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+    def process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
             return pd.DataFrame(columns=["text", "path", "page_number", "metadata"])
 
@@ -48,3 +51,6 @@ class HtmlSplitActor:
         if not out_dfs:
             return pd.DataFrame(columns=["text", "path", "page_number", "metadata"])
         return pd.concat(out_dfs, ignore_index=True)
+
+    def post_process(self, result: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return result

@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from nemo_retriever.params import ASRParams
+from nemo_retriever.utils.operator import AbstractOperator
 
 
 def _use_remote(params: ASRParams) -> bool:
@@ -116,7 +117,7 @@ def _get_client(params: ASRParams):  # noqa: ANN201
     )
 
 
-class ASRActor:
+class ASRActor(AbstractOperator):
     """
     Ray Data map_batches callable: chunk rows (path/bytes) -> rows with text (transcript).
 
@@ -135,8 +136,10 @@ class ASRActor:
             from nemo_retriever.model.local import ParakeetCTC1B1ASR
 
             self._model = ParakeetCTC1B1ASR()
+    def pre_process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return batch_df
 
-    def __call__(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+    def process(self, batch_df: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
         if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
             return pd.DataFrame(
                 columns=["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "text"]
@@ -157,6 +160,9 @@ class ASRActor:
                 columns=["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "text"]
             )
         return pd.DataFrame(out_rows)
+
+    def post_process(self, result: pd.DataFrame, **kwargs: Any) -> pd.DataFrame:
+        return result
 
     def _transcribe_remote(self, raw: bytes, path: Optional[str]) -> Optional[str]:
         """Use remote gRPC client to transcribe audio bytes."""

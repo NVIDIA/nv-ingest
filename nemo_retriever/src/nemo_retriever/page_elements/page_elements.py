@@ -40,6 +40,7 @@ except ImportError:
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
 
 from nemo_retriever.nim.nim import invoke_page_elements_batches
+from nemo_retriever.utils.operator import AbstractOperator
 
 
 TensorOrArray = Union["torch.Tensor", "np.ndarray"]
@@ -705,7 +706,7 @@ def detect_page_elements_v3(
     return out
 
 
-class PageElementDetectionActor:
+class PageElementDetectionActor(AbstractOperator):
     """
     Ray-friendly callable that initializes Nemotron Page Elements v3 once.
 
@@ -729,16 +730,13 @@ class PageElementDetectionActor:
 
             self._model = NemotronPageElementsV3()
 
-    def __call__(self, pages_df: Any, **override_kwargs: Any) -> Any:
+    def pre_process(self, pages_df: Any, **kwargs: Any) -> Any:
+        return pages_df
+
+    def process(self, pages_df: Any, **override_kwargs: Any) -> Any:
         try:
-            return detect_page_elements_v3(
-                pages_df,
-                model=self._model,
-                **self.detect_kwargs,
-                **override_kwargs,
-            )
+            return detect_page_elements_v3(pages_df, model=self._model, **self.detect_kwargs, **override_kwargs)
         except Exception as e:
-            # As a last line of defense, never let the Ray UDF raise.
             if isinstance(pages_df, pd.DataFrame):
                 out = pages_df.copy()
                 payload = _error_payload(stage="actor_call", exc=e)
@@ -747,3 +745,6 @@ class PageElementDetectionActor:
                 out["page_elements_v3_counts_by_label"] = [{} for _ in range(len(out.index))]
                 return out
             return [{"page_elements_v3": _error_payload(stage="actor_call", exc=e)}]
+
+    def post_process(self, result: Any, **kwargs: Any) -> Any:
+        return result

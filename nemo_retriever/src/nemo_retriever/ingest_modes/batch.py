@@ -24,6 +24,7 @@ from typing import Union
 
 import ray
 import ray.data as rd
+from nemo_retriever.utils.operator import AbstractOperator
 from nemo_retriever.utils.convert import DocToPdfConversionActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import OCRActor
@@ -73,7 +74,7 @@ def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, 
 # endregion
 
 
-class _LanceDBWriteActor:
+class _LanceDBWriteActor(AbstractOperator):
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
     Creates the table on the first batch, then appends subsequent batches.
@@ -219,7 +220,10 @@ class _LanceDBWriteActor:
             rows.append(row_out)
         return rows
 
-    def __call__(self, batch_df: Any) -> Any:
+    def pre_process(self, batch_df: Any, **kwargs: Any) -> Any:
+        return batch_df
+
+    def process(self, batch_df: Any, **kwargs: Any) -> Any:
         rows = self._build_rows(batch_df)
         if rows:
             # Infer schema from first batch
@@ -231,8 +235,14 @@ class _LanceDBWriteActor:
 
         return batch_df
 
+    def post_process(self, result: Any, **kwargs: Any) -> Any:
+        return result
 
-class _BatchEmbedActor:
+
+
+
+
+class _BatchEmbedActor(AbstractOperator):
     """Ray Data actor that holds a local text embedder on a single GPU.
 
     When ``embedding_endpoint`` is provided in kwargs, the actor skips local
@@ -287,10 +297,18 @@ class _BatchEmbedActor:
                 model_id=model_id,
             )
 
-    def __call__(self, batch_df: Any) -> Any:
+    def pre_process(self, batch_df: Any) -> Any:
+        # Placeholder for any preprocessing steps (e.g. validation/normalisation)
+        return batch_df
+
+    def process(self, batch_df: Any) -> Any:
         from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
 
         return embed_text_main_text_embed(batch_df, model=self._model, **self._kwargs)
+
+    def post_process(self, result: Any) -> Any:
+        # Placeholder for any postprocessing (e.g. metric collection)
+        return result
 
 
 class BatchIngestor(Ingestor):

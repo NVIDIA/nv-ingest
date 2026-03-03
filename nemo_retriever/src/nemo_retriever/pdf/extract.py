@@ -13,6 +13,7 @@ import traceback
 import pypdfium2.raw as pdfium_c
 
 import pandas as pd
+from nemo_retriever.utils.operator import AbstractOperator
 
 try:
     import pypdfium2 as pdfium
@@ -323,12 +324,9 @@ def pdf_extraction(
 
 
 @dataclass(slots=True)
-class PDFExtractionActor:
+class PDFExtractionActor(AbstractOperator):
     """
-    Skeleton PDF extraction callable.
-
-    `__call__` uses `pdf_extract_config_from_kwargs()` to normalize configuration
-    before running the (not yet implemented) extraction logic.
+    Skeleton PDF extraction operator that delegates to `pdf_extraction`.
     """
 
     extract_kwargs: Dict[str, Any]
@@ -336,9 +334,12 @@ class PDFExtractionActor:
     def __init__(self, **extract_kwargs: Any) -> None:
         self.extract_kwargs = dict(extract_kwargs)
 
-    def __call__(self, pdf: Any, **override_kwargs: Any) -> Optional[Any]:
+    def pre_process(self, pdf: Any) -> Any:
+        return pdf
+
+    def process(self, pdf: Any) -> Optional[Any]:
         try:
-            return pdf_extraction(pdf, **self.extract_kwargs, **override_kwargs)
+            return pdf_extraction(pdf, **self.extract_kwargs)
         except BaseException as e:
             # As a last line of defense, never let the Ray UDF raise.
             source_path = None
@@ -355,3 +356,6 @@ class PDFExtractionActor:
                     page_number=0,
                 )
             ]
+
+    def post_process(self, result: Any) -> Any:
+        return result
