@@ -240,6 +240,10 @@ def _embed_group(
     inference_batch_size: int,
     output_column: str,
     resolved_model_name: str,
+    use_vllm_compat: bool = False,
+    use_vllm_offline: bool = False,
+    embed_model_path: Optional[str] = None,
+    vllm_llm: Any = None,
 ) -> pd.DataFrame:
     """Embed a single modality group via ``create_text_embeddings_for_df``.
 
@@ -249,7 +253,10 @@ def _embed_group(
     _embed = None
     _multimodal_embedder = None
 
-    if endpoint is None and model is not None:
+    if endpoint is None and use_vllm_offline:
+        # vLLM offline path: no local model; task_config will trigger vLLM offline in create_text_embeddings_for_df.
+        pass
+    elif endpoint is None and model is not None:
         if group_modality in IMAGE_MODALITIES:
             _multimodal_embedder = model
         else:
@@ -285,14 +292,23 @@ def _embed_group(
         embed_modality=group_modality,
     )
 
+    task_config = {
+        "embedder": _embed,
+        "multimodal_embedder": _multimodal_embedder,
+        "endpoint_url": endpoint,
+        "local_batch_size": int(inference_batch_size),
+    }
+    if use_vllm_compat:
+        task_config["use_vllm_compat"] = True
+    if use_vllm_offline:
+        task_config["use_vllm_offline"] = True
+        task_config["embed_model_name"] = resolved_model_name
+        task_config["embed_model_path"] = embed_model_path
+        if vllm_llm is not None:
+            task_config["vllm_llm"] = vllm_llm
     out_df, _ = create_text_embeddings_for_df(
         group_df,
-        task_config={
-            "embedder": _embed,
-            "multimodal_embedder": _multimodal_embedder,
-            "endpoint_url": endpoint,
-            "local_batch_size": int(inference_batch_size),
-        },
+        task_config=task_config,
         transform_config=cfg,
     )
     return out_df
@@ -307,6 +323,10 @@ def embed_text_main_text_embed(
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
     embed_invoke_url: Optional[str] = None,
+    embed_use_vllm_compat: bool = False,
+    embed_use_vllm_offline: bool = False,
+    embed_model_path: Optional[str] = None,
+    vllm_llm: Any = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -343,8 +363,8 @@ def embed_text_main_text_embed(
     # Resolve endpoint: strip whitespace, treat empty string as None.
     _endpoint = (embedding_endpoint or embed_invoke_url or "").strip() or None
 
-    if _endpoint is None and model is None:
-        raise ValueError("Either a local model or an embedding_endpoint must be provided.")
+    if _endpoint is None and model is None and not embed_use_vllm_offline:
+        raise ValueError("Either a local model, an embedding_endpoint, or embed_use_vllm_offline must be provided.")
 
     # Resolve NIM aliases to the actual HF model ID.
     from nemo_retriever.model import resolve_embed_model
@@ -372,6 +392,10 @@ def embed_text_main_text_embed(
                 inference_batch_size=inference_batch_size,
                 output_column=output_column,
                 resolved_model_name=_resolved_model_name,
+                use_vllm_compat=bool(embed_use_vllm_compat),
+                use_vllm_offline=bool(embed_use_vllm_offline),
+                embed_model_path=embed_model_path,
+                vllm_llm=vllm_llm,
             )
         else:
             # Multiple modalities: group, embed each, reassemble in original order.
@@ -390,6 +414,10 @@ def embed_text_main_text_embed(
                     inference_batch_size=inference_batch_size,
                     output_column=output_column,
                     resolved_model_name=_resolved_model_name,
+                    use_vllm_compat=bool(embed_use_vllm_compat),
+                    use_vllm_offline=bool(embed_use_vllm_offline),
+                    embed_model_path=embed_model_path,
+                    vllm_llm=vllm_llm,
                 )
                 parts.append(part)
             out_df = pd.concat(parts).sort_index()
@@ -1404,6 +1432,14 @@ class InProcessIngestor(Ingestor):
         # If a remote NIM endpoint is configured, skip local model creation.
         endpoint = (embed_kwargs.get("embedding_endpoint") or embed_kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
+            embed_kwargs.setdefault("input_type", "passage")
+            self._tasks.append((embed_text_main_text_embed, embed_kwargs))
+            return self
+
+        # vLLM offline path: no server, no local HF model; embed stage will use vLLM Python API.
+        if resolved.embed_use_vllm_offline:
+            embed_kwargs["embed_use_vllm_offline"] = True
+            embed_kwargs["embed_model_path"] = getattr(resolved, "embed_model_path", None)
             embed_kwargs.setdefault("input_type", "passage")
             self._tasks.append((embed_text_main_text_embed, embed_kwargs))
             return self

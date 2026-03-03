@@ -131,6 +131,21 @@ def recall_with_main(
         min=1,
         help="Batch size for local HF embedding inference.",
     ),
+    embedding_use_vllm_compat: bool = typer.Option(
+        False,
+        "--embedding-use-vllm-compat/--no-embedding-use-vllm-compat",
+        help="Use vLLM-compatible HTTP payload (no input_type/truncate). Set when endpoint is a vLLM server.",
+    ),
+    embedding_use_vllm_offline: bool = typer.Option(
+        False,
+        "--embedding-use-vllm-offline/--no-embedding-use-vllm-offline",
+        help="Use vLLM offline Python API for query embeddings (no server).",
+    ),
+    embedding_vllm_model_path: Optional[str] = typer.Option(
+        None,
+        "--embedding-vllm-model-path",
+        help="Model path/id for vLLM offline (optional; else uses --embedding-model).",
+    ),
 ) -> None:
     query_csv = _resolve_query_csv(Path(query_csv))
 
@@ -155,6 +170,9 @@ def recall_with_main(
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),
+        embedding_use_vllm_compat=bool(embedding_use_vllm_compat),
+        embedding_use_vllm_offline=bool(embedding_use_vllm_offline),
+        embedding_vllm_model_path=_coerce_endpoint_str(embedding_vllm_model_path),
     )
 
     print("Reading and normalizing query CSV...")
@@ -251,6 +269,21 @@ def run(
         min=1,
         help="Batch size for local HF embedding inference.",
     ),
+    embedding_use_vllm_compat: bool = typer.Option(
+        False,
+        "--embedding-use-vllm-compat/--no-embedding-use-vllm-compat",
+        help="Use vLLM-compatible HTTP payload (no input_type/truncate). Set when endpoint is a vLLM server.",
+    ),
+    embedding_use_vllm_offline: bool = typer.Option(
+        False,
+        "--embedding-use-vllm-offline/--no-embedding-use-vllm-offline",
+        help="Use vLLM offline Python API for query embeddings (no server).",
+    ),
+    embedding_vllm_model_path: Optional[str] = typer.Option(
+        None,
+        "--embedding-vllm-model-path",
+        help="Model path/id for vLLM offline (optional; else uses --embedding-model).",
+    ),
     print_hits: bool = typer.Option(True, "--print-hits/--no-print-hits", help="Print top-k hits per query."),
 ) -> None:
     """
@@ -282,6 +315,9 @@ def run(
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),
+        embedding_use_vllm_compat=bool(embedding_use_vllm_compat),
+        embedding_use_vllm_offline=bool(embedding_use_vllm_offline),
+        embedding_vllm_model_path=_coerce_endpoint_str(embedding_vllm_model_path),
     )
 
     df_query, gold, raw_hits, retrieved_keys, metrics = retrieve_and_score(

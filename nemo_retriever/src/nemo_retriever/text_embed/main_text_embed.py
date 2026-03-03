@@ -455,6 +455,42 @@ def _async_runner(
     return flat_results
 
 
+def _vllm_compat_runner(
+    prompts: List[List[str]],
+    api_key: Optional[str],
+    endpoint_url: str,
+    embedding_model: str,
+    encoding_format: str,
+    dimensions: Optional[int] = None,
+    batch_size: int = 256,
+) -> dict:
+    """
+    Request embeddings using vLLM-compatible minimal payload (no input_type/truncate).
+    Returns the same {"embeddings": [...], "info_msgs": [...]} shape as _async_runner.
+    """
+    from nemo_retriever.text_embed.vllm_http import embed_via_vllm_http
+
+    flat_prompts: List[str] = []
+    for batch in prompts:
+        flat_prompts.extend(batch)
+    if not flat_prompts:
+        return {"embeddings": [], "info_msgs": []}
+    # llama-nemotron-embed-1b-v2 expects "passage: " for documents (see model README).
+    vectors = embed_via_vllm_http(
+        flat_prompts,
+        endpoint_url=endpoint_url,
+        model_name=embedding_model,
+        api_key=api_key,
+        dimensions=dimensions,
+        encoding_format=encoding_format,
+        batch_size=batch_size,
+        prefix="passage: ",
+    )
+    # Normalize to list of list (or None for missing)
+    embeddings = [v if v else None for v in vectors]
+    return {"embeddings": embeddings, "info_msgs": [None] * len(embeddings)}
+
+
 def _callable_runner(
     prompts: List[List[str]],
     *,
@@ -480,6 +516,47 @@ def _callable_runner(
             flat_info_msgs.extend([None] * len(vecs_list))
 
     return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
+
+
+def _vllm_offline_runner(
+    prompts: List[List[str]],
+    *,
+    model: str,
+    batch_size: int = 64,
+    dimensions: Optional[int] = None,
+    llm: Optional[Any] = None,
+) -> dict:
+    """
+    Request embeddings using vLLM offline Python API (no server).
+    If llm is provided (e.g. from a batch actor), reuse it and skip model load/CUDA capture.
+    Returns the same {"embeddings": [...], "info_msgs": [...]} shape as _vllm_compat_runner.
+    """
+    flat_prompts: List[str] = []
+    for batch in prompts:
+        flat_prompts.extend(batch)
+    if not flat_prompts:
+        return {"embeddings": [], "info_msgs": []}
+    if llm is not None:
+        from nemo_retriever.text_embed.vllm_offline import embed_with_vllm_llm
+
+        vectors = embed_with_vllm_llm(
+            flat_prompts,
+            llm,
+            batch_size=batch_size,
+            prefix="passage: ",
+        )
+    else:
+        from nemo_retriever.text_embed.vllm_offline import embed_via_vllm_offline
+
+        vectors = embed_via_vllm_offline(
+            flat_prompts,
+            model=model,
+            batch_size=batch_size,
+            prefix="passage: ",
+            dimensions=dimensions,
+        )
+    embeddings = [v if v else None for v in vectors]
+    return {"embeddings": embeddings, "info_msgs": [None] * len(embeddings)}
 
 
 # ------------------------------------------------------------------------------
@@ -542,6 +619,8 @@ def create_text_embeddings_for_df(
         - **dimensions**: optional int
         - **embedder**: optional callable(texts)->vectors; used when endpoint_url is empty/None
         - **local_batch_size**: int; used to sub-batch for the callable embedder path
+        - **use_vllm_offline**: bool; if True and no endpoint_url, use vLLM offline Python API
+        - **embed_model_name** or **embed_model_path**: model id or path for vLLM offline
     transform_config:
         Optional TextEmbeddingConfig; if omitted, defaults are used.
     execution_trace_log:
@@ -656,7 +735,28 @@ def create_text_embeddings_for_df(
                 filtered_content_list, batch_size=int(transform_config.batch_size)
             )
 
-            if endpoint_url:
+            if not endpoint_url and task_config.get("use_vllm_offline"):
+                embed_model = (
+                    task_config.get("embed_model_path") or task_config.get("embed_model_name") or str(model_name)
+                )
+                content_embeddings = _vllm_offline_runner(
+                    filtered_content_batches,
+                    model=str(embed_model),
+                    batch_size=int(task_config.get("local_batch_size") or transform_config.batch_size),
+                    dimensions=dimensions,
+                    llm=task_config.get("vllm_llm"),
+                )
+            elif endpoint_url and task_config.get("use_vllm_compat"):
+                content_embeddings = _vllm_compat_runner(
+                    filtered_content_batches,
+                    api_key=api_key,
+                    endpoint_url=str(endpoint_url),
+                    embedding_model=str(model_name),
+                    encoding_format=str(transform_config.encoding_format),
+                    dimensions=dimensions,
+                    batch_size=int(transform_config.batch_size),
+                )
+            elif endpoint_url:
                 content_embeddings = _async_runner(
                     filtered_content_batches,
                     api_key,

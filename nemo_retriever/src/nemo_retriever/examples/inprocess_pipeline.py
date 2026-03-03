@@ -173,6 +173,22 @@ def main(
         min=0.0,
         help="Parse stage batch size (enables Parse-only path when > 0.0 with parse workers/GPU).",
     ),
+    embed_use_vllm_compat: bool = typer.Option(
+        False,
+        "--embed-use-vllm-compat/--no-embed-use-vllm-compat",
+        help="Use vLLM-compatible HTTP payload for embeddings (no input_type/truncate)."
+        "Set when --embed-invoke-url is a vLLM server.",
+    ),
+    embed_use_vllm_offline: bool = typer.Option(
+        False,
+        "--embed-use-vllm-offline/--no-embed-use-vllm-offline",
+        help="Use vLLM offline Python API for embeddings (no server). Same model as vLLM server path.",
+    ),
+    embed_model_path: Optional[str] = typer.Option(
+        None,
+        "--embed-model-path",
+        help="Local path to embedding model for vLLM offline (optional; else uses --embed-model-name).",
+    ),
     embed_modality: str = typer.Option(
         "text",
         "--embed-modality",
@@ -212,6 +228,9 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm_compat=embed_use_vllm_compat,
+                    embed_use_vllm_offline=embed_use_vllm_offline,
+                    embed_model_path=embed_model_path,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -238,6 +257,9 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm_compat=embed_use_vllm_compat,
+                    embed_use_vllm_offline=embed_use_vllm_offline,
+                    embed_model_path=embed_model_path,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -280,6 +302,9 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm_compat=embed_use_vllm_compat,
+                    embed_use_vllm_offline=embed_use_vllm_offline,
+                    embed_model_path=embed_model_path,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -321,6 +346,9 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm_compat=embed_use_vllm_compat,
+                    embed_use_vllm_offline=embed_use_vllm_offline,
+                    embed_model_path=embed_model_path,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -379,6 +407,7 @@ def main(
         embedding_http_endpoint=embed_invoke_url,
         top_k=10,
         ks=(1, 5, 10),
+        embedding_use_vllm_compat=bool(embed_use_vllm_compat),
     )
 
     _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)

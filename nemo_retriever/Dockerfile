@@ -89,7 +89,9 @@ COPY src src
 COPY api api
 COPY client client
 
-# Use conda env's uv; create venv and install retriever in editable mode (path deps: ../src, ../api, ../client)
+# Use conda env's uv; create venv and install retriever with uv pip install (no lock; path deps: ../src, ../api, ../client).
+# INSTALL_ASR=1 installs the [asr] extra (transformers>=5, soundfile, scipy) for local Parakeet ASR; omit for vLLM/embedding-only images.
+ARG INSTALL_ASR=0
 SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
@@ -97,7 +99,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     && conda activate retriever_libcudart \
     && uv venv .retriever \
     && . .retriever/bin/activate \
-    && uv pip install -e ./retriever
+    && if [ "$INSTALL_ASR" = "1" ]; then uv pip install -e "./retriever[asr]"; else uv pip install -e ./retriever; fi
 
 # Default: run in-process pipeline (help if no args)
 ENTRYPOINT ["/workspace/.retriever/bin/python", "-m", "retriever.examples.inprocess_pipeline"]

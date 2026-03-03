@@ -10,7 +10,7 @@ RAG ingestion pipeline for PDFs: extract structure (text, tables, charts, infogr
 
 ## Installation
 
-Installation is done with **UV** from the **nv-ingest root**. UV manages the environment and dependencies; pip is not supported.
+Installation is done with **UV** from the **nv-ingest root** using **uv pip install** (no lockfile/sync so optional extras stay independent). Pip is not supported.
 
 From the repo root:
 
@@ -21,7 +21,17 @@ source .retriever/bin/activate
 uv pip install -e ./nemo_retriever
 ```
 
-This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
+This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers (4.x), vLLM 0.16, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
+
+### Optional: ASR extra (local Parakeet)
+
+For **local ASR** (nvidia/parakeet-ctc-1.1b with `audio_endpoints` unset), install the `[asr]` extra. This pulls in `transformers>=5`, `soundfile`, and `scipy` and is mutually exclusive with the default stack (vLLM 0.16 uses transformers&lt;5):
+
+```bash
+uv pip install -e "./nemo_retriever[asr]"
+```
+
+Docker: build with ASR support using `--build-arg INSTALL_ASR=1`.
 
 ### OCR and CUDA 13 runtime
 
@@ -122,3 +132,55 @@ To stop and remove both stacks:
 docker compose -p ingest-gpu0 down
 docker compose -p ingest-gpu1 down
 ```
+
+## Embedding backends
+
+Embeddings can be served by a **remote HTTP endpoint** (NIM, vLLM, or any OpenAI-compatible server) or by a **local HuggingFace model** when no endpoint is configured.
+
+- **Config**: Set `embedding_nim_endpoint` in `ingest-config.yaml` or stage config (e.g. `http://localhost:8000/v1`). Leave empty or null to use the local HF embedder.
+- **CLI**: Use `--embed-invoke-url` (inprocess/batch pipelines) or `--embedding-endpoint` / `--embedding-http-endpoint` (recall CLI) to point at a remote server.
+
+### Using vLLM for embeddings
+
+You can serve an embedding model with [vLLM](https://docs.vllm.ai/) and point the retriever at it. vLLM exposes an OpenAI-compatible `/v1/embeddings` API. Set the embedding endpoint to the vLLM base URL (e.g. `http://localhost:8000/v1`).
+
+**vLLM compatibility**: The default NIM-style client sends `input_type` and `truncate` in the request body; some vLLM versions or configs may not accept these. When using a **vLLM** server, enable the vLLM-compatible payload:
+
+- **Ingest**: `--embed-use-vllm-compat` (inprocess pipeline) or set `embed_use_vllm_compat: true` in `EmbedParams`.
+- **Recall**: `--embedding-use-vllm-compat` (recall CLI).
+
+This sends only `model`, `input`, and `encoding_format` (minimal OpenAI-compatible payload).
+
+### llama-nemotron-embed-1b-v2 with vLLM
+
+For **nvidia/llama-nemotron-embed-1b-v2**, follow the model’s official vLLM instructions:
+
+1. Use **vllm==0.11.0**.
+2. Clone the [model repo](https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2) and **overwrite `config.json` with `config_vllm.json`** from that repo.
+3. Start the server (replace `<path_to_the_cloned_repository>` and `<num_gpus_to_use>`):
+
+   ```bash
+   vllm serve \
+       <path_to_the_cloned_repository> \
+       --trust-remote-code \
+       --runner pooling \
+       --model-impl vllm \
+       --override-pooler-config '{"pooling_type": "MEAN"}' \
+       --data-parallel-size <num_gpus_to_use> \
+       --dtype float32 \
+       --port 8000
+   ```
+
+4. Set the retriever embedding endpoint to `http://localhost:8000/v1` and use `--embed-use-vllm-compat` / `--embedding-use-vllm-compat` as above.
+
+See the [model README](https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2) for the canonical vLLM setup and client example.
+
+### Using vLLM offline batched inference
+
+You can run the same embedding model (e.g. llama-nemotron-embed-1b-v2) **without a vLLM server** by using vLLM’s Python API for batched inference. This loads the model in-process and runs `LLM.embed()` in batches.
+
+- **When to use**: No server to run; same model and behavior as vLLM server; good for batch ingest or recall in a single process.
+- **Install**: vLLM is an optional dependency. Install with `pip install -e ".[vllm]"` or `uv pip install -e ".[vllm]"` (requires vllm>=0.11.0 for llama-nemotron-embed-1b-v2).
+- **Model path**: You can pass a HuggingFace model id (e.g. `nvidia/llama-nemotron-embed-1b-v2`) or a **local path**. For llama-nemotron-embed-1b-v2, a local clone with `config.json` replaced by `config_vllm.json` (from the model repo) may be required for vLLM to load it correctly.
+- **Ingest**: Set `embed_use_vllm_offline: true` in `EmbedParams` or use `--embed-use-vllm-offline` in the inprocess pipeline. Optionally set `embed_model_path` (or `--embed-model-path`) to a local model path.
+- **Recall**: Use `--embedding-use-vllm-offline` (recall CLI). Optionally `--embedding-vllm-model-path` to override the model path.
