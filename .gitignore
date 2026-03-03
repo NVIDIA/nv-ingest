@@ -249,3 +249,6 @@ outputs/
 models/
 
 nemo_retriever/run_results/
+
+# Ephemeral stamp file used to keep version deterministic across pip build subprocesses
+.build_stamp
