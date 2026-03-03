@@ -1,0 +1,12 @@
+runs:
+  - name: jp20_single
+    dataset: jp20
+    preset: single_gpu
+
+  - name: bo20_single
+    dataset: bo20
+    preset: single_gpu
+
+  # - name: bo767_single
+  #   dataset: bo767
+  #   preset: single_gpu

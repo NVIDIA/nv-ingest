@@ -1,0 +1,70 @@
+# Harness config for nemo_retriever benchmarks.
+
+active:
+  dataset: jp20
+  preset: single_gpu
+  query_csv: data/jp20_query_gt.csv
+  input_type: pdf
+  recall_required: true
+  artifacts_dir: null
+  ray_address: null
+  lancedb_uri: lancedb
+  hybrid: false
+  embed_model_name: nvidia/llama-3.2-nv-embedqa-1b-v2
+  write_detection_file: false
+
+presets:
+  single_gpu:
+    pdf_extract_workers: 8
+    pdf_extract_num_cpus: 2.0
+    pdf_extract_batch_size: 4
+    pdf_split_batch_size: 1
+    page_elements_batch_size: 4
+    page_elements_workers: 3
+    ocr_workers: 3
+    ocr_batch_size: 16
+    embed_workers: 3
+    embed_batch_size: 256
+    page_elements_cpus_per_actor: 1.0
+    ocr_cpus_per_actor: 1.0
+    embed_cpus_per_actor: 1.0
+    gpu_page_elements: 0.1
+    gpu_ocr: 0.1
+    gpu_embed: 0.25
+
+  dgx_8gpu:
+    pdf_extract_workers: 64
+    pdf_extract_num_cpus: 2.0
+    pdf_extract_batch_size: 4
+    pdf_split_batch_size: 1
+    page_elements_batch_size: 32
+    page_elements_workers: 24
+    ocr_workers: 24
+    ocr_batch_size: 16
+    embed_workers: 24
+    embed_batch_size: 256
+    page_elements_cpus_per_actor: 1.0
+    ocr_cpus_per_actor: 1.0
+    embed_cpus_per_actor: 1.0
+    gpu_page_elements: 0.1
+    gpu_ocr: 0.1
+    gpu_embed: 0.25
+
+datasets:
+  bo20:
+    path: /datasets/nv-ingest/bo20
+    query_csv: null
+    input_type: pdf
+    recall_required: false
+
+  bo767:
+    path: /datasets/nv-ingest/bo767
+    query_csv: data/bo767_query_gt.csv
+    input_type: pdf
+    recall_required: true
+
+  jp20:
+    path: /datasets/nv-ingest/jp20
+    query_csv: data/jp20_query_gt.csv
+    input_type: pdf
+    recall_required: true
