@@ -15,13 +15,7 @@
 # limitations under the License.
 
 
-#!/bin/bash
-
-# Activate the `nv_ingest_runtime` conda environment
-
 set -e
-. /opt/conda/etc/profile.d/conda.sh
-conda activate nv_ingest_runtime
 
 # Source "source" file if it exists
 SRC_FILE="/opt/docker/bin/entrypoint_source"

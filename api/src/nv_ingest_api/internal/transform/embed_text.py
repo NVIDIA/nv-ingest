@@ -717,18 +717,11 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
-    # Allow task_config to explicitly override values with None by checking key presence.
-    api_key = task_config["api_key"] if "api_key" in task_config else transform_config.api_key
-    endpoint_url = (
-        task_config["endpoint_url"] if "endpoint_url" in task_config else transform_config.embedding_nim_endpoint
-    )
-    model_name = task_config["model_name"] if "model_name" in task_config else transform_config.embedding_model
-    custom_content_field = (
-        task_config["custom_content_field"]
-        if "custom_content_field" in task_config
-        else transform_config.custom_content_field
-    )
-    dimensions = task_config["dimensions"] if "dimensions" in task_config else transform_config.dimensions
+    api_key = task_config.get("api_key") or transform_config.api_key
+    endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
+    model_name = task_config.get("model_name") or transform_config.embedding_model
+    custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
+    dimensions = task_config.get("dimensions") or transform_config.dimensions
 
     endpoint_url = endpoint_url.strip() if isinstance(endpoint_url, str) else endpoint_url
     if isinstance(endpoint_url, str) and not endpoint_url:
@@ -800,16 +793,6 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
-    # Reject non-text modalities — image/multimodal embedding support has been removed.
-    _NON_TEXT_MODALITIES = frozenset({"image", "text_image", "image_text"})
-    for _ct, _mod in task_type_to_modality.items():
-        if isinstance(_mod, str) and _mod in _NON_TEXT_MODALITIES:
-            raise ValueError(
-                f"Modality {_mod!r} for {_ct.value} elements is not supported. "
-                f"Only 'text' modality is supported for embedding. "
-                f"Image and multimodal embedding support has been removed."
-            )
-
     # Determine which content types to embed
     # When aggregating page content, automatically skip TEXT and STRUCTURED unless explicitly set
     def _get_embed_flag(content_type: ContentTypeEnum) -> bool:
@@ -878,7 +861,13 @@ def transform_create_text_embeddings_internal(
             else:
                 modality_batches = None
 
-            if endpoint_url:
+            if callable(embedder):
+                content_embeddings = _callable_runner(
+                    filtered_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            elif endpoint_url:
                 content_embeddings = _async_runner(
                     filtered_content_batches,
                     api_key,
@@ -890,12 +879,6 @@ def transform_create_text_embeddings_internal(
                     False,
                     modalities=modality_batches,
                     dimensions=dimensions,
-                )
-            elif callable(embedder):
-                content_embeddings = _callable_runner(
-                    filtered_content_batches,
-                    embedder=embedder,
-                    batch_size=local_batch_size,
                 )
             else:
                 raise ValueError(
@@ -936,7 +919,13 @@ def transform_create_text_embeddings_internal(
             custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
             custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
 
-            if endpoint_url:
+            if callable(embedder):
+                custom_content_embeddings = _callable_runner(
+                    custom_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            elif endpoint_url:
                 custom_content_embeddings = _async_runner(
                     custom_content_batches,
                     api_key,
@@ -947,12 +936,6 @@ def transform_create_text_embeddings_internal(
                     transform_config.truncate,
                     False,
                     dimensions=dimensions,
-                )
-            elif callable(embedder):
-                custom_content_embeddings = _callable_runner(
-                    custom_content_batches,
-                    embedder=embedder,
-                    batch_size=local_batch_size,
                 )
             else:
                 raise ValueError(

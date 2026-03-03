@@ -82,7 +82,7 @@
           "stkb.rewrap" // Wrapping all text in any language
         ],
         "settings": {
-          "cmake.cmakePath": "/tmp/.current-conda-env/bin/cmake",
+          "cmake.cmakePath": "/usr/bin/cmake",
           "C_Cpp.intelliSenseEngine": "disabled",
           "python.terminal.activateEnvironment": false,
           "files.watcherExclude": {

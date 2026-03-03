@@ -45,6 +45,7 @@ tools/harness/src/nv_ingest_harness/service_manager/
    - Installs/upgrades Helm releases with version support
    - Supports both remote charts (from Helm repos) and local `./helm` chart
    - Supports custom values files and inline values
+   - **SKU override**: Optional `helm/overrides/values-<sku>.yaml` via `-f` when `--sku` is set
    - **Port-forwarding**: Automatically sets up resilient `kubectl port-forward` for services
    - **Wildcard matching**: Supports dynamic service name patterns (e.g., `*embed*`)
    - **Auto-restart**: Port-forwards automatically restart on pod restarts/failures
@@ -58,12 +59,11 @@ tools/harness/src/nv_ingest_harness/service_manager/
      - Includes timestamps and handles multi-container pods
 
 4. **create_service_manager()**: Factory function that creates the appropriate manager based on `deployment_type` config
-   - Accepts `sku` parameter for Docker Compose GPU-specific overrides
-   - Passes `sku` to `DockerComposeManager` constructor
+   - Accepts `sku` parameter; passes it to `DockerComposeManager` or `HelmManager` for GPU-specific overrides
 
 ## SKU Override Support
 
-The service manager supports GPU-specific configuration overrides for Docker Compose deployments via the `--sku` CLI option.
+The service manager supports GPU-specific configuration overrides via the `--sku` CLI option for both Docker Compose and Helm deployments.
 
 ### Implementation Details
 
@@ -74,8 +74,7 @@ The service manager supports GPU-specific configuration overrides for Docker Com
 
 #### Service Manager Factory (`service_manager/__init__.py`)
 - `create_service_manager()` accepts `sku` parameter
-- Passes `sku` to `DockerComposeManager` constructor
-- Ignored for Helm deployments (only applies to Docker Compose)
+- Passes `sku` to `DockerComposeManager` (Compose) or `HelmManager` (Helm)
 
 #### Docker Compose Manager (`service_manager/docker_compose.py`)
 - Accepts `sku` parameter in `__init__()`
@@ -84,8 +83,14 @@ The service manager supports GPU-specific configuration overrides for Docker Com
 - Uses `_build_compose_cmd()` helper to construct commands
 - All docker compose commands include override file via multiple `-f` flags
 
+#### Helm Manager (`service_manager/helm.py`)
+- Accepts `sku` parameter in `__init__()`
+- In `start()`, if `sku` is set and `helm/overrides/values-<sku>.yaml` exists, adds `-f <path>` to the `helm upgrade --install` command
+- Prints warning if override file is specified but not found
+
 ### SKU Parameter Flow
 
+**Compose:**
 ```
 CLI (run.py/nightly.py)
   └─> --sku=a10g
@@ -96,10 +101,18 @@ CLI (run.py/nightly.py)
                            └─> Used by: start(), stop(), dump_logs()
 ```
 
+**Helm:**
+```
+CLI (run.py/nightly.py)
+  └─> --sku=a10g
+       └─> create_service_manager(config, repo_root, sku)
+            └─> HelmManager(config, repo_root, sku)
+                 └─> start(): if helm/overrides/values-a10g.yaml exists, add -f <path> to helm upgrade --install
+```
+
 ### Available SKU Override Files
-- `docker-compose.a10g.yaml` - NVIDIA A10G GPU settings
-- `docker-compose.a100-40gb.yaml` - NVIDIA A100 40GB GPU settings
-- `docker-compose.l40s.yaml` - NVIDIA L40S GPU settings
+- **Compose:** `docker-compose.a10g.yaml`, `docker-compose.l40s.yaml`, `docker-compose.a100-40gb.yaml` (repo root)
+- **Helm:** `helm/overrides/values-a10g.yaml`, `helm/overrides/values-l40s.yaml`, `helm/overrides/values-a100-40gb.yaml`
 
 ### Usage Examples
 
@@ -117,6 +130,12 @@ python -m nv_ingest_harness.cli.nightly \
   --deployment-type=compose \
   --managed \
   --sku=l40s
+
+# Helm with A10G GPU override (loads helm/overrides/values-a10g.yaml)
+python -m nv_ingest_harness.cli.run \
+  --dataset=bo767 --case=e2e --managed \
+  --deployment-type=helm \
+  --sku=a10g
 ```
 
 ### Override File Structure
@@ -330,7 +349,7 @@ The service manager is controlled via CLI flags:
 - `--deployment-type=<type>`: Set deployment type (`compose` or `helm`)
   - Overrides `deployment_type` in YAML config
   - Defaults to `compose` if not specified in either place
-- `--sku=<sku>`: GPU-specific override file for Docker Compose (e.g., `a10g`, `l40s`, `a100-40gb`)
+- `--sku=<sku>`: GPU-specific override (Compose: `docker-compose.<sku>.yaml`; Helm: `helm/overrides/values-<sku>.yaml`). e.g. `a10g`, `l40s`, `a100-40gb`
 - `--no-build`: Skip building Docker images (Docker Compose only)
 - `--keep-up`: Keep services running after test completes (does not apply to port-forwards)
 - `--doc-analysis`: Show per-document element breakdown in results

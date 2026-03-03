@@ -430,7 +430,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         Notes
         -----
-        - Imports are deferred so the API can run without retriever/torch installed unless local backend is used.
+        - Imports are deferred so the API can run without nemo-retriever/torch installed unless local backend is used.
         - Device selection is best-effort; tensors are moved to the chosen device before invocation.
         """
         if cls._local_nemotron_instance is not None:
@@ -445,16 +445,16 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
                     "Local YOLOX backend requested but 'torch' is not available. "
-                    "Install the retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
+                    "Install the nemo-retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
                 ) from e
 
             try:
-                # Import path used by retriever stages.
-                from retriever.model.local.nemotron_page_elements_v3 import NemotronPageElementsV3  # type: ignore
+                # Import path used by nemo_retriever stages.
+                from nemo_retriever.model.local.nemotron_page_elements_v3 import NemotronPageElementsV3  # type: ignore
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
-                    "Local YOLOX backend requested but 'retriever' package is not importable. "
-                    "Ensure the 'retriever' project is installed on the PYTHONPATH, or "
+                    "Local YOLOX backend requested but 'nemo-retriever' package is not importable. "
+                    "Ensure the 'nemo-retriever' project is installed on the PYTHONPATH, or "
                     "run with infer_protocol='grpc'/'http' and backend='local'."  # noqa: E501
                 ) from e
 
@@ -511,7 +511,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         if not images:
             return []
 
-        # Nemotron label id mapping used by retriever local stages.
+        # Nemotron label id mapping used by nemo_retriever local stages.
         # Nemotron emits "text" where nv-ingest yolox expects "paragraph".
         id_to_label = {
             0: "table",
@@ -552,7 +552,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             t = t.to(device=dev, dtype=torch.uint8, non_blocking=(getattr(dev, "type", "") == "cuda"))
             tensors.append(model.preprocess(t))
 
-        # Best-effort batching (mirrors retriever local stage behavior).
+        # Best-effort batching (mirrors nemo_retriever local stage behavior).
         per_image_preds: Optional[List[Any]] = None
         with torch.inference_mode():
             with torch.autocast(device_type="cuda"):
@@ -738,7 +738,7 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
 
         Note
         ----
-        This intentionally avoids importing the monorepo `retriever` package so local
+        This intentionally avoids importing the monorepo `nemo-retriever` package so local
         chart extraction can work in environments where only `nv_ingest_api` + the
         Nemotron HF packages are installed.
         """
@@ -754,7 +754,7 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             except Exception as e:  # pragma: no cover
                 raise RuntimeError(
                     "Local YOLOX (graphic-elements) backend requested but 'torch' is not available. "
-                    "Install the retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
+                    "Install the nemo-retriever/local model dependencies or run with infer_protocol='grpc'/'http'."
                 ) from e
 
             try:
@@ -778,7 +778,7 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
                 dev = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
             # Create minimal wrapper matching the methods we use in local inference.
-            # Use the same model id string used by the retriever shim.
+            # Use the same model id string used by the nemo_retriever shim.
             model_id = "Nemotron Graphic Elements v1"
             hf_model = define_model_graphic_elements(model_id)
             input_shape = (1024, 1024)

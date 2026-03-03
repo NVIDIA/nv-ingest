@@ -51,7 +51,7 @@ jobs:
 
       - name: Run Pytest inside Docker container
         run: |
-          docker run nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
+          docker run nv-ingest:latest bash -lc "python -m pip install --disable-pip-version-check 'pymilvus[milvus_lite]' && pytest -rs -m 'not integration' --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests"
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

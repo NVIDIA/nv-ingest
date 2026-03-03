@@ -20,7 +20,7 @@ from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graph
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -40,7 +40,7 @@ def _local_nemotron_ocr_boxes_texts(
 ) -> List[List[Any]]:
     """
     Local OCR fallback using the Nemotron OCR v1 pipeline via:
-      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+      `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
 
     Returns list aligned with base64_images:
       [bounding_boxes, text_predictions, conf_scores]
@@ -51,13 +51,13 @@ def _local_nemotron_ocr_boxes_texts(
         or os.getenv("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
     )
 
-    # Import locally to avoid making `nv-ingest-api` hard-depend on retriever unless needed.
+    # Import locally to avoid making `nv-ingest-api` hard-depend on nemo-retriever unless needed.
     try:
-        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local chart OCR fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+            "Local chart OCR fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
         ) from e
 
     if trace_info is not None:
@@ -211,7 +211,7 @@ def _run_chart_inference(
                 model_name="paddle",
                 max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
             )
-        elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+        elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}:
             future_ocr_kwargs.update(
                 model_name=ocr_model_name,
                 input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
@@ -354,7 +354,7 @@ def _create_ocr_client(
 ) -> NimClient:
     ocr_model_interface = (
         NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}
         else PaddleOCRModelInterface()
     )
 
@@ -364,7 +364,9 @@ def _create_ocr_client(
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
         enable_dynamic_batching=(
-            True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"} else False
+            True
+            if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}
+            else False
         ),
         dynamic_batch_memory_budget_mb=32,
     )
@@ -474,10 +476,8 @@ def extract_chart_data_from_image_internal(
             ocr_client = _LocalNemotronOCRClient()
             ocr_model_name = "local"
         else:
-            # Get the grpc endpoint to determine the model if needed
-            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
-            # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-            ocr_model_name = "scene_text_ensemble"
+            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
             ocr_client = _create_ocr_client(ocr_endpoints, ocr_protocol, ocr_model_name, auth_token)
 
         bulk_results = _update_chart_metadata(

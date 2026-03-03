@@ -19,7 +19,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTabl
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import NemoRetrieverOCRModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name  # noqa: F401
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
@@ -171,7 +171,7 @@ def _run_inference(
             model_name="paddle",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
         )
-    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}:
+    elif ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}:
         future_ocr_kwargs.update(
             model_name=ocr_model_name,
             input_names=["INPUT_IMAGE_URLS", "MERGE_LEVELS"],
@@ -321,7 +321,7 @@ def _create_ocr_client(
 ) -> NimClient:
     ocr_model_interface = (
         NemoRetrieverOCRModelInterface()
-        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"}
+        if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}
         else PaddleOCRModelInterface()
     )
 
@@ -331,7 +331,9 @@ def _create_ocr_client(
         auth_token=auth_token,
         infer_protocol=ocr_protocol,
         enable_dynamic_batching=(
-            True if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python"} else False
+            True
+            if ocr_model_name in {"scene_text_ensemble", "scene_text_wrapper", "scene_text_python", "pipeline"}
+            else False
         ),
         dynamic_batch_memory_budget_mb=32,
     )
@@ -347,7 +349,7 @@ def _local_nemotron_ocr_boxes_texts(
 ) -> List[Tuple[str, Any, Any, Any]]:
     """
     Local OCR fallback using the Nemotron OCR v1 pipeline via:
-      `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
+      `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`
 
     Returns a list aligned with base64_images:
       (base64_image, cell_predictions=None, bounding_boxes, text_predictions)
@@ -372,11 +374,11 @@ def _local_nemotron_ocr_boxes_texts(
 
     # Lazy import to avoid hard dependency when running pure API package.
     try:
-        from retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_ocr_v1 import NemotronOCRV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local table OCR fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
+            "Local table OCR fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_ocr_v1.NemotronOCRV1`."
         ) from e
 
     if trace_info is not None:
@@ -515,7 +517,7 @@ def _local_nemotron_table_structure_cell_predictions(
 ) -> List[Optional[Dict[str, Any]]]:
     """
     Local table-structure fallback using:
-      `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`
+      `nemo_retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`
 
     Returns a list aligned with base64_images where each element is either:
       - None (failed / skipped), or
@@ -530,11 +532,11 @@ def _local_nemotron_table_structure_cell_predictions(
 
     # Lazy import to avoid hard dependency when running pure API package.
     try:
-        from retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1  # type: ignore
+        from nemo_retriever.model.local.nemotron_table_structure_v1 import NemotronTableStructureV1  # type: ignore
     except Exception as e:
         raise RuntimeError(
-            "Local table-structure fallback requires the `retriever` package to be importable "
-            "so we can use `retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`."
+            "Local table-structure fallback requires the `nemo-retriever` package to be importable "
+            "so we can use `nemo_retriever.model.local.nemotron_table_structure_v1.NemotronTableStructureV1`."
         ) from e
 
     try:
@@ -795,10 +797,8 @@ def extract_table_data_from_image_internal(
                 )
             except Exception:
                 pass
-            # Get the grpc endpoint to determine the model if needed
-            ocr_grpc_endpoint = ocr_endpoints[0]  # noqa: F841
-            # ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-            ocr_model_name = "scene_text_ensemble"
+            ocr_grpc_endpoint = ocr_endpoints[0]
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
 
             yolox_client = _create_yolox_client(
                 yolox_endpoints,

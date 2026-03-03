@@ -5,11 +5,9 @@
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
 ARG BASE_IMG_TAG=jammy-20250619
-ARG TARGETPLATFORM
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
-ARG TARGETPLATFORM
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
@@ -18,22 +16,20 @@ ARG HF_ACCESS_TOKEN=""
 ARG MODEL_PREDOWNLOAD_PATH="/workspace/models/"
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
-# Allows for linking container builds to git commits
-# docker inspect nv-ingest:latest | jq '.[0].Config.Labels.git_commit' -> GIT_SHA
 ARG GIT_COMMIT
 LABEL git_commit=$GIT_COMMIT
 
-# Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
       bzip2 \
       ca-certificates \
       curl \
       libgl1-mesa-glx \
       libglib2.0-0 \
+      make \
+      tini \
       wget \
     && apt-get clean
 
-# Install ffmpeg
 COPY ./docker/scripts/install_ffmpeg.sh scripts/install_ffmpeg.sh
 RUN chmod +x scripts/install_ffmpeg.sh \
     && bash scripts/install_ffmpeg.sh \
@@ -78,63 +74,25 @@ RUN sed -i 's/# deb-src/deb-src/' /etc/apt/sources.list \
        done \
     && apt-get clean
 
-RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
-    && bash /tmp/miniforge.sh -b -p /opt/conda \
-    && rm /tmp/miniforge.sh
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Add conda to the PATH
-ENV PATH=/opt/conda/bin:$PATH
+ENV PATH=/root/.local/bin:$PATH
+ENV UV_LINK_MODE=copy
 
-RUN if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      CONDA_SUBDIR=linux-aarch64; \
-    else \
-      CONDA_SUBDIR=linux-64; \
-    fi;
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv python install 3.12 \
+    && uv venv --python 3.12 /opt/nv_ingest_runtime
 
-# Install Mamba, a faster alternative to conda, within the base environment
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    conda install -y python=3.12 mamba conda-build==24.5.1 conda-merge -n base -c conda-forge
+ENV VIRTUAL_ENV=/opt/nv_ingest_runtime
+ENV PATH=/opt/nv_ingest_runtime/bin:/root/.local/bin:$PATH
+ENV LD_LIBRARY_PATH=/opt/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 
-COPY conda/environments/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.base.yml
-COPY conda/environments/nv_ingest_environment.linux_64.yml /workspace/nv_ingest_environment.linux_64.yml
-COPY conda/environments/nv_ingest_environment.linux_aarch64.yml /workspace/nv_ingest_environment.linux_aarch64.yml
-
-# Create nv_ingest base environment
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    if [ "$TARGETPLATFORM" = "linux/arm64" ]; then \
-      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml > /workspace/nv_ingest_environment.yml; \
-      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_aarch64.yml; \
-    else \
-      conda-merge /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml > /workspace/nv_ingest_environment.yml; \
-      rm /workspace/nv_ingest_environment.base.yml /workspace/nv_ingest_environment.linux_64.yml; \
-    fi; \
-    mamba env create -f /workspace/nv_ingest_environment.yml
-
-# Set default shell to bash
-SHELL ["/bin/bash", "-c"]
-
-# Activate the environment (make it default for subsequent commands)
-RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
-
-# Install Tini via conda from the conda-forge channel
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && mamba install -y -c conda-forge tini
-
-# Ensure dynamically linked libraries in the conda environment are found at runtime
-ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
-
-# Set the working directory in the container
 WORKDIR /workspace
 
 FROM base AS nv_ingest_install
-# Copy the module code
+
 COPY ci ci
 
-# Prevent haystack from sending telemetry data
 ENV HAYSTACK_TELEMETRY_ENABLED=False
 
 # Ensure the NV_INGEST_VERSION is PEP 440 compatible
@@ -163,26 +121,19 @@ COPY client client
 COPY src src
 RUN rm -rf ./src/nv_ingest/dist ./src/dist ./client/dist ./api/dist
 
-# Install python build from pip, version needed not present in conda
-RUN source activate nv_ingest_runtime \
-    && pip install 'build>=1.2.2'
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install 'build>=1.2.2'
 
-# Add pip cache path to match conda's package cache
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,target=/root/.cache/uv \
     chmod +x ./ci/scripts/build_pip_packages.sh \
-    && source activate nv_ingest_runtime \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib api \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
 
-RUN --mount=type=cache,target=/opt/conda/pkgs\
-    --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && pip install ./src/dist/*.whl \
-    && pip install ./api/dist/*.whl \
-    && pip install ./client/dist/*.whl
-
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install ./src/dist/*.whl \
+    && uv pip install ./api/dist/*.whl \
+    && uv pip install ./client/dist/*.whl
 
 RUN rm -rf src
 
@@ -191,56 +142,31 @@ FROM nv_ingest_install AS runtime
 COPY src/microservice_entrypoint.py ./
 COPY config/default_pipeline.yaml ./config/
 
-# Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_source_ext.sh
-
-# Copy post build triggers script
 COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
-RUN  --mount=type=cache,target=/root/.cache/pip \
+RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=secret,id=hf_token,required=false \
-    source activate nv_ingest_runtime \
-    && python3 /workspace/docker/post_build_triggers.py
-
-# Remove graphviz and its dependencies to reduce image size
-RUN source activate nv_ingest_runtime && \
-    mamba remove graphviz python-graphviz --force -y && \
-    mamba uninstall gtk3 pango cairo fonts-conda-ecosystem -y
+    python3 /workspace/docker/post_build_triggers.py
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 
-# Set entrypoint to tini with a custom entrypoint script
-ENTRYPOINT ["/opt/conda/envs/nv_ingest_runtime/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
 FROM runtime AS test
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && WHEEL="$(ls ./api/dist/*.whl)" \
-    && pip install "${WHEEL}[test]"
+RUN --mount=type=cache,target=/root/.cache/uv \
+    WHEEL="$(ls ./api/dist/*.whl)" \
+    && uv pip install "${WHEEL}[test]"
 
 FROM nv_ingest_install AS development
 
-RUN source activate nv_ingest_runtime && \
-    --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
-    pip install -e ./client
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -e ./client
 
 CMD ["/bin/bash"]
 
-
 FROM nv_ingest_install AS docs
-
-# Install dependencies needed for docs generation
-#
-# NOTE: The nv_ingest_install base image may carry a broken apt/dpkg state
-# (e.g., partially-installed libreoffice dependencies). Installing `make`
-# via conda avoids apt entirely and is more reliable on CI runners.
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    source activate nv_ingest_runtime \
-    && mamba install -y make \
-    && mamba clean -afy
 
 COPY docs docs
 
@@ -249,8 +175,7 @@ COPY src src
 COPY api api
 COPY client client
 
-RUN source activate nv_ingest_runtime && \
-    pip install -r ./docs/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -r ./docs/requirements.txt
 
-# Default command: Run `make docs`
-CMD ["bash", "-c", "cd /workspace/docs && source activate nv_ingest_runtime && make docs"]
+CMD ["bash", "-c", "cd /workspace/docs && make docs"]

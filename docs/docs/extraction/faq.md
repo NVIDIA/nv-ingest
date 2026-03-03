@@ -1,27 +1,27 @@
-# Frequently Asked Questions for NeMo Retriever Extraction
+# Frequently Asked Questions for NeMo Retriever Library
 
-This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever extraction](overview.md).
+This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever Library](overview.md).
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    This library is the NeMo Retriever Library.
 
 
 
-## What if I already have a retrieval pipeline? Can I just use NeMo Retriever extraction? 
+## What if I already have a retrieval pipeline? Can I just use NeMo Retriever Library? 
 
-You can use the nv-ingest-cli or Python APIs to perform extraction only, and then consume the results.
+You can use the nemo-retriever CLI or Python APIs to perform extraction only, and then consume the results.
 Using the Python API, `results` is a list object with one entry.
-For code examples, see the Jupyter notebooks [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) 
-and [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb).
+For code examples, see the Jupyter notebooks [Multimodal RAG with LlamaIndex](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/llama_index_multimodal_rag.ipynb) 
+and [Multimodal RAG with LangChain](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/langchain_multimodal_rag.ipynb).
 
 
 
-## Where does NeMo Retriever extraction (nv-ingest) ingest to?
+## Where does NeMo Retriever Library ingest to?
 
-NeMo Retriever extraction supports extracting text representations of various forms of content, 
+NeMo Retriever Library supports extracting text representations of various forms of content, 
 and ingesting to the [Milvus vector database](https://milvus.io/). 
-NeMo Retriever extraction does not store data on disk except through Milvus and its underlying Minio object store. 
+NeMo Retriever Library does not store data on disk except through Milvus and its underlying Minio object store. 
 You can ingest to other data stores; however, you must configure other data stores yourself. 
 For more information, refer to [Data Upload](data-store.md).
 
@@ -32,7 +32,7 @@ For more information, refer to [Data Upload](data-store.md).
 For images that `nemoretriever-page-elements-v3` does not classify as tables, charts, or infographics,
 you can use our VLM caption task to create a dense caption of the detected image. 
 That caption is then be embedded along with the rest of your content. 
-For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
 
 
 
@@ -61,7 +61,7 @@ For production environments, you should use the provided Helm charts. For [libra
 
 For advanced scenarios, you might want to use library mode with self-hosted NIM instances. 
 You can set custom endpoints for each NIM. 
-For examples of `*_ENDPOINT` variables, refer to [nv-ingest/docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+For examples of `*_ENDPOINT` variables, refer to [NeMo-Retriever/docker-compose.yaml](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docker-compose.yaml).
 
 
 
@@ -74,10 +74,10 @@ For examples of `*_ENDPOINT` variables, refer to [nv-ingest/docker-compose.yaml]
 See the [Profile Information](quickstart-guide.md#profile-information) section 
 for information about the optional NIM components of the pipeline.
 
-You can configure the `extract`, `caption`, and other tasks by using the [Ingestor API](nv-ingest-python-api.md).
+You can configure the `extract`, `caption`, and other tasks by using the [Ingestor API](python-api-reference.md).
 
 To choose what types of content to extract, use code similar to the following. 
-For more information, refer to [Extract Specific Elements from PDFs](nv-ingest-python-api.md#extract-specific-elements-from-pdfs).
+For more information, refer to [Extract Specific Elements from PDFs](python-api-reference.md#extract-specific-elements-from-pdfs).
 
 ```python
 Ingestor(client=client)
@@ -94,7 +94,7 @@ Ingestor(client=client)
 ```
 
 To generate captions for images, use code similar to the following.
-For more information, refer to [Extract Captions from Images](nv-ingest-python-api.md#extract-captions-from-images).
+For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
 
 ```python
 Ingestor(client=client)
