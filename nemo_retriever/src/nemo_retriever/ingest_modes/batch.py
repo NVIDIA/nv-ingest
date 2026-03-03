@@ -718,7 +718,7 @@ class BatchIngestor(Ingestor):
                     batch_size=detect_batch_size,
                     batch_format="pandas",
                     num_cpus=ocr_cpus_per_actor,
-                    num_gpus=0..05,
+                    num_gpus=0.05,
                     compute=rd.ActorPoolStrategy(size=detect_workers*2),
                     fn_constructor_kwargs=ocr_flags,
                 )
