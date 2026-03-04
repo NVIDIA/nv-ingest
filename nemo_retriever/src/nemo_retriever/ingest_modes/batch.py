@@ -342,10 +342,18 @@ class BatchIngestor(Ingestor):
         print(f"Cluster has {len(node_ips)} nodes with IPs: {node_ips}")
 
         # iterate over ray_nodes and get the gpu memory information
+        results = []
         for node_ip in node_ips:
             print(f"Node: {node_ip}")
-            gpu_memory_info = _get_gpu_memory_info.remote(node_ip)
-            print(f"GPU memory info: {gpu_memory_info}")
+            gpu_memory_info_ref = _get_gpu_memory_info.remote(node_ip)
+            results.append(gpu_memory_info_ref)
+
+        # Retrieve all results
+        task_outputs = ray.get(results)
+
+        # Print results
+        for output in task_outputs:
+            print(output)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
