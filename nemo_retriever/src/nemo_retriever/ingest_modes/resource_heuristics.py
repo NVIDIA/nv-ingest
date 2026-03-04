@@ -113,8 +113,6 @@ def _get_gpu_memory_info() -> dict[int, int]:
         nvmlDeviceGetName,
         nvmlDeviceGetUUID,
         nvmlDeviceGetBrand,
-        nvmlDeviceGetProductBrand,
-        nvmlDeviceGetProductSeries,
         nvmlDeviceGetProductArchitecture,
         nvmlDeviceGetProductGeneration,
         nvmlDeviceGetProductRevision,
@@ -148,8 +146,8 @@ def _get_gpu_memory_info() -> dict[int, int]:
         gpu_uuid = nvmlDeviceGetUUID(handle)
         gpu_brand = nvmlDeviceGetBrand(handle)
         # gpu_product_name = nvmlDeviceGetProductName(handle)
-        gpu_product_brand = nvmlDeviceGetProductBrand(handle)
-        gpu_product_series = nvmlDeviceGetProductSeries(handle)
+        # gpu_product_brand = nvmlDeviceGetProductBrand(handle)
+        # gpu_product_series = nvmlDeviceGetProductSeries(handle)
         gpu_product_architecture = nvmlDeviceGetProductArchitecture(handle)
         gpu_product_generation = nvmlDeviceGetProductGeneration(handle)
         gpu_product_revision = nvmlDeviceGetProductRevision(handle)
@@ -168,8 +166,6 @@ def _get_gpu_memory_info() -> dict[int, int]:
             "gpu_name": gpu_name,
             "gpu_uuid": gpu_uuid,
             "gpu_brand": gpu_brand,
-            "gpu_product_brand": gpu_product_brand,
-            "gpu_product_series": gpu_product_series,
             "gpu_product_architecture": gpu_product_architecture,
             "gpu_product_generation": gpu_product_generation,
             "gpu_product_revision": gpu_product_revision,
