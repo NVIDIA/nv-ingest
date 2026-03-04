@@ -73,6 +73,13 @@ asr = [
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
 ]
+# Optional: prebuilt FlashInfer cubins + flash-attn + xformers for vLLM (faster startup / attention).
+# Keeps existing torch~=2.9.1; flash-attn uses a Linux py3.12 wheel from GitHub.
+vllm-attention = [
+  "flashinfer-cubin==0.6.3",
+  "flash-attn>=2.8.3",
+  "xformers>=0.0.33,<0.0.34",
+]
 dev = [
   "build>=1.2.2",
   "pytest>=8.0.2",
@@ -92,8 +99,10 @@ nemotron-page-elements-v3 = { index = "test-pypi" }
 nemotron-graphic-elements-v1 = { index = "test-pypi" }
 nemotron-table-structure-v1 = { index = "test-pypi" }
 nemotron-ocr = { index = "test-pypi" }
-torch = { index = "torch-cuda"}
-torchvision = { index ="torch-cuda"}
+torch = { index = "torch-cuda" }
+torchvision = { index = "torch-cuda" }
+# Prebuilt wheel for torch 2.9 + cu12 (Linux x86_64, py312). Avoids source build and keeps torch as-is.
+flash-attn = { url = "https://github.com/Dao-AILab/flash-attention/releases/download/v2.8.3/flash_attn-2.8.3+cu12torch2.9cxx11abiTRUE-cp312-cp312-linux_x86_64.whl" }
 
 [[tool.uv.index]]
 name = "test-pypi"

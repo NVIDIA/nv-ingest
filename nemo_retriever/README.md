@@ -184,3 +184,13 @@ You can run the same embedding model (e.g. llama-nemotron-embed-1b-v2) **without
 - **Model path**: You can pass a HuggingFace model id (e.g. `nvidia/llama-nemotron-embed-1b-v2`) or a **local path**. For llama-nemotron-embed-1b-v2, a local clone with `config.json` replaced by `config_vllm.json` (from the model repo) may be required for vLLM to load it correctly.
 - **Ingest**: Set `embed_use_vllm_offline: true` in `EmbedParams` or use `--embed-use-vllm-offline` in the inprocess pipeline. Optionally set `embed_model_path` (or `--embed-model-path`) to a local model path.
 - **Recall**: Use `--embedding-use-vllm-offline` (recall CLI). Optionally `--embedding-vllm-model-path` to override the model path.
+
+### Optional: vLLM attention extras (flash-attn, flashinfer-cubin, xformers)
+
+To add prebuilt attention-related packages without changing the project’s torch version, install the `[vllm-attention]` extra:
+
+```bash
+uv pip install -e "./nemo_retriever[vllm-attention]"
+```
+
+This installs **flashinfer-cubin** (match version to flashinfer-python), **flash-attn** (prebuilt wheel for torch 2.9 + cu12, Linux py312), and **xformers** (0.0.33.x compatible with torch 2.9). It can reduce vLLM startup time (e.g. CUDA graph capture). The `flash-attn` wheel is sourced from GitHub releases; on other platforms you may need to install it separately.
