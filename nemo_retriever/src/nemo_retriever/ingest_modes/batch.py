@@ -689,7 +689,7 @@ class BatchIngestor(Ingestor):
                 batch_format="pandas",
                 num_cpus=page_elements_cpus_per_actor,
                 num_gpus=gpu_page_elements,
-                compute=rd.ActorPoolStrategy(size=page_elements_workers * 2),
+                compute=rd.ActorPoolStrategy(size=page_elements_workers),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
@@ -728,7 +728,7 @@ class BatchIngestor(Ingestor):
                     batch_format="pandas",
                     num_cpus=ocr_cpus_per_actor,
                     num_gpus=gpu_ocr,
-                    compute=rd.ActorPoolStrategy(size=detect_workers * 2),
+                    compute=rd.ActorPoolStrategy(size=detect_workers),
                     fn_constructor_kwargs=ocr_flags,
                 )
 
@@ -935,8 +935,7 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
             num_cpus=embed_cpus_per_actor,
             num_gpus=embed_actor_num_gpus,
-            # compute=rd.ActorPoolStrategy(size=embed_workers),
-            compute=rd.ActorPoolStrategy(min_size=1, max_size=4),
+            compute=rd.ActorPoolStrategy(min_size=1, max_size=embed_workers),
             fn_constructor_kwargs={"params": resolved},
         )
 
