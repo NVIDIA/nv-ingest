@@ -64,6 +64,69 @@ MAX_GPU_PER_STAGE = 1.0
 ENV_BATCH_NUM_CPUS = "NEMO_RETRIEVER_BATCH_NUM_CPUS"
 ENV_BATCH_NUM_GPUS = "NEMO_RETRIEVER_BATCH_NUM_GPUS"
 
+# Default per-model VRAM ceiling (bytes) used for future scheduling heuristics.
+DEFAULT_MODEL_MAX_VRAM_BYTES = 3 * 1024 * 1024 * 1024  # 3GB
+MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+}
+
+
+def _get_gpu_memory_info() -> dict[int, int]:
+    """Get the memory information for each GPU."""
+    import nvidia_smi
+
+    # Initialize the NVML library
+    nvidia_smi.nvmlInit()
+
+    # Get the number of available GPUs
+    device_count = nvidia_smi.nvmlDeviceGetCount()
+
+    print(f"Found {device_count} GPU(s).")
+
+    # Iterate over each GPU to get memory information
+    for i in range(device_count):
+        # Get a handle to the device
+        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+
+        # Get memory information (total, free, used) in bytes
+        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+
+        print(f"\n--- GPU {i} ---")
+        # Convert bytes to MiB for better readability (1 MiB = 1024*1024 bytes)
+        print(f"Total memory: {info.total // (1024**2)} MiB")
+        print(f"Used memory: {info.used // (1024**2)} MiB")
+        print(f"Free memory: {info.free // (1024**2)} MiB")
+
+    # Shutdown the NVML library when finished
+    nvidia_smi.nvmlShutdown()
+
 
 def _debug_print(message: str) -> None:
     """Emit a lightweight resource-resolution debug message."""
@@ -442,6 +505,9 @@ def resolve_batch_worker_plan(
 
     Explicit worker overrides take precedence over heuristic values.
     """
+
+    _get_gpu_memory_info()
+
     cfg = _resolve_heuristic_config(resource_config_path)
     if override_cpu_count is None or override_gpu_count is None:
         detected = resolve_effective_resources(
