@@ -10,7 +10,9 @@ ingest time vs scale/GPU util, recall comparison, and FlashInfer impact.
 Requires: pandas, matplotlib (pip install matplotlib if needed).
 
 Example (from repo root):
-  uv run python nemo_retriever/scripts/plot_comparison_sweep.py run --input-csv comparison_sweep.csv --output-dir ./comparison_plots
+  uv run python nemo_retriever/scripts/plot_comparison_sweep.py run \
+    --input-csv comparison_sweep.csv \
+    --output-dir ./comparison_plots
 """
 
 from __future__ import annotations

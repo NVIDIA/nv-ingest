@@ -66,9 +66,7 @@ def run_sweep(
     output_csv: Path = typer.Option(..., "--output-csv", path_type=Path),
     output_json: Path | None = typer.Option(None, "--output-json", path_type=Path),
     lancedb_uri: str = typer.Option("lancedb", "--lancedb-uri"),
-    embed_model_name: str = typer.Option(
-        "nvidia/llama-3.2-nv-embedqa-1b-v2", "--embed-model-name"
-    ),
+    embed_model_name: str = typer.Option("nvidia/llama-3.2-nv-embedqa-1b-v2", "--embed-model-name"),
     gpu_utils: str = typer.Option(
         ",".join(str(x) for x in DEFAULT_GPU_UTILS),
         "--gpu-utils",

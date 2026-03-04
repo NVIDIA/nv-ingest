@@ -338,7 +338,7 @@ def compare(
         else:
             typer.echo("Warning: could not discover model from server, using --embed-model-name.", err=True)
 
-    _run = lambda **kw: _run_ingest_and_recall(
+    _run = lambda **kw: _run_ingest_and_recall(  # noqa: E731
         pdf_dir=pdf_dir,
         query_csv=query_csv,
         lancedb_uri=lancedb_uri,
@@ -483,6 +483,7 @@ def _detect_flashinfer_cubin() -> bool:
     """Return True if flashinfer_cubin is importable (prebuilt FlashInfer kernels)."""
     try:
         import flashinfer_cubin  # noqa: F401
+
         return True
     except ImportError:
         return False
@@ -541,7 +542,10 @@ def run_compare_from_pre_embed(
     ray_addr = ray_address or "local"
     if not ray.is_initialized():
         ray.init(address=ray_addr, ignore_reinit_error=True, log_to_driver=True)
-    print(f"Ray address: {ray_addr} (RAY_ADDRESS env is {'set' if os.environ.get('RAY_ADDRESS') else 'unset'})", flush=True)
+    print(
+        f"Ray address: {ray_addr} (RAY_ADDRESS env is {'set' if os.environ.get('RAY_ADDRESS') else 'unset'})",
+        flush=True,
+    )
     _ = ray.cluster_resources()
     # EmbedServiceActor requires num_gpus=1; without a GPU the actor stays pending forever.
     available = ray.available_resources()
@@ -611,7 +615,9 @@ def run_compare_from_pre_embed(
                 "create_index": True,
             }
         )
-    ).ingest(params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True))
+    ).ingest(
+        params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True)
+    )
     baseline_ingest_s = time.perf_counter() - t0
     ray.kill(service_baseline)
     baseline_recall = _run_recall_only(
@@ -672,7 +678,9 @@ def run_compare_from_pre_embed(
                 "create_index": True,
             }
         )
-    ).ingest(params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True))
+    ).ingest(
+        params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True)
+    )
     vllm_ingest_s = time.perf_counter() - t0
     ray.kill(service_vllm)
     vllm_recall = _run_recall_only(
@@ -779,7 +787,8 @@ def compare_from_pre_embed(
     sort_key_column: str | None = typer.Option(
         None,
         "--sort-key",
-        help="If set, sort pre-embed dataset by this column before limit (deterministic same rows for baseline and vLLM).",
+        help="If set, sort pre-embed dataset by this column before limit (deterministic same rows for baseline and "
+        "vLLM).",
     ),
 ) -> None:
     """Load pre-embed parquet, run baseline + vLLM offline embed+vdb, then recall; print comparison.
@@ -992,7 +1001,9 @@ def validate_recall_parity(
                 "create_index": True,
             }
         )
-    ).ingest(params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True))
+    ).ingest(
+        params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True)
+    )
     preembed_baseline = _run_recall_only(
         query_csv=query_csv,
         lancedb_uri=lancedb_uri,
@@ -1020,7 +1031,9 @@ def validate_recall_parity(
                 "create_index": True,
             }
         )
-    ).ingest(params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True))
+    ).ingest(
+        params=IngestExecuteParams(parallel=True, max_workers=8, show_progress=True)
+    )
     preembed_vllm = _run_recall_only(
         query_csv=query_csv,
         lancedb_uri=lancedb_uri,
