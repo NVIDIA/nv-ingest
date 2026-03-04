@@ -64,10 +64,16 @@ def create_vllm_llm(
     gpu_memory_utilization: float = 0.45,
     enforce_eager: bool = False,
     compile_cache_dir: Optional[str] = None,
+    attention_backend: Optional[str] = None,
 ) -> Any:
     """
     Create and return a vLLM LLM instance for embedding (pooling runner).
     Caller can reuse it across many embed batches to avoid repeated model load and CUDA graph capture.
+
+    Note on attention backend: vLLM selects automatically by default. FLASH_ATTN only supports
+    fp16/bf16; with dtype float32 vLLM will fall back to TRITON_ATTN (or FLEX_ATTENTION).
+    To use FLASH_ATTN for better throughput, set dtype to "bfloat16" or "float16", and
+    optionally pass attention_backend="FLASH_ATTN".
     """
     try:
         from vllm import LLM
@@ -109,6 +115,8 @@ def create_vllm_llm(
         kwargs["max_model_len"] = max_model_len
     if pooler_config is not None:
         kwargs["pooler_config"] = pooler_config
+    if attention_backend is not None:
+        kwargs["attention_backend"] = attention_backend
 
     return LLM(**kwargs)
 
@@ -161,6 +169,7 @@ def embed_via_vllm_offline(
     gpu_memory_utilization: float = 0.45,
     enforce_eager: bool = False,
     compile_cache_dir: Optional[str] = None,
+    attention_backend: Optional[str] = None,
 ) -> List[List[float]]:
     """
     Compute embeddings via vLLM's offline Python API (no server).
@@ -198,6 +207,11 @@ def embed_via_vllm_offline(
         supports loading shared libs (e.g. local disk or /dev/shm). If None and
         enforce_eager is False, we set TORCHINDUCTOR_CACHE_DIR and TRITON_CACHE_DIR to
         a path under /dev/shm when available, so /tmp is not used.
+    attention_backend : str, optional
+        vLLM attention backend (e.g. "FLASH_ATTN", "TRITON_ATTN"). If None, vLLM selects
+        automatically. FLASH_ATTN only supports fp16/bf16; with dtype float32 vLLM uses
+        TRITON_ATTN or FLEX_ATTENTION. Use dtype "bfloat16" (or "float16") to enable
+        FLASH_ATTN for better throughput.
 
     Returns
     -------
@@ -214,6 +228,7 @@ def embed_via_vllm_offline(
         gpu_memory_utilization=gpu_memory_utilization,
         enforce_eager=enforce_eager,
         compile_cache_dir=compile_cache_dir,
+        attention_backend=attention_backend,
     )
     return embed_with_vllm_llm(prompts, llm, batch_size=batch_size, prefix=prefix)
 

@@ -278,9 +278,11 @@ class _BatchEmbedActor:
             self._vllm_llm = create_vllm_llm(
                 str(embed_model),
                 dimensions=self._kwargs.get("dimensions"),
+                dtype=self._kwargs.get("dtype") or "float32",
                 gpu_memory_utilization=float(self._kwargs.get("gpu_memory_utilization", 0.45)),
                 enforce_eager=bool(self._kwargs.get("enforce_eager", False)),
                 compile_cache_dir=self._kwargs.get("compile_cache_dir"),
+                attention_backend=self._kwargs.get("attention_backend"),
             )
             return
 
@@ -360,9 +362,11 @@ class _EmbedServiceActorImpl:
             self._vllm_llm = create_vllm_llm(
                 str(embed_model),
                 dimensions=self._kwargs.get("dimensions"),
+                dtype=self._kwargs.get("dtype") or "float32",
                 gpu_memory_utilization=float(self._kwargs.get("gpu_memory_utilization", 0.45)),
                 enforce_eager=bool(self._kwargs.get("enforce_eager", False)),
                 compile_cache_dir=self._kwargs.get("compile_cache_dir"),
+                attention_backend=self._kwargs.get("attention_backend"),
             )
             return
 

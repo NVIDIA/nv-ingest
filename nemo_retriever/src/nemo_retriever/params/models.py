@@ -39,6 +39,10 @@ class ModelRuntimeParams(_ParamsModel):
     gpu_memory_utilization: float = 0.45
     # Optional dir for torch inductor/Triton cache when enforce_eager=False; must be on non-noexec fs.
     compile_cache_dir: Optional[str] = None
+    # vLLM offline: dtype (default float32). Use "bfloat16" or "float16" to allow FLASH_ATTN (fp32 forces TRITON_ATTN).
+    dtype: Optional[str] = None
+    # vLLM offline: attention backend (e.g. "FLASH_ATTN", "TRITON_ATTN"). None = auto; FLASH_ATTN needs bf16/fp16.
+    attention_backend: Optional[str] = None
 
 
 class IngestorCreateParams(_ParamsModel):
