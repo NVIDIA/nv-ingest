@@ -245,6 +245,9 @@ embedding:
   # Batch sizing (NIM-side batching is handled internally; this is stage batching)
   batch_size: 4
 
+  # Granularity: "element" (one embedding per table/chart/text) or "page" (one embedding per page)
+  embed_granularity: "element"
+
   # Modalities for multi-modal models (leave as "text" for text-only models)
   text_elements_modality: "text"
   image_elements_modality: "text"

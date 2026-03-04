@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 #
-# Build from nv-ingest root: docker build -f nemo_retriever/Dockerfile -t retriever .
-# Run: docker run retriever  (help) or docker run -v /host/docs:/data retriever /data
+# Build from repo root: docker build -f nemo_retriever/Dockerfile -t nemo-retriever .
+# Run: docker run nemo-retriever  (help) or docker run -v /host/docs:/data nemo-retriever /data
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
 ARG BASE_IMG_TAG=jammy-20250619
@@ -75,7 +75,7 @@ ENV PATH=/opt/retriever_runtime/bin:/root/.local/bin:$PATH
 ENV LD_LIBRARY_PATH=/opt/retriever_runtime/lib:${LD_LIBRARY_PATH}
 
 # ---------------------------------------------------------------------------
-# Install retriever and siblings (build context = nv-ingest root)
+# Install nemo_retriever and path deps (build context = repo root)
 # ---------------------------------------------------------------------------
 FROM base AS install
 
@@ -84,21 +84,18 @@ WORKDIR /workspace
 # Unbuffered stdout/stderr so CLI output appears when run without a TTY (e.g. docker run without -it)
 ENV PYTHONUNBUFFERED=1
 
-COPY retriever retriever
+COPY nemo_retriever nemo_retriever
 COPY src src
 COPY api api
 COPY client client
 
-# Use conda env's uv; create venv and install retriever in editable mode (path deps: ../src, ../api, ../client)
+# Use base stage's venv at /opt/retriever_runtime; install nemo_retriever in editable mode (path deps: ../src, ../api, ../client)
 SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/uv \
-    source /opt/conda/etc/profile.d/conda.sh \
-    && conda activate retriever_libcudart \
-    && uv venv .retriever \
-    && . .retriever/bin/activate \
-    && uv pip install -e ./retriever
+    . /opt/retriever_runtime/bin/activate \
+    && uv pip install -e ./nemo_retriever
 
 # Default: run in-process pipeline (help if no args)
-ENTRYPOINT ["/workspace/.retriever/bin/python", "-m", "retriever.examples.inprocess_pipeline"]
+ENTRYPOINT ["/opt/retriever_runtime/bin/python", "-m", "nemo_retriever.examples.inprocess_pipeline"]
 CMD ["--help"]
