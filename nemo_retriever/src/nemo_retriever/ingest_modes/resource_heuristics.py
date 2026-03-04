@@ -249,14 +249,11 @@ def _get_gpu_memory_info() -> dict[int, int]:
     nvmlInit()
 
     driver_version = nvmlSystemGetDriverVersion()
-    print(f"Driver Version: {driver_version}")
 
     # Get the number of available GPUs
     device_count = nvmlDeviceGetCount()
 
-    print(f"Found {device_count} GPU(s).")
-
-    gpus_info = {}
+    gpu_info = {}
 
     # Iterate over each GPU to get memory information
     for i in range(device_count):
@@ -266,21 +263,11 @@ def _get_gpu_memory_info() -> dict[int, int]:
         # Get memory information (total, free, used) in bytes
         info = nvmlDeviceGetMemoryInfo(handle)
 
-        gpu_name = nvmlDeviceGetName(handle)
-        gpu_uuid = nvmlDeviceGetUUID(handle)
-        gpu_brand = nvmlDeviceGetBrand(handle)
-
-        print(f"\n--- GPU {i} ---")
-        # Convert bytes to MiB for better readability (1 MiB = 1024*1024 bytes)
-        print(f"Total memory: {info.total // (1024**2)} MiB")
-        print(f"Used memory: {info.used // (1024**2)} MiB")
-        print(f"Free memory: {info.free // (1024**2)} MiB")
-
-        gpus_info[i] = {
+        gpu_info[i] = {
             "drvier_version": driver_version,
-            "gpu_name": gpu_name,
-            "gpu_uuid": gpu_uuid,
-            "gpu_brand": gpu_brand,
+            "gpu_name": nvmlDeviceGetName(handle),
+            "gpu_uuid": nvmlDeviceGetUUID(handle),
+            "gpu_brand": nvmlDeviceGetBrand(handle),
             "total": info.total // (1024**2),
             "used": info.used // (1024**2),
             "free": info.free // (1024**2),
@@ -289,7 +276,7 @@ def _get_gpu_memory_info() -> dict[int, int]:
     # Shutdown the NVML library when finished
     nvmlShutdown()
 
-    return gpus_info
+    return gpu_info
 
 
 def _debug_print(message: str) -> None:

@@ -39,6 +39,7 @@ class IngestorCreateParams(_ParamsModel):
     documents: list[str] = Field(default_factory=list)
     ray_address: Optional[str] = None
     ray_log_to_driver: bool = True
+    debug: bool = False
     base_url: str = "http://localhost:7670"
 
 

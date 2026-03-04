@@ -73,14 +73,16 @@ class _TeeStream:
         return str(getattr(self._primary, "encoding", "utf-8"))
 
 
-def _configure_logging(log_file: Optional[Path]) -> tuple[Optional[TextIO], TextIO, TextIO]:
+def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tuple[Optional[TextIO], TextIO, TextIO]:
     """Configure root logging; optionally tee stdout/stderr into one file."""
     original_stdout = sys.stdout
     original_stderr = sys.stderr
+    log_level = logging.DEBUG if debug else logging.INFO
     if log_file is None:
         logging.basicConfig(
-            level=logging.INFO,
+            level=log_level,
             format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+            force=True,
         )
         return None, original_stdout, original_stderr
 
@@ -94,7 +96,7 @@ def _configure_logging(log_file: Optional[Path]) -> tuple[Optional[TextIO], Text
     sys.stderr = _TeeStream(sys.__stderr__, fh)
 
     logging.basicConfig(
-        level=logging.INFO,
+        level=log_level,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         handlers=[
             logging.StreamHandler(sys.stdout),
@@ -672,6 +674,11 @@ def main(
         "--ray-log-to-driver/--no-ray-log-to-driver",
         help="Forward Ray worker logs to the driver (recommended with --log-file).",
     ),
+    debug: bool = typer.Option(
+        False,
+        "--debug/--no-debug",
+        help="Enable debug-level logging for this full pipeline run.",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -704,7 +711,7 @@ def main(
         help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
     ),
 ) -> None:
-    log_handle, original_stdout, original_stderr = _configure_logging(log_file)
+    log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
@@ -743,7 +750,9 @@ def main(
             glob_pattern = str(input_dir / "*.txt")
             ingestor = create_ingestor(
                 run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+                params=IngestorCreateParams(
+                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
+                ),
             )
             ingestor = (
                 ingestor.files(glob_pattern)
@@ -773,7 +782,9 @@ def main(
             glob_pattern = str(input_dir / "*.html")
             ingestor = create_ingestor(
                 run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+                params=IngestorCreateParams(
+                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
+                ),
             )
             ingestor = (
                 ingestor.files(glob_pattern)
@@ -804,7 +815,9 @@ def main(
             doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
             ingestor = create_ingestor(
                 run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+                params=IngestorCreateParams(
+                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
+                ),
             )
             ingestor = (
                 ingestor.files(doc_globs)
@@ -869,7 +882,9 @@ def main(
             pdf_glob = str(input_dir / "*.pdf")
             ingestor = create_ingestor(
                 run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+                params=IngestorCreateParams(
+                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
+                ),
             )
             ingestor = (
                 ingestor.files(pdf_glob)

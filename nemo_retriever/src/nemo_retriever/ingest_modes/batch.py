@@ -48,7 +48,25 @@ from ..params import PdfSplitParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
 
-DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
+
+def _setup_batch_debug_logger(enabled: bool) -> logging.Logger:
+    """Return a batch logger configured for optional DEBUG verbosity."""
+    logger = logging.getLogger("nemo_retriever.ingest_modes.batch")
+    logger.propagate = True
+    if enabled:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Batch debug logging enabled.")
+    return logger
+
+
+def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dict[str, Any]) -> None:
+    """Emit structured debug payloads without interrupting pipeline execution."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        logger.debug("%s | %s | %s", location, message, json.dumps(data, default=str))
+    except Exception:
+        logger.debug("%s | %s | %r", location, message, data)
 
 
 def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
@@ -57,27 +75,6 @@ def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, An
     if kwargs:
         return params.model_copy(update=kwargs)  # type: ignore[return-value]
     return params
-
-
-# region agent log
-def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    payload = {
-        "sessionId": "250ae2",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# endregion
 
 
 class _LanceDBWriteActor:
@@ -316,10 +313,14 @@ class BatchIngestor(Ingestor):
         documents: Optional[List[str]] = None,
         ray_address: Optional[str] = None,
         ray_log_to_driver: bool = True,
+        debug: bool = False,
     ) -> None:
         super().__init__(documents=documents)
 
-        logging.basicConfig(level=logging.INFO)
+        self._logger = _setup_batch_debug_logger(bool(debug))
+        self._debug = bool(debug)
+        if self._debug:
+            logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize Ray for distributed execution.
         ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver))
@@ -339,10 +340,17 @@ class BatchIngestor(Ingestor):
         )
         self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
+        # Gather information about the Ray cluster.
         ray_nodes = [node for node in ray.nodes() if bool(node.get("Alive", False))]
-        print(f"Ray nodes: {ray_nodes}")
         node_ips = [node["NodeManagerAddress"] for node in ray_nodes if node.get("NodeManagerAddress")]
-        print(f"Cluster has {len(node_ips)} alive node(s) with IPs: {node_ips}")
+
+        if self._debug:
+            _debug_log(
+                logger=self._logger,
+                location="ingest_modes/batch.py:BatchIngestor.__init__",
+                message="Ray nodes",
+                data={"nodes": ray_nodes},
+            )
 
         # Schedule one GPU-memory probe task per alive node by pinning each task
         # to that node's implicit "node:<ip>" resource.
@@ -360,21 +368,36 @@ class BatchIngestor(Ingestor):
         for node_ip, probe_ref in node_probe_refs:
             try:
                 node_gpu_info = ray.get(probe_ref)
-                print(f"[{node_ip}] GPU memory info: {node_gpu_info}")
                 self._cluster_gpu_info[node_ip] = node_gpu_info
             except Exception as exc:
                 logging.warning("GPU probe failed on node %s: %s", node_ip, exc)
 
+        # Log debug if configured.
+        _debug_log(
+            logger=self._logger,
+            location="ingest_modes/batch.py:BatchIngestor.__init__",
+            message="Collected per-node GPU memory snapshots",
+            data={"nodes": len(self._cluster_gpu_info), "node_ids": list(self._cluster_gpu_info.keys())},
+        )
+
+        # TODO: Replace with actual hueristics gathered ...
         desired_model_actor_instances = {
             "nvidia/llama-3.2-nv-embedqa-1b-v2": 2,
             "nemotron-page-elements-v3": 4,
             "nemotron-ocr-v1": 4,
             "nemotron-parse-v1.2": 0,
         }
-        model_actor_capacity = estimate_model_actor_capacity_by_gpu(
+        self._model_actor_capacity = estimate_model_actor_capacity_by_gpu(
             self._cluster_gpu_info, desired_model_actor_instances
         )
-        print(f"Model actor capacity: {model_actor_capacity}")
+
+        # Log debug if configured.
+        _debug_log(
+            logger=self._logger,
+            location="ingest_modes/batch.py:BatchIngestor.__init__",
+            message="Model actor capacity",
+            data={"model_actor_capacity": self._model_actor_capacity},
+        )
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -463,7 +486,6 @@ class BatchIngestor(Ingestor):
                 return 0
             return len([p for p in s.split(",") if p.strip()])
 
-        debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
         pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
         pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
         pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
@@ -548,52 +570,15 @@ class BatchIngestor(Ingestor):
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
         pdf_extract_workers = self._page_elements_workers * self._num_gpus
 
-        # region agent log
-        if use_nemotron_parse_only:
-            total_gpu_requested = float(gpu_nemotron_parse) * float(nemotron_parse_workers) + float(gpu_embed) * 1.0
-        else:
-            total_gpu_requested = (
-                float(gpu_page_elements) * float(page_elements_workers)
-                + float(gpu_ocr) * float(detect_workers * detect_stage_count)
-                + float(gpu_embed) * 1.0
-            )
-        _debug_log(
-            run_id=debug_run_id,
-            hypothesis_id="H1",
-            location="ingest_modes/batch.py:extract",
-            message="Resource envelope computed for Ray stages",
-            data={
-                "num_gpus_available": self._num_gpus,
-                "num_cpus_available": self._num_cpus,
-                "gpu_page_elements": gpu_page_elements,
-                "gpu_ocr": gpu_ocr,
-                "gpu_nemotron_parse": gpu_nemotron_parse,
-                "gpu_embed": gpu_embed,
-                "page_elements_workers": page_elements_workers,
-                "detect_workers": detect_workers,
-                "nemotron_parse_workers": nemotron_parse_workers,
-                "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                "use_nemotron_parse_only": use_nemotron_parse_only,
-                "detect_stage_count": detect_stage_count,
-                "pdf_extract_workers": pdf_extract_workers,
-                "pdf_extract_num_cpus": pdf_extract_num_cpus,
-                "total_gpu_requested_across_stages": total_gpu_requested,
-                "can_fully_overlap_gpu_stages": bool(total_gpu_requested <= float(self._num_gpus)),
-            },
-        )
-        _debug_log(
-            run_id=debug_run_id,
-            hypothesis_id="H2",
-            location="ingest_modes/batch.py:extract",
-            message="CPU reservation breakdown for actors and extraction pool",
-            data={
-                "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                "total_gpu_actor_cpus_reserved": total_gpu_cpus,
-                "cpus_for_extract": cpus_for_extract,
-            },
-        )
-        # endregion
+        # TODO: removed in favor of using the model actor capacity.
+        # if use_nemotron_parse_only:
+        #     total_gpu_requested = float(gpu_nemotron_parse) * float(nemotron_parse_workers) + float(gpu_embed) * 1.0
+        # else:
+        #     total_gpu_requested = (
+        #         float(gpu_page_elements) * float(page_elements_workers)
+        #         + float(gpu_ocr) * float(detect_workers * detect_stage_count)
+        #         + float(gpu_embed) * 1.0
+        #     )
 
         # Store per-stage GPU allocations for downstream stages (e.g. embed).
         self._gpu_page_elements = gpu_page_elements
@@ -1080,10 +1065,8 @@ class BatchIngestor(Ingestor):
         elapsed = time.monotonic() - t0
 
         print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
-        # region agent log
         _debug_log(
-            run_id=str(runtime_metrics_prefix or "unknown"),
-            hypothesis_id="H3",
+            logger=self._logger,
             location="ingest_modes/batch.py:ingest",
             message="Pipeline completed with aggregate throughput",
             data={
@@ -1094,7 +1077,6 @@ class BatchIngestor(Ingestor):
                 "runtime_metrics_dir": runtime_metrics_dir,
             },
         )
-        # endregion
 
         # Best-effort runtime metrics capture for per-run stage-level debugging.
         if runtime_metrics_dir:
