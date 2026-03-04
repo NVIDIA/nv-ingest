@@ -346,6 +346,14 @@ class BatchIngestor(Ingestor):
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
 
+    def _map_batches_logged(self, stage_name: str, fn: Any, **kwargs: Any) -> rd.Dataset:
+        """Log map_batches call details before submitting the stage to Ray Data."""
+        fn_name = getattr(fn, "__name__", fn.__class__.__name__)
+        print(f"[batch.map_batches] stage={stage_name} fn={fn_name}")
+        for key in sorted(kwargs.keys()):
+            print(f"  {key}={kwargs[key]!r}")
+        return self._rd_dataset.map_batches(fn, **kwargs)
+
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
         Add local files for batch processing.
@@ -605,7 +613,8 @@ class BatchIngestor(Ingestor):
 
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract.doc_to_pdf",
             DocToPdfConversionActor,
             batch_size=1,
             num_cpus=1,
@@ -620,7 +629,8 @@ class BatchIngestor(Ingestor):
                 end_page=kwargs.get("end_page"),
             )
         )
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract.pdf_split",
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
             num_cpus=1,
@@ -629,7 +639,8 @@ class BatchIngestor(Ingestor):
 
         # Pre-split pdfs are now ready for extraction — the main CPU bottleneck.
         extraction_actor = PDFExtractionActor(**kwargs)
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract.pdf_extract",
             extraction_actor,
             batch_size=pdf_extract_batch_size,
             batch_format="pandas",
@@ -659,7 +670,8 @@ class BatchIngestor(Ingestor):
             )
             if parse_invoke_url:
                 parse_flags["invoke_url"] = parse_invoke_url
-            self._rd_dataset = self._rd_dataset.map_batches(
+            self._rd_dataset = self._map_batches_logged(
+                "extract.nemotron_parse",
                 NemotronParseActor,
                 batch_size=int(nemotron_parse_batch_size),
                 batch_format="pandas",
@@ -670,7 +682,8 @@ class BatchIngestor(Ingestor):
             )
         else:
             # Page-element detection with a GPU actor pool.
-            self._rd_dataset = self._rd_dataset.map_batches(
+            self._rd_dataset = self._map_batches_logged(
+                "extract.page_elements",
                 PageElementDetectionActor,
                 batch_size=page_elements_batch_size,
                 batch_format="pandas",
@@ -708,7 +721,8 @@ class BatchIngestor(Ingestor):
                 ocr_flags["inference_batch_size"] = int(kwargs["ocr_inference_batch_size"])
 
             if ocr_flags:
-                self._rd_dataset = self._rd_dataset.map_batches(
+                self._rd_dataset = self._map_batches_logged(
+                    "extract.ocr",
                     OCRActor,
                     batch_size=detect_batch_size,
                     batch_format="pandas",
@@ -734,7 +748,8 @@ class BatchIngestor(Ingestor):
         self._extract_txt_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract_txt.split",
             TxtSplitActor,
             batch_size=4,
             batch_format="pandas",
@@ -757,7 +772,8 @@ class BatchIngestor(Ingestor):
         self._extract_html_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract_html.split",
             HtmlSplitActor,
             batch_size=4,
             batch_format="pandas",
@@ -794,14 +810,16 @@ class BatchIngestor(Ingestor):
         audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
         asr_batch_size = kwargs.get("asr_batch_size", 8)
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract_audio.chunk",
             MediaChunkActor,
             batch_size=audio_chunk_batch_size,
             batch_format="pandas",
             num_cpus=1,
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "extract_audio.asr",
             ASRActor,
             batch_size=asr_batch_size,
             batch_format="pandas",
@@ -895,7 +913,8 @@ class BatchIngestor(Ingestor):
             text_elements_modality=text_elements_modality,
             structured_elements_modality=structured_elements_modality,
         )
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "embed.explode",
             _explode_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
@@ -909,7 +928,8 @@ class BatchIngestor(Ingestor):
         else:
             embed_actor_num_gpus = float(getattr(self, "_gpu_embed", worker_heuristic.embed_num_gpus))
 
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "embed.actor",
             _BatchEmbedActor,
             batch_size=embed_batch_size,
             batch_format="pandas",
@@ -947,7 +967,8 @@ class BatchIngestor(Ingestor):
         self._vdb_upload_kwargs = dict(vdb_kwargs)
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
-        self._rd_dataset = self._rd_dataset.map_batches(
+        self._rd_dataset = self._map_batches_logged(
+            "vdb_upload.write",
             _LanceDBWriteActor,
             batch_format="pandas",
             num_cpus=1,
