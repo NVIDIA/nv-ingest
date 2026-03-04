@@ -1,6 +1,6 @@
 [project]
 name = "retrieval-bench"
-dynamic = ["version"]
+version = "0.1.0"
 description = "Retrieval pipeline benchmarking toolkit for ViDoRe V3 and BRIGHT leaderboards."
 authors = []
 readme = "README.md"
@@ -40,12 +40,8 @@ dev = ["pytest>=8.2.1", "ruff>=0.4.5"]
 retrieval-bench = "retrieval_bench.cli.main:app"
 
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling"]
 build-backend = "hatchling.build"
-
-[tool.hatch.version]
-source = "vcs"
-root = ".."
 
 [tool.hatch.metadata]
 allow-direct-references = true
