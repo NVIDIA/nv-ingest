@@ -336,7 +336,7 @@ class BatchIngestor(Ingestor):
         )
         self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
-        ray_nodes = ray.get_nodes()
+        ray_nodes = ray.nodes()
         print(f"Ray nodes: {ray_nodes}")
         node_ips = [node["NodeManagerAddress"] for node in ray_nodes]
         print(f"Cluster has {len(node_ips)} nodes with IPs: {node_ips}")
