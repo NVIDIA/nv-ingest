@@ -27,7 +27,7 @@ import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
-from nemo_retriever.table.table_structure import TableStructureActor
+from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 

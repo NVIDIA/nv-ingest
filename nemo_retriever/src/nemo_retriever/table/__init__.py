@@ -17,7 +17,7 @@ from .config import (
 )
 from .commands import app
 from .processor import extract_table_data_from_primitives_df
-from .table_structure import TableStructureActor, table_structure_ocr_page_elements
+from .table_detection import TableStructureActor, table_structure_ocr_page_elements
 
 __all__ = [
     "app",

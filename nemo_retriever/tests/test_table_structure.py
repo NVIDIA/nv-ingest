@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import base64
 import io
-from typing import Any, Dict, List
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -124,23 +122,29 @@ def _make_page_df(
     image_b64 = _make_b64_png(width, height)
     detections = []
     if has_table:
-        detections.append({
-            "label_name": "table",
-            "bbox_xyxy_norm": [0.0, 0.0, 1.0, 1.0],
-            "score": 0.95,
-        })
-    return pd.DataFrame([{
-        "page_image": {"image_b64": image_b64},
-        "page_elements_v3": {"detections": detections},
-        "page_elements_v3_counts_by_label": {"table": len(detections)},
-    }])
+        detections.append(
+            {
+                "label_name": "table",
+                "bbox_xyxy_norm": [0.0, 0.0, 1.0, 1.0],
+                "score": 0.95,
+            }
+        )
+    return pd.DataFrame(
+        [
+            {
+                "page_image": {"image_b64": image_b64},
+                "page_elements_v3": {"detections": detections},
+                "page_elements_v3_counts_by_label": {"table": len(detections)},
+            }
+        ]
+    )
 
 
 class TestTableStructureOCRPageElements:
     """Test the full table_structure_ocr_page_elements function with mocked models."""
 
     def test_no_tables_produces_empty_table_column(self) -> None:
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
         df = _make_page_df(has_table=False)
         mock_ts_model = MagicMock()
@@ -159,14 +163,20 @@ class TestTableStructureOCRPageElements:
         mock_ocr_model.invoke.assert_not_called()
 
     def test_no_page_image_produces_empty_table_column(self) -> None:
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
-        df = pd.DataFrame([{
-            "page_image": {},
-            "page_elements_v3": {"detections": [
-                {"label_name": "table", "bbox_xyxy_norm": [0.0, 0.0, 1.0, 1.0]},
-            ]},
-        }])
+        df = pd.DataFrame(
+            [
+                {
+                    "page_image": {},
+                    "page_elements_v3": {
+                        "detections": [
+                            {"label_name": "table", "bbox_xyxy_norm": [0.0, 0.0, 1.0, 1.0]},
+                        ]
+                    },
+                }
+            ]
+        )
         mock_ts_model = MagicMock()
         mock_ocr_model = MagicMock()
 
@@ -178,7 +188,7 @@ class TestTableStructureOCRPageElements:
         assert result.iloc[0]["table"] == []
 
     def test_with_mocked_models_produces_markdown(self) -> None:
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
         import torch
 
@@ -218,7 +228,7 @@ class TestTableStructureOCRPageElements:
 
     def test_fallback_to_pseudo_markdown_when_no_cells(self) -> None:
         """When table-structure returns no cells, should fall back to pseudo-markdown."""
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
         import torch
 
@@ -259,7 +269,7 @@ class TestTableStructureOCRPageElements:
 
     def test_model_error_recorded_in_metadata(self) -> None:
         """When model raises an exception, it should be recorded in metadata, not crash."""
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
         df = _make_page_df(width=200, height=100)
 
@@ -282,7 +292,7 @@ class TestTableStructureOCRPageElements:
         assert "model exploded" in meta["error"]["message"]
 
     def test_requires_model_when_no_url(self) -> None:
-        from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+        from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
         df = _make_page_df()
         with pytest.raises(ValueError, match="table_structure_model"):
@@ -302,12 +312,10 @@ class TestTableStructureActor:
 
     def test_actor_error_returns_dataframe_with_error(self) -> None:
         """Actor should never raise; errors go into metadata columns."""
-        from nemo_retriever.table.table_structure import TableStructureActor
+        from nemo_retriever.table.table_detection import TableStructureActor
 
         # Patch model constructors to avoid loading real models.
-        with (
-            patch("nemo_retriever.table.table_structure.TableStructureActor.__init__", return_value=None),
-        ):
+        with (patch("nemo_retriever.table.table_detection.TableStructureActor.__init__", return_value=None),):
             actor = TableStructureActor.__new__(TableStructureActor)
             actor._table_structure_model = None
             actor._ocr_model = None
@@ -344,12 +352,14 @@ class TestTableStructureOCRConfig:
     def test_load_config_with_values(self) -> None:
         from nemo_retriever.table.config import load_table_structure_ocr_config_from_dict
 
-        cfg = load_table_structure_ocr_config_from_dict({
-            "table_structure_invoke_url": "http://ts:8000",
-            "ocr_invoke_url": "http://ocr:8000",
-            "api_key": "secret",
-            "request_timeout_s": 60.0,
-        })
+        cfg = load_table_structure_ocr_config_from_dict(
+            {
+                "table_structure_invoke_url": "http://ts:8000",
+                "ocr_invoke_url": "http://ocr:8000",
+                "api_key": "secret",
+                "request_timeout_s": 60.0,
+            }
+        )
         assert cfg.table_structure_invoke_url == "http://ts:8000"
         assert cfg.ocr_invoke_url == "http://ocr:8000"
         assert cfg.api_key == "secret"
@@ -365,9 +375,13 @@ class TestBuildPlan:
     def test_use_table_structure_selects_structure_stage(self) -> None:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags
 
-        names = list(stage_names_from_flags(
-            extract_tables=True, use_table_structure=True, table_output_format="markdown",
-        ))
+        names = list(
+            stage_names_from_flags(
+                extract_tables=True,
+                use_table_structure=True,
+                table_output_format="markdown",
+            )
+        )
         assert "enrich_table_structure" in names
         assert "enrich_table" not in names
 
@@ -388,7 +402,9 @@ class TestBuildPlan:
     def test_no_extract_tables_yields_nothing(self) -> None:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags
 
-        names = list(stage_names_from_flags(extract_tables=False, use_table_structure=True, table_output_format="markdown"))
+        names = list(
+            stage_names_from_flags(extract_tables=False, use_table_structure=True, table_output_format="markdown")
+        )
         assert "enrich_table_structure" not in names
         assert "enrich_table" not in names
 
@@ -396,9 +412,13 @@ class TestBuildPlan:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags
 
         with pytest.raises(ValueError, match="use_table_structure=True"):
-            list(stage_names_from_flags(
-                extract_tables=True, use_table_structure=False, table_output_format="markdown",
-            ))
+            list(
+                stage_names_from_flags(
+                    extract_tables=True,
+                    use_table_structure=False,
+                    table_output_format="markdown",
+                )
+            )
 
     def test_use_table_structure_with_pseudo_markdown_warns(self) -> None:
         import warnings
@@ -406,9 +426,13 @@ class TestBuildPlan:
 
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
-            names = list(stage_names_from_flags(
-                extract_tables=True, use_table_structure=True, table_output_format="pseudo_markdown",
-            ))
+            names = list(
+                stage_names_from_flags(
+                    extract_tables=True,
+                    use_table_structure=True,
+                    table_output_format="pseudo_markdown",
+                )
+            )
             assert len(w) == 1
             assert "consider using table_output_format='markdown'" in str(w[0].message)
         assert "enrich_table_structure" in names

@@ -32,7 +32,7 @@ from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, Ne
 from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
-from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:

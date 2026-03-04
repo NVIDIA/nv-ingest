@@ -18,7 +18,7 @@ import ray.data as rd
 
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
-from nemo_retriever.table.table_structure import table_structure_ocr_page_elements
+from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 
 from ..pdf.extract import PDFExtractionActor
 from ..pdf.split import PDFSplitActor
