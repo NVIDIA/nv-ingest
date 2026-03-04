@@ -65,6 +65,11 @@ ENV_BATCH_NUM_CPUS = "NEMO_RETRIEVER_BATCH_NUM_CPUS"
 ENV_BATCH_NUM_GPUS = "NEMO_RETRIEVER_BATCH_NUM_GPUS"
 
 
+def _debug_print(message: str) -> None:
+    """Emit a lightweight resource-resolution debug message."""
+    print(f"[resource_heuristics] {message}")
+
+
 def _default_config_path() -> Path:
     """Return the default resource heuristic config path."""
     return Path.home() / ".nemo-retriever" / "config.yaml"
@@ -242,6 +247,9 @@ def _detect_auto_resources(ray_cluster_address: Optional[str] = None) -> SystemR
     try:
         import ray
     except Exception:
+        _debug_print(
+            "Auto-detect: Ray unavailable; using local resources " f"(cpu={local_cpu_count}, gpu={local_gpu_count})."
+        )
         return SystemResources(cpu_count=local_cpu_count, gpu_count=local_gpu_count, source=source)
 
     detected_cpu_count = local_cpu_count
@@ -264,11 +272,17 @@ def _detect_auto_resources(ray_cluster_address: Optional[str] = None) -> SystemR
     except Exception:
         pass
 
-    return SystemResources(
+    detected = SystemResources(
         cpu_count=max(1, detected_cpu_count),
         gpu_count=max(0, detected_gpu_count),
         source=source,
     )
+    _debug_print(
+        "Auto-detect: "
+        f"source={detected.source}, cpu={detected.cpu_count}, gpu={detected.gpu_count}, "
+        f"ray_cluster_address={ray_cluster_address!r}"
+    )
+    return detected
 
 
 def resolve_resource_details(
@@ -319,7 +333,7 @@ def resolve_resource_details(
         resolved_gpu_count = max(0, int(override_gpu_count))
         gpu_source = "arg"
 
-    return ResourceResolutionDetails(
+    resolved = ResourceResolutionDetails(
         cpu_count=resolved_cpu_count,
         gpu_count=resolved_gpu_count,
         cpu_source=cpu_source,
@@ -327,6 +341,22 @@ def resolve_resource_details(
         auto_source=auto.source,
         config_path=str(cfg_path) if cfg_exists else None,
     )
+    _debug_print(
+        "Resolved resources: "
+        f"cpu={resolved.cpu_count} (source={resolved.cpu_source}), "
+        f"gpu={resolved.gpu_count} (source={resolved.gpu_source}), "
+        f"config_path={resolved.config_path or '(not found)'}"
+    )
+    if raw_env_cpu is not None or raw_env_gpu is not None:
+        _debug_print(
+            f"Environment overrides: {ENV_BATCH_NUM_CPUS}={raw_env_cpu!r}, " f"{ENV_BATCH_NUM_GPUS}={raw_env_gpu!r}"
+        )
+    if override_cpu_count is not None or override_gpu_count is not None:
+        _debug_print(
+            "Argument overrides: "
+            f"override_cpu_count={override_cpu_count!r}, override_gpu_count={override_gpu_count!r}"
+        )
+    return resolved
 
 
 @dataclass(frozen=True)
@@ -468,7 +498,7 @@ def resolve_batch_worker_plan(
         detect_num_gpus = float(max(0.0, gpu_per_stage))
         embed_num_gpus = float(max(0.0, gpu_per_stage))
 
-    return WorkerHeuristicResult(
+    result = WorkerHeuristicResult(
         cpu_count=cpu_count,
         gpu_count=gpu_count,
         profile_name=profile_name,
@@ -490,6 +520,15 @@ def resolve_batch_worker_plan(
         embed_num_gpus=embed_num_gpus,
         cpu_threshold_workers=cfg.cpu_threshold_workers,
     )
+    _debug_print(
+        "Worker plan: "
+        f"profile={result.profile_name}, cpu={result.cpu_count}, gpu={result.gpu_count}, "
+        f"workers(page_elements={result.page_elements_workers}, "
+        "detect={result.detect_workers}, embed={result.embed_workers}), "
+        f"gpu_per_stage(page_elements={result.page_elements_num_gpus:.3f}, "
+        f"detect={result.detect_num_gpus:.3f}, embed={result.embed_num_gpus:.3f})"
+    )
+    return result
 
 
 def format_worker_heuristic_summary(
