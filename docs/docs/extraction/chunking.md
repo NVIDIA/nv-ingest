@@ -48,7 +48,8 @@ The `split` task uses a tokenizer to count the number of tokens in the document,
 and splits the document based on the desired maximum chunk size and chunk overlap. 
 We recommend that you use the `meta-llama/Llama-3.2-1B` tokenizer, 
 because it's the same tokenizer as the llama-3.2 embedding model that we use for embedding.
-You can use any tokenizer from any Hugging Face model that includes a tokenizer file; tokenizers are run **locally** (local HF), downloaded from the [Hugging Face Hub](https://huggingface.co/models).
+
+You can use any tokenizer from a Hugging Face model that provides a tokenizer file. Tokenizers run locally (local HF) and can be downloaded directly from the [Hugging Face Hub](https://huggingface.co/models).
 
 Use the `split` method to chunk large documents as shown in the following code.
 
