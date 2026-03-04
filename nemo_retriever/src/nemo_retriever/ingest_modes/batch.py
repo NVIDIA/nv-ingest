@@ -336,24 +336,29 @@ class BatchIngestor(Ingestor):
         )
         self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
-        ray_nodes = ray.nodes()
+        ray_nodes = [node for node in ray.nodes() if bool(node.get("Alive", False))]
         print(f"Ray nodes: {ray_nodes}")
-        node_ips = [node["NodeManagerAddress"] for node in ray_nodes]
-        print(f"Cluster has {len(node_ips)} nodes with IPs: {node_ips}")
+        node_ips = [node["NodeManagerAddress"] for node in ray_nodes if node.get("NodeManagerAddress")]
+        print(f"Cluster has {len(node_ips)} alive node(s) with IPs: {node_ips}")
 
-        # iterate over ray_nodes and get the gpu memory information
-        results = []
+        # Schedule one GPU-memory probe task per alive node by pinning each task
+        # to that node's implicit "node:<ip>" resource.
+        node_probe_refs: list[tuple[str, ray.ObjectRef]] = []
         for node_ip in node_ips:
-            print(f"Node: {node_ip}")
-            gpu_memory_info_ref = _get_gpu_memory_info.remote(node_ip)
-            results.append(gpu_memory_info_ref)
+            print(f"Scheduling GPU probe on node: {node_ip}")
+            node_probe_refs.append(
+                (
+                    node_ip,
+                    _get_gpu_memory_info.options(resources={f"node:{node_ip}": 0.001}).remote(),
+                )
+            )
 
-        # Retrieve all results
-        task_outputs = ray.get(results)
-
-        # Print results
-        for output in task_outputs:
-            print(output)
+        for node_ip, probe_ref in node_probe_refs:
+            try:
+                output = ray.get(probe_ref)
+                print(f"[{node_ip}] GPU memory info: {output}")
+            except Exception as exc:
+                logging.warning("GPU probe failed on node %s: %s", node_ip, exc)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
