@@ -21,6 +21,8 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_resource_details
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_worker_heuristic
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
@@ -257,6 +259,106 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
     print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
 
 
+def _param_source_label(ctx: typer.Context, name: str) -> str:
+    """Best-effort label for where a Typer option value came from."""
+    try:
+        src = ctx.get_parameter_source(name)
+    except Exception:
+        return "unknown"
+    if src is None:
+        return "unknown"
+    s = str(src).lower()
+    if "commandline" in s:
+        return "user"
+    if "environment" in s:
+        return "env"
+    if "default" in s:
+        return "default"
+    return s
+
+
+def _print_heuristic_resources(
+    *,
+    ctx: typer.Context,
+    ingestor: object,
+    ray_address: Optional[str],
+    input_type: str,
+    page_elements_workers: Optional[int],
+    ocr_workers: Optional[int],
+    embed_workers: Optional[int],
+    nemotron_parse_workers: float,
+    gpu_nemotron_parse: float,
+    nemotron_parse_batch_size: float,
+) -> None:
+    """Pretty-print resolved resources, heuristic outputs, and source provenance."""
+    details = resolve_resource_details(ray_address=ray_address)
+    num_cpus = int(getattr(ingestor, "_num_cpus", details.cpu_count))
+    num_gpus = int(getattr(ingestor, "_num_gpus", details.gpu_count))
+
+    use_nemotron_parse_only = (
+        float(nemotron_parse_workers) > 0.0
+        and float(gpu_nemotron_parse) > 0.0
+        and float(nemotron_parse_batch_size) > 0.0
+    )
+    if input_type in {"pdf", "doc"}:
+        detect_stage_count = 1  # extract_tables/charts are enabled in this example.
+        gpu_stage_count = (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
+    else:
+        gpu_stage_count = 1
+
+    heuristic = resolve_worker_heuristic(
+        num_cpus=num_cpus,
+        num_gpus=num_gpus,
+        page_elements_workers=page_elements_workers,
+        detect_workers=ocr_workers,
+        embed_workers=embed_workers,
+        gpu_stage_count=gpu_stage_count,
+    )
+
+    print("\nHeuristic resource resolution:")
+    print(f"  cpu_count: {num_cpus} (source={details.cpu_source})")
+    print(f"  gpu_count: {num_gpus} (source={details.gpu_source})")
+    print(f"  auto_detect_source: {details.auto_source}")
+    if details.config_path:
+        print(f"  config_path: {details.config_path}")
+    else:
+        print("  config_path: (not found)")
+
+    print("  workers:")
+    print(
+        "    page_elements="
+        f"{int(getattr(ingestor, '_page_elements_workers', heuristic.page_elements_workers))} "
+        f"(source={'user' if page_elements_workers is not None else 'heuristic'})"
+    )
+    print(
+        "    detect="
+        f"{int(getattr(ingestor, '_detect_workers', heuristic.detect_workers))} "
+        f"(source={'user' if ocr_workers is not None else 'heuristic'})"
+    )
+    print(
+        "    embed="
+        f"{int(getattr(ingestor, '_embed_workers', heuristic.embed_workers))} "
+        f"(source={'user' if embed_workers is not None else 'heuristic'})"
+    )
+
+    print("  gpu_per_stage:")
+    print(
+        "    page_elements="
+        f"{float(getattr(ingestor, '_gpu_page_elements', heuristic.page_elements_num_gpus)):.3f} "
+        f"(source={_param_source_label(ctx, 'gpu_page_elements')})"
+    )
+    print(
+        "    ocr="
+        f"{float(getattr(ingestor, '_gpu_ocr', heuristic.detect_num_gpus)):.3f} "
+        f"(source={_param_source_label(ctx, 'gpu_ocr')})"
+    )
+    print(
+        "    embed="
+        f"{float(getattr(ingestor, '_gpu_embed', heuristic.embed_num_gpus)):.3f} "
+        f"(source={_param_source_label(ctx, 'gpu_embed')})"
+    )
+
+
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """
     Ensure the local LanceDB URI exists and table can be opened.
@@ -342,6 +444,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 
 @app.command()
 def main(
+    ctx: typer.Context,
     input_dir: Path = typer.Argument(
         ...,
         help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
@@ -840,6 +943,18 @@ def main(
         query_csv = Path(query_csv)
         if not query_csv.exists():
             print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+            _print_heuristic_resources(
+                ctx=ctx,
+                ingestor=ingestor,
+                ray_address=ray_address,
+                input_type=input_type,
+                page_elements_workers=page_elements_workers,
+                ocr_workers=ocr_workers,
+                embed_workers=embed_workers,
+                nemotron_parse_workers=nemotron_parse_workers,
+                gpu_nemotron_parse=gpu_nemotron_parse,
+                nemotron_parse_batch_size=nemotron_parse_batch_size,
+            )
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
@@ -863,6 +978,18 @@ def main(
         try:
             if int(table.count_rows()) == 0:
                 print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+                _print_heuristic_resources(
+                    ctx=ctx,
+                    ingestor=ingestor,
+                    ray_address=ray_address,
+                    input_type=input_type,
+                    page_elements_workers=page_elements_workers,
+                    ocr_workers=ocr_workers,
+                    embed_workers=embed_workers,
+                    nemotron_parse_workers=nemotron_parse_workers,
+                    gpu_nemotron_parse=gpu_nemotron_parse,
+                    nemotron_parse_batch_size=nemotron_parse_batch_size,
+                )
                 _print_pages_per_second(processed_pages, ingest_elapsed_s)
                 return
         except Exception:
@@ -943,6 +1070,18 @@ def main(
         print("\nRecall metrics (matching nemo_retriever.recall.core):")
         for k, v in metrics.items():
             print(f"  {k}: {v:.4f}")
+        _print_heuristic_resources(
+            ctx=ctx,
+            ingestor=ingestor,
+            ray_address=ray_address,
+            input_type=input_type,
+            page_elements_workers=page_elements_workers,
+            ocr_workers=ocr_workers,
+            embed_workers=embed_workers,
+            nemotron_parse_workers=nemotron_parse_workers,
+            gpu_nemotron_parse=gpu_nemotron_parse,
+            nemotron_parse_batch_size=nemotron_parse_batch_size,
+        )
         _print_pages_per_second(processed_pages, ingest_elapsed_s)
     finally:
         # Restore real stdio before closing the mirror file so exception hooks

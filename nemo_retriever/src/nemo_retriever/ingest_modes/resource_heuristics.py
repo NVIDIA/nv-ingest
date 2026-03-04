@@ -125,6 +125,18 @@ class _ResolvedHeuristicConfig:
     max_gpu_per_stage: float
 
 
+@dataclass(frozen=True)
+class ResourceResolutionDetails:
+    """Resolved CPU/GPU values and where each value came from."""
+
+    cpu_count: int
+    gpu_count: int
+    cpu_source: str
+    gpu_source: str
+    auto_source: str
+    config_path: Optional[str]
+
+
 def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) -> _ResolvedHeuristicConfig:
     """Resolve heuristic constants with precedence defaults -> config -> env."""
     cfg = _load_config(filepath)
@@ -221,6 +233,102 @@ def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) ->
     )
 
 
+def _detect_auto_resources(ray_address: Optional[str] = None) -> SystemResources:
+    """Detect base CPU/GPU resources from Ray (if available) or local machine."""
+    local_cpu_count = int(os.cpu_count() or 1)
+    local_gpu_count = int(_detect_local_gpu_count())
+    source = "local"
+
+    try:
+        import ray
+    except Exception:
+        return SystemResources(cpu_count=local_cpu_count, gpu_count=local_gpu_count, source=source)
+
+    detected_cpu_count = local_cpu_count
+    detected_gpu_count = local_gpu_count
+    try:
+        if ray.is_initialized():
+            resources = ray.cluster_resources() or ray.available_resources()
+            detected_cpu_count = int(resources.get("CPU", local_cpu_count))
+            detected_gpu_count = int(resources.get("GPU", local_gpu_count))
+            source = "ray"
+        elif ray_address:
+            ray.init(address=ray_address, ignore_reinit_error=True, log_to_driver=False)
+            try:
+                resources = ray.cluster_resources() or ray.available_resources()
+                detected_cpu_count = int(resources.get("CPU", local_cpu_count))
+                detected_gpu_count = int(resources.get("GPU", local_gpu_count))
+                source = "ray"
+            finally:
+                ray.shutdown()
+    except Exception:
+        pass
+
+    return SystemResources(
+        cpu_count=max(1, detected_cpu_count),
+        gpu_count=max(0, detected_gpu_count),
+        source=source,
+    )
+
+
+def resolve_resource_details(
+    *,
+    ray_address: Optional[str] = None,
+    config_path: str | os.PathLike[str] | None = None,
+    num_cpus: Optional[int] = None,
+    num_gpus: Optional[int] = None,
+) -> ResourceResolutionDetails:
+    """Resolve CPU/GPU counts and annotate precedence source for each value."""
+    auto = _detect_auto_resources(ray_address=ray_address)
+    cfg = _load_config(config_path)
+    cfg_path = _coerce_path(config_path)
+    cfg_exists = cfg_path.exists()
+    cfg_cpu_count = _as_int(_cfg_get(cfg, "resources", "cpu_count"), minimum=1)
+    cfg_gpu_count = _as_int(_cfg_get(cfg, "resources", "gpu_count"), minimum=0)
+
+    resolved_cpu_count = int(auto.cpu_count)
+    resolved_gpu_count = int(auto.gpu_count)
+    cpu_source = f"auto:{auto.source}"
+    gpu_source = f"auto:{auto.source}"
+
+    if cfg_cpu_count is not None:
+        resolved_cpu_count = int(cfg_cpu_count)
+        cpu_source = "config"
+    if cfg_gpu_count is not None:
+        resolved_gpu_count = int(cfg_gpu_count)
+        gpu_source = "config"
+
+    raw_env_cpu = os.getenv(ENV_BATCH_NUM_CPUS)
+    if raw_env_cpu is not None:
+        env_cpu = _as_int(raw_env_cpu, minimum=1)
+        if env_cpu is not None:
+            resolved_cpu_count = int(env_cpu)
+            cpu_source = "env"
+
+    raw_env_gpu = os.getenv(ENV_BATCH_NUM_GPUS)
+    if raw_env_gpu is not None:
+        env_gpu = _as_int(raw_env_gpu, minimum=0)
+        if env_gpu is not None:
+            resolved_gpu_count = int(env_gpu)
+            gpu_source = "env"
+
+    if num_cpus is not None:
+        resolved_cpu_count = max(1, int(num_cpus))
+        cpu_source = "arg"
+    if num_gpus is not None:
+        resolved_gpu_count = max(0, int(num_gpus))
+        gpu_source = "arg"
+
+    return ResourceResolutionDetails(
+        cpu_count=resolved_cpu_count,
+        gpu_count=resolved_gpu_count,
+        cpu_source=cpu_source,
+        gpu_source=gpu_source,
+        auto_source=auto.source,
+        config_path=str(cfg_path) if cfg_exists else None,
+    )
+
+
 @dataclass(frozen=True)
 class SystemResources:
     """Detected compute resources and where they came from."""
@@ -280,53 +388,13 @@ def get_cluster_or_local_resources(
     num_gpus: Optional[int] = None,
 ) -> SystemResources:
     """Return resources with precedence autodetect -> config file -> env/args."""
-    local_cpu_count = int(os.cpu_count() or 1)
-    local_gpu_count = int(_detect_local_gpu_count())
-
-    source = "local"
-    try:
-        import ray
-    except Exception:
-        detected_cpu_count = local_cpu_count
-        detected_gpu_count = local_gpu_count
-    else:
-        detected_cpu_count = local_cpu_count
-        detected_gpu_count = local_gpu_count
-
-        try:
-            if ray.is_initialized():
-                resources = ray.cluster_resources() or ray.available_resources()
-                detected_cpu_count = int(resources.get("CPU", local_cpu_count))
-                detected_gpu_count = int(resources.get("GPU", local_gpu_count))
-                source = "ray"
-            elif ray_address:
-                ray.init(address=ray_address, ignore_reinit_error=True, log_to_driver=False)
-                try:
-                    resources = ray.cluster_resources() or ray.available_resources()
-                    detected_cpu_count = int(resources.get("CPU", local_cpu_count))
-                    detected_gpu_count = int(resources.get("GPU", local_gpu_count))
-                    source = "ray"
-                finally:
-                    ray.shutdown()
-        except Exception:
-            pass
-
-    cfg = _load_config(config_path)
-    cfg_cpu_count = _as_int(_cfg_get(cfg, "resources", "cpu_count"), minimum=1)
-    cfg_gpu_count = _as_int(_cfg_get(cfg, "resources", "gpu_count"), minimum=0)
-
-    resolved_cpu_count = cfg_cpu_count if cfg_cpu_count is not None else detected_cpu_count
-    resolved_gpu_count = cfg_gpu_count if cfg_gpu_count is not None else detected_gpu_count
-
-    resolved_cpu_count = _read_env_int(ENV_BATCH_NUM_CPUS, resolved_cpu_count, minimum=1)
-    resolved_gpu_count = _read_env_int(ENV_BATCH_NUM_GPUS, resolved_gpu_count, minimum=0)
-
-    if num_cpus is not None:
-        resolved_cpu_count = max(1, int(num_cpus))
-    if num_gpus is not None:
-        resolved_gpu_count = max(0, int(num_gpus))
-
-    return SystemResources(cpu_count=resolved_cpu_count, gpu_count=resolved_gpu_count, source=source)
+    details = resolve_resource_details(
+        ray_address=ray_address,
+        config_path=config_path,
+        num_cpus=num_cpus,
+        num_gpus=num_gpus,
+    )
+    return SystemResources(cpu_count=details.cpu_count, gpu_count=details.gpu_count, source=details.auto_source)
 
 
 def resolve_worker_heuristic(
