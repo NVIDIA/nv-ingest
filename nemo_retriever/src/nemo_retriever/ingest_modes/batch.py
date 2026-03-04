@@ -820,6 +820,61 @@ class BatchIngestor(Ingestor):
         )
         return self
 
+    def _add_explode_stage(
+        self,
+        *,
+        embed_modality: str,
+        text_elements_modality: str,
+        structured_elements_modality: str,
+        embed_batch_size: int = 256,
+    ) -> None:
+        """Append repartition + explode_content_to_rows to the current Ray Dataset."""
+        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
+        from functools import partial
+        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
+
+        _explode_fn = partial(
+            explode_content_to_rows,
+            modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+        )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _explode_fn,
+            batch_size=embed_batch_size,
+            batch_format="pandas",
+            num_cpus=1,
+            num_gpus=0,
+        )
+
+    def prepare_for_embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Add the explode stage (repartition + explode_content_to_rows) without the embed actor.
+
+        Use before ``save_intermediate_results(pre_embed_dir)`` to write pre-embed
+        parquet. Later, load with ``ray.data.read_parquet(pre_embed_dir)`` and call
+        ``embed_only(...).vdb_upload(...).ingest()``.
+        """
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs_copy = {
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
+        embed_batch_size = int(kwargs_copy.pop("embed_batch_size", 256))
+        embed_modality = resolved.embed_modality
+        text_elements_modality = resolved.text_elements_modality or embed_modality
+        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        self._add_explode_stage(
+            embed_modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+            embed_batch_size=embed_batch_size,
+        )
+        return self
+
     def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
@@ -837,7 +892,6 @@ class BatchIngestor(Ingestor):
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
         """
-
         resolved = _coerce_params(params, EmbedParams, kwargs)
         kwargs = {
             **resolved.model_dump(
@@ -870,41 +924,73 @@ class BatchIngestor(Ingestor):
             )
             embed_workers = int(endpoint_count)
 
-        # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
         text_elements_modality = resolved.text_elements_modality or embed_modality
         structured_elements_modality = resolved.structured_elements_modality or embed_modality
         self._tasks.append(("embed", dict(kwargs)))
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
-
-        from functools import partial
-        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
-
-        _explode_fn = partial(
-            explode_content_to_rows,
-            modality=embed_modality,
+        self._add_explode_stage(
+            embed_modality=embed_modality,
             text_elements_modality=text_elements_modality,
             structured_elements_modality=structured_elements_modality,
-        )
-        self._rd_dataset = self._rd_dataset.map_batches(
-            _explode_fn,
-            batch_size=embed_batch_size,
-            batch_format="pandas",
-            num_cpus=1,
-            num_gpus=0,
+            embed_batch_size=embed_batch_size,
         )
 
-        # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
             gpu_per_stage = 0
         else:
-            # Embedding is GPU-bound; only needs modest CPU for tokenisation.
-            # Requesting all CPUs would prevent this stage from overlapping with
-            # upstream extraction/detection in Ray Data's streaming pipeline.
+            gpu_per_stage = getattr(self, "_gpu_embed", 1.0)
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _BatchEmbedActor,
+            batch_size=embed_batch_size,
+            batch_format="pandas",
+            num_cpus=embed_cpus_per_actor,
+            num_gpus=gpu_per_stage,
+            compute=rd.ActorPoolStrategy(size=embed_workers),
+            fn_constructor_kwargs={"params": resolved},
+        )
+
+        return self
+
+    def embed_only(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Add only the _BatchEmbedActor stage (no repartition, no explode).
+
+        Assumes ``self._rd_dataset`` is already the post-explode dataset, e.g. from
+        ``ray.data.read_parquet(pre_embed_dir)``. Chain with ``vdb_upload(...).ingest()``.
+        """
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs_copy = {
+            **resolved.model_dump(
+                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
+            ),
+            **resolved.runtime.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
+
+        def _endpoint_count(raw: Any) -> int:
+            s = str(raw or "").strip()
+            if not s:
+                return 0
+            return len([p for p in s.split(",") if p.strip()])
+
+        embed_workers = kwargs_copy.pop("embed_workers", 1)
+        embed_batch_size = kwargs_copy.pop("embed_batch_size", 256)
+        embed_cpus_per_actor = float(kwargs_copy.pop("embed_cpus_per_actor", 1))
+
+        if "embedding_endpoint" not in kwargs_copy and kwargs_copy.get("embed_invoke_url"):
+            kwargs_copy["embedding_endpoint"] = kwargs_copy.get("embed_invoke_url")
+
+        endpoint_count = _endpoint_count(kwargs_copy.get("embedding_endpoint"))
+        if endpoint_count > 0 and int(embed_workers) != int(endpoint_count):
+            embed_workers = int(endpoint_count)
+
+        endpoint = (kwargs_copy.get("embedding_endpoint") or kwargs_copy.get("embed_invoke_url") or "").strip()
+        if endpoint:
+            gpu_per_stage = 0
+        else:
             gpu_per_stage = getattr(self, "_gpu_embed", 1.0)
 
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -1014,7 +1100,10 @@ class BatchIngestor(Ingestor):
         num_pages = self._rd_dataset.count()
         elapsed = time.monotonic() - t0
 
-        print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
+        if len(self._input_documents) == 0:
+            print(f"[done] Embedded {num_pages} rows from pre-embed in {elapsed:.1f}s")
+        else:
+            print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
         # region agent log
         _debug_log(
             run_id=str(runtime_metrics_prefix or "unknown"),

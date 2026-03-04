@@ -139,6 +139,17 @@ def run(
         min=1,
         help="Batch size for local HF embedding inference.",
     ),
+    use_vllm_offline: bool = typer.Option(
+        False,
+        "--use-vllm-offline/--no-use-vllm-offline",
+        help="Use vLLM offline Python API (no server) for embeddings.",
+    ),
+    embed_model_path: Optional[Path] = typer.Option(
+        None,
+        "--embed-model-path",
+        path_type=Path,
+        help="Local path to model for vLLM offline (optional; else uses --model-name).",
+    ),
     overwrite: bool = typer.Option(False, "--overwrite", help="Overwrite existing outputs."),
     limit: Optional[int] = typer.Option(None, "--limit", min=1, help="Optionally limit number of input files."),
     write_embedding_input: bool = typer.Option(
@@ -162,14 +173,20 @@ def run(
     task_cfg: Dict[str, Any] = {}
     if api_key is not None:
         task_cfg["api_key"] = api_key
-    if endpoint_url is not None:
+    if use_vllm_offline:
+        task_cfg["use_vllm_offline"] = True
+        task_cfg["embed_model_path"] = str(embed_model_path) if embed_model_path is not None else None
+        if model_name is not None:
+            task_cfg["model_name"] = model_name
+        task_cfg["endpoint_url"] = None
+    elif endpoint_url is not None:
         value = endpoint_url.strip()
         task_cfg["endpoint_url"] = None if value.lower() in ("", "none", "null") else value
     elif not cfg_dict.get("embedding_nim_endpoint"):
         # No CLI endpoint and no config-file endpoint — override the schema default
         # so maybe_inject_local_hf_embedder() will inject the local HF fallback.
         task_cfg["endpoint_url"] = None
-    if model_name is not None:
+    if model_name is not None and "model_name" not in task_cfg:
         task_cfg["model_name"] = model_name
     if dimensions is not None:
         task_cfg["dimensions"] = int(dimensions)
