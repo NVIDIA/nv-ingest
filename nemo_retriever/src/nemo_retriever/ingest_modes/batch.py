@@ -219,6 +219,10 @@ class _LanceDBWriteActor:
             rows.append(row_out)
         return rows
 
+    # Columns that can trigger "cannot call vectorize on size 0 inputs" when Ray/Lance
+    # compute size; safe to drop for perf comparison (we only need ingest to complete).
+    _DROP_COLS_FOR_SIZE_GUARD = ("images", "tables", "charts", "infographics", "infographic")
+
     def __call__(self, batch_df: Any) -> Any:
         rows = self._build_rows(batch_df)
         if rows:
@@ -229,6 +233,11 @@ class _LanceDBWriteActor:
 
             self._total_rows += len(rows)
 
+        # Drop list columns that cause "vectorize on size 0 inputs" in size calculation.
+        if hasattr(batch_df, "columns"):
+            drop = [c for c in self._DROP_COLS_FOR_SIZE_GUARD if c in batch_df.columns]
+            if drop:
+                batch_df = batch_df.drop(columns=drop)
         return batch_df
 
 
@@ -314,6 +323,98 @@ class _BatchEmbedActor:
         if getattr(self, "_vllm_llm", None) is not None:
             kwargs["vllm_llm"] = self._vllm_llm
         return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
+
+
+class _EmbedServiceActorImpl:
+    """Long-lived actor that holds a single embedder (HF or vLLM). Same init as _BatchEmbedActor."""
+
+    def __init__(self, params: EmbedParams) -> None:
+        self._params = params
+        self._kwargs = {
+            **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
+            **params.runtime.model_dump(mode="python", exclude_none=True),
+        }
+        if "embedding_endpoint" not in self._kwargs and self._kwargs.get("embed_invoke_url"):
+            self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url")
+
+        endpoint = (self._kwargs.get("embedding_endpoint") or self._kwargs.get("embed_invoke_url") or "").strip()
+        if endpoint:
+            self._model = None
+            return
+
+        if self._kwargs.get("embed_use_vllm_offline"):
+            self._model = None
+            from nemo_retriever.text_embed.vllm_offline import create_vllm_llm
+
+            embed_model = (
+                self._kwargs.get("embed_model_path")
+                or self._kwargs.get("embed_model_name")
+                or self._kwargs.get("model_name")
+                or ""
+            )
+            self._vllm_llm = create_vllm_llm(
+                str(embed_model),
+                dimensions=self._kwargs.get("dimensions"),
+                gpu_memory_utilization=float(self._kwargs.get("gpu_memory_utilization", 0.45)),
+                enforce_eager=bool(self._kwargs.get("enforce_eager", False)),
+                compile_cache_dir=self._kwargs.get("compile_cache_dir"),
+            )
+            return
+
+        device = self._kwargs.get("device")
+        hf_cache_dir = self._kwargs.get("hf_cache_dir")
+        normalize = bool(self._kwargs.get("normalize", True))
+        max_length = int(self._kwargs.get("max_length", 8192))
+        model_name_raw = self._kwargs.get("model_name")
+
+        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+
+        model_id = resolve_embed_model(model_name_raw)
+
+        if is_vl_embed_model(model_name_raw):
+            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+                LlamaNemotronEmbedVL1BV2Embedder,
+            )
+
+            self._model = LlamaNemotronEmbedVL1BV2Embedder(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                model_id=model_id,
+            )
+        else:
+            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
+                LlamaNemotronEmbed1BV2Embedder,
+            )
+
+            self._model = LlamaNemotronEmbed1BV2Embedder(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                normalize=normalize,
+                max_length=max_length,
+                model_id=model_id,
+            )
+
+    def embed_batch(self, batch_df: Any) -> Any:
+        from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
+
+        kwargs = dict(self._kwargs)
+        if getattr(self, "_vllm_llm", None) is not None:
+            kwargs["vllm_llm"] = self._vllm_llm
+        return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
+
+
+EmbedServiceActor = ray.remote(num_gpus=1)(_EmbedServiceActorImpl)
+
+
+class EmbedViaService:
+    """Stateless callable for map_batches: forwards each batch to a named EmbedServiceActor."""
+
+    def __init__(self, service_name: str) -> None:
+        self._service_name = service_name
+
+    def __call__(self, batch_df: Any) -> Any:
+        actor = ray.get_actor(self._service_name)
+        return ray.get(actor.embed_batch.remote(batch_df))
 
 
 class BatchIngestor(Ingestor):
@@ -961,6 +1062,8 @@ class BatchIngestor(Ingestor):
         Assumes ``self._rd_dataset`` is already the post-explode dataset, e.g. from
         ``ray.data.read_parquet(pre_embed_dir)``. Chain with ``vdb_upload(...).ingest()``.
         """
+        # embedding_service_name is not on EmbedParams; pop from kwargs before _coerce_params so it is not lost.
+        embedding_service_name = kwargs.pop("embedding_service_name", None)
         resolved = _coerce_params(params, EmbedParams, kwargs)
         kwargs_copy = {
             **resolved.model_dump(
@@ -993,15 +1096,24 @@ class BatchIngestor(Ingestor):
         else:
             gpu_per_stage = getattr(self, "_gpu_embed", 1.0)
 
-        self._rd_dataset = self._rd_dataset.map_batches(
-            _BatchEmbedActor,
-            batch_size=embed_batch_size,
-            batch_format="pandas",
-            num_cpus=embed_cpus_per_actor,
-            num_gpus=gpu_per_stage,
-            compute=rd.ActorPoolStrategy(size=embed_workers),
-            fn_constructor_kwargs={"params": resolved},
-        )
+        if embedding_service_name is not None:
+            self._rd_dataset = self._rd_dataset.map_batches(
+                EmbedViaService(embedding_service_name),
+                batch_size=embed_batch_size,
+                batch_format="pandas",
+                num_cpus=1,
+                num_gpus=0,
+            )
+        else:
+            self._rd_dataset = self._rd_dataset.map_batches(
+                _BatchEmbedActor,
+                batch_size=embed_batch_size,
+                batch_format="pandas",
+                num_cpus=embed_cpus_per_actor,
+                num_gpus=gpu_per_stage,
+                compute=rd.ActorPoolStrategy(size=embed_workers),
+                fn_constructor_kwargs={"params": resolved},
+            )
 
         return self
 
