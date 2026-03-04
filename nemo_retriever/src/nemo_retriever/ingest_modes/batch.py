@@ -335,6 +335,14 @@ class BatchIngestor(Ingestor):
         )
         self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
+        ray_nodes = ray.get_nodes()
+        print(f"Ray nodes: {ray_nodes}")
+
+        # iterate over ray_nodes and get the gpu memory information
+        for node in ray_nodes:
+            print(f"Node: {node}")
+            print(f"GPU memory: {node['Resources']['GPU']}")
+
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
         # (older examples/tests) by ensuring both names refer to the same list.

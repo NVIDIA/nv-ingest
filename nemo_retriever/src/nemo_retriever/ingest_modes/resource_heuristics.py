@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import ray
+
 """Helpers for inferring batch-stage worker and GPU allocations.
 
 This module centralizes small, environment-overridable heuristics used by the
@@ -98,6 +100,7 @@ MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
 }
 
 
+@ray.remote
 def _get_gpu_memory_info() -> dict[int, int]:
     """Get the memory information for each GPU."""
     from pynvml import (
@@ -107,17 +110,32 @@ def _get_gpu_memory_info() -> dict[int, int]:
         nvmlDeviceGetHandleByIndex,
         nvmlDeviceGetMemoryInfo,
         nvmlShutdown,
+        nvmlDeviceGetName,
+        nvmlDeviceGetUUID,
+        nvmlDeviceGetBrand,
+        nvmlDeviceGetProductName,
+        nvmlDeviceGetProductBrand,
+        nvmlDeviceGetProductSeries,
+        nvmlDeviceGetProductArchitecture,
+        nvmlDeviceGetProductGeneration,
+        nvmlDeviceGetProductRevision,
+        nvmlDeviceGetProductVersion,
+        nvmlDeviceGetProductVersionMajor,
+        nvmlDeviceGetProductVersionMinor,
     )
 
     # Initialize the NVML library
     nvmlInit()
 
-    print(f"Driver Version: {nvmlSystemGetDriverVersion()}")
+    driver_version = nvmlSystemGetDriverVersion()
+    print(f"Driver Version: {driver_version}")
 
     # Get the number of available GPUs
     device_count = nvmlDeviceGetCount()
 
     print(f"Found {device_count} GPU(s).")
+
+    gpus_info = {}
 
     # Iterate over each GPU to get memory information
     for i in range(device_count):
@@ -127,14 +145,48 @@ def _get_gpu_memory_info() -> dict[int, int]:
         # Get memory information (total, free, used) in bytes
         info = nvmlDeviceGetMemoryInfo(handle)
 
+        gpu_name = nvmlDeviceGetName(handle)
+        gpu_uuid = nvmlDeviceGetUUID(handle)
+        gpu_brand = nvmlDeviceGetBrand(handle)
+        gpu_product_name = nvmlDeviceGetProductName(handle)
+        gpu_product_brand = nvmlDeviceGetProductBrand(handle)
+        gpu_product_series = nvmlDeviceGetProductSeries(handle)
+        gpu_product_architecture = nvmlDeviceGetProductArchitecture(handle)
+        gpu_product_generation = nvmlDeviceGetProductGeneration(handle)
+        gpu_product_revision = nvmlDeviceGetProductRevision(handle)
+        gpu_product_version = nvmlDeviceGetProductVersion(handle)
+        gpu_product_version_major = nvmlDeviceGetProductVersionMajor(handle)
+        gpu_product_version_minor = nvmlDeviceGetProductVersionMinor(handle)
+
         print(f"\n--- GPU {i} ---")
         # Convert bytes to MiB for better readability (1 MiB = 1024*1024 bytes)
         print(f"Total memory: {info.total // (1024**2)} MiB")
         print(f"Used memory: {info.used // (1024**2)} MiB")
         print(f"Free memory: {info.free // (1024**2)} MiB")
 
+        gpus_info[i] = {
+            "drvier_version": driver_version,
+            "gpu_name": gpu_name,
+            "gpu_uuid": gpu_uuid,
+            "gpu_brand": gpu_brand,
+            "gpu_product_name": gpu_product_name,
+            "gpu_product_brand": gpu_product_brand,
+            "gpu_product_series": gpu_product_series,
+            "gpu_product_architecture": gpu_product_architecture,
+            "gpu_product_generation": gpu_product_generation,
+            "gpu_product_revision": gpu_product_revision,
+            "gpu_product_version": gpu_product_version,
+            "gpu_product_version_major": gpu_product_version_major,
+            "gpu_product_version_minor": gpu_product_version_minor,
+            "total": info.total // (1024**2),
+            "used": info.used // (1024**2),
+            "free": info.free // (1024**2),
+        }
+
     # Shutdown the NVML library when finished
     nvmlShutdown()
+
+    return gpus_info
 
 
 def _debug_print(message: str) -> None:
