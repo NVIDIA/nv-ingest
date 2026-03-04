@@ -21,8 +21,9 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
+from nemo_retriever.ingest_modes.resource_heuristics import freeze_resource_config as freeze_resource_config_file
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
 from nemo_retriever.ingest_modes.resource_heuristics import resolve_resource_details
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_worker_heuristic
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
@@ -281,43 +282,45 @@ def _print_heuristic_resources(
     *,
     ctx: typer.Context,
     ingestor: object,
-    ray_address: Optional[str],
+    ray_cluster_address: Optional[str],
     input_type: str,
-    page_elements_workers: Optional[int],
-    ocr_workers: Optional[int],
-    embed_workers: Optional[int],
-    nemotron_parse_workers: float,
-    gpu_nemotron_parse: float,
-    nemotron_parse_batch_size: float,
+    page_elements_actors: Optional[int],
+    ocr_actors: Optional[int],
+    embed_actors: Optional[int],
+    nemotron_parse_actors: float,
+    nemotron_parse_gpus_per_actor: float,
+    nemotron_parse_ray_batch_size: float,
 ) -> None:
     """Pretty-print resolved resources, heuristic outputs, and source provenance."""
-    details = resolve_resource_details(ray_address=ray_address)
-    num_cpus = int(getattr(ingestor, "_num_cpus", details.cpu_count))
-    num_gpus = int(getattr(ingestor, "_num_gpus", details.gpu_count))
+    details = resolve_resource_details(ray_cluster_address=ray_cluster_address)
+    override_cpu_count = int(getattr(ingestor, "_num_cpus", details.cpu_count))
+    override_gpu_count = int(getattr(ingestor, "_num_gpus", details.gpu_count))
 
     use_nemotron_parse_only = (
-        float(nemotron_parse_workers) > 0.0
-        and float(gpu_nemotron_parse) > 0.0
-        and float(nemotron_parse_batch_size) > 0.0
+        float(nemotron_parse_actors) > 0.0
+        and float(nemotron_parse_gpus_per_actor) > 0.0
+        and float(nemotron_parse_ray_batch_size) > 0.0
     )
     if input_type in {"pdf", "doc"}:
         detect_stage_count = 1  # extract_tables/charts are enabled in this example.
-        gpu_stage_count = (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
+        concurrent_gpu_stage_count = (
+            (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
+        )
     else:
-        gpu_stage_count = 1
+        concurrent_gpu_stage_count = 1
 
-    heuristic = resolve_worker_heuristic(
-        num_cpus=num_cpus,
-        num_gpus=num_gpus,
-        page_elements_workers=page_elements_workers,
-        detect_workers=ocr_workers,
-        embed_workers=embed_workers,
-        gpu_stage_count=gpu_stage_count,
+    heuristic = resolve_batch_worker_plan(
+        override_cpu_count=override_cpu_count,
+        override_gpu_count=override_gpu_count,
+        override_page_elements_actors=page_elements_actors,
+        override_ocr_actors=ocr_actors,
+        override_embed_actors=embed_actors,
+        concurrent_gpu_stage_count=concurrent_gpu_stage_count,
     )
 
     print("\nHeuristic resource resolution:")
-    print(f"  cpu_count: {num_cpus} (source={details.cpu_source})")
-    print(f"  gpu_count: {num_gpus} (source={details.gpu_source})")
+    print(f"  cpu_count: {override_cpu_count} (source={details.cpu_source})")
+    print(f"  gpu_count: {override_gpu_count} (source={details.gpu_source})")
     print(f"  auto_detect_source: {details.auto_source}")
     if details.config_path:
         print(f"  config_path: {details.config_path}")
@@ -328,34 +331,34 @@ def _print_heuristic_resources(
     print(
         "    page_elements="
         f"{int(getattr(ingestor, '_page_elements_workers', heuristic.page_elements_workers))} "
-        f"(source={'user' if page_elements_workers is not None else 'heuristic'})"
+        f"(source={'user' if page_elements_actors is not None else 'heuristic'})"
     )
     print(
         "    detect="
         f"{int(getattr(ingestor, '_detect_workers', heuristic.detect_workers))} "
-        f"(source={'user' if ocr_workers is not None else 'heuristic'})"
+        f"(source={'user' if ocr_actors is not None else 'heuristic'})"
     )
     print(
         "    embed="
         f"{int(getattr(ingestor, '_embed_workers', heuristic.embed_workers))} "
-        f"(source={'user' if embed_workers is not None else 'heuristic'})"
+        f"(source={'user' if embed_actors is not None else 'heuristic'})"
     )
 
     print("  gpu_per_stage:")
     print(
         "    page_elements="
         f"{float(getattr(ingestor, '_gpu_page_elements', heuristic.page_elements_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'gpu_page_elements')})"
+        f"(source={_param_source_label(ctx, 'page_elements_gpus_per_actor')})"
     )
     print(
         "    ocr="
         f"{float(getattr(ingestor, '_gpu_ocr', heuristic.detect_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'gpu_ocr')})"
+        f"(source={_param_source_label(ctx, 'ocr_gpus_per_actor')})"
     )
     print(
         "    embed="
         f"{float(getattr(ingestor, '_gpu_embed', heuristic.embed_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'gpu_embed')})"
+        f"(source={_param_source_label(ctx, 'embed_gpus_per_actor')})"
     )
 
 
@@ -486,15 +489,15 @@ def main(
             "Only the missed-gold summary and recall metrics are printed."
         ),
     ),
-    pdf_extract_workers: int = typer.Option(
+    pdf_extract_tasks: int = typer.Option(
         12,
-        "--pdf-extract-workers",
+        "--pdf-extract-tasks",
         min=1,
-        help="Number of CPU workers for PDF extraction stage.",
+        help="Number of CPU tasks for PDF extraction stage.",
     ),
-    pdf_extract_num_cpus: float = typer.Option(
+    pdf_extract_cpus_per_task: float = typer.Option(
         2.0,
-        "--pdf-extract-num-cpus",
+        "--pdf-extract-cpus-per-task",
         min=0.1,
         help="CPUs reserved per PDF extraction task.",
     ),
@@ -510,39 +513,39 @@ def main(
         min=1,
         help="Batch size for PDF split stage.",
     ),
-    page_elements_batch_size: int = typer.Option(
+    page_elements_ray_batch_size: int = typer.Option(
         24,
-        "--page-elements-batch-size",
+        "--page-elements-ray-batch-size",
         min=1,
         help="Ray Data batch size for page-elements stage.",
     ),
-    page_elements_inference_batch_size: int = typer.Option(
+    page_elements_model_batch_size: int = typer.Option(
         8,
-        "--page-elements-inference-batch-size",
+        "--page-elements-model-batch-size",
         min=1,
         help="Model inference chunk size for PageElementDetectionActor only.",
     ),
-    ocr_workers: Optional[int] = typer.Option(
+    ocr_actors: Optional[int] = typer.Option(
         None,
-        "--ocr-workers",
+        "--ocr-actors",
         min=1,
         help="Actor count for OCR stage. Omit to use resource heuristic.",
     ),
-    page_elements_workers: Optional[int] = typer.Option(
+    page_elements_actors: Optional[int] = typer.Option(
         None,
-        "--page-elements-workers",
+        "--page-elements-actors",
         min=1,
         help="Actor count for page-elements stage. Omit to use resource heuristic.",
     ),
-    ocr_batch_size: int = typer.Option(
+    ocr_ray_batch_size: int = typer.Option(
         16,
-        "--ocr-batch-size",
+        "--ocr-ray-batch-size",
         min=1,
         help="Ray Data batch size for OCR stage.",
     ),
-    ocr_inference_batch_size: int = typer.Option(
+    ocr_model_batch_size: int = typer.Option(
         8,
-        "--ocr-inference-batch-size",
+        "--ocr-model-batch-size",
         min=1,
         help="Model inference chunk size for OCRActor only.",
     ),
@@ -558,15 +561,15 @@ def main(
         min=0.1,
         help="CPUs reserved per OCR actor.",
     ),
-    embed_workers: Optional[int] = typer.Option(
+    embed_actors: Optional[int] = typer.Option(
         None,
-        "--embed-workers",
+        "--embed-actors",
         min=1,
         help="Actor count for embedding stage. Omit to use resource heuristic.",
     ),
-    embed_batch_size: int = typer.Option(
+    embed_ray_batch_size: int = typer.Option(
         256,
-        "--embed-batch-size",
+        "--embed-ray-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
     ),
@@ -576,28 +579,28 @@ def main(
         min=0.1,
         help="CPUs reserved per embedding actor.",
     ),
-    gpu_page_elements: float = typer.Option(
+    page_elements_gpus_per_actor: float = typer.Option(
         0.5,
-        "--gpu-page-elements",
+        "--page-elements-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per page-elements actor.",
     ),
-    gpu_ocr: float = typer.Option(
+    ocr_gpus_per_actor: float = typer.Option(
         1.0,
-        "--gpu-ocr",
+        "--ocr-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per OCR actor.",
     ),
-    gpu_embed: float = typer.Option(
+    embed_gpus_per_actor: float = typer.Option(
         0.5,
-        "--gpu-embed",
+        "--embed-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per embedding actor.",
     ),
     # fmt: off
-    nemotron_parse_workers: float = typer.Option(
+    nemotron_parse_actors: float = typer.Option(
         0.0,
-        "--nemotron-parse-workers",
+        "--nemotron-parse-actors",
         min=0.0,
         help=(
             "Actor count for Nemotron Parse stage "
@@ -605,15 +608,15 @@ def main(
         ),  # noqa: E501
     ),
     # fmt: on
-    gpu_nemotron_parse: float = typer.Option(
+    nemotron_parse_gpus_per_actor: float = typer.Option(
         0.0,
-        "--gpu-nemotron-parse",
+        "--nemotron-parse-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per Nemotron Parse actor.",
     ),
-    nemotron_parse_batch_size: float = typer.Option(
+    nemotron_parse_ray_batch_size: float = typer.Option(
         0.0,
-        "--nemotron-parse-batch-size",
+        "--nemotron-parse-ray-batch-size",
         min=0.0,
         help="Ray Data batch size for Nemotron Parse stage "
         "(enables parse-only mode when > 0.0 with parse workers/GPU).",
@@ -667,6 +670,11 @@ def main(
         "--runtime-metrics-prefix",
         help="Optional filename prefix for per-run metrics artifacts.",
     ),
+    freeze_resource_config: bool = typer.Option(
+        False,
+        "--freeze_resource_config",
+        help="Write resolved resource heuristic config to $HOME/.nemo-retriever/config.yaml before ingest starts.",
+    ),
     lancedb_uri: str = typer.Option(
         LANCEDB_URI,
         "--lancedb-uri",
@@ -705,20 +713,26 @@ def main(
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
 
         # Remote endpoints don't need local model GPUs for their stage.
-        if page_elements_invoke_url and float(gpu_page_elements) != 0.0:
+        if page_elements_invoke_url and float(page_elements_gpus_per_actor) != 0.0:
             print(
-                "[WARN] --page-elements-invoke-url is set; forcing --gpu-page-elements from "
-                f"{float(gpu_page_elements):.3f} to 0.0"
+                "[WARN] --page-elements-invoke-url is set; forcing --page-elements-gpus-per-actor from "
+                f"{float(page_elements_gpus_per_actor):.3f} to 0.0"
             )
-            gpu_page_elements = 0.0
+            page_elements_gpus_per_actor = 0.0
 
-        if ocr_invoke_url and float(gpu_ocr) != 0.0:
-            print("[WARN] --ocr-invoke-url is set; forcing --gpu-ocr from " f"{float(gpu_ocr):.3f} to 0.0")
-            gpu_ocr = 0.0
+        if ocr_invoke_url and float(ocr_gpus_per_actor) != 0.0:
+            print(
+                "[WARN] --ocr-invoke-url is set; forcing --ocr-gpus-per-actor from "
+                f"{float(ocr_gpus_per_actor):.3f} to 0.0"
+            )
+            ocr_gpus_per_actor = 0.0
 
-        if embed_invoke_url and float(gpu_embed) != 0.0:
-            print("[WARN] --embed-invoke-url is set; forcing --gpu-embed from " f"{float(gpu_embed):.3f} to 0.0")
-            gpu_embed = 0.0
+        if embed_invoke_url and float(embed_gpus_per_actor) != 0.0:
+            print(
+                "[WARN] --embed-invoke-url is set; forcing --embed-gpus-per-actor from "
+                f"{float(embed_gpus_per_actor):.3f} to 0.0"
+            )
+            embed_gpus_per_actor = 0.0
 
         # Resolve Ray: start a head node, connect to given address, or run in-process
         if start_ray:
@@ -801,28 +815,28 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
-                        inference_batch_size=int(page_elements_inference_batch_size),
+                        inference_batch_size=int(page_elements_model_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
                             "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": int(pdf_extract_workers),
-                            "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                            "pdf_extract_workers": int(pdf_extract_tasks),
+                            "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
-                            "page_elements_batch_size": int(page_elements_batch_size),
-                            "page_elements_workers": page_elements_workers,
-                            "detect_workers": ocr_workers,
-                            "detect_batch_size": int(ocr_batch_size),
-                            "ocr_inference_batch_size": int(ocr_inference_batch_size),
+                            "page_elements_batch_size": int(page_elements_ray_batch_size),
+                            "page_elements_workers": page_elements_actors,
+                            "detect_workers": ocr_actors,
+                            "detect_batch_size": int(ocr_ray_batch_size),
+                            "ocr_inference_batch_size": int(ocr_model_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
-                            "gpu_page_elements": float(gpu_page_elements),
-                            "gpu_ocr": float(gpu_ocr),
-                            "gpu_embed": float(gpu_embed),
-                            "nemotron_parse_workers": float(nemotron_parse_workers),
-                            "gpu_nemotron_parse": float(gpu_nemotron_parse),
-                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
+                            "gpu_page_elements": float(page_elements_gpus_per_actor),
+                            "gpu_ocr": float(ocr_gpus_per_actor),
+                            "gpu_embed": float(embed_gpus_per_actor),
+                            "nemotron_parse_workers": float(nemotron_parse_actors),
+                            "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
+                            "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
                         },
                     )
                 )
@@ -834,8 +848,8 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         batch_tuning={
-                            "embed_workers": embed_workers,
-                            "embed_batch_size": int(embed_batch_size),
+                            "embed_workers": embed_actors,
+                            "embed_batch_size": int(embed_ray_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
                     )
@@ -866,28 +880,28 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
-                        inference_batch_size=int(page_elements_inference_batch_size),
+                        inference_batch_size=int(page_elements_model_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
                             "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": int(pdf_extract_workers),
-                            "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                            "pdf_extract_workers": int(pdf_extract_tasks),
+                            "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
-                            "page_elements_batch_size": int(page_elements_batch_size),
-                            "page_elements_workers": page_elements_workers,
-                            "detect_workers": ocr_workers,
-                            "detect_batch_size": int(ocr_batch_size),
-                            "ocr_inference_batch_size": int(ocr_inference_batch_size),
+                            "page_elements_batch_size": int(page_elements_ray_batch_size),
+                            "page_elements_workers": page_elements_actors,
+                            "detect_workers": ocr_actors,
+                            "detect_batch_size": int(ocr_ray_batch_size),
+                            "ocr_inference_batch_size": int(ocr_model_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
-                            "gpu_page_elements": float(gpu_page_elements),
-                            "gpu_ocr": float(gpu_ocr),
-                            "gpu_embed": float(gpu_embed),
-                            "nemotron_parse_workers": float(nemotron_parse_workers),
-                            "gpu_nemotron_parse": float(gpu_nemotron_parse),
-                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
+                            "gpu_page_elements": float(page_elements_gpus_per_actor),
+                            "gpu_ocr": float(ocr_gpus_per_actor),
+                            "gpu_embed": float(embed_gpus_per_actor),
+                            "nemotron_parse_workers": float(nemotron_parse_actors),
+                            "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
+                            "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
                         },
                     )
                 )
@@ -899,8 +913,8 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         batch_tuning={
-                            "embed_workers": embed_workers,
-                            "embed_batch_size": int(embed_batch_size),
+                            "embed_workers": embed_actors,
+                            "embed_batch_size": int(embed_ray_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
                     )
@@ -917,6 +931,10 @@ def main(
                     )
                 )
             )
+
+        if freeze_resource_config:
+            frozen_path = freeze_resource_config_file(ray_cluster_address=ray_address)
+            print(f"Froze resource configuration to {frozen_path}")
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
@@ -946,14 +964,14 @@ def main(
             _print_heuristic_resources(
                 ctx=ctx,
                 ingestor=ingestor,
-                ray_address=ray_address,
+                ray_cluster_address=ray_address,
                 input_type=input_type,
-                page_elements_workers=page_elements_workers,
-                ocr_workers=ocr_workers,
-                embed_workers=embed_workers,
-                nemotron_parse_workers=nemotron_parse_workers,
-                gpu_nemotron_parse=gpu_nemotron_parse,
-                nemotron_parse_batch_size=nemotron_parse_batch_size,
+                page_elements_actors=page_elements_actors,
+                ocr_actors=ocr_actors,
+                embed_actors=embed_actors,
+                nemotron_parse_actors=nemotron_parse_actors,
+                nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+                nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
             )
             _print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
@@ -981,14 +999,14 @@ def main(
                 _print_heuristic_resources(
                     ctx=ctx,
                     ingestor=ingestor,
-                    ray_address=ray_address,
+                    ray_cluster_address=ray_address,
                     input_type=input_type,
-                    page_elements_workers=page_elements_workers,
-                    ocr_workers=ocr_workers,
-                    embed_workers=embed_workers,
-                    nemotron_parse_workers=nemotron_parse_workers,
-                    gpu_nemotron_parse=gpu_nemotron_parse,
-                    nemotron_parse_batch_size=nemotron_parse_batch_size,
+                    page_elements_actors=page_elements_actors,
+                    ocr_actors=ocr_actors,
+                    embed_actors=embed_actors,
+                    nemotron_parse_actors=nemotron_parse_actors,
+                    nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+                    nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
                 )
                 _print_pages_per_second(processed_pages, ingest_elapsed_s)
                 return
@@ -1015,57 +1033,57 @@ def main(
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
 
-        if not no_recall_details:
-            print("\nPer-query retrieval details:")
-        missed_gold: list[tuple[str, str]] = []
-        ext = (
-            ".html"
-            if input_type == "html"
-            else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
-        )
-        for i, (q, g, hits) in enumerate(
-            zip(
-                _df_query["query"].astype(str).tolist(),
-                _gold,
-                _raw_hits,
-            )
-        ):
-            doc, page = _gold_to_doc_page(g)
+        # if not no_recall_details:
+        #     print("\nPer-query retrieval details:")
+        # missed_gold: list[tuple[str, str]] = []
+        # ext = (
+        #     ".html"
+        #     if input_type == "html"
+        #     else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
+        # )
+        # for i, (q, g, hits) in enumerate(
+        #     zip(
+        #         _df_query["query"].astype(str).tolist(),
+        #         _gold,
+        #         _raw_hits,
+        #     )
+        # ):
+        #     doc, page = _gold_to_doc_page(g)
 
-            scored_hits: list[tuple[str, float | None]] = []
-            for h in hits:
-                key, dist = _hit_key_and_distance(h)
-                if key:
-                    scored_hits.append((key, dist))
+        #     scored_hits: list[tuple[str, float | None]] = []
+        #     for h in hits:
+        #         key, dist = _hit_key_and_distance(h)
+        #         if key:
+        #             scored_hits.append((key, dist))
 
-            top_keys = [k for (k, _d) in scored_hits]
-            hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+        #     top_keys = [k for (k, _d) in scored_hits]
+        #     hit = _is_hit_at_k(g, top_keys, cfg.top_k)
 
-            if not no_recall_details:
-                print(f"\nQuery {i}: {q}")
-                print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
-                print(f"  Hit@{cfg.top_k}: {hit}")
-                print("  Top hits:")
-                if not scored_hits:
-                    print("    (no hits)")
-                else:
-                    for rank, (key, dist) in enumerate(scored_hits[: int(cfg.top_k)], start=1):
-                        if dist is None:
-                            print(f"    {rank:02d}. {key}")
-                        else:
-                            print(f"    {rank:02d}. {key}  distance={dist:.6f}")
+        #     if not no_recall_details:
+        #         print(f"\nQuery {i}: {q}")
+        #         print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
+        #         print(f"  Hit@{cfg.top_k}: {hit}")
+        #         print("  Top hits:")
+        #         if not scored_hits:
+        #             print("    (no hits)")
+        #         else:
+        #             for rank, (key, dist) in enumerate(scored_hits[: int(cfg.top_k)], start=1):
+        #                 if dist is None:
+        #                     print(f"    {rank:02d}. {key}")
+        #                 else:
+        #                     print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
-            if not hit:
-                missed_gold.append((f"{doc}{ext}", str(page)))
+        #     if not hit:
+        #         missed_gold.append((f"{doc}{ext}", str(page)))
 
-        missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-        print("\nMissed gold (unique doc/page):")
-        if not missed_unique:
-            print("  (none)")
-        else:
-            for doc_page, page in missed_unique:
-                print(f"  {doc_page} page {page}")
-        print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
+        # missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
+        # print("\nMissed gold (unique doc/page):")
+        # if not missed_unique:
+        #     print("  (none)")
+        # else:
+        #     for doc_page, page in missed_unique:
+        #         print(f"  {doc_page} page {page}")
+        # print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
         print("\nRecall metrics (matching nemo_retriever.recall.core):")
         for k, v in metrics.items():
@@ -1073,14 +1091,14 @@ def main(
         _print_heuristic_resources(
             ctx=ctx,
             ingestor=ingestor,
-            ray_address=ray_address,
+            ray_cluster_address=ray_address,
             input_type=input_type,
-            page_elements_workers=page_elements_workers,
-            ocr_workers=ocr_workers,
-            embed_workers=embed_workers,
-            nemotron_parse_workers=nemotron_parse_workers,
-            gpu_nemotron_parse=gpu_nemotron_parse,
-            nemotron_parse_batch_size=nemotron_parse_batch_size,
+            page_elements_actors=page_elements_actors,
+            ocr_actors=ocr_actors,
+            embed_actors=embed_actors,
+            nemotron_parse_actors=nemotron_parse_actors,
+            nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+            nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
         )
         _print_pages_per_second(processed_pages, ingest_elapsed_s)
     finally:

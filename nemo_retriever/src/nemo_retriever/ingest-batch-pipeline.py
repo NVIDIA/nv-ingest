@@ -719,8 +719,8 @@ def run(
     embed_local_hf_batch_size: int = typer.Option(
         64, "--embed-local-hf-batch-size", min=1, help="Batch size for local HF embedding inference."
     ),
-    embed_batch_size: int = typer.Option(
-        256, "--embed-batch-size", min=1, help="Ray Data batch size for embedding stage."
+    embed_ray_batch_size: int = typer.Option(
+        256, "--embed-ray-batch-size", min=1, help="Ray Data batch size for embedding stage."
     ),
     embed_actors: int = typer.Option(1, "--embed-actors", min=1, help="Number of embedding actors."),
     embed_cpus_per_actor: float = typer.Option(
@@ -910,11 +910,11 @@ def run(
         if embed_local_hf_batch_size is not None:
             embed_task_cfg["local_hf_batch_size"] = int(embed_local_hf_batch_size)
 
-        logger.info("Actor stage: text embeddings (actors=%s, batch_size=%s)", embed_actors, embed_batch_size)
+        logger.info("Actor stage: text embeddings (actors=%s, batch_size=%s)", embed_actors, embed_ray_batch_size)
         extracted = extracted.map_batches(
             TextEmbeddingActorBatchFn,
             batch_format="pandas",
-            batch_size=int(embed_batch_size),
+            batch_size=int(embed_ray_batch_size),
             num_cpus=float(embed_cpus_per_actor),
             num_gpus=float(embed_gpus_per_actor),
             compute=rd.ActorPoolStrategy(size=int(embed_actors)),

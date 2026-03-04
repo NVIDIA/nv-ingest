@@ -29,9 +29,9 @@ from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
-from nemo_retriever.ingest_modes.resource_heuristics import get_cluster_or_local_resources
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_effective_resources
 from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_worker_heuristic
+from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -326,10 +326,13 @@ class BatchIngestor(Ingestor):
         ctx.use_ray_tqdm = False
 
         # Query Ray cluster resources when available, otherwise local resources.
-        system_resources = get_cluster_or_local_resources()
+        system_resources = resolve_effective_resources()
         self._num_gpus = int(system_resources.gpu_count)
         self._num_cpus = int(system_resources.cpu_count)
-        base_heuristic = resolve_worker_heuristic(num_cpus=self._num_cpus, num_gpus=self._num_gpus)
+        base_heuristic = resolve_batch_worker_plan(
+            override_cpu_count=self._num_cpus,
+            override_gpu_count=self._num_gpus,
+        )
         self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
         # Builder-style task configuration recorded for later execution.
@@ -438,12 +441,12 @@ class BatchIngestor(Ingestor):
         user_page_elements_workers = kwargs.pop("page_elements_workers", None)
         user_ocr_workers = kwargs.pop("ocr_workers", None)
         user_detect_workers = kwargs.pop("detect_workers", user_ocr_workers)
-        worker_heuristic = resolve_worker_heuristic(
-            num_cpus=self._num_cpus,
-            num_gpus=self._num_gpus,
-            page_elements_workers=user_page_elements_workers,
-            detect_workers=user_detect_workers,
-            gpu_stage_count=gpu_stage_count,
+        worker_heuristic = resolve_batch_worker_plan(
+            override_cpu_count=self._num_cpus,
+            override_gpu_count=self._num_gpus,
+            override_page_elements_actors=user_page_elements_workers,
+            override_ocr_actors=user_detect_workers,
+            concurrent_gpu_stage_count=gpu_stage_count,
         )
         gpu_page_elements = float(kwargs.pop("gpu_page_elements", worker_heuristic.page_elements_num_gpus))
         gpu_ocr = float(kwargs.pop("gpu_ocr", worker_heuristic.detect_num_gpus))
@@ -673,7 +676,7 @@ class BatchIngestor(Ingestor):
                 batch_format="pandas",
                 num_cpus=page_elements_cpus_per_actor,
                 num_gpus=gpu_page_elements,
-                compute=rd.ActorPoolStrategy(size=page_elements_workers*2),
+                compute=rd.ActorPoolStrategy(size=page_elements_workers * 2),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
@@ -711,7 +714,7 @@ class BatchIngestor(Ingestor):
                     batch_format="pandas",
                     num_cpus=ocr_cpus_per_actor,
                     num_gpus=gpu_ocr,
-                    compute=rd.ActorPoolStrategy(size=detect_workers*2),
+                    compute=rd.ActorPoolStrategy(size=detect_workers * 2),
                     fn_constructor_kwargs=ocr_flags,
                 )
 
@@ -841,11 +844,11 @@ class BatchIngestor(Ingestor):
             return len([p for p in s.split(",") if p.strip()])
 
         user_embed_workers = kwargs.pop("embed_workers", None)
-        worker_heuristic = resolve_worker_heuristic(
-            num_cpus=self._num_cpus,
-            num_gpus=self._num_gpus,
-            embed_workers=user_embed_workers,
-            gpu_stage_count=1,
+        worker_heuristic = resolve_batch_worker_plan(
+            override_cpu_count=self._num_cpus,
+            override_gpu_count=self._num_gpus,
+            override_embed_actors=user_embed_workers,
+            concurrent_gpu_stage_count=1,
         )
         embed_workers = int(worker_heuristic.embed_workers)
         cpu_only_stage_num_gpus = float(worker_heuristic.cpu_only_stage_num_gpus)

@@ -233,7 +233,7 @@ def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) ->
     )
 
 
-def _detect_auto_resources(ray_address: Optional[str] = None) -> SystemResources:
+def _detect_auto_resources(ray_cluster_address: Optional[str] = None) -> SystemResources:
     """Detect base CPU/GPU resources from Ray (if available) or local machine."""
     local_cpu_count = int(os.cpu_count() or 1)
     local_gpu_count = int(_detect_local_gpu_count())
@@ -252,8 +252,8 @@ def _detect_auto_resources(ray_address: Optional[str] = None) -> SystemResources
             detected_cpu_count = int(resources.get("CPU", local_cpu_count))
             detected_gpu_count = int(resources.get("GPU", local_gpu_count))
             source = "ray"
-        elif ray_address:
-            ray.init(address=ray_address, ignore_reinit_error=True, log_to_driver=False)
+        elif ray_cluster_address:
+            ray.init(address=ray_cluster_address, ignore_reinit_error=True, log_to_driver=False)
             try:
                 resources = ray.cluster_resources() or ray.available_resources()
                 detected_cpu_count = int(resources.get("CPU", local_cpu_count))
@@ -273,15 +273,15 @@ def _detect_auto_resources(ray_address: Optional[str] = None) -> SystemResources
 
 def resolve_resource_details(
     *,
-    ray_address: Optional[str] = None,
-    config_path: str | os.PathLike[str] | None = None,
-    num_cpus: Optional[int] = None,
-    num_gpus: Optional[int] = None,
+    ray_cluster_address: Optional[str] = None,
+    resource_config_path: str | os.PathLike[str] | None = None,
+    override_cpu_count: Optional[int] = None,
+    override_gpu_count: Optional[int] = None,
 ) -> ResourceResolutionDetails:
     """Resolve CPU/GPU counts and annotate precedence source for each value."""
-    auto = _detect_auto_resources(ray_address=ray_address)
-    cfg = _load_config(config_path)
-    cfg_path = _coerce_path(config_path)
+    auto = _detect_auto_resources(ray_cluster_address=ray_cluster_address)
+    cfg = _load_config(resource_config_path)
+    cfg_path = _coerce_path(resource_config_path)
     cfg_exists = cfg_path.exists()
     cfg_cpu_count = _as_int(_cfg_get(cfg, "resources", "cpu_count"), minimum=1)
     cfg_gpu_count = _as_int(_cfg_get(cfg, "resources", "gpu_count"), minimum=0)
@@ -312,11 +312,11 @@ def resolve_resource_details(
             resolved_gpu_count = int(env_gpu)
             gpu_source = "env"
 
-    if num_cpus is not None:
-        resolved_cpu_count = max(1, int(num_cpus))
+    if override_cpu_count is not None:
+        resolved_cpu_count = max(1, int(override_cpu_count))
         cpu_source = "arg"
-    if num_gpus is not None:
-        resolved_gpu_count = max(0, int(num_gpus))
+    if override_gpu_count is not None:
+        resolved_gpu_count = max(0, int(override_gpu_count))
         gpu_source = "arg"
 
     return ResourceResolutionDetails(
@@ -380,51 +380,51 @@ def _detect_local_gpu_count() -> int:
     return len([device for device in cuda_visible_devices.split(",") if device.strip()])
 
 
-def get_cluster_or_local_resources(
-    ray_address: Optional[str] = None,
+def resolve_effective_resources(
+    ray_cluster_address: Optional[str] = None,
     *,
-    config_path: str | os.PathLike[str] | None = None,
-    num_cpus: Optional[int] = None,
-    num_gpus: Optional[int] = None,
+    resource_config_path: str | os.PathLike[str] | None = None,
+    override_cpu_count: Optional[int] = None,
+    override_gpu_count: Optional[int] = None,
 ) -> SystemResources:
     """Return resources with precedence autodetect -> config file -> env/args."""
     details = resolve_resource_details(
-        ray_address=ray_address,
-        config_path=config_path,
-        num_cpus=num_cpus,
-        num_gpus=num_gpus,
+        ray_cluster_address=ray_cluster_address,
+        resource_config_path=resource_config_path,
+        override_cpu_count=override_cpu_count,
+        override_gpu_count=override_gpu_count,
     )
     return SystemResources(cpu_count=details.cpu_count, gpu_count=details.gpu_count, source=details.auto_source)
 
 
-def resolve_worker_heuristic(
+def resolve_batch_worker_plan(
     *,
-    num_cpus: Optional[int] = None,
-    num_gpus: Optional[int] = None,
-    page_elements_workers: Optional[int] = None,
-    detect_workers: Optional[int] = None,
-    embed_workers: Optional[int] = None,
-    gpu_stage_count: Optional[int] = None,
-    config_path: str | os.PathLike[str] | None = None,
-    ray_address: Optional[str] = None,
+    override_cpu_count: Optional[int] = None,
+    override_gpu_count: Optional[int] = None,
+    override_page_elements_actors: Optional[int] = None,
+    override_ocr_actors: Optional[int] = None,
+    override_embed_actors: Optional[int] = None,
+    concurrent_gpu_stage_count: Optional[int] = None,
+    resource_config_path: str | os.PathLike[str] | None = None,
+    ray_cluster_address: Optional[str] = None,
 ) -> WorkerHeuristicResult:
     """Resolve worker counts and stage GPU defaults for batch ingest stages.
 
     Explicit worker overrides take precedence over heuristic values.
     """
-    cfg = _resolve_heuristic_config(config_path)
-    if num_cpus is None or num_gpus is None:
-        detected = get_cluster_or_local_resources(
-            ray_address=ray_address,
-            config_path=config_path,
-            num_cpus=num_cpus,
-            num_gpus=num_gpus,
+    cfg = _resolve_heuristic_config(resource_config_path)
+    if override_cpu_count is None or override_gpu_count is None:
+        detected = resolve_effective_resources(
+            ray_cluster_address=ray_cluster_address,
+            resource_config_path=resource_config_path,
+            override_cpu_count=override_cpu_count,
+            override_gpu_count=override_gpu_count,
         )
-        cpu_count = int(num_cpus if num_cpus is not None else detected.cpu_count)
-        gpu_count = int(num_gpus if num_gpus is not None else detected.gpu_count)
+        cpu_count = int(override_cpu_count if override_cpu_count is not None else detected.cpu_count)
+        gpu_count = int(override_gpu_count if override_gpu_count is not None else detected.gpu_count)
     else:
-        cpu_count = int(num_cpus)
-        gpu_count = int(num_gpus)
+        cpu_count = int(override_cpu_count)
+        gpu_count = int(override_gpu_count)
 
     cpu_count = max(1, cpu_count)
     gpu_count = max(0, gpu_count)
@@ -450,12 +450,14 @@ def resolve_worker_heuristic(
         heuristic_embed_workers = 1
 
     final_page_elements_workers = (
-        int(page_elements_workers) if page_elements_workers is not None else heuristic_page_elements_workers
+        int(override_page_elements_actors)
+        if override_page_elements_actors is not None
+        else heuristic_page_elements_workers
     )
-    final_detect_workers = int(detect_workers) if detect_workers is not None else heuristic_detect_workers
-    final_embed_workers = int(embed_workers) if embed_workers is not None else heuristic_embed_workers
+    final_detect_workers = int(override_ocr_actors) if override_ocr_actors is not None else heuristic_detect_workers
+    final_embed_workers = int(override_embed_actors) if override_embed_actors is not None else heuristic_embed_workers
 
-    effective_gpu_stage_count = max(1, int(gpu_stage_count if gpu_stage_count is not None else 1))
+    effective_gpu_stage_count = max(1, int(concurrent_gpu_stage_count if concurrent_gpu_stage_count is not None else 1))
     if gpu_count >= 2 and effective_gpu_stage_count == 3:
         page_elements_num_gpus = float(cfg.high_overlap_page_elements_num_gpus)
         detect_num_gpus = float(cfg.high_overlap_ocr_num_gpus)
@@ -479,9 +481,9 @@ def resolve_worker_heuristic(
         page_elements_workers=max(1, final_page_elements_workers),
         detect_workers=max(1, final_detect_workers),
         embed_workers=max(1, final_embed_workers),
-        page_elements_override=page_elements_workers,
-        detect_override=detect_workers,
-        embed_override=embed_workers,
+        page_elements_override=override_page_elements_actors,
+        detect_override=override_ocr_actors,
+        embed_override=override_embed_actors,
         cpu_only_stage_num_gpus=float(cfg.cpu_only_stage_num_gpus),
         page_elements_num_gpus=page_elements_num_gpus,
         detect_num_gpus=detect_num_gpus,
@@ -563,16 +565,20 @@ def pretty_print_worker_heuristic_summary(
     )
 
 
-def freeze(filepath: str | os.PathLike[str] | None = None, *, ray_address: Optional[str] = None) -> Path:
+def freeze_resource_config(
+    output_path: str | os.PathLike[str] | None = None,
+    *,
+    ray_cluster_address: Optional[str] = None,
+) -> Path:
     """Persist the current resolved resource/heuristic configuration to YAML.
 
     By default this writes to ``$HOME/.nemo-retriever/config.yaml``.
     """
-    target = _coerce_path(filepath)
+    target = _coerce_path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
 
     settings = _resolve_heuristic_config(target)
-    resources = get_cluster_or_local_resources(ray_address=ray_address, config_path=target)
+    resources = resolve_effective_resources(ray_cluster_address=ray_cluster_address, resource_config_path=target)
 
     payload = {
         "resources": {

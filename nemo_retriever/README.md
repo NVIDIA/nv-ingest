@@ -110,8 +110,8 @@ This means defaults are deterministic but easy to override when you need fixed b
   - `embed_workers = gpu_count * embed_per_gpu`
   - minimum of `1` per stage
 - Stage GPU defaults:
-  - If `gpu_count >= 2` and `gpu_stage_count == 3`, uses high-overlap values for page-elements/OCR/embed.
-  - Otherwise uses `min(max_gpu_per_stage, gpu_count / gpu_stage_count)`.
+  - If `gpu_count >= 2` and `concurrent_gpu_stage_count == 3`, uses high-overlap values for page-elements/OCR/embed.
+  - Otherwise uses `min(max_gpu_per_stage, gpu_count / concurrent_gpu_stage_count)`.
 
 ### Override variables
 
@@ -121,7 +121,7 @@ This means defaults are deterministic but easy to override when you need fixed b
 | `resources.gpu_count` | `config.yaml` | Base GPU count override before env/args |
 | `NEMO_RETRIEVER_BATCH_NUM_CPUS` | env | Override resolved CPU count |
 | `NEMO_RETRIEVER_BATCH_NUM_GPUS` | env | Override resolved GPU count |
-| `num_cpus`, `num_gpus` | function args | Highest-priority CPU/GPU override |
+| `override_cpu_count`, `override_gpu_count` | function args | Highest-priority CPU/GPU override |
 | `heuristics.cpu_threshold_workers` | `config.yaml` | CPU threshold for high/low profile |
 | `heuristics.high_cpu_page_elements_per_gpu` | `config.yaml` or env | Page-elements workers per GPU in high-CPU profile |
 | `heuristics.high_cpu_ocr_per_gpu` | `config.yaml` or env | OCR workers per GPU in high-CPU profile |
@@ -151,7 +151,7 @@ Environment variable names for heuristic knobs:
 
 ### `~/.nemo-retriever/config.yaml`
 
-If present, this file is read automatically. You can also generate one from current resolved values with `freeze()` in `resource_heuristics.py`.
+If present, this file is read automatically. You can also generate one from current resolved values with `freeze_resource_config()` in `resource_heuristics.py`.
 
 Example:
 
