@@ -77,7 +77,7 @@ jobs:
             pymilvus \
             'pymilvus[bulk_writer, model]' \
             'milvus-lite==2.4.12' \
-            'nvidia-riva-client==2.20.0' \
+            'nvidia-riva-client==2.25.0' \
             'unstructured-client>=0.25.9' \
             'pypdfium2<5' \
             tritonclient \
