@@ -13,9 +13,9 @@ In addition, you can use library mode, which is intended for the following cases
 - Small-scale workloads, such as workloads of fewer than 100 documents
 
 
-By default, library mode depends on NIMs that are **hosted** on build.nvidia.com. 
+By default, library mode depends on NIMs that are hosted on build.nvidia.com. 
 In library mode you launch the main pipeline service directly within a Python process, 
-while embedding and reranking use hosted NIMs; you can also use **local Hugging Face** models or **self-hosted** endpoints by setting custom NIM endpoints (see [FAQ](faq.md)).
+while embedding and reranking use hosted NIMs; you can also use local Hugging Face models or self-hosted endpoints by setting custom NIM endpoints (see [FAQ](faq.md)).
 
 To get started using library mode, you need the following:
 
