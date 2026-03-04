@@ -74,58 +74,71 @@ MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
     ("nvidia/llama-3.2-nv-embedqa-1b-v2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nvidia/llama-3.2-nv-embedqa-1b-v2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nvidia/llama-3.2-nv-embedqa-1b-v2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 64): 15 * 1024 * 1024 * 1024,  # 15GB
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 128): 25 * 1024 * 1024 * 1024,  # 25GB
+    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 256): 50 * 1024 * 1024 * 1024,  # 50GB
     ("nemotron-page-elements-v3", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-page-elements-v3", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-page-elements-v3", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-page-elements-v3", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-page-elements-v3", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-page-elements-v3", 64): 15 * 1024 * 1024 * 1024,  # 15GB
+    ("nemotron-page-elements-v3", 128): 25 * 1024 * 1024 * 1024,  # 25GB
+    ("nemotron-page-elements-v3", 256): 50 * 1024 * 1024 * 1024,  # 50GB
     ("nemotron-ocr-v1", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-ocr-v1", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-ocr-v1", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-ocr-v1", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-ocr-v1", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-ocr-v1", 64): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-ocr-v1", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
+    ("nemotron-parse-v1.2", 64): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
 }
 
 
 def estimate_model_actor_capacity_by_gpu(
     cluster_gpu_info: dict[str, dict[int, dict[str, Any]]],
+    desired_model_actor_instances: dict[str, int],
     model_max_vram_bytes: dict[tuple[str, int], int] | None = None,
-) -> dict[str, dict[tuple[str, int], int]]:
-    """Estimate per-model actor capacity on each GPU from free memory.
+) -> dict[str, dict[tuple[str, int], dict[str, int]]]:
+    """Estimate per-model actor counts and batch sizes per GPU.
 
-    For each model and each ``(node_id, gpu_id)`` slot, this function:
-    1) finds the largest batch size whose VRAM requirement fits the GPU's free memory,
-    2) computes how many actors of that model can fit concurrently on that GPU.
+    For each ``(node_id, gpu_id)``, this function:
+    1) scales the desired per-model actor ratio by the largest feasible integer
+       multiplier that can fit at each model's minimum VRAM profile, then
+    2) chooses the largest batch sizes per model that jointly fit within the
+       GPU's free memory for that actor allocation.
 
     The returned structure is:
-    ``{model_name: {(node_id, gpu_id): actor_count}}``.
+    ``{model_name: {(node_id, gpu_id): {"actors": int, "batch_size": int}}}``.
     """
     model_limits = model_max_vram_bytes or MODEL_MAX_VRAM_BYTES
 
-    # Group model entries as: model -> [(batch_size, required_bytes), ...]
-    # sorted by batch size descending so the first fit is the largest batch.
+    # Group model entries as: model -> [(batch_size, required_bytes), ...],
+    # sorted by batch size ascending for easy min-profile lookup.
     model_profiles: dict[str, list[tuple[int, int]]] = {}
     for (model_name, batch_size), required_bytes in model_limits.items():
         if int(batch_size) <= 0 or int(required_bytes) <= 0:
             continue
         model_profiles.setdefault(str(model_name), []).append((int(batch_size), int(required_bytes)))
     for model_name in model_profiles:
-        model_profiles[model_name].sort(key=lambda item: item[0], reverse=True)
+        model_profiles[model_name].sort(key=lambda item: item[0])
 
-    result: dict[str, dict[tuple[str, int], int]] = {model_name: {} for model_name in model_profiles}
+    desired_ratios: dict[str, int] = {}
+    for model_name, count in (desired_model_actor_instances or {}).items():
+        if model_name in model_profiles and int(count) > 0:
+            desired_ratios[str(model_name)] = int(count)
+
+    result: dict[str, dict[tuple[str, int], dict[str, int]]] = {model_name: {} for model_name in desired_ratios}
+
+    if not desired_ratios:
+        return result
 
     bytes_per_mib = 1024 * 1024
     for node_id, gpu_map in (cluster_gpu_info or {}).items():
@@ -145,18 +158,74 @@ def estimate_model_actor_capacity_by_gpu(
                 free_mib = 0.0
             free_bytes = int(max(0.0, free_mib) * bytes_per_mib)
 
-            for model_name, profile in model_profiles.items():
-                selected_required_bytes: int | None = None
-                for _batch_size, required_bytes in profile:
-                    if required_bytes <= free_bytes:
-                        selected_required_bytes = required_bytes
-                        break
+            # Minimum per-ratio memory unit using each model's smallest profile.
+            ratio_unit_bytes = 0
+            for model_name, desired_count in desired_ratios.items():
+                min_required_bytes = model_profiles[model_name][0][1]
+                ratio_unit_bytes += int(desired_count) * int(min_required_bytes)
 
-                actors = 0
-                if selected_required_bytes is not None and selected_required_bytes > 0:
-                    actors = int(free_bytes // selected_required_bytes)
+            scale = 0
+            if ratio_unit_bytes > 0:
+                scale = int(free_bytes // ratio_unit_bytes)
 
-                result[model_name][(str(node_id), gpu_id)] = max(0, actors)
+            if scale <= 0:
+                for model_name in desired_ratios:
+                    result[model_name][(str(node_id), gpu_id)] = {"actors": 0, "batch_size": 0}
+                continue
+
+            actor_counts: dict[str, int] = {
+                model_name: int(desired_ratios[model_name]) * int(scale) for model_name in desired_ratios
+            }
+
+            # Start from largest batch for each model.
+            profile_index_by_model: dict[str, int] = {
+                model_name: len(model_profiles[model_name]) - 1 for model_name in desired_ratios
+            }
+
+            def _total_bytes() -> int:
+                total = 0
+                for model_name, actors in actor_counts.items():
+                    idx = profile_index_by_model[model_name]
+                    required_bytes = model_profiles[model_name][idx][1]
+                    total += int(actors) * int(required_bytes)
+                return total
+
+            # Reduce batch sizes only as needed until aggregate memory fits.
+            while _total_bytes() > free_bytes:
+                best_model_to_reduce: str | None = None
+                best_saved_bytes = 0
+                for model_name, idx in profile_index_by_model.items():
+                    if idx <= 0:
+                        continue
+                    current_required = model_profiles[model_name][idx][1]
+                    next_required = model_profiles[model_name][idx - 1][1]
+                    saved = actor_counts[model_name] * (current_required - next_required)
+                    if saved > best_saved_bytes:
+                        best_saved_bytes = saved
+                        best_model_to_reduce = model_name
+
+                if best_model_to_reduce is None:
+                    break
+                profile_index_by_model[best_model_to_reduce] -= 1
+
+            # If still not fitting, reduce ratio scale until it does.
+            while _total_bytes() > free_bytes and scale > 0:
+                scale -= 1
+                actor_counts = {
+                    model_name: int(desired_ratios[model_name]) * int(scale) for model_name in desired_ratios
+                }
+
+            if scale <= 0:
+                for model_name in desired_ratios:
+                    result[model_name][(str(node_id), gpu_id)] = {"actors": 0, "batch_size": 0}
+                continue
+
+            for model_name in desired_ratios:
+                batch_size = int(model_profiles[model_name][profile_index_by_model[model_name]][0])
+                result[model_name][(str(node_id), gpu_id)] = {
+                    "actors": int(actor_counts[model_name]),
+                    "batch_size": batch_size,
+                }
 
     return result
 

@@ -365,7 +365,15 @@ class BatchIngestor(Ingestor):
             except Exception as exc:
                 logging.warning("GPU probe failed on node %s: %s", node_ip, exc)
 
-        model_actor_capacity = estimate_model_actor_capacity_by_gpu(self._cluster_gpu_info)
+        desired_model_actor_instances = {
+            "nvidia/llama-3.2-nv-embedqa-1b-v2": 2,
+            "nemotron-page-elements-v3": 4,
+            "nemotron-ocr-v1": 4,
+            "nemotron-parse-v1.2": 0,
+        }
+        model_actor_capacity = estimate_model_actor_capacity_by_gpu(
+            self._cluster_gpu_info, desired_model_actor_instances
+        )
         print(f"Model actor capacity: {model_actor_capacity}")
 
         # Builder-style task configuration recorded for later execution.
