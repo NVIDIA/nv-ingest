@@ -153,7 +153,7 @@ class ExtractParams(_ParamsModel):
     extract_images: bool = False
     extract_tables: bool = False
     use_table_structure: bool = False
-    table_output_format: Literal["pseudo_markdown", "markdown"] = "pseudo_markdown"
+    table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     extract_charts: bool = False
     extract_infographics: bool = False
     extract_page_as_image: Optional[bool] = None
@@ -190,8 +190,8 @@ class ExtractParams(_ParamsModel):
         """
         if self.table_structure_invoke_url and not self.use_table_structure:
             self.use_table_structure = True
-        if self.use_table_structure and "table_output_format" not in self.model_fields_set:
-            self.table_output_format = "markdown"
+        if self.table_output_format is None:
+            self.table_output_format = "markdown" if self.use_table_structure else "pseudo_markdown"
         return self
 
 
