@@ -18,7 +18,7 @@ batch ingestor to derive:
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import yaml
 
@@ -98,6 +98,67 @@ MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
     ("nemotron-parse-v1.2", 62): DEFAULT_MODEL_MAX_VRAM_BYTES,
     ("nemotron-parse-v1.2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
 }
+
+
+def estimate_model_actor_capacity_by_gpu(
+    cluster_gpu_info: dict[str, dict[int, dict[str, Any]]],
+    model_max_vram_bytes: dict[tuple[str, int], int] | None = None,
+) -> dict[str, dict[tuple[str, int], int]]:
+    """Estimate per-model actor capacity on each GPU from free memory.
+
+    For each model and each ``(node_id, gpu_id)`` slot, this function:
+    1) finds the largest batch size whose VRAM requirement fits the GPU's free memory,
+    2) computes how many actors of that model can fit concurrently on that GPU.
+
+    The returned structure is:
+    ``{model_name: {(node_id, gpu_id): actor_count}}``.
+    """
+    model_limits = model_max_vram_bytes or MODEL_MAX_VRAM_BYTES
+
+    # Group model entries as: model -> [(batch_size, required_bytes), ...]
+    # sorted by batch size descending so the first fit is the largest batch.
+    model_profiles: dict[str, list[tuple[int, int]]] = {}
+    for (model_name, batch_size), required_bytes in model_limits.items():
+        if int(batch_size) <= 0 or int(required_bytes) <= 0:
+            continue
+        model_profiles.setdefault(str(model_name), []).append((int(batch_size), int(required_bytes)))
+    for model_name in model_profiles:
+        model_profiles[model_name].sort(key=lambda item: item[0], reverse=True)
+
+    result: dict[str, dict[tuple[str, int], int]] = {model_name: {} for model_name in model_profiles}
+
+    bytes_per_mib = 1024 * 1024
+    for node_id, gpu_map in (cluster_gpu_info or {}).items():
+        if not isinstance(gpu_map, dict):
+            continue
+        for gpu_id_raw, gpu_info in gpu_map.items():
+            try:
+                gpu_id = int(gpu_id_raw)
+            except (TypeError, ValueError):
+                continue
+            if not isinstance(gpu_info, dict):
+                continue
+
+            try:
+                free_mib = float(gpu_info.get("free", 0))
+            except (TypeError, ValueError):
+                free_mib = 0.0
+            free_bytes = int(max(0.0, free_mib) * bytes_per_mib)
+
+            for model_name, profile in model_profiles.items():
+                selected_required_bytes: int | None = None
+                for _batch_size, required_bytes in profile:
+                    if required_bytes <= free_bytes:
+                        selected_required_bytes = required_bytes
+                        break
+
+                actors = 0
+                if selected_required_bytes is not None and selected_required_bytes > 0:
+                    actors = int(free_bytes // selected_required_bytes)
+
+                result[model_name][(str(node_id), gpu_id)] = max(0, actors)
+
+    return result
 
 
 @ray.remote

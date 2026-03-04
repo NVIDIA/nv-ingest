@@ -29,7 +29,10 @@ from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_effective_resources
+from nemo_retriever.ingest_modes.resource_heuristics import (
+    estimate_model_actor_capacity_by_gpu,
+    resolve_effective_resources,
+)
 from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
 from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
 from nemo_retriever.ingest_modes.resource_heuristics import _get_gpu_memory_info
@@ -353,12 +356,17 @@ class BatchIngestor(Ingestor):
                 )
             )
 
+        self._cluster_gpu_info = {}
         for node_ip, probe_ref in node_probe_refs:
             try:
-                output = ray.get(probe_ref)
-                print(f"[{node_ip}] GPU memory info: {output}")
+                node_gpu_info = ray.get(probe_ref)
+                print(f"[{node_ip}] GPU memory info: {node_gpu_info}")
+                self._cluster_gpu_info[node_ip] = node_gpu_info
             except Exception as exc:
                 logging.warning("GPU probe failed on node %s: %s", node_ip, exc)
+
+        model_actor_capacity = estimate_model_actor_capacity_by_gpu(self._cluster_gpu_info)
+        print(f"Model actor capacity: {model_actor_capacity}")
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
