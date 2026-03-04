@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import pandas as pd
 
-from nv_ingest_api.util.nim import infer_microservice
-
 
 @dataclass(frozen=True)
 class RecallConfig:
@@ -141,6 +139,8 @@ def _embed_queries_nim(
     api_key: str,
     grpc: bool,
 ) -> List[List[float]]:
+    from nv_ingest_api.util.nim import infer_microservice
+
     # `infer_microservice` returns a list of embeddings.
     embeddings = infer_microservice(
         queries,
