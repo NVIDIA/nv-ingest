@@ -70,6 +70,7 @@ import typer
 from nemo_retriever import create_ingestor
 from nemo_retriever.ingest_modes.batch import EmbedServiceActor
 from nemo_retriever.params import (
+    BatchTuningParams,
     EmbedParams,
     ExtractParams,
     IngestorCreateParams,
@@ -493,6 +494,7 @@ def _detect_flashinfer_cubin() -> bool:
 _COMPARISON_ROW_KEYS = [
     "gpu_memory_utilization",
     "max_rows",
+    "embed_batch_size",
     "enforce_eager",
     "flashinfer_cubin",
     "baseline_recall_at_1",
@@ -518,6 +520,7 @@ def run_compare_from_pre_embed(
     gpu_memory_utilization: float,
     enforce_eager: bool,
     compile_cache_dir: Path | None,
+    embed_batch_size: int = 256,
     sort_key_column: str | None = None,
 ) -> dict:
     """Run baseline + vLLM offline from pre-embed parquet; return one row of metrics as a dict.
@@ -576,10 +579,12 @@ def run_compare_from_pre_embed(
         ray.kill(ray.get_actor("embed_service_baseline"))
     except ValueError:
         pass
+    batch_tuning = BatchTuningParams(embed_batch_size=embed_batch_size)
     baseline_params = EmbedParams(
         model_name=embed_model_name,
         embed_use_vllm_offline=False,
         embed_model_path=None,
+        batch_tuning=batch_tuning,
     )
     service_baseline = EmbedServiceActor.options(name="embed_service_baseline").remote(baseline_params)
     warmup_df = _warmup_batch(pre_embed_dir, sort_key_column)
@@ -604,6 +609,7 @@ def run_compare_from_pre_embed(
             model_name=embed_model_name,
             embed_use_vllm_offline=False,
             embed_model_path=None,
+            batch_tuning=batch_tuning,
         ),
         embedding_service_name="embed_service_baseline",
     ).vdb_upload(
@@ -644,6 +650,7 @@ def run_compare_from_pre_embed(
         embed_use_vllm_offline=True,
         embed_model_path=embed_model_path,
         runtime=vllm_runtime,
+        batch_tuning=batch_tuning,
     )
     service_vllm = EmbedServiceActor.options(name="embed_service_vllm").remote(vllm_params)
     try:
@@ -667,6 +674,7 @@ def run_compare_from_pre_embed(
             embed_use_vllm_offline=True,
             embed_model_path=embed_model_path,
             runtime=vllm_runtime,
+            batch_tuning=batch_tuning,
         ),
         embedding_service_name="embed_service_vllm",
     ).vdb_upload(
@@ -695,6 +703,7 @@ def run_compare_from_pre_embed(
     return {
         "gpu_memory_utilization": gpu_memory_utilization,
         "max_rows": max_rows,
+        "embed_batch_size": embed_batch_size,
         "enforce_eager": enforce_eager,
         "flashinfer_cubin": flashinfer_cubin,
         "baseline_recall_at_1": baseline_recall["metrics"].get("recall@1"),
@@ -790,6 +799,12 @@ def compare_from_pre_embed(
         help="If set, sort pre-embed dataset by this column before limit (deterministic same rows for baseline and "
         "vLLM).",
     ),
+    embed_batch_size: int = typer.Option(
+        256,
+        "--embed-batch-size",
+        help="Ray Data batch size for embed stage (rows per batch sent to long-lived embedder service). "
+        "Sweep 256,512,768 to compare.",
+    ),
 ) -> None:
     """Load pre-embed parquet, run baseline + vLLM offline embed+vdb, then recall; print comparison.
 
@@ -806,6 +821,7 @@ def compare_from_pre_embed(
 
     if max_rows is not None:
         typer.echo(f"Using up to {max_rows} rows (--max-rows={max_rows})")
+    typer.echo(f"Embed batch size: {embed_batch_size}")
     if sort_key_column is not None:
         typer.echo(f"Sorting by {sort_key_column!r} before limit for deterministic row set.")
 
@@ -821,6 +837,7 @@ def compare_from_pre_embed(
         gpu_memory_utilization=gpu_memory_utilization,
         enforce_eager=enforce_eager,
         compile_cache_dir=Path(compile_cache_dir) if compile_cache_dir else None,
+        embed_batch_size=embed_batch_size,
         sort_key_column=sort_key_column,
     )
 

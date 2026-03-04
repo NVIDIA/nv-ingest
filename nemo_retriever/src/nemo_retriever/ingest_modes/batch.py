@@ -253,6 +253,7 @@ class _BatchEmbedActor:
         self._kwargs = {
             **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
             **params.runtime.model_dump(mode="python", exclude_none=True),
+            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
         if "embedding_endpoint" not in self._kwargs and self._kwargs.get("embed_invoke_url"):
             self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url")
@@ -322,6 +323,9 @@ class _BatchEmbedActor:
         kwargs = dict(self._kwargs)
         if getattr(self, "_vllm_llm", None) is not None:
             kwargs["vllm_llm"] = self._vllm_llm
+        # Use embed_batch_size as inference_batch_size so the full Ray batch is sent to vLLM in one go.
+        if kwargs.get("embed_use_vllm_offline") and "embed_batch_size" in kwargs:
+            kwargs["inference_batch_size"] = int(kwargs["embed_batch_size"])
         return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
 
 
@@ -333,6 +337,7 @@ class _EmbedServiceActorImpl:
         self._kwargs = {
             **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
             **params.runtime.model_dump(mode="python", exclude_none=True),
+            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
         if "embedding_endpoint" not in self._kwargs and self._kwargs.get("embed_invoke_url"):
             self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url")
@@ -400,6 +405,9 @@ class _EmbedServiceActorImpl:
         kwargs = dict(self._kwargs)
         if getattr(self, "_vllm_llm", None) is not None:
             kwargs["vllm_llm"] = self._vllm_llm
+        # Use embed_batch_size as inference_batch_size so the full Ray batch is sent to vLLM in one go.
+        if kwargs.get("embed_use_vllm_offline") and "embed_batch_size" in kwargs:
+            kwargs["inference_batch_size"] = int(kwargs["embed_batch_size"])
         return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
 
 

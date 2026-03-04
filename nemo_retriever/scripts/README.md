@@ -55,21 +55,23 @@ Runs `compare-from-pre-embed` over a grid of **gpu_memory_utilization** × **max
 - **gpu_utils:** 0.4, 0.5, 0.6, 0.7, 0.8  
 - **max_rows:** 1000, 2000, 5000, 10000  
 
-Override with `--gpu-utils 0.4,0.6,0.8` and `--max-rows-list 1000,5000`.
+Override with `--gpu-utils 0.4,0.6,0.8` and `--max-rows-list 1000,5000`. To sweep **embed_batch_size** (e.g. 256, 512, 768) with an env that has **flashinfer-cubin**, see [embed_batch_size_sweep_setup.md](embed_batch_size_sweep_setup.md).
 
-### FlashInfer
+### FlashInfer / flashinfer-cubin
 
-`flashinfer_cubin` is **not** a CLI flag; it is **detected at runtime** (whether the package is importable). To get both states in one CSV:
+By default the sweep **requires** an environment with **flashinfer-cubin** (e.g. `uv sync --extra vllm-attention` in `nemo_retriever`). If it is not installed, the script exits with install instructions. Use `--no-require-flashinfer-cubin` to run anyway (e.g. to collect flashinfer_cubin=false rows).
+
+`flashinfer_cubin` is **detected at runtime** and written to the CSV. To get both true/false in one CSV:
 
 1. **With FlashInfer:** run the sweep with `flashinfer-cubin` installed (e.g. `[vllm-attention]` extra).  
-2. **Without FlashInfer:** `uv pip uninstall flashinfer-cubin`, then run the **same** command and **same** `--output-csv` so rows are appended.
+2. **Without FlashInfer:** `uv pip uninstall flashinfer-cubin`, then run the **same** command and **same** `--output-csv` (with `--no-require-flashinfer-cubin`) so rows are appended.
 
 ### Usage
 
 ```bash
 unset RAY_ADDRESS
 
-uv run python nemo_retriever/scripts/run_comparison_sweep.py run-sweep \
+uv run python nemo_retriever/scripts/run_comparison_sweep.py \
   --pre-embed-dir /path/to/pre_embed_dir \
   --query-csv /path/to/query_gt.csv \
   --embed-model-path /path/to/llama-nemotron-embed-1b-v2/main \
@@ -80,7 +82,7 @@ uv run python nemo_retriever/scripts/run_comparison_sweep.py run-sweep \
 
 ```bash
 unset RAY_ADDRESS
-uv run python nemo_retriever/scripts/run_comparison_sweep.py run-sweep \
+uv run python nemo_retriever/scripts/run_comparison_sweep.py \
   --pre-embed-dir /path/to/pre_embed_dir \
   --query-csv /path/to/query_gt.csv \
   --embed-model-path /path/to/llama-nemotron-embed-1b-v2/main \

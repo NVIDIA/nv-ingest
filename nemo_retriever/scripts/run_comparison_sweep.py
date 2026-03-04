@@ -4,24 +4,28 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Run compare-from-pre-embed over a parameter grid (gpu_util x max_rows) and append
-each run's metrics to a CSV (and optionally JSONL) for later plotting.
+Run compare-from-pre-embed over a parameter grid (gpu_util x max_rows x embed_batch_size)
+and append each run's metrics to a CSV (and optionally JSONL) for later plotting.
+
+Uses the long-lived embedder service (EmbedServiceActor); sweep --embed-batch-sizes
+to see if 5K batch-size behavior holds with the service (e.g. 256,512,768).
 
 FlashInfer: not a CLI flag. Run this script twice — once with flashinfer-cubin
 installed, once after uninstalling it — and append to the same --output-csv so
 the file contains both flashinfer_cubin=true and false rows.
 
-Example (with cubin, from repo root):
-  unset RAY_ADDRESS
-  uv run python nemo_retriever/scripts/run_comparison_sweep.py run-sweep \\
+Example (sweep embed batch size at 5K only):
+  uv run python nemo_retriever/scripts/run_comparison_sweep.py \\
     --pre-embed-dir /path/to/bo767_pre_embed \\
     --query-csv data/bo767_query_gt.csv \\
     --embed-model-path /path/to/llama-nemotron-embed-1b-v2/main \\
-    --output-csv comparison_sweep.csv
+    --output-csv comparison_sweep.csv \\
+    --gpu-utils 0.7 --max-rows-list 5000 --embed-batch-sizes 256,512,768
 
-Then (without cubin):
-  uv pip uninstall flashinfer-cubin
-  uv run python nemo_retriever/scripts/run_comparison_sweep.py run-sweep ... --output-csv comparison_sweep.csv
+Example (default grid: gpu_util x max_rows, single batch size 256):
+  uv run python nemo_retriever/scripts/run_comparison_sweep.py \\
+    --pre-embed-dir /path/to/bo767_pre_embed --query-csv data/bo767_query_gt.csv \\
+    --embed-model-path /path/to/model --output-csv comparison_sweep.csv
 """
 
 from __future__ import annotations
@@ -58,7 +62,7 @@ def _parse_int_list(s: str) -> list[int]:
     return [int(x.strip()) for x in s.split(",") if x.strip()]
 
 
-@app.command()
+@app.callback(invoke_without_command=True)
 def run_sweep(
     pre_embed_dir: Path = typer.Option(..., "--pre-embed-dir", path_type=Path),
     query_csv: Path = typer.Option(..., "--query-csv", path_type=Path),
@@ -77,8 +81,19 @@ def run_sweep(
         "--max-rows-list",
         help="Comma-separated max_rows values (e.g. 1000,2000,5000,10000).",
     ),
+    embed_batch_sizes: str = typer.Option(
+        "256",
+        "--embed-batch-sizes",
+        help="Comma-separated embed_batch_size values (e.g. 256,512,768). Sweep to compare long-lived embedder service "
+        "at different batch sizes.",
+    ),
     sort_key_column: str | None = typer.Option(None, "--sort-key"),
     ray_address: str | None = typer.Option(None, "--ray-address"),
+    require_flashinfer_cubin: bool = typer.Option(
+        True,
+        "--require-flashinfer-cubin/--no-require-flashinfer-cubin",
+        help="Exit with instructions if flashinfer-cubin is not installed (use env with .[vllm-attention]).",
+    ),
 ) -> None:
     """Run grid of compare-from-pre-embed; append one row per run to output_csv (and optional output_json)."""
     pre_embed_dir = Path(pre_embed_dir)
@@ -91,38 +106,57 @@ def run_sweep(
 
     os.environ.pop("RAY_ADDRESS", None)
 
+    has_cubin = _detect_flashinfer_cubin()
+    if require_flashinfer_cubin and not has_cubin:
+        typer.echo(
+            "flashinfer-cubin is not installed. Use an env with the vllm-attention extra, e.g.:",
+            err=True,
+        )
+        typer.echo("  cd nemo_retriever && uv sync --extra vllm-attention", err=True)
+        typer.echo("  uv pip install -e '.[vllm-attention]'   # or from repo root", err=True)
+        raise typer.Exit(1)
+
     gpu_util_values = _parse_float_list(gpu_utils)
     max_rows_values = _parse_int_list(max_rows_list)
-    total = len(gpu_util_values) * len(max_rows_values)
-    typer.echo(f"flashinfer_cubin={_detect_flashinfer_cubin()} (detected at start)")
-    typer.echo(f"Grid: {len(gpu_util_values)} gpu_utils x {len(max_rows_values)} max_rows = {total} runs")
+    embed_batch_size_values = _parse_int_list(embed_batch_sizes)
+    total = len(gpu_util_values) * len(max_rows_values) * len(embed_batch_size_values)
+    typer.echo(f"flashinfer_cubin={has_cubin} (detected at start)")
+    typer.echo(
+        f"Grid: {len(gpu_util_values)} gpu_utils x {len(max_rows_values)} max_rows x {len(embed_batch_size_values)} "
+        "embed_batch_sizes = {total} runs"
+    )
     typer.echo(f"Output CSV: {output_csv}")
 
     run_id = 0
     for gpu_util in gpu_util_values:
         for max_rows in max_rows_values:
-            run_id += 1
-            typer.echo(f"[{run_id}/{total}] gpu_memory_utilization={gpu_util}, max_rows={max_rows}")
-            try:
-                row = run_compare_from_pre_embed(
-                    pre_embed_dir=pre_embed_dir,
-                    query_csv=query_csv,
-                    lancedb_uri=lancedb_uri,
-                    ray_address=ray_address,
-                    embed_model_path=str(embed_model_path) if embed_model_path else None,
-                    embed_model_name=embed_model_name,
-                    max_rows=max_rows,
-                    gpu_memory_utilization=gpu_util,
-                    enforce_eager=False,
-                    compile_cache_dir=None,
-                    sort_key_column=sort_key_column,
+            for embed_batch_size in embed_batch_size_values:
+                run_id += 1
+                typer.echo(
+                    f"[{run_id}/{total}] gpu_memory_utilization={gpu_util}, max_rows={max_rows}, "
+                    f"embed_batch_size={embed_batch_size}"
                 )
-                _append_comparison_row_csv(row, output_csv)
-                if output_json is not None:
-                    _append_comparison_row_json(row, Path(output_json))
-            except Exception as e:
-                typer.echo(f"Run failed: {e}", err=True)
-                raise
+                try:
+                    row = run_compare_from_pre_embed(
+                        pre_embed_dir=pre_embed_dir,
+                        query_csv=query_csv,
+                        lancedb_uri=lancedb_uri,
+                        ray_address=ray_address,
+                        embed_model_path=str(embed_model_path) if embed_model_path else None,
+                        embed_model_name=embed_model_name,
+                        max_rows=max_rows,
+                        gpu_memory_utilization=gpu_util,
+                        enforce_eager=False,
+                        compile_cache_dir=None,
+                        embed_batch_size=embed_batch_size,
+                        sort_key_column=sort_key_column,
+                    )
+                    _append_comparison_row_csv(row, output_csv)
+                    if output_json is not None:
+                        _append_comparison_row_json(row, Path(output_json))
+                except Exception as e:
+                    typer.echo(f"Run failed: {e}", err=True)
+                    raise
 
     typer.echo(f"Wrote {total} rows to {output_csv}")
 
