@@ -10,6 +10,7 @@ from nemo_retriever.audio import app as audio_app
 from nemo_retriever.utils.benchmark import app as benchmark_app
 from nemo_retriever.chart import app as chart_app
 from nemo_retriever.utils.compare import app as compare_app
+from nemo_retriever.harness import app as harness_app
 from nemo_retriever.html import __main__ as html_main
 from nemo_retriever.utils.image import app as image_app
 from nemo_retriever.local import app as local_app
@@ -28,6 +29,7 @@ app.add_typer(local_app, name="local")
 app.add_typer(chart_app, name="chart")
 app.add_typer(compare_app, name="compare")
 app.add_typer(benchmark_app, name="benchmark")
+app.add_typer(harness_app, name="harness")
 app.add_typer(vector_store_app, name="vector-store")
 app.add_typer(recall_app, name="recall")
 app.add_typer(txt_main.app, name="txt")
