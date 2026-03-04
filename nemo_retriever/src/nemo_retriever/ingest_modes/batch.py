@@ -32,6 +32,7 @@ from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.ingest_modes.resource_heuristics import resolve_effective_resources
 from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
 from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
+from nemo_retriever.ingest_modes.resource_heuristics import _get_gpu_memory_info
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -337,11 +338,14 @@ class BatchIngestor(Ingestor):
 
         ray_nodes = ray.get_nodes()
         print(f"Ray nodes: {ray_nodes}")
+        node_ips = [node["NodeManagerAddress"] for node in ray_nodes]
+        print(f"Cluster has {len(node_ips)} nodes with IPs: {node_ips}")
 
         # iterate over ray_nodes and get the gpu memory information
-        for node in ray_nodes:
-            print(f"Node: {node}")
-            print(f"GPU memory: {node['Resources']['GPU']}")
+        for node_ip in node_ips:
+            print(f"Node: {node_ip}")
+            gpu_memory_info = _get_gpu_memory_info.remote(node_ip)
+            print(f"GPU memory info: {gpu_memory_info}")
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`

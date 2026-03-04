@@ -566,9 +566,6 @@ def resolve_batch_worker_plan(
 
     Explicit worker overrides take precedence over heuristic values.
     """
-
-    _get_gpu_memory_info()
-
     cfg = _resolve_heuristic_config(resource_config_path)
     if override_cpu_count is None or override_gpu_count is None:
         detected = resolve_effective_resources(
