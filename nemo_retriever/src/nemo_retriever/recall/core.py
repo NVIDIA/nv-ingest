@@ -305,8 +305,13 @@ def _is_hit(golden_key: str, retrieved: List[str], k: int, *, match_mode: str) -
     return specific_page in top or entire_document in top
 
 
+def is_hit_at_k(golden_key: str, retrieved: Sequence[str], k: int, *, match_mode: str) -> bool:
+    """Public wrapper for top-k hit checks across match modes."""
+    return _is_hit(str(golden_key), list(retrieved), int(k), match_mode=str(match_mode))
+
+
 def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int, *, match_mode: str) -> float:
-    hits = sum(_is_hit(g, r, k, match_mode=match_mode) for g, r in zip(gold, retrieved))
+    hits = sum(is_hit_at_k(g, r, k, match_mode=match_mode) for g, r in zip(gold, retrieved))
     return hits / max(1, len(gold))
 
 
@@ -388,7 +393,7 @@ def evaluate_recall(
         row = {"query_id": i, "query": q, "golden_answer": g, "top_retrieved": r[: cfg.top_k]}
         for k in cfg.ks:
             k = int(k)
-            row[f"hit@{k}"] = _is_hit(g, r, k, match_mode=str(cfg.match_mode))
+            row[f"hit@{k}"] = is_hit_at_k(g, r, k, match_mode=str(cfg.match_mode))
             if str(cfg.match_mode) == "pdf_only":
                 top_docs = [_extract_doc_from_pdf_page(key) for key in r[: cfg.top_k]]
                 try:

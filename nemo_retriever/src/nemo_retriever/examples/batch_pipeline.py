@@ -27,7 +27,7 @@ from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
-from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.recall.core import RecallConfig, is_hit_at_k, retrieve_and_score
 
 app = typer.Typer()
 
@@ -313,27 +313,6 @@ def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
         return s, ""
     doc, page = s.rsplit("_", 1)
     return doc, page
-
-
-def _extract_doc_from_key(key: str) -> str:
-    s = str(key)
-    if "_" not in s:
-        return s
-    doc, _page = s.rsplit("_", 1)
-    return doc
-
-
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int, *, match_mode: str) -> bool:
-    top = (retrieved_keys or [])[: int(k)]
-    if match_mode == "pdf_only":
-        gold_doc = str(golden_key).replace(".pdf", "")
-        top_docs = [_extract_doc_from_key(key) for key in top]
-        return gold_doc in top_docs
-
-    doc, page = _gold_to_doc_page(golden_key)
-    specific_page = f"{doc}_{page}"
-    entire_document = f"{doc}_-1"
-    return (specific_page in top) or (entire_document in top)
 
 
 def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
@@ -931,7 +910,7 @@ def main(
                     scored_hits.append((key, dist))
 
             top_keys = [k for (k, _d) in scored_hits]
-            hit = _is_hit_at_k(g, top_keys, cfg.top_k, match_mode=recall_match_mode)
+            hit = is_hit_at_k(g, top_keys, cfg.top_k, match_mode=recall_match_mode)
 
             if not no_recall_details:
                 print(f"\nQuery {i}: {q}")

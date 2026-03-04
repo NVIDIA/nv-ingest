@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Callable
 
 import pandas as pd
 
@@ -70,6 +71,12 @@ def _adapt_financebench_json(query_json: Path, output_csv: Path) -> Path:
     return output_csv
 
 
+_ADAPTER_HANDLERS: dict[str, tuple[Callable[[Path, Path], Path], str]] = {
+    "page_plus_one": (_adapt_page_plus_one, "query_adapter.page_plus_one.csv"),
+    "financebench_json": (_adapt_financebench_json, "query_adapter.financebench_json.csv"),
+}
+
+
 def prepare_recall_query_file(*, query_csv: Path | None, recall_adapter: str, output_dir: Path) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     if query_csv is None:
@@ -83,7 +90,9 @@ def prepare_recall_query_file(*, query_csv: Path | None, recall_adapter: str, ou
     if adapter == "none":
         return source
 
-    if adapter == "page_plus_one":
-        return _adapt_page_plus_one(source, output_dir / "query_adapter.page_plus_one.csv")
+    handler = _ADAPTER_HANDLERS.get(adapter)
+    if handler is None:
+        raise ValueError(f"Adapter '{adapter}' is valid but not implemented.")
 
-    return _adapt_financebench_json(source, output_dir / "query_adapter.financebench_json.csv")
+    adapter_fn, output_name = handler
+    return adapter_fn(source, output_dir / output_name)
