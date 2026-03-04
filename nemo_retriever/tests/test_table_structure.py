@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import base64
+import importlib
 import io
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,16 @@ import pandas as pd
 import pytest
 
 from nemo_retriever.util.table_and_chart import join_table_structure_and_ocr_output
+
+
+def _can_import(mod: str) -> bool:
+    return importlib.util.find_spec(mod) is not None
+
+
+_needs_pil = pytest.mark.skipif(not _can_import("PIL"), reason="PIL (Pillow) not installed")
+_needs_requests = pytest.mark.skipif(not _can_import("requests"), reason="requests not installed")
+_needs_torch = pytest.mark.skipif(not _can_import("torch"), reason="torch not installed")
+_needs_cv2 = pytest.mark.skipif(not _can_import("cv2"), reason="cv2 (opencv) not installed")
 
 
 def _make_b64_png(width: int = 200, height: int = 100) -> str:
@@ -140,6 +151,9 @@ def _make_page_df(
     )
 
 
+@_needs_pil
+@_needs_requests
+@_needs_torch
 class TestTableStructureOCRPageElements:
     """Test the full table_structure_ocr_page_elements function with mocked models."""
 
@@ -307,6 +321,7 @@ class TestTableStructureOCRPageElements:
 # ---------------------------------------------------------------------------
 
 
+@_needs_pil
 class TestTableStructureActor:
     """Test the Ray actor wrapper."""
 
@@ -371,6 +386,7 @@ class TestTableStructureOCRConfig:
 # ---------------------------------------------------------------------------
 
 
+@_needs_cv2
 class TestBuildPlan:
     def test_use_table_structure_selects_structure_stage(self) -> None:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags

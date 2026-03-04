@@ -550,21 +550,6 @@ def join_table_structure_and_ocr_output(
         "column": class_boxes.get("column", np.empty((0, 4))),
     }
 
-    # When the model returns rows and columns but no cells, synthesize
-    # cells from the intersection of each row and column bbox.
-    if cell_preds["cell"].shape[0] == 0 and cell_preds["row"].shape[0] > 0 and cell_preds["column"].shape[0] > 0:
-        synthetic_cells = []
-        for row_box in cell_preds["row"]:
-            for col_box in cell_preds["column"]:
-                x1 = max(row_box[0], col_box[0])
-                y1 = max(row_box[1], col_box[1])
-                x2 = min(row_box[2], col_box[2])
-                y2 = min(row_box[3], col_box[3])
-                if x2 > x1 and y2 > y1:
-                    synthetic_cells.append([x1, y1, x2, y2])
-        if synthetic_cells:
-            cell_preds["cell"] = np.array(synthetic_cells)
-
     if cell_preds["cell"].shape[0] == 0:
         return ""
 
