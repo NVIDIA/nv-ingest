@@ -448,6 +448,70 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 @app.command()
 def main(
     ctx: typer.Context,
+    detection_summary_file: Optional[Path] = typer.Option(
+        None,
+        "--detection-summary-file",
+        path_type=Path,
+        dir_okay=False,
+        help="Optional JSON file path to write end-of-run detection counts summary.",
+    ),
+    embed_actors: Optional[int] = typer.Option(
+        None,
+        "--embed-actors",
+        min=1,
+        help="Actor count for embedding stage. Omit to use resource heuristic.",
+    ),
+    embed_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--embed-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per embedding actor.",
+    ),
+    embed_gpus_per_actor: float = typer.Option(
+        0.1,
+        "--embed-gpus-per-actor",
+        min=0.0,
+        help="GPUs reserved per embedding actor.",
+    ),
+    embed_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--embed-invoke-url",
+        help="Optional remote endpoint URL for embedding model inference.",
+    ),
+    embed_model_name: str = typer.Option(
+        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "--embed-model-name",
+        help="Embedding model name passed to .embed().",
+    ),
+    embed_modality: str = typer.Option(
+        "text",
+        "--embed-modality",
+        help="Default embedding modality for all element types: "
+        "'text', 'image', or 'text_image' ('image_text' is also accepted).",
+    ),
+    embed_ray_batch_size: int = typer.Option(
+        256,
+        "--embed-ray-batch-size",
+        min=1,
+        help="Ray Data batch size for embedding stage.",
+    ),
+    freeze_resource_config: bool = typer.Option(
+        False,
+        "--freeze_resource_config",
+        help="Write resolved resource heuristic config to $HOME/.nemo-retriever/config.yaml before ingest starts.",
+    ),
+    freeze_resource_config_path: Optional[Path] = typer.Option(
+        None,
+        "--freeze_resource_config_path",
+        path_type=Path,
+        dir_okay=False,
+        help="Optional output path for frozen resource config YAML. Implies --freeze_resource_config behavior.",
+    ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
     input_dir: Path = typer.Argument(
         ...,
         help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
@@ -459,144 +523,26 @@ def main(
         "--input-type",
         help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
     ),
-    ray_address: Optional[str] = typer.Option(
+    lancedb_uri: str = typer.Option(
+        LANCEDB_URI,
+        "--lancedb-uri",
+        help="LanceDB URI/path for this run.",
+    ),
+    log_file: Optional[Path] = typer.Option(
         None,
-        "--ray-address",
-        help="URL or address of a running Ray cluster (e.g. 'auto' or 'ray://host:10001'). Omit for in-process Ray.",
-    ),
-    start_ray: bool = typer.Option(
-        False,
-        "--start-ray",
-        help=(
-            "Start a Ray head node (ray start --head) and connect to it. "
-            "Dashboard at http://127.0.0.1:8265. Ignores --ray-address."
-        ),
-    ),
-    query_csv: Path = typer.Option(
-        "bo767_query_gt.csv",
-        "--query-csv",
+        "--log-file",
         path_type=Path,
-        help=(
-            "Path to query CSV for recall evaluation. Default: bo767_query_gt.csv "
-            "(current directory). Recall is skipped if the file does not exist."
-        ),
+        dir_okay=False,
+        help="Optional file to collect all pipeline + Ray driver logs for this run.",
     ),
-    no_recall_details: bool = typer.Option(
-        False,
-        "--no-recall-details",
-        help=(
-            "Do not print per-query retrieval details (query, gold, hits). "
-            "Only the missed-gold summary and recall metrics are printed."
-        ),
-    ),
-    pdf_extract_tasks: int = typer.Option(
-        12,
-        "--pdf-extract-tasks",
-        min=1,
-        help="Number of CPU tasks for PDF extraction stage.",
-    ),
-    pdf_extract_cpus_per_task: float = typer.Option(
-        2.0,
-        "--pdf-extract-cpus-per-task",
-        min=0.1,
-        help="CPUs reserved per PDF extraction task.",
-    ),
-    pdf_extract_batch_size: int = typer.Option(
-        4,
-        "--pdf-extract-batch-size",
-        min=1,
-        help="Batch size for PDF extraction stage.",
-    ),
-    pdf_split_batch_size: int = typer.Option(
-        1,
-        "--pdf-split-batch-size",
-        min=1,
-        help="Batch size for PDF split stage.",
-    ),
-    page_elements_ray_batch_size: int = typer.Option(
-        24,
-        "--page-elements-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for page-elements stage.",
-    ),
-    page_elements_model_batch_size: int = typer.Option(
-        8,
-        "--page-elements-model-batch-size",
-        min=1,
-        help="Model inference chunk size for PageElementDetectionActor only.",
-    ),
-    ocr_actors: Optional[int] = typer.Option(
-        None,
-        "--ocr-actors",
-        min=1,
-        help="Actor count for OCR stage. Omit to use resource heuristic.",
-    ),
-    page_elements_actors: Optional[int] = typer.Option(
-        None,
-        "--page-elements-actors",
-        min=1,
-        help="Actor count for page-elements stage. Omit to use resource heuristic.",
-    ),
-    ocr_ray_batch_size: int = typer.Option(
-        16,
-        "--ocr-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for OCR stage.",
-    ),
-    ocr_model_batch_size: int = typer.Option(
-        8,
-        "--ocr-model-batch-size",
-        min=1,
-        help="Model inference chunk size for OCRActor only.",
-    ),
-    page_elements_cpus_per_actor: float = typer.Option(
-        1.0,
-        "--page-elements-cpus-per-actor",
-        min=0.1,
-        help="CPUs reserved per page-elements actor.",
-    ),
-    ocr_cpus_per_actor: float = typer.Option(
-        1.0,
-        "--ocr-cpus-per-actor",
-        min=0.1,
-        help="CPUs reserved per OCR actor.",
-    ),
-    embed_actors: Optional[int] = typer.Option(
-        None,
-        "--embed-actors",
-        min=1,
-        help="Actor count for embedding stage. Omit to use resource heuristic.",
-    ),
-    embed_ray_batch_size: int = typer.Option(
-        256,
-        "--embed-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for embedding stage.",
-    ),
-    embed_cpus_per_actor: float = typer.Option(
-        1.0,
-        "--embed-cpus-per-actor",
-        min=0.1,
-        help="CPUs reserved per embedding actor.",
-    ),
-    page_elements_gpus_per_actor: float = typer.Option(
-        0.5,
-        "--page-elements-gpus-per-actor",
-        min=0.0,
-        help="GPUs reserved per page-elements actor.",
-    ),
-    ocr_gpus_per_actor: float = typer.Option(
-        1.0,
-        "--ocr-gpus-per-actor",
-        min=0.0,
-        help="GPUs reserved per OCR actor.",
-    ),
-    embed_gpus_per_actor: float = typer.Option(
-        0.5,
-        "--embed-gpus-per-actor",
-        min=0.0,
-        help="GPUs reserved per embedding actor.",
-    ),
+    # no_recall_details: bool = typer.Option(
+    #     False,
+    #     "--no-recall-details",
+    #     help=(
+    #         "Do not print per-query retrieval details (query, gold, hits). "
+    #         "Only the missed-gold summary and recall metrics are printed."
+    #     ),
+    # ),
     # fmt: off
     nemotron_parse_actors: float = typer.Option(
         0.0,
@@ -621,41 +567,118 @@ def main(
         help="Ray Data batch size for Nemotron Parse stage "
         "(enables parse-only mode when > 0.0 with parse workers/GPU).",
     ),
-    page_elements_invoke_url: Optional[str] = typer.Option(
+    ocr_actors: Optional[int] = typer.Option(
         None,
-        "--page-elements-invoke-url",
-        help="Optional remote endpoint URL for page-elements model inference.",
+        "--ocr-actors",
+        min=1,
+        help="Actor count for OCR stage. Omit to use resource heuristic.",
+    ),
+    ocr_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--ocr-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per OCR actor.",
+    ),
+    ocr_gpus_per_actor: float = typer.Option(
+        0.1,
+        "--ocr-gpus-per-actor",
+        min=0.0,
+        help="GPUs reserved per OCR actor.",
     ),
     ocr_invoke_url: Optional[str] = typer.Option(
         None,
         "--ocr-invoke-url",
         help="Optional remote endpoint URL for OCR model inference.",
     ),
-    embed_invoke_url: Optional[str] = typer.Option(
+    ocr_model_batch_size: int = typer.Option(
+        8,
+        "--ocr-model-batch-size",
+        min=1,
+        help="Model inference chunk size for OCRActor only.",
+    ),
+    ocr_ray_batch_size: int = typer.Option(
+        16,
+        "--ocr-ray-batch-size",
+        min=1,
+        help="Ray Data batch size for OCR stage.",
+    ),
+    page_elements_actors: Optional[int] = typer.Option(
         None,
-        "--embed-invoke-url",
-        help="Optional remote endpoint URL for embedding model inference.",
+        "--page-elements-actors",
+        min=1,
+        help="Actor count for page-elements stage. Omit to use resource heuristic.",
     ),
-    embed_model_name: str = typer.Option(
-        "nvidia/llama-3.2-nv-embedqa-1b-v2",
-        "--embed-model-name",
-        help="Embedding model name passed to .embed().",
+    page_elements_cpus_per_actor: float = typer.Option(
+        1.0,
+        "--page-elements-cpus-per-actor",
+        min=0.1,
+        help="CPUs reserved per page-elements actor.",
     ),
-    embed_modality: str = typer.Option(
-        "text",
-        "--embed-modality",
-        help="Default embedding modality for all element types: "
-        "'text', 'image', or 'text_image' ('image_text' is also accepted).",
+    page_elements_gpus_per_actor: float = typer.Option(
+        0.1,
+        "--page-elements-gpus-per-actor",
+        min=0.0,
+        help="GPUs reserved per page-elements actor.",
     ),
-    text_elements_modality: Optional[str] = typer.Option(
+    page_elements_invoke_url: Optional[str] = typer.Option(
         None,
-        "--text-elements-modality",
-        help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
+        "--page-elements-invoke-url",
+        help="Optional remote endpoint URL for page-elements model inference.",
     ),
-    structured_elements_modality: Optional[str] = typer.Option(
+    page_elements_model_batch_size: int = typer.Option(
+        8,
+        "--page-elements-model-batch-size",
+        min=1,
+        help="Model inference chunk size for PageElementDetectionActor only.",
+    ),
+    page_elements_ray_batch_size: int = typer.Option(
+        24,
+        "--page-elements-ray-batch-size",
+        min=1,
+        help="Ray Data batch size for page-elements stage.",
+    ),
+    pdf_extract_batch_size: int = typer.Option(
+        4,
+        "--pdf-extract-batch-size",
+        min=1,
+        help="Batch size for PDF extraction stage.",
+    ),
+    pdf_extract_cpus_per_task: float = typer.Option(
+        2.0,
+        "--pdf-extract-cpus-per-task",
+        min=0.1,
+        help="CPUs reserved per PDF extraction task.",
+    ),
+    pdf_extract_tasks: int = typer.Option(
+        12,
+        "--pdf-extract-tasks",
+        min=1,
+        help="Number of CPU tasks for PDF extraction stage.",
+    ),
+    pdf_split_batch_size: int = typer.Option(
+        1,
+        "--pdf-split-batch-size",
+        min=1,
+        help="Batch size for PDF split stage.",
+    ),
+    query_csv: Path = typer.Option(
+        "./data/bo767_query_gt.csv",
+        "--query-csv",
+        path_type=Path,
+        help=(
+            "Path to query CSV for recall evaluation. Default: bo767_query_gt.csv "
+            "(current directory). Recall is skipped if the file does not exist."
+        ),
+    ),
+    ray_address: Optional[str] = typer.Option(
         None,
-        "--structured-elements-modality",
-        help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
+        "--ray-address",
+        help="URL or address of a running Ray cluster (e.g. 'auto' or 'ray://host:10001'). Omit for in-process Ray.",
+    ),
+    ray_log_to_driver: bool = typer.Option(
+        True,
+        "--ray-log-to-driver/--no-ray-log-to-driver",
+        help="Forward Ray worker logs to the driver (recommended with --log-file).",
     ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
@@ -670,39 +693,23 @@ def main(
         "--runtime-metrics-prefix",
         help="Optional filename prefix for per-run metrics artifacts.",
     ),
-    freeze_resource_config: bool = typer.Option(
+    start_ray: bool = typer.Option(
         False,
-        "--freeze_resource_config",
-        help="Write resolved resource heuristic config to $HOME/.nemo-retriever/config.yaml before ingest starts.",
+        "--start-ray",
+        help=(
+            "Start a Ray head node (ray start --head) and connect to it. "
+            "Dashboard at http://127.0.0.1:8265. Ignores --ray-address."
+        ),
     ),
-    lancedb_uri: str = typer.Option(
-        LANCEDB_URI,
-        "--lancedb-uri",
-        help="LanceDB URI/path for this run.",
-    ),
-    log_file: Optional[Path] = typer.Option(
+    structured_elements_modality: Optional[str] = typer.Option(
         None,
-        "--log-file",
-        path_type=Path,
-        dir_okay=False,
-        help="Optional file to collect all pipeline + Ray driver logs for this run.",
+        "--structured-elements-modality",
+        help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
     ),
-    ray_log_to_driver: bool = typer.Option(
-        True,
-        "--ray-log-to-driver/--no-ray-log-to-driver",
-        help="Forward Ray worker logs to the driver (recommended with --log-file).",
-    ),
-    detection_summary_file: Optional[Path] = typer.Option(
+    text_elements_modality: Optional[str] = typer.Option(
         None,
-        "--detection-summary-file",
-        path_type=Path,
-        dir_okay=False,
-        help="Optional JSON file path to write end-of-run detection counts summary.",
-    ),
-    hybrid: bool = typer.Option(
-        False,
-        "--hybrid/--no-hybrid",
-        help="Enable LanceDB hybrid mode (dense + FTS text).",
+        "--text-elements-modality",
+        help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
     ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
@@ -932,8 +939,11 @@ def main(
                 )
             )
 
-        if freeze_resource_config:
-            frozen_path = freeze_resource_config_file(ray_cluster_address=ray_address)
+        if freeze_resource_config or freeze_resource_config_path is not None:
+            frozen_path = freeze_resource_config_file(
+                output_path=freeze_resource_config_path,
+                ray_cluster_address=ray_address,
+            )
             print(f"Froze resource configuration to {frozen_path}")
 
         print("Running extraction...")
