@@ -113,12 +113,6 @@ def _get_gpu_memory_info() -> dict[int, int]:
         nvmlDeviceGetName,
         nvmlDeviceGetUUID,
         nvmlDeviceGetBrand,
-        nvmlDeviceGetProductArchitecture,
-        nvmlDeviceGetProductGeneration,
-        nvmlDeviceGetProductRevision,
-        nvmlDeviceGetProductVersion,
-        nvmlDeviceGetProductVersionMajor,
-        nvmlDeviceGetProductVersionMinor,
     )
 
     # Initialize the NVML library
@@ -145,15 +139,6 @@ def _get_gpu_memory_info() -> dict[int, int]:
         gpu_name = nvmlDeviceGetName(handle)
         gpu_uuid = nvmlDeviceGetUUID(handle)
         gpu_brand = nvmlDeviceGetBrand(handle)
-        # gpu_product_name = nvmlDeviceGetProductName(handle)
-        # gpu_product_brand = nvmlDeviceGetProductBrand(handle)
-        # gpu_product_series = nvmlDeviceGetProductSeries(handle)
-        gpu_product_architecture = nvmlDeviceGetProductArchitecture(handle)
-        gpu_product_generation = nvmlDeviceGetProductGeneration(handle)
-        gpu_product_revision = nvmlDeviceGetProductRevision(handle)
-        gpu_product_version = nvmlDeviceGetProductVersion(handle)
-        gpu_product_version_major = nvmlDeviceGetProductVersionMajor(handle)
-        gpu_product_version_minor = nvmlDeviceGetProductVersionMinor(handle)
 
         print(f"\n--- GPU {i} ---")
         # Convert bytes to MiB for better readability (1 MiB = 1024*1024 bytes)
@@ -166,12 +151,6 @@ def _get_gpu_memory_info() -> dict[int, int]:
             "gpu_name": gpu_name,
             "gpu_uuid": gpu_uuid,
             "gpu_brand": gpu_brand,
-            "gpu_product_architecture": gpu_product_architecture,
-            "gpu_product_generation": gpu_product_generation,
-            "gpu_product_revision": gpu_product_revision,
-            "gpu_product_version": gpu_product_version,
-            "gpu_product_version_major": gpu_product_version_major,
-            "gpu_product_version_minor": gpu_product_version_minor,
             "total": info.total // (1024**2),
             "used": info.used // (1024**2),
             "free": info.free // (1024**2),
