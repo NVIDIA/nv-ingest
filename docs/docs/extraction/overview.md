@@ -4,9 +4,9 @@ NeMo Retriever Library is a scalable, performance-oriented document content and 
 NeMo Retriever Library uses specialized NVIDIA NIM microservices 
 to find, contextualize, and extract text, tables, charts and infographics that you can use in downstream generative applications.
 
-!!! tip "Get Started"
+!!! tip "Get Started Recommendation"
 
-    **[Deploy without containers (Library Mode)](quickstart-library-mode.md)** is the primary, recommended path for workloads under 100 PDFs. Use it for local development, experimentation, and small-scale ingestion.
+    **[Deploy without containers (Library Mode)](quickstart-library-mode.md)** is the recommended approach for workloads with fewer than 100 PDFs. It’s best suited for local development, experimentation, and small-scale ingestion.
 
 NeMo Retriever Library enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever Library can optionally manage computation of embeddings for the extracted content, 
