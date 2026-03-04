@@ -23,6 +23,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest pandas pydantic pyyaml typer scikit-learn
+          python -m pip install api/
 
       - name: Run retriever unit tests
         env:
