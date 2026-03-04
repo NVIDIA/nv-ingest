@@ -505,6 +505,7 @@ class BatchIngestor(Ingestor):
             )
         cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
+        pdf_extract_workers = self._page_elements_workers * self._num_gpus
 
         # region agent log
         if use_nemotron_parse_only:
