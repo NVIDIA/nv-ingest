@@ -25,6 +25,7 @@ from typing import Union
 import ray
 import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
+from nemo_retriever.chart.chart_detection import ChartDetectionActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
@@ -665,12 +666,43 @@ class BatchIngestor(Ingestor):
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
+            # Graphic elements detection for charts (runs before OCR).
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                ge_kwargs: dict[str, Any] = {}
+                ge_invoke_url = kwargs.get("graphic_elements_invoke_url", "")
+                if ge_invoke_url:
+                    ge_kwargs["invoke_url"] = ge_invoke_url
+                if "inference_batch_size" in kwargs:
+                    ge_kwargs["inference_batch_size"] = kwargs["inference_batch_size"]
+                for k in (
+                    "api_key",
+                    "request_timeout_s",
+                    "remote_max_pool_workers",
+                    "remote_max_retries",
+                    "remote_max_429_retries",
+                ):
+                    if k in kwargs:
+                        ge_kwargs[k] = kwargs[k]
+                ge_gpu = 0.0 if ge_invoke_url else gpu_page_elements
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    ChartDetectionActor,
+                    batch_size=detect_batch_size,
+                    batch_format="pandas",
+                    num_cpus=page_elements_cpus_per_actor,
+                    num_gpus=ge_gpu,
+                    compute=rd.ActorPoolStrategy(size=page_elements_workers),
+                    fn_constructor_kwargs=ge_kwargs,
+                )
+
             # OCR-based extraction for tables/charts/infographics (single stage).
             ocr_flags = {}
             if kwargs.get("extract_tables") is True:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True
+                if use_graphic_elements:
+                    ocr_flags["use_graphic_elements"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True
             for k in (

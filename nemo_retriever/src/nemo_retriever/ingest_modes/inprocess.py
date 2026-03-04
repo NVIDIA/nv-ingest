@@ -30,6 +30,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 import pandas as pd
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
 from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+from nemo_retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
 from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
@@ -775,6 +776,12 @@ def upload_embeddings_to_lancedb_inprocess(
             metadata_obj["page_elements_v3_counts_by_label"] = {
                 str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
             }
+        ge_num = getattr(r, "graphic_elements_v1_num_detections", None)
+        if ge_num is not None:
+            try:
+                metadata_obj["graphic_elements_v1_num_detections"] = int(ge_num)
+            except Exception:
+                pass
         for ocr_col in ("table", "chart", "infographic"):
             entries = getattr(r, ocr_col, None)
             if isinstance(entries, list):
@@ -1077,6 +1084,7 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
             key,
             {
                 "pe": 0,
+                "ge": 0,
                 "ocr_table": 0,
                 "ocr_chart": 0,
                 "ocr_infographic": 0,
@@ -1094,6 +1102,16 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
         except (TypeError, ValueError):
             pe = 0
         entry["pe"] = max(entry["pe"], pe)
+
+        try:
+            ge = int(
+                meta.get("graphic_elements_v1_num_detections")
+                or row_dict.get("graphic_elements_v1_num_detections")
+                or 0
+            )
+        except (TypeError, ValueError):
+            ge = 0
+        entry["ge"] = max(entry["ge"], ge)
 
         for field, meta_key, col_key in [
             ("ocr_table", "ocr_table_detections", "table"),
@@ -1121,9 +1139,10 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
                 entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
 
     pe_by_label_totals: dict[str, int] = defaultdict(int)
-    pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
+    pe_total = ge_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
     for e in per_page.values():
         pe_total += e["pe"]
+        ge_total += e["ge"]
         ocr_table_total += e["ocr_table"]
         ocr_chart_total += e["ocr_chart"]
         ocr_infographic_total += e["ocr_infographic"]
@@ -1133,6 +1152,7 @@ def _collect_summary_from_df(df: pd.DataFrame) -> dict:
     return {
         "pages_seen": len(per_page),
         "page_elements_v3_total_detections": pe_total,
+        "graphic_elements_v1_total_detections": ge_total,
         "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
         "ocr_table_total_detections": ocr_table_total,
         "ocr_chart_total_detections": ocr_chart_total,
@@ -1153,6 +1173,7 @@ def _print_ingest_summary(results: list, elapsed_s: float) -> None:
     print("\nDetection summary (deduped by source/page_number):")
     print(f"  Pages seen: {summary['pages_seen']}")
     print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
+    print(f"  Graphic elements v1 total detections: {summary['graphic_elements_v1_total_detections']}")
     print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
     print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
     print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
@@ -1247,8 +1268,8 @@ class InProcessIngestor(Ingestor):
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
-        # the caller explicitly disables it.
-        if "extract_page_as_image" not in extract_kwargs:
+        # the caller explicitly set it to False.
+        if extract_kwargs.get("extract_page_as_image") is None:
             if any(
                 extract_kwargs.get(k) is True
                 for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")
@@ -1334,12 +1355,29 @@ class InProcessIngestor(Ingestor):
                     )
                 )
 
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+
+            # Graphic elements detection for charts (runs before OCR).
+            # When use_graphic_elements is True, charts go through the
+            # combined graphic-elements + OCR path for structured text.
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                print("Adding graphic-elements+OCR extraction task")
+
+                from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+                ge_kwargs: dict[str, Any] = {"model": NemotronGraphicElementsV1()}
+                if "inference_batch_size" in kwargs:
+                    ge_kwargs["inference_batch_size"] = kwargs["inference_batch_size"]
+                self._tasks.append((detect_graphic_elements_v1_from_page_elements_v3, ge_kwargs))
+
             # OCR-based extraction for tables/charts/infographics.
             ocr_flags = {}
             if kwargs.get("extract_tables") is True:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True
+                if use_graphic_elements:
+                    ocr_flags["use_graphic_elements"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True
             ocr_flags.update(_stage_remote_kwargs("ocr"))

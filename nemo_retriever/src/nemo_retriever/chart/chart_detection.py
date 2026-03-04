@@ -13,6 +13,8 @@ import time
 import traceback
 
 import pandas as pd
+from nemo_retriever.nim.nim import invoke_image_inference_batches
+from nemo_retriever.params import RemoteRetryParams
 
 try:
     import numpy as np
@@ -53,7 +55,7 @@ def _decode_b64_image_to_chw_tensor(image_b64: str) -> Tuple["torch.Tensor", Tup
         arr = np.array(im, dtype=np.uint8)  # (H,W,3)
 
     t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()  # (3,H,W) uint8
-    t = t.to(dtype=torch.float32) / 255.0
+    t = t.to(dtype=torch.float32)
     return t, (int(h), int(w))
 
 
@@ -235,6 +237,75 @@ def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     return out
 
 
+def _remote_response_to_ge_detections(response_json: Any) -> List[Dict[str, Any]]:
+    """Parse a NIM graphic-elements response into the standard detection list.
+
+    The NIM returns either:
+    * ``{"label_name": [[x0, y0, x1, y1, conf], ...], ...}`` (annotation dict), or
+    * ``{"bounding_boxes": {"label_name": [{"x_min":..., ...}]}}`` (NIM v2), or
+    * a dict with ``boxes``/``labels``/``scores`` tensors (model-pred style).
+    """
+    if not isinstance(response_json, dict):
+        return []
+
+    # Unwrap common NIM envelopes.
+    candidates: List[Any] = [response_json]
+    for key in ("data", "output", "predictions"):
+        nested = response_json.get(key)
+        if isinstance(nested, list) and nested:
+            candidates.append(nested[0])
+
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+
+        # NIM v2 bounding_boxes format.
+        bb = cand.get("bounding_boxes")
+        if isinstance(bb, dict):
+            dets: List[Dict[str, Any]] = []
+            for label_name, items in bb.items():
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    if isinstance(item, dict):
+                        dets.append(
+                            {
+                                "bbox_xyxy_norm": [
+                                    float(item.get("x_min", 0)),
+                                    float(item.get("y_min", 0)),
+                                    float(item.get("x_max", 0)),
+                                    float(item.get("y_max", 0)),
+                                ],
+                                "label": None,
+                                "label_name": str(label_name),
+                                "score": float(item.get("confidence", 0)),
+                            }
+                        )
+            if dets:
+                return dets
+
+        # Annotation dict: {"chart_title": [[x0, y0, x1, y1, conf], ...]}
+        if all(isinstance(v, list) for v in cand.values()):
+            dets = []
+            for label_name, boxes in cand.items():
+                if not isinstance(boxes, list):
+                    continue
+                for box in boxes:
+                    if isinstance(box, (list, tuple)) and len(box) >= 4:
+                        dets.append(
+                            {
+                                "bbox_xyxy_norm": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+                                "label": None,
+                                "label_name": str(label_name),
+                                "score": float(box[4]) if len(box) > 4 else None,
+                            }
+                        )
+            if dets:
+                return dets
+
+    return []
+
+
 def detect_graphic_elements_v1(
     batch_df: Any,
     *,
@@ -354,14 +425,19 @@ def detect_graphic_elements_v1(
 def detect_graphic_elements_v1_from_page_elements_v3(
     pages_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
     inference_batch_size: int = 8,
+    remote_retry: RemoteRetryParams | None = None,
     page_elements_column: str = "page_elements_v3",
     page_elements_counts_by_label_column: str = "page_elements_v3_counts_by_label",
     page_image_column: str = "page_image",
     output_column: str = "graphic_elements_v1",
     num_detections_column: str = "graphic_elements_v1_num_detections",
     counts_by_label_column: str = "graphic_elements_v1_counts_by_label",
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron Graphic Elements v1 only on cropped chart regions.
@@ -379,6 +455,17 @@ def detect_graphic_elements_v1_from_page_elements_v3(
         )
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
+
+    invoke_url = (invoke_url or kwargs.get("graphic_elements_invoke_url") or "").strip()
+    use_remote = bool(invoke_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `invoke_url` is not provided.")
+
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
 
     out_payloads: List[Dict[str, Any]] = []
     out_total_dets: List[int] = []
@@ -464,7 +551,37 @@ def detect_graphic_elements_v1_from_page_elements_v3(
         out_total_dets.append(0)
         out_counts.append({})
 
-    if crop_b64s:
+    if crop_b64s and use_remote:
+        # ---- Remote NIM inference path ----
+        crop_payloads: List[Dict[str, Any]] = [{"detections": []} for _ in crop_b64s]
+        t0 = time.perf_counter()
+        try:
+            response_items = invoke_image_inference_batches(
+                invoke_url=invoke_url,
+                image_b64_list=crop_b64s,
+                api_key=api_key,
+                timeout_s=float(request_timeout_s),
+                max_batch_size=int(inference_batch_size),
+                max_pool_workers=int(retry.remote_max_pool_workers),
+                max_retries=int(retry.remote_max_retries),
+                max_429_retries=int(retry.remote_max_429_retries),
+            )
+            elapsed = time.perf_counter() - t0
+            if len(response_items) != len(crop_b64s):
+                raise RuntimeError(f"Expected {len(crop_b64s)} GE responses, got {len(response_items)}")
+            for crop_i, resp in enumerate(response_items):
+                dets = _remote_response_to_ge_detections(resp)
+                crop_payloads[crop_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
+        except BaseException as e:
+            elapsed = time.perf_counter() - t0
+            for crop_i in range(len(crop_b64s)):
+                if not crop_payloads[crop_i].get("timing"):
+                    crop_payloads[crop_i] = _error_payload(stage="remote_invoke", exc=e) | {
+                        "timing": {"seconds": float(elapsed)}
+                    }
+
+    elif crop_b64s:
+        # ---- Local model inference path ----
         label_names = _labels_from_model(model)
 
         tensors: List[Optional["torch.Tensor"]] = []
@@ -551,6 +668,8 @@ def detect_graphic_elements_v1_from_page_elements_v3(
                             "timing": {"seconds": float(time.perf_counter() - t1)}
                         }
 
+    # Merge inference results (remote or local) into region payloads.
+    if crop_b64s:
         for crop_i, region_ref in enumerate(crop_region_refs):
             payload = crop_payloads[crop_i] if crop_i < len(crop_payloads) else {"detections": []}
             if isinstance(payload, dict):
@@ -612,9 +731,17 @@ class ChartDetectionActor:
 
     def __init__(self, **detect_kwargs: Any) -> None:
         self.detect_kwargs = dict(detect_kwargs)
-        from nemo_retriever.model.local import NemotronGraphicElementsV1
+        invoke_url = str(
+            self.detect_kwargs.get("graphic_elements_invoke_url") or self.detect_kwargs.get("invoke_url") or ""
+        ).strip()
+        if invoke_url and "invoke_url" not in self.detect_kwargs:
+            self.detect_kwargs["invoke_url"] = invoke_url
+        if invoke_url:
+            self._model = None
+        else:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
 
-        self._model = NemotronGraphicElementsV1()
+            self._model = NemotronGraphicElementsV1()
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:

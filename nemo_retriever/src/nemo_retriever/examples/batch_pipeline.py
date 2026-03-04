@@ -513,6 +513,11 @@ def main(
         "--ocr-invoke-url",
         help="Optional remote endpoint URL for OCR model inference.",
     ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
+    ),
     embed_invoke_url: Optional[str] = typer.Option(
         None,
         "--embed-invoke-url",
@@ -585,6 +590,11 @@ def main(
         False,
         "--hybrid/--no-hybrid",
         help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
+    use_graphic_elements: bool = typer.Option(
+        False,
+        "--use-graphic-elements",
+        help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
     ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
@@ -693,6 +703,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -756,6 +768,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={

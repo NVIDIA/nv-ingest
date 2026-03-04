@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
 from nemo_retriever.nim.nim import invoke_image_inference_batches
+from nemo_retriever.util.table_and_chart import join_graphic_elements_and_ocr_output
 
 try:
     from PIL import Image
@@ -361,6 +362,43 @@ def _blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
     return "\n".join(rows)
 
 
+def _bboxes_close(a: Sequence[float], b: Sequence[float], tol: float = 1e-4) -> bool:
+    """Check if two normalized bboxes are approximately equal."""
+    if len(a) != 4 or len(b) != 4:
+        return False
+    return all(abs(float(a[i]) - float(b[i])) < tol for i in range(4))
+
+
+def _find_ge_detections_for_bbox(
+    row: Any,
+    chart_bbox: Sequence[float],
+) -> Optional[List[Dict[str, Any]]]:
+    """Find graphic element detections for a chart bbox.
+
+    Reads the ``graphic_elements_v1`` column from *row* and returns the
+    detections list for the region whose ``bbox_xyxy_norm`` matches
+    *chart_bbox*, or ``None`` if no match is found.
+    """
+    ge_col = getattr(row, "graphic_elements_v1", None)
+    if not isinstance(ge_col, dict):
+        return None
+    regions = ge_col.get("regions")
+    if not isinstance(regions, list):
+        return None
+
+    for region in regions:
+        if not isinstance(region, dict):
+            continue
+        region_bbox = region.get("bbox_xyxy_norm")
+        if not isinstance(region_bbox, (list, tuple)) or len(region_bbox) != 4:
+            continue
+        if _bboxes_close(chart_bbox, region_bbox):
+            dets = region.get("detections")
+            if isinstance(dets, list) and dets:
+                return dets
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Core function
 # ---------------------------------------------------------------------------
@@ -376,6 +414,7 @@ def ocr_page_elements(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    use_graphic_elements: bool = False,
     remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
@@ -464,10 +503,10 @@ def ocr_page_elements(
 
             if use_remote:
                 crop_b64s: List[str] = []
-                crop_meta: List[Tuple[str, List[float]]] = []
+                crop_meta: List[Tuple[str, List[float], Tuple[int, int]]] = []
                 for label_name, bbox, crop_array in crops:
                     crop_b64s.append(_np_rgb_to_b64_png(crop_array))
-                    crop_meta.append((label_name, bbox))
+                    crop_meta.append((label_name, bbox, (crop_array.shape[0], crop_array.shape[1])))
 
                 if crop_b64s:
                     response_items = invoke_image_inference_batches(
@@ -483,8 +522,17 @@ def ocr_page_elements(
                     if len(response_items) != len(crop_meta):
                         raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")
 
-                    for i, (label_name, bbox) in enumerate(crop_meta):
+                    for i, (label_name, bbox, crop_hw) in enumerate(crop_meta):
                         preds = _extract_remote_ocr_item(response_items[i])
+
+                        if label_name == "chart" and use_graphic_elements:
+                            ge_dets = _find_ge_detections_for_bbox(row, bbox)
+                            if ge_dets:
+                                text = join_graphic_elements_and_ocr_output(ge_dets, preds, crop_hw)
+                                if text:
+                                    chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
+                                    continue
+
                         blocks = _parse_ocr_result(preds)
                         if label_name == "table":
                             text = _blocks_to_pseudo_markdown(blocks) or _blocks_to_text(blocks)
@@ -503,6 +551,15 @@ def ocr_page_elements(
                     # paragraph-level for charts/infographics where structure matters less.
                     ml = "word" if label_name == "table" else "paragraph"
                     preds = model.invoke(crop_array, merge_level=ml)
+
+                    if label_name == "chart" and use_graphic_elements:
+                        ge_dets = _find_ge_detections_for_bbox(row, bbox)
+                        if ge_dets:
+                            crop_hw = (crop_array.shape[0], crop_array.shape[1])
+                            text = join_graphic_elements_and_ocr_output(ge_dets, preds, crop_hw)
+                            if text:
+                                chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
+                                continue
 
                     # Parse and assemble text.
                     blocks = _parse_ocr_result(preds)
@@ -546,9 +603,15 @@ def ocr_page_elements(
         meta["timing"] = {"seconds": float(elapsed)}
 
     out = batch_df.copy()
-    out["table"] = all_table
-    out["chart"] = all_chart
-    out["infographic"] = all_infographic
+    # Only overwrite content columns that this call is responsible for.
+    # When extract_tables=False, preserve any existing `table` column
+    # (e.g. populated by an upstream table-structure+OCR stage).
+    if extract_tables or "table" not in out.columns:
+        out["table"] = all_table
+    if extract_charts or "chart" not in out.columns:
+        out["chart"] = all_chart
+    if extract_infographics or "infographic" not in out.columns:
+        out["infographic"] = all_infographic
     out["ocr_v1"] = all_ocr_meta
     return out
 
@@ -581,6 +644,7 @@ class OCRActor:
         "_extract_tables",
         "_extract_charts",
         "_extract_infographics",
+        "_use_graphic_elements",
         "_invoke_url",
         "_api_key",
         "_request_timeout_s",
@@ -593,6 +657,7 @@ class OCRActor:
         extract_tables: bool = False,
         extract_charts: bool = False,
         extract_infographics: bool = False,
+        use_graphic_elements: bool = False,
         ocr_invoke_url: Optional[str] = None,
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
@@ -618,6 +683,7 @@ class OCRActor:
         self._extract_tables = bool(extract_tables)
         self._extract_charts = bool(extract_charts)
         self._extract_infographics = bool(extract_infographics)
+        self._use_graphic_elements = bool(use_graphic_elements)
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:
@@ -630,6 +696,7 @@ class OCRActor:
                 extract_tables=self._extract_tables,
                 extract_charts=self._extract_charts,
                 extract_infographics=self._extract_infographics,
+                use_graphic_elements=self._use_graphic_elements,
                 remote_retry=self._remote_retry,
                 **override_kwargs,
             )

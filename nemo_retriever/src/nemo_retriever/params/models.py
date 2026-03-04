@@ -152,6 +152,7 @@ class ExtractParams(_ParamsModel):
     extract_images: bool = False
     extract_tables: bool = False
     extract_charts: bool = False
+    use_graphic_elements: bool = False
     extract_infographics: bool = False
     extract_page_as_image: Optional[bool] = None
     dpi: int = 200
@@ -165,6 +166,7 @@ class ExtractParams(_ParamsModel):
     ocr_invoke_url: Optional[str] = None
     ocr_api_key: Optional[str] = None
     ocr_request_timeout_s: Optional[float] = None
+    graphic_elements_invoke_url: Optional[str] = None
 
     inference_batch_size: int = 8
     output_column: str = "page_elements_v3"
@@ -174,6 +176,13 @@ class ExtractParams(_ParamsModel):
 
     remote_retry: RemoteRetryParams = Field(default_factory=RemoteRetryParams)
     batch_tuning: BatchTuningParams = Field(default_factory=BatchTuningParams)
+
+    @model_validator(mode="after")
+    def _auto_enable_graphic_elements(self) -> "ExtractParams":
+        """Auto-enable ``use_graphic_elements`` when a remote endpoint is provided."""
+        if self.graphic_elements_invoke_url and not self.use_graphic_elements:
+            self.use_graphic_elements = True
+        return self
 
 
 IMAGE_MODALITIES: frozenset[str] = frozenset({"image", "text_image", "image_text"})

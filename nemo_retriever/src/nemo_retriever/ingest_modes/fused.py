@@ -16,6 +16,7 @@ from typing import Any, Dict
 
 import ray.data as rd
 
+from nemo_retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 
@@ -67,6 +68,7 @@ class _FusedModelActor:
         self._extract_tables = bool(kwargs.get("extract_tables", False))
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
+        self._use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
         self._embed_granularity = str(kwargs.get("embed_granularity", "element"))
         self._embed_modality = str(kwargs.get("embed_modality", "text"))
         self._embed_kwargs = {
@@ -88,6 +90,11 @@ class _FusedModelActor:
         model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
 
         self._page_elements_model = NemotronPageElementsV3()
+        self._ge_model = None
+        if self._use_graphic_elements and self._extract_charts:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+            self._ge_model = NemotronGraphicElementsV1()
         self._ocr_model = NemotronOCRV1()
         self._embed_model = LlamaNemotronEmbed1BV2Embedder(
             device=str(device) if device else None,
@@ -103,12 +110,19 @@ class _FusedModelActor:
             model=self._page_elements_model,
             **self._detect_kwargs,
         )
+        if self._ge_model is not None:
+            detected = detect_graphic_elements_v1_from_page_elements_v3(
+                detected,
+                model=self._ge_model,
+                inference_batch_size=int(self._detect_kwargs.get("inference_batch_size", 8)),
+            )
         ocred = ocr_page_elements(
             detected,
             model=self._ocr_model,
             extract_tables=self._extract_tables,
             extract_charts=self._extract_charts,
             extract_infographics=self._extract_infographics,
+            use_graphic_elements=self._use_graphic_elements,
         )
         if self._embed_granularity == "page":
             prepared = collapse_content_to_page_rows(
@@ -154,6 +168,7 @@ class FusedIngestor(BatchIngestor):
             "extract_tables": bool(kwargs.get("extract_tables", False)),
             "extract_charts": bool(kwargs.get("extract_charts", False)),
             "extract_infographics": bool(kwargs.get("extract_infographics", False)),
+            "use_graphic_elements": bool(kwargs.get("use_graphic_elements", False)),
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
         }
 
