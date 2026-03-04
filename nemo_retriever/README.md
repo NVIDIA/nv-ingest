@@ -54,6 +54,76 @@ Pass the directory that contains your PDFs as the first argument (`input-dir`). 
 
 For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
 
+## Harness (run, sweep, nightly)
+
+`nemo_retriever` includes a lightweight harness for benchmark orchestration without Docker.
+
+- Config files:
+  - `nemo_retriever/harness/test_configs.yaml`
+  - `nemo_retriever/harness/nightly_config.yaml`
+- CLI entrypoint is nested under `retriever harness`.
+- First pass is LanceDB-only and enforces recall-required pass/fail by default.
+- Single-run artifact directories default to `<dataset>_<timestamp>`.
+
+### Single run
+
+```bash
+# Dataset preset from test_configs.yaml (recall-required example)
+retriever harness run --dataset jp20 --preset single_gpu
+
+# Direct dataset path
+retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
+```
+
+### Sweep runs (explicit runs list)
+
+```bash
+retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
+```
+
+### Nightly session
+
+```bash
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
+retriever harness nightly --dry-run
+```
+
+### Harness artifacts
+
+Each run writes a compact artifact set (no full stdout/stderr log persistence):
+
+- `results.json` (normalized metrics + pass/fail + config snapshot)
+- `command.txt` (exact invoked command)
+- `runtime_metrics/` (Ray runtime summary + timeline files)
+
+By default, detection totals are embedded into `results.json` under `detection_summary`.
+If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
+`nemo_retriever/harness/test_configs.yaml`.
+
+Sweep/nightly sessions additionally write:
+
+- `session_summary.json` (overall pass/fail rollup)
+
+### Runtime metrics interpretation
+
+`runtime_metrics/` currently includes:
+
+- `run.runtime.summary.json`: high-level run totals (input files, pages, elapsed seconds)
+- `run.ray.timeline.json`: detailed Ray execution timeline for deeper profiling
+- `run.rd_dataset.stats.txt`: Ray dataset stats dump (can be empty on some runs)
+
+For routine benchmark comparison, `results.json` is the primary source.
+Use `runtime_metrics/` when investigating throughput regressions or stage-level behavior.
+
+### Artifact size profile
+
+Current observed runs show that per-run LanceDB data dominates footprint:
+
+- `bo20`: ~9.0 MiB total, ~8.6 MiB LanceDB (~96%)
+- `jp20`: ~36.8 MiB total, ~36.2 MiB LanceDB (~98%)
+
+So storage growth is mostly driven by `lancedb/`, not the summary JSON artifacts.
+
 ### Audio pipeline
 
 Audio ingestion uses `.files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest()` in batch, inprocess, or fused mode. **ASR** (speech-to-text) can be:
