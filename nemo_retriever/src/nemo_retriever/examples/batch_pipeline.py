@@ -535,14 +535,6 @@ def main(
         dir_okay=False,
         help="Optional file to collect all pipeline + Ray driver logs for this run.",
     ),
-    # no_recall_details: bool = typer.Option(
-    #     False,
-    #     "--no-recall-details",
-    #     help=(
-    #         "Do not print per-query retrieval details (query, gold, hits). "
-    #         "Only the missed-gold summary and recall metrics are printed."
-    #     ),
-    # ),
     # fmt: off
     nemotron_parse_actors: float = typer.Option(
         0.0,
@@ -966,7 +958,7 @@ def main(
         ray.shutdown()
 
         # ---------------------------------------------------------------------------
-        # Recall calculation (optional)
+        # Recall calculation
         # ---------------------------------------------------------------------------
         query_csv = Path(query_csv)
         if not query_csv.exists():
@@ -1022,8 +1014,6 @@ def main(
                 return
         except Exception:
             pass
-        unique_basenames = table.to_pandas()["pdf_basename"].unique()
-        print(f"Unique basenames: {unique_basenames}")
 
         # Resolve the HF model ID for recall query embedding so aliases
         # (e.g. "nemo_retriever_v1") map to the correct model.
@@ -1042,58 +1032,6 @@ def main(
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
-
-        # if not no_recall_details:
-        #     print("\nPer-query retrieval details:")
-        # missed_gold: list[tuple[str, str]] = []
-        # ext = (
-        #     ".html"
-        #     if input_type == "html"
-        #     else (".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf"))
-        # )
-        # for i, (q, g, hits) in enumerate(
-        #     zip(
-        #         _df_query["query"].astype(str).tolist(),
-        #         _gold,
-        #         _raw_hits,
-        #     )
-        # ):
-        #     doc, page = _gold_to_doc_page(g)
-
-        #     scored_hits: list[tuple[str, float | None]] = []
-        #     for h in hits:
-        #         key, dist = _hit_key_and_distance(h)
-        #         if key:
-        #             scored_hits.append((key, dist))
-
-        #     top_keys = [k for (k, _d) in scored_hits]
-        #     hit = _is_hit_at_k(g, top_keys, cfg.top_k)
-
-        #     if not no_recall_details:
-        #         print(f"\nQuery {i}: {q}")
-        #         print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
-        #         print(f"  Hit@{cfg.top_k}: {hit}")
-        #         print("  Top hits:")
-        #         if not scored_hits:
-        #             print("    (no hits)")
-        #         else:
-        #             for rank, (key, dist) in enumerate(scored_hits[: int(cfg.top_k)], start=1):
-        #                 if dist is None:
-        #                     print(f"    {rank:02d}. {key}")
-        #                 else:
-        #                     print(f"    {rank:02d}. {key}  distance={dist:.6f}")
-
-        #     if not hit:
-        #         missed_gold.append((f"{doc}{ext}", str(page)))
-
-        # missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-        # print("\nMissed gold (unique doc/page):")
-        # if not missed_unique:
-        #     print("  (none)")
-        # else:
-        #     for doc_page, page in missed_unique:
-        #         print(f"  {doc_page} page {page}")
-        # print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
         print("\nRecall metrics (matching nemo_retriever.recall.core):")
         for k, v in metrics.items():
