@@ -11,7 +11,6 @@ import traceback
 
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
-from nemo_retriever.nim.nim import invoke_image_inference_batches
 
 try:
     import torch
@@ -254,6 +253,7 @@ def table_structure_ocr_page_elements(
     pandas.DataFrame
         Original columns plus ``table`` and ``table_structure_ocr_v1``.
     """
+    from nemo_retriever.nim.nim import invoke_image_inference_batches
     from nemo_retriever.ocr.ocr import (
         _blocks_to_pseudo_markdown,
         _crop_all_from_page,
