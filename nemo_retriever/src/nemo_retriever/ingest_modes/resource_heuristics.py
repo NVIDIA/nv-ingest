@@ -100,23 +100,32 @@ MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
 
 def _get_gpu_memory_info() -> dict[int, int]:
     """Get the memory information for each GPU."""
-    import nvidia_smi
+    from pynvml import (
+        nvmlInit,
+        nvmlSystemGetDriverVersion,
+        nvmlDeviceGetCount,
+        nvmlDeviceGetHandleByIndex,
+        nvmlDeviceGetMemoryInfo,
+        nvmlShutdown,
+    )
 
     # Initialize the NVML library
-    nvidia_smi.nvmlInit()
+    nvmlInit()
+
+    print(f"Driver Version: {nvmlSystemGetDriverVersion()}")
 
     # Get the number of available GPUs
-    device_count = nvidia_smi.nvmlDeviceGetCount()
+    device_count = nvmlDeviceGetCount()
 
     print(f"Found {device_count} GPU(s).")
 
     # Iterate over each GPU to get memory information
     for i in range(device_count):
         # Get a handle to the device
-        handle = nvidia_smi.nvmlDeviceGetHandleByIndex(i)
+        handle = nvmlDeviceGetHandleByIndex(i)
 
         # Get memory information (total, free, used) in bytes
-        info = nvidia_smi.nvmlDeviceGetMemoryInfo(handle)
+        info = nvmlDeviceGetMemoryInfo(handle)
 
         print(f"\n--- GPU {i} ---")
         # Convert bytes to MiB for better readability (1 MiB = 1024*1024 bytes)
@@ -125,7 +134,7 @@ def _get_gpu_memory_info() -> dict[int, int]:
         print(f"Free memory: {info.free // (1024**2)} MiB")
 
     # Shutdown the NVML library when finished
-    nvidia_smi.nvmlShutdown()
+    nvmlShutdown()
 
 
 def _debug_print(message: str) -> None:
