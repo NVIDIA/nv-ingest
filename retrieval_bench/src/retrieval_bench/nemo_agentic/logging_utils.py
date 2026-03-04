@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 # taken from:
 # https://github.com/BatsResearch/trove/blob/main/src/trove/logging_utils.py
 """Simple utilities to create python loggers."""

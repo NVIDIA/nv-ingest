@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 CLI commands for ``retrieval-bench evaluate dense-retrieval`` and
 ``retrieval-bench evaluate agentic-retrieval``.

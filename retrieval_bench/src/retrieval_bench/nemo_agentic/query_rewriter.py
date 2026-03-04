@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from . import llm_handler
 
 _SYSTEM_PROMPT = """You are the query rewriting component of an agentic retrieval system.

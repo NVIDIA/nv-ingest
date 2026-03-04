@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """
 Nemotron ColEmbed-VL v2 singleton retriever (late interaction, ColBERT-style MaxSim).
 

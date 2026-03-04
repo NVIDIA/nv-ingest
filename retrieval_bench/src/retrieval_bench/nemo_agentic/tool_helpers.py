@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """Tool definition and utilities for managing tools for an LLM.
 
 This is an internalized subset of the original external agent code. All MCP and
