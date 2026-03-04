@@ -33,6 +33,12 @@ class ModelRuntimeParams(_ParamsModel):
     normalize: bool = True
     max_length: int = 8192
     model_name: Optional[str] = None
+    # vLLM offline: use CUDA graphs when False (faster); set True to avoid torch.compile issues (e.g. noexec mount).
+    enforce_eager: bool = False
+    # vLLM: fraction of GPU memory for KV cache / batching (default 0.45); increase (e.g. 0.55–0.7) for throughput.
+    gpu_memory_utilization: float = 0.45
+    # Optional dir for torch inductor/Triton cache when enforce_eager=False; must be on non-noexec fs.
+    compile_cache_dir: Optional[str] = None
 
 
 class IngestorCreateParams(_ParamsModel):
