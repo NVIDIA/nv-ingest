@@ -55,7 +55,9 @@ Use the `split` method to chunk large documents as shown in the following code.
 
 !!! note
 
-    The default tokenizer (`meta-llama/Llama-3.2-1B`) runs locally (local HF) and requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token": "hf_***` to authenticate.
+    The default tokenizer (meta-llama/Llama-3.2-1B) runs locally (local HF) and requires a  [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens) for authentication. Set "hf_access_token": "hf_***" to provide your token.
+
+
 
 ```python
 ingestor = ingestor.split(
