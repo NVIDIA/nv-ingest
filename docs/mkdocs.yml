@@ -1,4 +1,4 @@
-site_name: NeMo Retriever Documentation
+site_name: NeMo Retriever Library Documentation
 site_url: https://docs.nvidia.com/nemo/retriever/
 
 repo_name: NVIDIA/nv-ingest
@@ -55,12 +55,13 @@ extra_css:
 
 
 nav:
-  - NeMo Retriever: 
+  - NeMo Retriever Library: 
     - Overview: 
       - Overview: index.md
     - NeMo Retriever Extraction:
       - Overview: extraction/overview.md
       - Release Notes: extraction/releasenotes-nv-ingest.md
+      # Get Started CTA points to Library Mode QuickStart; Library Mode is the primary path for workloads <100 PDFs.
       - Get Started:
         - Prerequisites: extraction/prerequisites.md
         - Support Matrix: extraction/support-matrix.md
@@ -85,7 +86,7 @@ nav:
         - NimClient Usage: extraction/nimclient.md
         - Resource Scaling Modes: extraction/scaling-modes.md
       - Performance:
-        - Benchmarking: extraction/benchmarking.md
+        - Benchmarks & Comparison: extraction/benchmarking.md
         - Telemetry: extraction/telemetry.md
         - Throughput Is Dataset-Dependent: extraction/throughput-is-dataset-dependent.md
       - Reference:

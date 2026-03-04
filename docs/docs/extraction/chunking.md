@@ -48,13 +48,13 @@ The `split` task uses a tokenizer to count the number of tokens in the document,
 and splits the document based on the desired maximum chunk size and chunk overlap. 
 We recommend that you use the `meta-llama/Llama-3.2-1B` tokenizer, 
 because it's the same tokenizer as the llama-3.2 embedding model that we use for embedding.
-However, you can use any tokenizer from any HuggingFace model that includes a tokenizer file.
+You can use any tokenizer from any Hugging Face model that includes a tokenizer file; tokenizers are run **locally** (local HF), downloaded from the [Hugging Face Hub](https://huggingface.co/models).
 
 Use the `split` method to chunk large documents as shown in the following code.
 
 !!! note
 
-    The default tokenizer (`meta-llama/Llama-3.2-1B`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token": "hf_***` to authenticate.
+    The default tokenizer (`meta-llama/Llama-3.2-1B`) runs locally (local HF) and requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `hf_access_token": "hf_***` to authenticate.
 
 ```python
 ingestor = ingestor.split(
