@@ -552,11 +552,7 @@ def join_table_structure_and_ocr_output(
 
     # When the model returns rows and columns but no cells, synthesize
     # cells from the intersection of each row and column bbox.
-    if (
-        cell_preds["cell"].shape[0] == 0
-        and cell_preds["row"].shape[0] > 0
-        and cell_preds["column"].shape[0] > 0
-    ):
+    if cell_preds["cell"].shape[0] == 0 and cell_preds["row"].shape[0] > 0 and cell_preds["column"].shape[0] > 0:
         synthetic_cells = []
         for row_box in cell_preds["row"]:
             for col_box in cell_preds["column"]:

@@ -97,7 +97,7 @@ def run_structure_ocr(
         exists=True,
         dir_okay=False,
         file_okay=True,
-        help=("Optional YAML config file for table-structure+OCR stage. " "Uses section: table_structure_ocr."),
+        help=("Optional YAML config file for table-structure+OCR stage. Uses section: table_structure_ocr."),
     ),
 ) -> None:
     """
