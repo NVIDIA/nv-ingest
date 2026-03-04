@@ -315,11 +315,24 @@ def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
     return doc, page
 
 
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int) -> bool:
+def _extract_doc_from_key(key: str) -> str:
+    s = str(key)
+    if "_" not in s:
+        return s
+    doc, _page = s.rsplit("_", 1)
+    return doc
+
+
+def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int, *, match_mode: str) -> bool:
+    top = (retrieved_keys or [])[: int(k)]
+    if match_mode == "pdf_only":
+        gold_doc = str(golden_key).replace(".pdf", "")
+        top_docs = [_extract_doc_from_key(key) for key in top]
+        return gold_doc in top_docs
+
     doc, page = _gold_to_doc_page(golden_key)
     specific_page = f"{doc}_{page}"
     entire_document = f"{doc}_-1"
-    top = (retrieved_keys or [])[: int(k)]
     return (specific_page in top) or (entire_document in top)
 
 
@@ -374,6 +387,11 @@ def main(
             "Path to query CSV for recall evaluation. Default: bo767_query_gt.csv "
             "(current directory). Recall is skipped if the file does not exist."
         ),
+    ),
+    recall_match_mode: str = typer.Option(
+        "pdf_page",
+        "--recall-match-mode",
+        help="Recall match mode: 'pdf_page' or 'pdf_only'.",
     ),
     no_recall_details: bool = typer.Option(
         False,
@@ -589,6 +607,9 @@ def main(
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
+        if recall_match_mode not in {"pdf_page", "pdf_only"}:
+            raise ValueError(f"Unsupported --recall-match-mode: {recall_match_mode}")
+
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
@@ -617,7 +638,7 @@ def main(
 
         input_dir = Path(input_dir)
         if input_type == "txt":
-            glob_pattern = str(input_dir / "*.txt")
+            glob_pattern = str(input_dir / "**" / "*.txt") if input_dir.is_dir() else str(input_dir)
             ingestor = create_ingestor(
                 run_mode="batch",
                 params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
@@ -648,7 +669,7 @@ def main(
                 )
             )
         elif input_type == "html":
-            glob_pattern = str(input_dir / "*.html")
+            glob_pattern = str(input_dir / "**" / "*.html") if input_dir.is_dir() else str(input_dir)
             ingestor = create_ingestor(
                 run_mode="batch",
                 params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
@@ -680,7 +701,10 @@ def main(
             )
         elif input_type == "doc":
             # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
-            doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
+            if input_dir.is_dir():
+                doc_globs = [str(input_dir / "**" / "*.docx"), str(input_dir / "**" / "*.pptx")]
+            else:
+                doc_globs = [str(input_dir)]
             ingestor = create_ingestor(
                 run_mode="batch",
                 params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
@@ -743,7 +767,7 @@ def main(
                 )
             )
         else:
-            pdf_glob = str(input_dir / "*.pdf")
+            pdf_glob = str(input_dir / "**" / "*.pdf") if input_dir.is_dir() else str(input_dir)
             ingestor = create_ingestor(
                 run_mode="batch",
                 params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
@@ -875,6 +899,7 @@ def main(
             top_k=10,
             ks=(1, 5, 10),
             hybrid=hybrid,
+            match_mode=recall_match_mode,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
@@ -894,7 +919,10 @@ def main(
                 _raw_hits,
             )
         ):
-            doc, page = _gold_to_doc_page(g)
+            if recall_match_mode == "pdf_only":
+                doc, page = str(g), ""
+            else:
+                doc, page = _gold_to_doc_page(g)
 
             scored_hits: list[tuple[str, float | None]] = []
             for h in hits:
@@ -903,11 +931,14 @@ def main(
                     scored_hits.append((key, dist))
 
             top_keys = [k for (k, _d) in scored_hits]
-            hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+            hit = _is_hit_at_k(g, top_keys, cfg.top_k, match_mode=recall_match_mode)
 
             if not no_recall_details:
                 print(f"\nQuery {i}: {q}")
-                print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
+                if recall_match_mode == "pdf_only":
+                    print(f"  Gold: {g}  (file: {doc}{ext})")
+                else:
+                    print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
                 print(f"  Hit@{cfg.top_k}: {hit}")
                 print("  Top hits:")
                 if not scored_hits:
@@ -920,15 +951,24 @@ def main(
                             print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
             if not hit:
-                missed_gold.append((f"{doc}{ext}", str(page)))
+                if recall_match_mode == "pdf_only":
+                    missed_gold.append((f"{doc}{ext}", ""))
+                else:
+                    missed_gold.append((f"{doc}{ext}", str(page)))
 
         missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-        print("\nMissed gold (unique doc/page):")
+        if recall_match_mode == "pdf_only":
+            print("\nMissed gold (unique docs):")
+        else:
+            print("\nMissed gold (unique doc/page):")
         if not missed_unique:
             print("  (none)")
         else:
             for doc_page, page in missed_unique:
-                print(f"  {doc_page} page {page}")
+                if recall_match_mode == "pdf_only":
+                    print(f"  {doc_page}")
+                else:
+                    print(f"  {doc_page} page {page}")
         print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
         print("\nRecall metrics (matching nemo_retriever.recall.core):")
