@@ -241,21 +241,20 @@ class Resources(BaseModel):
 
     cpu_count: int
     gpu_count: int
-    source: str = "Ray"
 
     def __str__(self) -> str:
-        return f"Resources(cpu_count={self.cpu_count}, gpu_count={self.gpu_count}, source={self.source})"
+        return f"Resources(cpu_count={self.cpu_count}, gpu_count={self.gpu_count})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def __hash__(self) -> int:
-        return hash((self.cpu_count, self.gpu_count, self.source))
+        return hash((self.cpu_count, self.gpu_count))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Resources):
             return False
-        return self.cpu_count == other.cpu_count and self.gpu_count == other.gpu_count and self.source == other.source
+        return self.cpu_count == other.cpu_count and self.gpu_count == other.gpu_count
 
     def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
@@ -268,21 +267,32 @@ class ClusterResources(BaseModel):
 
     total_resources: Resources  # Total resources available to the cluster
     available_resources: Resources  # Available resources to the cluster (not in use currently)
-    source: str = "Ray"
+
+    def total_cpu_count(self) -> int:
+        return self.total_resources.cpu_count
+    
+    def total_gpu_count(self) -> int:
+        return self.total_resources.gpu_count
+    
+    def available_cpu_count(self) -> int:
+        return self.available_resources.cpu_count
+    
+    def available_gpu_count(self) -> int:
+        return self.available_resources.gpu_count
 
     def __str__(self) -> str:
-        return f"ClusterResources(total_resources={self.total_resources}, available_resources={self.available_resources}, source={self.source})"
+        return f"ClusterResources(total_resources={self.total_resources}, available_resources={self.available_resources})"
 
     def __repr__(self) -> str:
         return self.__str__()
 
     def __hash__(self) -> int:
-        return hash((self.total_resources, self.available_resources, self.source))
+        return hash((self.total_resources, self.available_resources))
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ClusterResources):
             return False
-        return self.total_resources == other.total_resources and self.available_resources == other.available_resources and self.source == other.source
+        return self.total_resources == other.total_resources and self.available_resources == other.available_resources
 
     def __ne__(self, other: object) -> bool:
         return not self.__eq__(other)
@@ -313,55 +323,9 @@ class ClusterResources(BaseModel):
 #     embed_num_gpus: float
 
 
-# def _resolve_heuristic_config() -> _ResolvedHeuristicConfig:
-#     """Resolve heuristic constants with precedence defaults -> env."""
-#     return _ResolvedHeuristicConfig(
-#         page_elements_per_gpu=_read_env_int(
-#             "NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU",
-#             PAGE_ELEMENTS_PER_GPU,
-#             minimum=1,
-#         ),
-#         ocr_per_gpu=_read_env_int(
-#             "NEMO_RETRIEVER_BATCH_OCR_PER_GPU",
-#             OCR_PER_GPU,
-#             minimum=1,
-#         ),
-#         embed_per_gpu=_read_env_int(
-#             "NEMO_RETRIEVER_BATCH_EMBED_PER_GPU",
-#             EMBED_PER_GPU,
-#             minimum=1,
-#         ),
-#         cpu_only_stage_num_gpus=_read_env_float(
-#             "NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS",
-#             CPU_ONLY_STAGE_NUM_GPUS,
-#             minimum=0.0,
-#         ),
-#         high_overlap_page_elements_num_gpus=_read_env_float(
-#             "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS",
-#             HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS,
-#             minimum=0.0,
-#         ),
-#         high_overlap_ocr_num_gpus=_read_env_float(
-#             "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS",
-#             HIGH_OVERLAP_OCR_NUM_GPUS,
-#             minimum=0.0,
-#         ),
-#         high_overlap_embed_num_gpus=_read_env_float(
-#             "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS",
-#             HIGH_OVERLAP_EMBED_NUM_GPUS,
-#             minimum=0.0,
-#         ),
-#         max_gpu_per_stage=_read_env_float(
-#             "NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE",
-#             MAX_GPU_PER_STAGE,
-#             minimum=0.0,
-#         ),
-#     )
 
-
-
-def resolve_cluster_resources(ray: object) -> ClusterResources:
-    """Resolve available CPU/GPU resources from a Ray cluster."""
+def gather_cluster_resources(ray: object) -> ClusterResources:
+    """Gather total and available CPU/GPU resources from a Ray cluster."""
 
     if not ray.is_initialized():
         raise ValueError("Ray is not initialized")
@@ -372,9 +336,160 @@ def resolve_cluster_resources(ray: object) -> ClusterResources:
     return ClusterResources(
         total_resources=Resources(cpu_count=total_resources.get("CPU", 0), gpu_count=total_resources.get("GPU", 0)),
         available_resources=Resources(cpu_count=available_resources.get("CPU", 0), gpu_count=available_resources.get("GPU", 0)),
-        source="ray"
     )
 
+
+class RequestedPlan(BaseModel):
+    """Contains the requested Ray DAG plan for the batch ingest."""
+
+    model_config = ConfigDict(frozen=True)
+
+    # Embedder resources requested to satisfy DAG plan
+    embed_initial_actors: int
+    embed_min_actors: int
+    embed_max_actors: int
+    embed_gpus_per_actor: float
+    embed_batch_size: int
+
+    # Nemotron Parse resources requested to satisfy DAG plan
+    nemotron_parse_initial_actors: int
+    nemotron_parse_min_actors: int
+    nemotron_parse_max_actors: int
+    nemotron_parse_gpus_per_actor: float
+    nemotron_parse_batch_size: int
+
+    # OCR resources requested to satisfy DAG plan
+    ocr_initial_actors: int
+    ocr_min_actors: int
+    ocr_max_actors: int
+    ocr_gpus_per_actor: float
+    ocr_batch_size: int
+
+    # Page Elements resources requested to satisfy DAG plan
+    page_elements_initial_actors: int
+    page_elements_min_actors: int
+    page_elements_max_actors: int
+    page_elements_gpus_per_actor: float
+    page_elements_batch_size: int
+
+    # PDF Extraction resources requested to satisfy DAG plan
+    pdf_extract_batch_size: int
+    pdf_extract_cpus_per_task: float
+    pdf_extract_tasks: int
+
+    def __str__(self) -> str:
+        return f"RequestedPlan(embed_initial_actors={self.embed_initial_actors}, embed_min_actors={self.embed_min_actors}, embed_max_actors={self.embed_max_actors}, embed_gpus_per_actor={self.embed_gpus_per_actor}, embed_batch_size={self.embed_batch_size}, nemotron_parse_initial_actors={self.nemotron_parse_initial_actors}, nemotron_parse_min_actors={self.nemotron_parse_min_actors}, nemotron_parse_max_actors={self.nemotron_parse_max_actors}, nemotron_parse_gpus_per_actor={self.nemotron_parse_gpus_per_actor}, nemotron_parse_batch_size={self.nemotron_parse_batch_size}, ocr_initial_actors={self.ocr_initial_actors}, ocr_min_actors={self.ocr_min_actors}, ocr_max_actors={self.ocr_max_actors}, ocr_gpus_per_actor={self.ocr_gpus_per_actor}, ocr_batch_size={self.ocr_batch_size}, page_elements_initial_actors={self.page_elements_initial_actors}, page_elements_min_actors={self.page_elements_min_actors}, page_elements_max_actors={self.page_elements_max_actors}, page_elements_gpus_per_actor={self.page_elements_gpus_per_actor}, page_elements_batch_size={self.page_elements_batch_size}, pdf_extract_batch_size={self.pdf_extract_batch_size}, pdf_extract_cpus_per_task={self.pdf_extract_cpus_per_task}, pdf_extract_tasks={self.pdf_extract_tasks})"
+    
+    def __repr__(self) -> str:
+        return self.__str__()
+
+    def __hash__(self) -> int:
+        return hash((self.embed_initial_actors, self.embed_min_actors, self.embed_max_actors, self.embed_gpus_per_actor, self.embed_batch_size, self.nemotron_parse_initial_actors, self.nemotron_parse_min_actors, self.nemotron_parse_max_actors, self.nemotron_parse_gpus_per_actor, self.nemotron_parse_batch_size, self.ocr_initial_actors, self.ocr_min_actors, self.ocr_max_actors, self.ocr_gpus_per_actor, self.ocr_batch_size, self.page_elements_initial_actors, self.page_elements_min_actors, self.page_elements_max_actors, self.page_elements_gpus_per_actor, self.page_elements_batch_size, self.pdf_extract_batch_size, self.pdf_extract_cpus_per_task, self.pdf_extract_tasks))
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, RequestedPlan):
+            return False
+        return self.embed_initial_actors == other.embed_initial_actors and self.embed_min_actors == other.embed_min_actors and self.embed_max_actors == other.embed_max_actors and self.embed_gpus_per_actor == other.embed_gpus_per_actor and self.embed_batch_size == other.embed_batch_size and self.nemotron_parse_initial_actors == other.nemotron_parse_initial_actors and self.nemotron_parse_min_actors == other.nemotron_parse_min_actors and self.nemotron_parse_max_actors == other.nemotron_parse_max_actors and self.nemotron_parse_gpus_per_actor == other.nemotron_parse_gpus_per_actor and self.nemotron_parse_batch_size == other.nemotron_parse_batch_size and self.ocr_initial_actors == other.ocr_initial_actors and self.ocr_min_actors == other.ocr_min_actors and self.ocr_max_actors == other.ocr_max_actors and self.ocr_gpus_per_actor == other.ocr_gpus_per_actor and self.ocr_batch_size == other.ocr_batch_size and self.page_elements_initial_actors == other.page_elements_initial_actors and self.page_elements_min_actors == other.page_elements_min_actors and self.page_elements_max_actors == other.page_elements_max_actors and self.page_elements_gpus_per_actor == other.page_elements_gpus_per_actor and self.page_elements_batch_size == other.page_elements_batch_size and self.pdf_extract_batch_size == other.pdf_extract_batch_size and self.pdf_extract_cpus_per_task == other.pdf_extract_cpus_per_task and self.pdf_extract_tasks == other.pdf_extract_tasks
+
+    def __ne__(self, other: object) -> bool:
+        return not self.__eq__(other)
+
+
+def resolve_requested_plan(
+    *,
+    cluster_resources: ClusterResources,
+    override_embed_initial_actors: Optional[int] = None,
+    override_embed_min_actors: Optional[int] = None,
+    override_embed_max_actors: Optional[int] = None,
+    override_embed_gpus_per_actor: Optional[float] = None,
+    override_embed_batch_size: Optional[int] = None,
+    override_nemotron_parse_initial_actors: Optional[int] = None,
+    override_nemotron_parse_min_actors: Optional[int] = None,
+    override_nemotron_parse_max_actors: Optional[int] = None,
+    override_nemotron_parse_gpus_per_actor: Optional[float] = None,
+    override_nemotron_parse_batch_size: Optional[int] = None,
+    override_ocr_initial_actors: Optional[int] = None,
+    override_ocr_min_actors: Optional[int] = None,
+    override_ocr_max_actors: Optional[int] = None,
+    override_ocr_gpus_per_actor: Optional[float] = None,
+    override_ocr_batch_size: Optional[int] = None,
+    override_page_elements_initial_actors: Optional[int] = None,
+    override_page_elements_min_actors: Optional[int] = None,
+    override_page_elements_max_actors: Optional[int] = None,
+    override_page_elements_gpus_per_actor: Optional[float] = None,
+    override_page_elements_batch_size: Optional[int] = None,
+    override_pdf_extract_batch_size: Optional[int] = None,
+    override_pdf_extract_cpus_per_task: Optional[float] = None,
+    override_pdf_extract_tasks: Optional[int] = None,
+) -> RequestedPlan:
+    available_gpu_count = max(0, int(cluster_resources.available_gpu_count()))
+
+    if available_gpu_count == 0:
+        raise ValueError("No GPUs available")
+
+    def _resolve_int(override: Optional[int], default: int) -> int:
+        if override is not None:
+            return int(override)
+        return int(default * available_gpu_count)
+
+    def _resolve_float(override: Optional[float], default: float) -> float:
+        if override is not None:
+            return float(override)
+        return float(default * available_gpu_count)
+
+    embed_initial_actors = _resolve_int(override_embed_initial_actors, EMBED_INITIAL_ACTORS)
+    embed_min_actors = _resolve_int(override_embed_min_actors, EMBED_MIN_ACTORS)
+    embed_max_actors = _resolve_int(override_embed_max_actors, EMBED_MAX_ACTORS)
+    embed_gpus_per_actor = _resolve_float(override_embed_gpus_per_actor, EMBED_GPUS_PER_ACTOR)
+    embed_batch_size = _resolve_int(override_embed_batch_size, EMBED_BATCH_SIZE)
+
+    nemotron_parse_initial_actors = _resolve_int(override_nemotron_parse_initial_actors, NEMOTRON_PARSE_INITIAL_ACTORS)
+    nemotron_parse_min_actors = _resolve_int(override_nemotron_parse_min_actors, NEMOTRON_PARSE_MIN_ACTORS)
+    nemotron_parse_max_actors = _resolve_int(override_nemotron_parse_max_actors, NEMOTRON_PARSE_MAX_ACTORS)
+    nemotron_parse_gpus_per_actor = _resolve_float(override_nemotron_parse_gpus_per_actor, NEMOTRON_PARSE_GPUS_PER_ACTOR)
+    nemotron_parse_batch_size = _resolve_int(override_nemotron_parse_batch_size, NEMOTRON_PARSE_BATCH_SIZE)
+
+    ocr_initial_actors = _resolve_int(override_ocr_initial_actors, OCR_INITIAL_ACTORS)
+    ocr_min_actors = _resolve_int(override_ocr_min_actors, OCR_MIN_ACTORS)
+    ocr_max_actors = _resolve_int(override_ocr_max_actors, OCR_MAX_ACTORS)
+    ocr_gpus_per_actor = _resolve_float(override_ocr_gpus_per_actor, OCR_GPUS_PER_ACTOR)
+    ocr_batch_size = _resolve_int(override_ocr_batch_size, OCR_BATCH_SIZE)
+
+    page_elements_initial_actors = _resolve_int(override_page_elements_initial_actors, PAGE_ELEMENTS_INITIAL_ACTORS)
+    page_elements_min_actors = _resolve_int(override_page_elements_min_actors, PAGE_ELEMENTS_MIN_ACTORS)
+    page_elements_max_actors = _resolve_int(override_page_elements_max_actors, PAGE_ELEMENTS_MAX_ACTORS)
+    page_elements_gpus_per_actor = _resolve_float(override_page_elements_gpus_per_actor, PAGE_ELEMENTS_GPUS_PER_ACTOR)
+    page_elements_batch_size = _resolve_int(override_page_elements_batch_size, PAGE_ELEMENTS_BATCH_SIZE)
+
+    pdf_extract_batch_size = _resolve_int(override_pdf_extract_batch_size, PDF_EXTRACT_BATCH_SIZE)
+    pdf_extract_cpus_per_task = _resolve_float(override_pdf_extract_cpus_per_task, PDF_EXTRACT_CPUS_PER_TASK)
+    pdf_extract_tasks = _resolve_int(override_pdf_extract_tasks, PDF_EXTRACT_TASKS)
+
+    return RequestedPlan(
+        embed_initial_actors=embed_initial_actors,
+        embed_min_actors=embed_min_actors,
+        embed_max_actors=embed_max_actors,
+        embed_gpus_per_actor=embed_gpus_per_actor,
+        embed_batch_size=embed_batch_size,
+        nemotron_parse_initial_actors=nemotron_parse_initial_actors,
+        nemotron_parse_min_actors=nemotron_parse_min_actors,
+        nemotron_parse_max_actors=nemotron_parse_max_actors,
+        nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+        nemotron_parse_batch_size=nemotron_parse_batch_size,
+        ocr_initial_actors=ocr_initial_actors,
+        ocr_min_actors=ocr_min_actors,
+        ocr_max_actors=ocr_max_actors,
+        ocr_gpus_per_actor=ocr_gpus_per_actor,
+        ocr_batch_size=ocr_batch_size,
+        page_elements_initial_actors=page_elements_initial_actors,
+        page_elements_min_actors=page_elements_min_actors,
+        page_elements_max_actors=page_elements_max_actors,
+        page_elements_gpus_per_actor=page_elements_gpus_per_actor,
+        page_elements_batch_size=page_elements_batch_size,
+        pdf_extract_batch_size=pdf_extract_batch_size,
+        pdf_extract_cpus_per_task=pdf_extract_cpus_per_task,
+        pdf_extract_tasks=pdf_extract_tasks,
+    )
 
 # def resolve_resource_details(
 #     *,

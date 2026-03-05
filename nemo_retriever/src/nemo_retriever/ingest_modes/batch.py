@@ -30,7 +30,8 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.ray_resource_hueristics import (
-    resolve_cluster_resources,
+    gather_cluster_resources,
+    resolve_requested_plan,
 )
 from nemo_retriever.utils.ray_resource_hueristics import pretty_print_worker_heuristic_summary
 
@@ -44,6 +45,8 @@ from ..params import IngestExecuteParams
 from ..params import PdfSplitParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
+
+logger = logging.getLogger(__name__)
 
 
 def _setup_batch_debug_logger(enabled: bool) -> logging.Logger:
@@ -320,7 +323,6 @@ class BatchIngestor(Ingestor):
             logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize Ray for distributed execution.
-        print(f"NEMO_RETRIEVER_HF_CACHE_DIR: {os.getenv('NEMO_RETRIEVER_HF_CACHE_DIR')}")
         ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver),
         runtime_env={
             "env_vars": {
@@ -342,40 +344,22 @@ class BatchIngestor(Ingestor):
         # 2a. -> requested_resources = resolve_requested_resources() -> RequestedResources(BaseModel)
         # 3. Compute final values that will be scheduled based on available_resources and requested_resources
         # 3a. -> final_resources = compute_final_resources(available_resources, requested_resources) -> FinalResources(BaseModel)
+        # 4. Examine the finer details of the GPUs available. Ray does not expose this to use so we must trigger a remote call on each node
+        # 4a. -> Determine the batch_size that should be used for each model based on the GPU vram available
 
         # 1. Gather available resources
-        available_resources = resolve_cluster_resources(ray)
-        print(available_resources)
+        self._cluster_resources = gather_cluster_resources(ray) # Contains both total and available resources
+        self._total_cpu_count = self._cluster_resources.total_cpu_count()
+        self._total_gpu_count = self._cluster_resources.total_gpu_count()
+        self._available_cpu_count = self._cluster_resources.available_cpu_count()
+        self._available_gpu_count = self._cluster_resources.available_gpu_count()
+        logger.info(self._cluster_resources)
 
-        # # Query Ray cluster resources when available, otherwise local resources.
-        # system_resources = resolve_effective_resources()
-        # self._num_gpus = int(system_resources.gpu_count)
-        # self._num_cpus = int(system_resources.cpu_count)
-        # base_heuristic = resolve_batch_worker_plan(
-        #     override_cpu_count=self._num_cpus,
-        #     override_gpu_count=self._num_gpus,
-        # )
-        # self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
-
-        # # Gather information about the Ray cluster.
-        # ray_nodes = [node for node in ray.nodes() if bool(node.get("Alive", False))]
-        # node_ips = [node["NodeManagerAddress"] for node in ray_nodes if node.get("NodeManagerAddress")]
-
-        # if self._debug:
-        #     _debug_log(
-        #         logger=self._logger,
-        #         location="ingest_modes/batch.py:BatchIngestor.__init__",
-        #         message="Ray nodes",
-        #         data={"nodes": ray_nodes},
-        #     )
-
-        # if self._debug:
-        #     _debug_log(
-        #         logger=self._logger,
-        #         location="ingest_modes/batch.py:BatchIngestor.__init__",
-        #         message="Ray node IPs",
-        #         data={"node_ips": node_ips},
-        #     )
+        # 2. Resolve requested resources
+        self._requested_resources = resolve_requested_plan(
+            cluster_resources=self._cluster_resources
+        ) # Contains the requested resources
+        logger.info(self._requested_resources)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
