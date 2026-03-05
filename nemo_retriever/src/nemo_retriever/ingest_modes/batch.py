@@ -1107,6 +1107,7 @@ class BatchIngestor(Ingestor):
             fts_language = str(kw.get("fts_language", "English"))
             try:
                 table.create_fts_index(text_column, language=fts_language)
+                print(f"[hybrid] FTS index created on column {text_column!r} (language={fts_language!r})")
             except Exception as e:
                 print(
                     f"Warning: FTS index creation failed on column {text_column!r} (continuing with vector-only): {e}"
@@ -1115,4 +1116,5 @@ class BatchIngestor(Ingestor):
         for index_stub in table.list_indices():
             table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
-        print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r}")
+        index_names = [idx.name for idx in table.list_indices()]
+        print(f"Wrote {n_vecs} rows to LanceDB uri={lancedb_uri!r} table={table_name!r} indices={index_names}")

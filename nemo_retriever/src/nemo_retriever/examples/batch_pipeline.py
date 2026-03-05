@@ -593,6 +593,9 @@ def main(
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
 
+        if hybrid:
+            print("[hybrid] Hybrid search enabled (dense + FTS).")
+
         # Remote endpoints don't need local model GPUs for their stage.
         if page_elements_invoke_url and float(gpu_page_elements) != 0.0:
             print(
@@ -873,6 +876,7 @@ def main(
             match_mode=recall_match_mode,
         )
 
+        print(f"[recall] Search mode: {'hybrid (dense + FTS + RRF rerank)' if hybrid else 'vector-only'}")
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
 
         if not no_recall_details:
