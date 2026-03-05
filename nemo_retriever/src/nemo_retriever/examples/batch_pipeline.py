@@ -334,11 +334,10 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 
 @app.command()
 def main(
-    input_dir: Path = typer.Argument(
+    input_path: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
-        exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
@@ -637,15 +636,27 @@ def main(
             subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
             ray_address = "auto"
 
-        input_dir = Path(input_dir)
+        input_path = Path(input_path)
+        if input_path.is_file():
+            file_patterns = [str(input_path)]
+        elif input_path.is_dir():
+            ext_map = {
+                "txt": ["*.txt"],
+                "html": ["*.html"],
+                "doc": ["*.docx", "*.pptx"],
+            }
+            exts = ext_map.get(input_type, ["*.pdf"])
+            file_patterns = [str(input_path / e) for e in exts]
+        else:
+            raise typer.BadParameter(f"Path does not exist: {input_path}")
+
+        ingestor = create_ingestor(
+            run_mode="batch",
+            params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+        )
         if input_type == "txt":
-            glob_pattern = str(input_dir / "**" / "*.txt") if input_dir.is_dir() else str(input_dir)
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -670,13 +681,8 @@ def main(
                 )
             )
         elif input_type == "html":
-            glob_pattern = str(input_dir / "**" / "*.html") if input_dir.is_dir() else str(input_dir)
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -701,17 +707,8 @@ def main(
                 )
             )
         elif input_type == "doc":
-            # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
-            if input_dir.is_dir():
-                doc_globs = [str(input_dir / "**" / "*.docx"), str(input_dir / "**" / "*.pptx")]
-            else:
-                doc_globs = [str(input_dir)]
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(doc_globs)
+                ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
                         extract_text=True,
@@ -771,13 +768,8 @@ def main(
                 )
             )
         else:
-            pdf_glob = str(input_dir / "**" / "*.pdf") if input_dir.is_dir() else str(input_dir)
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(pdf_glob)
+                ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
                         extract_text=True,
