@@ -219,6 +219,37 @@ def _print_detection_summary(summary: Optional[dict]) -> None:
             print(f"    {label}: {count}")
 
 
+def _extract_error_payloads(v: object) -> list[object]:
+    """Recursively extract only error payloads from nested values."""
+    payloads: list[object] = []
+    if v is None:
+        return payloads
+    if isinstance(v, dict):
+        if any(k in v for k in ("error", "errors", "exception", "traceback", "failed")):
+            payloads.append(v)
+        for item in v.values():
+            payloads.extend(_extract_error_payloads(item))
+        return payloads
+    if isinstance(v, list):
+        for item in v:
+            payloads.extend(_extract_error_payloads(item))
+        return payloads
+    if isinstance(v, str):
+        s = v.strip()
+        if not s:
+            return payloads
+        if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+            try:
+                payloads.extend(_extract_error_payloads(json.loads(s)))
+                return payloads
+            except Exception:
+                pass
+        low = s.lower()
+        if any(tok in low for tok in ("error", "exception", "traceback", "failed")):
+            payloads.append(s)
+    return payloads
+
+
 def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
     target = Path(path).expanduser().resolve()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -829,13 +860,32 @@ def main(
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
             error_count = int(error_rows.count())
             if error_count > 0:
+                error_file = Path("ingest_errors.json").resolve()
+                with error_file.open("w", encoding="utf-8") as fh:
+                    fh.write("[\n")
+                    first = True
+                    for row in error_rows.iter_rows():
+                        if not first:
+                            fh.write(",\n")
+                        fh.write(json.dumps(row, default=str))
+                        first = False
+                    fh.write("\n]\n")
                 logger.error(
-                    "Detected %d error row(s) in ingest results. Showing top 5 and exiting before recall.",
+                    "Detected %d error row(s) in ingest results. Wrote full rows "
+                    "to %s. Showing top 5 extracted errors and exiting before recall.",
                     error_count,
+                    str(error_file),
                 )
                 for idx, row in enumerate(error_rows.take(min(5, error_count)), start=1):
-                    logger.error("Error row %d: %s", idx, json.dumps(row, default=str))
+                    extracted: list[object] = []
+                    for value in row.values():
+                        extracted.extend(_extract_error_payloads(value))
+                    if extracted:
+                        logger.error("Error row %d payloads: %s", idx, json.dumps(extracted, default=str))
+                    else:
+                        logger.error("Error row %d payloads: (no structured payload extracted)", idx)
                 ray.shutdown()
+                logger.error(f"Exiting with code 1 due to {error_count} error rows in ingest results.")
                 raise typer.Exit(code=1)
 
         ray.shutdown()
