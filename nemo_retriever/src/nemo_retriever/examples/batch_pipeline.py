@@ -492,7 +492,7 @@ def main(
         "'text', 'image', or 'text_image' ('image_text' is also accepted).",
     ),
     embed_ray_batch_size: int = typer.Option(
-        124,
+        64,
         "--embed-ray-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
