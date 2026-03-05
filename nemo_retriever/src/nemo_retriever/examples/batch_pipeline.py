@@ -238,24 +238,6 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
     print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
 
 
-def _param_source_label(ctx: typer.Context, name: str) -> str:
-    """Best-effort label for where a Typer option value came from."""
-    try:
-        src = ctx.get_parameter_source(name)
-    except Exception:
-        return "unknown"
-    if src is None:
-        return "unknown"
-    s = str(src).lower()
-    if "commandline" in s:
-        return "user"
-    if "environment" in s:
-        return "env"
-    if "default" in s:
-        return "default"
-    return s
-
-
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """
     Ensure the local LanceDB URI exists and table can be opened.
