@@ -33,6 +33,7 @@ from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import Llama
 from nemo_retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
+from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
@@ -1370,9 +1371,50 @@ class InProcessIngestor(Ingestor):
                     ge_kwargs["inference_batch_size"] = kwargs["inference_batch_size"]
                 self._tasks.append((detect_graphic_elements_v1_from_page_elements_v3, ge_kwargs))
 
+            use_table_structure = bool(kwargs.get("use_table_structure", False))
+            from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
+
+            validate_table_structure_flags(
+                use_table_structure, str(kwargs.get("table_output_format", "pseudo_markdown"))
+            )
+
+            # When use_table_structure is True, tables go through
+            # the combined table-structure + OCR stage instead of OCR-only.
+            if use_table_structure and kwargs.get("extract_tables") is True:
+                print("Adding table-structure+OCR extraction task")
+                ts_invoke_url = kwargs.get("table_structure_invoke_url", "")
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                )
+
+                ts_ocr_kwargs: dict[str, Any] = {}
+                if ts_invoke_url:
+                    ts_ocr_kwargs["table_structure_invoke_url"] = ts_invoke_url
+                    ts_ocr_kwargs["table_structure_model"] = None
+                else:
+                    from nemo_retriever.model.local import NemotronTableStructureV1
+
+                    ts_ocr_kwargs["table_structure_model"] = NemotronTableStructureV1()
+
+                if ocr_invoke_url:
+                    ts_ocr_kwargs["ocr_invoke_url"] = ocr_invoke_url
+                    ts_ocr_kwargs["ocr_model"] = None
+                else:
+                    ocr_model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                    ts_ocr_kwargs["ocr_model"] = ocr_model
+
+                ts_ocr_kwargs.update(_stage_remote_kwargs("ocr"))
+                self._tasks.append((table_structure_ocr_page_elements, ts_ocr_kwargs))
+
             # OCR-based extraction for tables/charts/infographics.
+            # When use_table_structure is True, tables are handled above;
+            # charts/infographics still go through OCR.
             ocr_flags = {}
-            if kwargs.get("extract_tables") is True:
+            if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True

@@ -592,6 +592,28 @@ def main(
         "--use-graphic-elements",
         help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
     ),
+    use_table_structure: bool = typer.Option(
+        False,
+        "--use-table-structure",
+        help="Enable the combined table-structure + OCR stage for tables (requires extract_tables).",
+    ),
+    table_output_format: Optional[str] = typer.Option(
+        None,
+        "--table-output-format",
+        help=(
+            "Table output format: 'pseudo_markdown' (OCR-only) or 'markdown' "
+            "(table-structure + OCR). Defaults to 'markdown' when table-structure "
+            "is enabled, 'pseudo_markdown' otherwise."
+        ),
+    ),
+    table_structure_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--table-structure-invoke-url",
+        help=(
+            "Optional remote endpoint URL for table-structure model inference "
+            "(used when --table-output-format=markdown)."
+        ),
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
@@ -705,6 +727,9 @@ def main(
                         extract_infographics=False,
                         use_graphic_elements=use_graphic_elements,
                         graphic_elements_invoke_url=graphic_elements_invoke_url,
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -765,6 +790,9 @@ def main(
                         extract_infographics=False,
                         use_graphic_elements=use_graphic_elements,
                         graphic_elements_invoke_url=graphic_elements_invoke_url,
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
