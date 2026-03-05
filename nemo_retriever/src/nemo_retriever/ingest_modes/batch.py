@@ -371,6 +371,7 @@ class BatchIngestor(Ingestor):
         self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
+        self._use_nemotron_parse_only: bool = False
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -440,137 +441,137 @@ class BatchIngestor(Ingestor):
                 return 0
             return len([p for p in s.split(",") if p.strip()])
 
-        self._extract_pdf_split_batch_size_default = 1
-        self._extract_pdf_extract_batch_size_default = 4
-        self._extract_pdf_extract_num_cpus_default = 2.0
-        self._extract_page_elements_batch_size_default = 24
-        self._extract_detect_batch_size_default = 24
-        self._extract_parse_workers_default = 0
-        self._extract_parse_gpu_default = 0.0
-        self._extract_parse_batch_size_default = 0.0
-        self._extract_page_elements_cpus_per_actor_default = 1.0
-        self._extract_ocr_cpus_per_actor_default = 1.0
-        pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", self._extract_pdf_split_batch_size_default)
-        pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", self._extract_pdf_extract_batch_size_default)
-        pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", self._extract_pdf_extract_num_cpus_default))
-        page_elements_batch_size = kwargs.pop(
-            "page_elements_batch_size", self._extract_page_elements_batch_size_default
-        )
-        detect_batch_size = kwargs.pop("detect_batch_size", self._extract_detect_batch_size_default)
-        nemotron_parse_workers = int(kwargs.pop("nemotron_parse_workers", self._extract_parse_workers_default))
-        gpu_nemotron_parse = float(kwargs.pop("gpu_nemotron_parse", self._extract_parse_gpu_default))
-        nemotron_parse_batch_size = float(
-            kwargs.pop("nemotron_parse_batch_size", self._extract_parse_batch_size_default)
-        )
-        requested_use_nemotron_parse_only = (
-            nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
-        )
+        # self._extract_pdf_split_batch_size_default = 1
+        # self._extract_pdf_extract_batch_size_default = 4
+        # self._extract_pdf_extract_num_cpus_default = 2.0
+        # self._extract_page_elements_batch_size_default = 24
+        # self._extract_detect_batch_size_default = 24
+        # self._extract_parse_workers_default = 0
+        # self._extract_parse_gpu_default = 0.0
+        # self._extract_parse_batch_size_default = 0.0
+        # self._extract_page_elements_cpus_per_actor_default = 1.0
+        # self._extract_ocr_cpus_per_actor_default = 1.0
+        # pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", self._extract_pdf_split_batch_size_default)
+        # pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", self._extract_pdf_extract_batch_size_default)
+        # pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", self._extract_pdf_extract_num_cpus_default))
+        # page_elements_batch_size = kwargs.pop(
+        #     "page_elements_batch_size", self._extract_page_elements_batch_size_default
+        # )
+        # detect_batch_size = kwargs.pop("detect_batch_size", self._extract_detect_batch_size_default)
+        # nemotron_parse_workers = int(kwargs.pop("nemotron_parse_workers", self._extract_parse_workers_default))
+        # gpu_nemotron_parse = float(kwargs.pop("gpu_nemotron_parse", self._extract_parse_gpu_default))
+        # nemotron_parse_batch_size = float(
+        #     kwargs.pop("nemotron_parse_batch_size", self._extract_parse_batch_size_default)
+        # )
+        # requested_use_nemotron_parse_only = (
+        #     nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        # )
 
-        # Count GPU stages that will be created.
-        # +1 reserves headroom for a downstream embed() stage.
-        detect_stage_count = (
-            1 if any(kwargs.get(k) is True for k in ("extract_tables", "extract_charts", "extract_infographics")) else 0
-        )
-        if requested_use_nemotron_parse_only:
-            gpu_stage_count = detect_stage_count + 1  # nemotron-parse + embed
-        else:
-            gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
+        # # Count GPU stages that will be created.
+        # # +1 reserves headroom for a downstream embed() stage.
+        # detect_stage_count = (
+        #     1 if any(kwargs.get(k) is True for k in ("extract_tables", "extract_charts", "extract_infographics")) else 0
+        # )
+        # if requested_use_nemotron_parse_only:
+        #     gpu_stage_count = detect_stage_count + 1  # nemotron-parse + embed
+        # else:
+        #     gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
 
-        # Resolve worker defaults from system resources unless user overrides are set.
-        user_page_elements_workers = kwargs.pop("page_elements_workers", None)
-        user_ocr_workers = kwargs.pop("ocr_workers", None)
-        user_detect_workers = kwargs.pop("detect_workers", user_ocr_workers)
-        worker_heuristic = resolve_batch_worker_plan(
-            override_cpu_count=self._num_cpus,
-            override_gpu_count=self._num_gpus,
-            override_page_elements_actors=user_page_elements_workers,
-            override_ocr_actors=user_detect_workers,
-            concurrent_gpu_stage_count=gpu_stage_count,
-        )
-        self._extract_page_elements_gpu_default = float(worker_heuristic.page_elements_num_gpus)
-        self._extract_ocr_gpu_default = float(worker_heuristic.detect_num_gpus)
-        self._extract_embed_gpu_default = float(worker_heuristic.embed_num_gpus)
-        self._extract_page_elements_workers_default = int(worker_heuristic.page_elements_workers)
-        self._extract_detect_workers_default = int(worker_heuristic.detect_workers)
-        gpu_page_elements = float(kwargs.pop("gpu_page_elements", self._extract_page_elements_gpu_default))
-        gpu_ocr = float(kwargs.pop("gpu_ocr", self._extract_ocr_gpu_default))
-        gpu_embed = float(kwargs.pop("gpu_embed", self._extract_embed_gpu_default))
-        page_elements_workers = int(kwargs.pop("page_elements_workers", self._extract_page_elements_workers_default))
-        detect_workers = int(kwargs.pop("detect_workers", self._extract_detect_workers_default))
-        page_elements_cpus_per_actor = float(
-            kwargs.pop("page_elements_cpus_per_actor", self._extract_page_elements_cpus_per_actor_default)
-        )
-        ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", self._extract_ocr_cpus_per_actor_default))
+        # # Resolve worker defaults from system resources unless user overrides are set.
+        # user_page_elements_workers = kwargs.pop("page_elements_workers", None)
+        # user_ocr_workers = kwargs.pop("ocr_workers", None)
+        # user_detect_workers = kwargs.pop("detect_workers", user_ocr_workers)
+        # worker_heuristic = resolve_batch_worker_plan(
+        #     override_cpu_count=self._num_cpus,
+        #     override_gpu_count=self._num_gpus,
+        #     override_page_elements_actors=user_page_elements_workers,
+        #     override_ocr_actors=user_detect_workers,
+        #     concurrent_gpu_stage_count=gpu_stage_count,
+        # )
+        # self._extract_page_elements_gpu_default = float(worker_heuristic.page_elements_num_gpus)
+        # self._extract_ocr_gpu_default = float(worker_heuristic.detect_num_gpus)
+        # self._extract_embed_gpu_default = float(worker_heuristic.embed_num_gpus)
+        # self._extract_page_elements_workers_default = int(worker_heuristic.page_elements_workers)
+        # self._extract_detect_workers_default = int(worker_heuristic.detect_workers)
+        # gpu_page_elements = float(kwargs.pop("gpu_page_elements", self._extract_page_elements_gpu_default))
+        # gpu_ocr = float(kwargs.pop("gpu_ocr", self._extract_ocr_gpu_default))
+        # gpu_embed = float(kwargs.pop("gpu_embed", self._extract_embed_gpu_default))
+        # page_elements_workers = int(kwargs.pop("page_elements_workers", self._extract_page_elements_workers_default))
+        # detect_workers = int(kwargs.pop("detect_workers", self._extract_detect_workers_default))
+        # page_elements_cpus_per_actor = float(
+        #     kwargs.pop("page_elements_cpus_per_actor", self._extract_page_elements_cpus_per_actor_default)
+        # )
+        # ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", self._extract_ocr_cpus_per_actor_default))
 
-        # When remote endpoints are provided as a comma-separated list, scale
-        # actor count to match endpoint count so load can be distributed.
-        pe_endpoints = _endpoint_count(kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url")))
-        if pe_endpoints > 0 and int(page_elements_workers) != int(pe_endpoints):
-            logging.warning(
-                "page_elements invoke URL list has %d endpoint(s); overriding page_elements_workers from %d to %d",
-                pe_endpoints,
-                int(page_elements_workers),
-                int(pe_endpoints),
-            )
-            page_elements_workers = int(pe_endpoints)
+        # # When remote endpoints are provided as a comma-separated list, scale
+        # # actor count to match endpoint count so load can be distributed.
+        # pe_endpoints = _endpoint_count(kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url")))
+        # if pe_endpoints > 0 and int(page_elements_workers) != int(pe_endpoints):
+        #     logging.warning(
+        #         "page_elements invoke URL list has %d endpoint(s); overriding page_elements_workers from %d to %d",
+        #         pe_endpoints,
+        #         int(page_elements_workers),
+        #         int(pe_endpoints),
+        #     )
+        #     page_elements_workers = int(pe_endpoints)
 
-        ocr_endpoints = _endpoint_count(kwargs.get("ocr_invoke_url", kwargs.get("invoke_url")))
-        if ocr_endpoints > 0 and int(detect_workers) != int(ocr_endpoints):
-            logging.warning(
-                "ocr invoke URL list has %d endpoint(s); overriding detect_workers from %d to %d",
-                ocr_endpoints,
-                int(detect_workers),
-                int(ocr_endpoints),
-            )
-            detect_workers = int(ocr_endpoints)
+        # ocr_endpoints = _endpoint_count(kwargs.get("ocr_invoke_url", kwargs.get("invoke_url")))
+        # if ocr_endpoints > 0 and int(detect_workers) != int(ocr_endpoints):
+        #     logging.warning(
+        #         "ocr invoke URL list has %d endpoint(s); overriding detect_workers from %d to %d",
+        #         ocr_endpoints,
+        #         int(detect_workers),
+        #         int(ocr_endpoints),
+        #     )
+        #     detect_workers = int(ocr_endpoints)
 
-        use_nemotron_parse_only = (
-            nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
-        )
-        if not use_nemotron_parse_only and page_elements_workers < 1:
-            raise RuntimeError(
-                "extract.page_elements resolved to 0 actors. Increase page_elements_workers before running extraction."
-            )
+        # use_nemotron_parse_only = (
+        #     nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        # )
+        # if not use_nemotron_parse_only and page_elements_workers < 1:
+        #     raise RuntimeError(
+        #         "extract.page_elements resolved to 0 actors. Increase page_elements_workers before running extraction."
+        #     )
 
-        self._page_elements_workers = int(page_elements_workers)
-        self._detect_workers = int(detect_workers)
+        # self._page_elements_workers = int(page_elements_workers)
+        # self._detect_workers = int(detect_workers)
 
-        print(f"page_elements_workers: {page_elements_workers}")
-        print(f"detect_workers: {detect_workers}")
+        # print(f"page_elements_workers: {page_elements_workers}")
+        # print(f"detect_workers: {detect_workers}")
 
-        # Reserve CPUs for GPU actors, then divide the rest among extract workers.
-        if use_nemotron_parse_only:
-            total_gpu_cpus = int(nemotron_parse_workers) * ocr_cpus_per_actor
-        else:
-            total_gpu_cpus = (
-                page_elements_workers * page_elements_cpus_per_actor
-                + detect_workers * detect_stage_count * ocr_cpus_per_actor
-            )
-        cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
-        self._extract_pdf_extract_workers_default = max(1, cpus_for_extract // 2)
-        pdf_extract_workers = kwargs.pop("pdf_extract_workers", self._extract_pdf_extract_workers_default)
-        pdf_extract_workers = self._page_elements_workers * self._num_gpus
+        # # Reserve CPUs for GPU actors, then divide the rest among extract workers.
+        # if use_nemotron_parse_only:
+        #     total_gpu_cpus = int(nemotron_parse_workers) * ocr_cpus_per_actor
+        # else:
+        #     total_gpu_cpus = (
+        #         page_elements_workers * page_elements_cpus_per_actor
+        #         + detect_workers * detect_stage_count * ocr_cpus_per_actor
+        #     )
+        # cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
+        # self._extract_pdf_extract_workers_default = max(1, cpus_for_extract // 2)
+        # pdf_extract_workers = kwargs.pop("pdf_extract_workers", self._extract_pdf_extract_workers_default)
+        # pdf_extract_workers = self._page_elements_workers * self._num_gpus
 
-        # Store per-stage GPU allocations for downstream stages (e.g. embed).
-        self._gpu_page_elements = gpu_page_elements
-        self._gpu_ocr = gpu_ocr
-        self._gpu_embed = gpu_embed
+        # # Store per-stage GPU allocations for downstream stages (e.g. embed).
+        # self._gpu_page_elements = gpu_page_elements
+        # self._gpu_ocr = gpu_ocr
+        # self._gpu_embed = gpu_embed
 
-        logging.info(
-            "Batch extract resources: %d GPUs, %d CPUs | "
-            "pdf_extract_workers=%d, page_elements_workers=%d, ocr_workers=%d, "
-            "gpu_page_elements=%.2f, gpu_ocr=%.2f, gpu_nemotron_parse=%.2f, gpu_embed=%.2f, parse_only=%s",
-            self._num_gpus,
-            self._num_cpus,
-            pdf_extract_workers,
-            page_elements_workers,
-            detect_workers,
-            gpu_page_elements,
-            gpu_ocr,
-            gpu_nemotron_parse,
-            gpu_embed,
-            use_nemotron_parse_only,
-        )
+        # logging.info(
+        #     "Batch extract resources: %d GPUs, %d CPUs | "
+        #     "pdf_extract_workers=%d, page_elements_workers=%d, ocr_workers=%d, "
+        #     "gpu_page_elements=%.2f, gpu_ocr=%.2f, gpu_nemotron_parse=%.2f, gpu_embed=%.2f, parse_only=%s",
+        #     self._num_gpus,
+        #     self._num_cpus,
+        #     pdf_extract_workers,
+        #     page_elements_workers,
+        #     detect_workers,
+        #     gpu_page_elements,
+        #     gpu_ocr,
+        #     gpu_nemotron_parse,
+        #     gpu_embed,
+        #     use_nemotron_parse_only,
+        # )
 
         # Downstream batch stages assume `page_image.image_b64` exists for every page.
         # Ensure PDF extraction emits a page image unless the caller explicitly disables it.
@@ -619,34 +620,44 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
         )
 
-        # Splitting pdfs is broken into a separate stage to help amortize downstream
-        # processing if PDFs have vastly different numbers of pages.
-        pdf_split_actor = PDFSplitActor(
-            split_params=PdfSplitParams(
-                start_page=kwargs.get("start_page"),
-                end_page=kwargs.get("end_page"),
-            )
-        )
+
+        # PDF SPLIT - Splits each PDF document into individual pages. 
+        # To help amortize downstream processing if PDFs have vastly different numbers of pages. 
+        # This is a CPU-only stage. This "Actor" is technically scheduled as a Task
         self._rd_dataset = self._rd_dataset.map_batches(
             "extract.pdf_split",
-            pdf_split_actor,
-            batch_size=pdf_split_batch_size,
+            PDFSplitActor(
+                split_params=PdfSplitParams(
+                    start_page=kwargs.get("start_page"),
+                    end_page=kwargs.get("end_page"),
+                )
+            ),
+            batch_size=1,
             num_cpus=1,
             batch_format="pandas",
         )
 
-        # Pre-split pdfs are now ready for extraction — the main CPU bottleneck.
-        extraction_actor = PDFExtractionActor(**kwargs)
+
+        # PDF EXTRACTION - Extracts text, tables, charts, infographics, etc. from the PDF pages.
+        # This is a CPU-only stage and is the main CPU bottleneck of the entire DAG
         self._rd_dataset = self._rd_dataset.map_batches(
             "extract.pdf_extract",
-            extraction_actor,
-            batch_size=pdf_extract_batch_size,
+            PDFExtractionActor(**kwargs),
+            batch_size=self._requested_plan.get_pdf_extract_batch_size(),
             batch_format="pandas",
-            num_cpus=pdf_extract_num_cpus,
-            compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
+            num_cpus=self._requested_plan.get_pdf_extract_cpus_per_task(),
+            compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
-        if use_nemotron_parse_only:
+
+
+        # In further stages we don't prefer individual rows as batching is more performant.
+        # Here we set the target number of rows per block to either
+        # nemotron-parse batch size or the page-elements batch size, depending on which is used.
+        if self._use_nemotron_parse_only:
+            
+            # Set the target number of rows per block to the nemotron-parse batch size
+            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=self._requested_plan.get_nemotron_parse_batch_size())
+
             parse_flags: dict[str, Any] = {}
             if kwargs.get("extract_tables") is True:
                 parse_flags["extract_tables"] = True
@@ -671,22 +682,24 @@ class BatchIngestor(Ingestor):
             self._rd_dataset = self._rd_dataset.map_batches(
                 "extract.nemotron_parse",
                 NemotronParseActor,
-                batch_size=int(nemotron_parse_batch_size),
+                batch_size=self._requested_plan.get_nemotron_parse_batch_size(),
                 batch_format="pandas",
-                num_gpus=float(gpu_nemotron_parse),
-                compute=rd.ActorPoolStrategy(initial_size=4, min_size=1, max_size=int(nemotron_parse_workers)),
+                num_gpus=self._requested_plan.get_nemotron_parse_gpus_per_actor(),
+                compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_nemotron_parse_initial_actors(), min_size=self._requested_plan.get_nemotron_parse_min_actors(), max_size=self._requested_plan.get_nemotron_parse_max_actors()),
                 fn_constructor_kwargs=parse_flags,
             )
         else:
+            # Set the target number of rows per block to the page-elements batch size
+            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=self._requested_plan.get_page_elements_batch_size())
 
             # Page-element detection with a GPU actor pool.
             self._rd_dataset = self._rd_dataset.map_batches(
                 "extract.page_elements",
                 PageElementDetectionActor,
-                batch_size=page_elements_batch_size,
+                batch_size=self._requested_plan.get_page_elements_batch_size(),
                 batch_format="pandas",
-                num_gpus=gpu_page_elements,
-                compute=rd.ActorPoolStrategy(initial_size=4, min_size=1, max_size=page_elements_workers),
+                num_gpus=self._requested_plan.get_page_elements_gpus_per_actor(),
+                compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_page_elements_initial_actors(), min_size=self._requested_plan.get_page_elements_min_actors(), max_size=self._requested_plan.get_page_elements_max_actors()),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
@@ -721,10 +734,10 @@ class BatchIngestor(Ingestor):
                 self._rd_dataset = self._rd_dataset.map_batches(
                     "extract.ocr",
                     OCRActor,
-                    batch_size=detect_batch_size,
+                    batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
-                    num_gpus=gpu_ocr,
-                    compute=rd.ActorPoolStrategy(min_size=1, max_size=detect_workers),
+                    num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
+                    compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_ocr_initial_actors(), min_size=self._requested_plan.get_ocr_min_actors(), max_size=self._requested_plan.get_ocr_max_actors()),
                     fn_constructor_kwargs=ocr_flags,
                 )
 

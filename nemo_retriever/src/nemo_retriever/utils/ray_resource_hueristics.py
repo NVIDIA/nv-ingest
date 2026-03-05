@@ -377,6 +377,76 @@ class RequestedPlan(BaseModel):
     pdf_extract_cpus_per_task: float
     pdf_extract_tasks: int
 
+    def get_embed_initial_actors(self) -> int:
+        return self.embed_initial_actors
+
+    def get_embed_min_actors(self) -> int:
+        return self.embed_min_actors
+
+    def get_embed_max_actors(self) -> int:
+        return self.embed_max_actors
+
+    def get_embed_gpus_per_actor(self) -> float:
+        return self.embed_gpus_per_actor
+
+    def get_embed_batch_size(self) -> int:
+        return self.embed_batch_size
+
+    def get_nemotron_parse_initial_actors(self) -> int:
+        return self.nemotron_parse_initial_actors
+
+    def get_nemotron_parse_min_actors(self) -> int:
+        return self.nemotron_parse_min_actors
+
+    def get_nemotron_parse_max_actors(self) -> int:
+        return self.nemotron_parse_max_actors
+
+    def get_nemotron_parse_gpus_per_actor(self) -> float:
+        return self.nemotron_parse_gpus_per_actor
+
+    def get_nemotron_parse_batch_size(self) -> int:
+        return self.nemotron_parse_batch_size
+
+    def get_ocr_initial_actors(self) -> int:
+        return self.ocr_initial_actors
+
+    def get_ocr_min_actors(self) -> int:
+        return self.ocr_min_actors
+
+    def get_ocr_max_actors(self) -> int:
+        return self.ocr_max_actors
+
+    def get_ocr_gpus_per_actor(self) -> float:
+        return self.ocr_gpus_per_actor
+
+    def get_ocr_batch_size(self) -> int:
+        return self.ocr_batch_size
+
+    def get_page_elements_initial_actors(self) -> int:
+        return self.page_elements_initial_actors
+
+    def get_page_elements_min_actors(self) -> int:
+        return self.page_elements_min_actors
+
+    def get_page_elements_max_actors(self) -> int:
+        return self.page_elements_max_actors
+
+    def get_page_elements_gpus_per_actor(self) -> float:
+        return self.page_elements_gpus_per_actor
+
+    def get_page_elements_batch_size(self) -> int:
+        return self.page_elements_batch_size
+
+    def get_pdf_extract_batch_size(self) -> int:
+        return self.pdf_extract_batch_size
+
+    def get_pdf_extract_cpus_per_task(self) -> float:
+        return self.pdf_extract_cpus_per_task
+
+    def get_pdf_extract_tasks(self) -> int:
+        return self.pdf_extract_tasks
+
+
     def __str__(self) -> str:
         return f"RequestedPlan(embed_initial_actors={self.embed_initial_actors}, embed_min_actors={self.embed_min_actors}, embed_max_actors={self.embed_max_actors}, embed_gpus_per_actor={self.embed_gpus_per_actor}, embed_batch_size={self.embed_batch_size}, nemotron_parse_initial_actors={self.nemotron_parse_initial_actors}, nemotron_parse_min_actors={self.nemotron_parse_min_actors}, nemotron_parse_max_actors={self.nemotron_parse_max_actors}, nemotron_parse_gpus_per_actor={self.nemotron_parse_gpus_per_actor}, nemotron_parse_batch_size={self.nemotron_parse_batch_size}, ocr_initial_actors={self.ocr_initial_actors}, ocr_min_actors={self.ocr_min_actors}, ocr_max_actors={self.ocr_max_actors}, ocr_gpus_per_actor={self.ocr_gpus_per_actor}, ocr_batch_size={self.ocr_batch_size}, page_elements_initial_actors={self.page_elements_initial_actors}, page_elements_min_actors={self.page_elements_min_actors}, page_elements_max_actors={self.page_elements_max_actors}, page_elements_gpus_per_actor={self.page_elements_gpus_per_actor}, page_elements_batch_size={self.page_elements_batch_size}, pdf_extract_batch_size={self.pdf_extract_batch_size}, pdf_extract_cpus_per_task={self.pdf_extract_cpus_per_task}, pdf_extract_tasks={self.pdf_extract_tasks})"
     
