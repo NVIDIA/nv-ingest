@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 import errno
+from importlib import metadata
 import json
 import os
 import pty
 import re
 import select
 import shlex
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +39,54 @@ from nemo_retriever.harness.parsers import StreamMetrics
 from nemo_retriever.harness.recall_adapters import prepare_recall_query_file
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+
+def _collect_gpu_metadata() -> tuple[int | None, str | None]:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, ValueError):
+        return None, None
+
+    output_lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    combined_output = f"{result.stdout}\n{result.stderr}"
+    if "No devices were found" in combined_output:
+        return 0, None
+    if result.returncode != 0:
+        return None, None
+    if not output_lines:
+        return 0, None
+    return len(output_lines), output_lines[0]
+
+
+def _collect_run_metadata() -> dict[str, Any]:
+    try:
+        host = socket.gethostname().strip() or "unknown"
+    except OSError:
+        host = "unknown"
+
+    try:
+        python_version = sys.version.split()[0] or "unknown"
+    except Exception:
+        python_version = "unknown"
+
+    try:
+        ray_version = metadata.version("ray") or "unknown"
+    except (metadata.PackageNotFoundError, OSError):
+        ray_version = "unknown"
+
+    gpu_count, cuda_driver = _collect_gpu_metadata()
+    return {
+        "host": host,
+        "gpu_count": gpu_count,
+        "cuda_driver": cuda_driver,
+        "ray_version": ray_version,
+        "python_version": python_version,
+    }
 
 
 def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
@@ -222,6 +272,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
 
     metrics = StreamMetrics()
     process_rc = _run_subprocess_with_tty(cmd, metrics)
+    run_metadata = _collect_run_metadata()
     runtime_summary_path = runtime_dir / f"{run_id}.runtime.summary.json"
     runtime_summary = _read_json_if_exists(runtime_summary_path)
     detection_summary = _read_json_if_exists(detection_summary_file)
@@ -269,6 +320,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
             "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
             **recall_metrics_normalized,
         },
+        "run_metadata": run_metadata,
         "runtime_summary": runtime_summary,
         "detection_summary": detection_summary,
         "artifacts": {

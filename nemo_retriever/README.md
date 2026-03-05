@@ -97,13 +97,23 @@ retriever harness nightly --dry-run
 
 Each run writes a compact artifact set (no full stdout/stderr log persistence):
 
-- `results.json` (normalized metrics + pass/fail + config snapshot)
+- `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
 - `command.txt` (exact invoked command)
 - `runtime_metrics/` (Ray runtime summary + timeline files)
 
 By default, detection totals are embedded into `results.json` under `detection_summary`.
 If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
 `nemo_retriever/harness/test_configs.yaml`.
+
+`results.json` also includes a nested `run_metadata` block for lightweight environment context:
+
+- `host`
+- `gpu_count`
+- `cuda_driver`
+- `ray_version`
+- `python_version`
+
+These fields use best-effort discovery and fall back to `null` or `"unknown"` rather than failing a run.
 
 Sweep/nightly sessions additionally write:
 
