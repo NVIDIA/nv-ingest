@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Sequence
@@ -71,7 +72,8 @@ class LlamaNemotronEmbed1BV2Embedder:
         dev = self._device
 
         outs: List[torch.Tensor] = []
-        with torch.inference_mode():
+        with torch.inference_mode(), warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             with torch.autocast(device_type="cuda"):
                 for i in range(0, len(texts), max(1, int(batch_size))):
                     chunk = texts[i : i + max(1, int(batch_size))]
