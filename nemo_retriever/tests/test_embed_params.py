@@ -10,6 +10,7 @@ import warnings
 
 import pytest
 
+from nemo_retriever.model import _DEFAULT_EMBED_MODEL
 from nemo_retriever.params.models import EmbedParams, IMAGE_MODALITIES
 
 
@@ -93,3 +94,25 @@ class TestEmbedParamsGranularity:
                 structured_elements_modality="text_image",
             )
             assert len(w) == 0
+
+
+# ===================================================================
+# vLLM embedding
+# ===================================================================
+
+
+def test_embed_vllm_params_defaults():
+    """embed_use_vllm and embed_model_name default to False and None."""
+    params = EmbedParams()
+    assert params.embed_use_vllm is False
+    assert params.embed_model_name is None
+
+
+def test_embed_vllm_params_accepted():
+    """embed_use_vllm and embed_model_name are accepted."""
+    params = EmbedParams(
+        embed_use_vllm=True,
+        embed_model_name=_DEFAULT_EMBED_MODEL,
+    )
+    assert params.embed_use_vllm is True
+    assert params.embed_model_name == _DEFAULT_EMBED_MODEL

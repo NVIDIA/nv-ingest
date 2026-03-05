@@ -245,6 +245,7 @@ class _BatchEmbedActor:
         self._kwargs = {
             **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
             **params.runtime.model_dump(mode="python", exclude_none=True),
+            **params.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
         if "embedding_endpoint" not in self._kwargs and self._kwargs.get("embed_invoke_url"):
             self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url")
@@ -255,14 +256,12 @@ class _BatchEmbedActor:
             self._model = None
             return
 
-        device = self._kwargs.get("device")
-        hf_cache_dir = self._kwargs.get("hf_cache_dir")
-        normalize = bool(self._kwargs.get("normalize", True))
-        max_length = int(self._kwargs.get("max_length", 8192))
-        model_name_raw = self._kwargs.get("model_name")
-
         from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
+            LlamaNemotronEmbed1BV2Embedder,
+        )
 
+        model_name_raw = self._kwargs.get("embed_model_name") or self._kwargs.get("model_name")
         model_id = resolve_embed_model(model_name_raw)
 
         if is_vl_embed_model(model_name_raw):
@@ -270,28 +269,41 @@ class _BatchEmbedActor:
                 LlamaNemotronEmbedVL1BV2Embedder,
             )
 
+            device = self._kwargs.get("device")
+            hf_cache_dir = self._kwargs.get("hf_cache_dir")
             self._model = LlamaNemotronEmbedVL1BV2Embedder(
                 device=str(device) if device else None,
                 hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
                 model_id=model_id,
             )
-        else:
-            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-                LlamaNemotronEmbed1BV2Embedder,
-            )
+            return
 
-            self._model = LlamaNemotronEmbed1BV2Embedder(
+        # Single constructor: vLLM branch only controls which kwargs are passed.
+        embedder_kwargs: dict[str, Any] = {"model_id": model_id}
+        if self._kwargs.get("embed_use_vllm"):
+            embedder_kwargs.update(
+                use_vllm=True,
+                dimensions=self._kwargs.get("dimensions"),
+                gpu_memory_utilization=float(self._kwargs.get("gpu_memory_utilization", 0.45)),
+                enforce_eager=bool(self._kwargs.get("enforce_eager", False)),
+                compile_cache_dir=self._kwargs.get("compile_cache_dir"),
+            )
+        else:
+            device = self._kwargs.get("device")
+            hf_cache_dir = self._kwargs.get("hf_cache_dir")
+            embedder_kwargs.update(
                 device=str(device) if device else None,
                 hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-                normalize=normalize,
-                max_length=max_length,
-                model_id=model_id,
+                normalize=bool(self._kwargs.get("normalize", True)),
+                max_length=int(self._kwargs.get("max_length", 8192)),
             )
+        self._model = LlamaNemotronEmbed1BV2Embedder(**embedder_kwargs)
 
     def __call__(self, batch_df: Any) -> Any:
         from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
 
-        return embed_text_main_text_embed(batch_df, model=self._model, **self._kwargs)
+        kwargs = dict(self._kwargs)
+        return embed_text_main_text_embed(batch_df, model=self._model, **kwargs)
 
 
 class BatchIngestor(Ingestor):

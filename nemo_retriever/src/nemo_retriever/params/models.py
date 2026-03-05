@@ -202,6 +202,8 @@ class EmbedParams(_ParamsModel):
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
+    embed_use_vllm: bool = False
+    embed_model_name: Optional[str] = None
     input_type: str = "passage"
     embed_modality: str = "text"  # "text", "image", or "text_image" — default for all element types
     embed_granularity: Literal["element", "page"] = "element"  # "element" = per-element rows, "page" = one row per page

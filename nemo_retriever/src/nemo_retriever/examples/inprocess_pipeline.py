@@ -154,6 +154,11 @@ def main(
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),
+    embed_use_vllm: bool = typer.Option(
+        False,
+        "--embed-use-vllm/--no-embed-use-vllm",
+        help="Use vLLM Python API for embedding (docs and recall queries). Requires [embed-vllm] extra.",
+    ),
     nemotron_parse_workers: float = typer.Option(
         0.0,
         "--nemotron-parse-workers",
@@ -248,6 +253,7 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm=embed_use_vllm,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -273,6 +279,7 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm=embed_use_vllm,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -316,6 +323,7 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm=embed_use_vllm,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -359,6 +367,7 @@ def main(
                 EmbedParams(
                     model_name=str(embed_model_name),
                     embed_invoke_url=embed_invoke_url,
+                    embed_use_vllm=embed_use_vllm,
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
@@ -416,6 +425,7 @@ def main(
         lancedb_table=str(LANCEDB_TABLE),
         embedding_model=_recall_model,
         embedding_http_endpoint=embed_invoke_url,
+        use_vllm=embed_use_vllm,
         top_k=10,
         ks=(1, 5, 10),
     )

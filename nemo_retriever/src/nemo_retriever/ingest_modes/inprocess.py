@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
+from nemo_retriever.model import _DEFAULT_EMBED_MODEL
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
 from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from nemo_retriever.page_elements import detect_page_elements_v3
@@ -329,18 +330,19 @@ def _embed_group(
         truncate="END",
         dimensions=None,
         embedding_nim_endpoint=endpoint or "http://localhost:8012/v1",
-        embedding_model=resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model=resolved_model_name or _DEFAULT_EMBED_MODEL,
         embed_modality=group_modality,
     )
 
+    task_config: Dict[str, Any] = {
+        "embedder": _embed,
+        "multimodal_embedder": _multimodal_embedder,
+        "endpoint_url": endpoint,
+        "local_batch_size": int(inference_batch_size),
+    }
     out_df, _ = create_text_embeddings_for_df(
         group_df,
-        task_config={
-            "embedder": _embed,
-            "multimodal_embedder": _multimodal_embedder,
-            "endpoint_url": endpoint,
-            "local_batch_size": int(inference_batch_size),
-        },
+        task_config=task_config,
         transform_config=cfg,
     )
     return out_df
@@ -1506,19 +1508,18 @@ class InProcessIngestor(Ingestor):
             self._tasks.append((embed_text_main_text_embed, embed_kwargs))
             return self
 
-        # Local HF embedder path.
+        # Local embedder path (HF or vLLM).
         # Allow callers to control device / max_length to avoid OOMs.
         device = embed_kwargs.pop("device", None)
         hf_cache_dir = embed_kwargs.pop("hf_cache_dir", None)
         normalize = bool(embed_kwargs.pop("normalize", True))
         max_length = int(embed_kwargs.pop("max_length", 8192))
-
+        embed_use_vllm = bool(embed_kwargs.pop("embed_use_vllm", False))
         model_name_raw = embed_kwargs.pop("model_name", None)
 
         from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
 
         model_id = resolve_embed_model(model_name_raw)
-
         embed_kwargs.setdefault("input_type", "passage")
 
         if is_vl_embed_model(model_name_raw):
@@ -1532,13 +1533,23 @@ class InProcessIngestor(Ingestor):
                 model_id=model_id,
             )
         else:
-            embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
-                device=str(device) if device is not None else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-                normalize=normalize,
-                max_length=max_length,
-                model_id=model_id,
-            )
+            embedder_kwargs: dict[str, Any] = {"model_id": model_id}
+            if embed_use_vllm:
+                embedder_kwargs.update(
+                    use_vllm=True,
+                    gpu_memory_utilization=float(kwargs.get("gpu_memory_utilization", 0.45)),
+                    enforce_eager=bool(kwargs.get("enforce_eager", False)),
+                    compile_cache_dir=kwargs.get("compile_cache_dir"),
+                    dimensions=kwargs.get("dimensions"),
+                )
+            else:
+                embedder_kwargs.update(
+                    device=str(device) if device is not None else None,
+                    hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+                    normalize=normalize,
+                    max_length=max_length,
+                )
+            embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(**embedder_kwargs)
         self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self
 
