@@ -30,7 +30,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 try:
     import torch
-    import torch.nn.functional as F
 except ImportError as e:  # pragma: no cover
     raise ImportError(
         "Required dependencies not installed for Nemotron ColEmbed-VL v2 retriever. "

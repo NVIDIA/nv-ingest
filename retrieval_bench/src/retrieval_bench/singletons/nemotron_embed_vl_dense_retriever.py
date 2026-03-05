@@ -33,7 +33,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
 try:
     import torch
-    import torch.nn.functional as F  # noqa: N812
 except ImportError as e:  # pragma: no cover
     raise ImportError("Required dependencies not installed for Nemotron-VL dense retriever. Install: torch") from e
 
