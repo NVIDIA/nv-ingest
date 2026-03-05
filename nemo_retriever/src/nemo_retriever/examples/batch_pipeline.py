@@ -994,6 +994,10 @@ def main(
         print(embedding_results_message)
         print(total_time_message)
 
+        pandas_df = ingestor.get_dataset().to_pandas(limit=100)
+        print(f"pandas_df: {pandas_df}")
+        print(f"Type of pandas_df: {type(pandas_df)}")
+
         # _print_detection_summary(detection_summary)
         # if detection_summary_file is not None:
         #     _write_detection_summary(detection_summary_file, detection_summary)
