@@ -963,6 +963,10 @@ def main(
         print(f"ingest_dataset: {ingest_dataset}")
         print(f"Type of ingest_dataset: {type(ingest_dataset)}")
 
+        ingest_results = ingest_dataset.materialize()
+        print(f"ingest_results: {ingest_results}")
+        print(f"Type of ingest_results: {type(ingest_results)}")
+
         ingest_elapsed_s = time.perf_counter() - ingest_start
         processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
@@ -974,98 +978,98 @@ def main(
 
         ray.shutdown()
 
-        # ---------------------------------------------------------------------------
-        # Recall calculation
-        # ---------------------------------------------------------------------------
-        query_csv = Path(query_csv)
-        if not query_csv.exists():
-            print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
-            _print_heuristic_resources(
-                ctx=ctx,
-                ingestor=ingestor,
-                ray_cluster_address=ray_address,
-                input_type=input_type,
-                page_elements_actors=page_elements_actors,
-                ocr_actors=ocr_actors,
-                embed_actors=embed_actors,
-                nemotron_parse_actors=nemotron_parse_actors,
-                nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-                nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-            )
-            _print_pages_per_second(processed_pages, ingest_elapsed_s)
-            return
+        # # ---------------------------------------------------------------------------
+        # # Recall calculation
+        # # ---------------------------------------------------------------------------
+        # query_csv = Path(query_csv)
+        # if not query_csv.exists():
+        #     print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+        #     _print_heuristic_resources(
+        #         ctx=ctx,
+        #         ingestor=ingestor,
+        #         ray_cluster_address=ray_address,
+        #         input_type=input_type,
+        #         page_elements_actors=page_elements_actors,
+        #         ocr_actors=ocr_actors,
+        #         embed_actors=embed_actors,
+        #         nemotron_parse_actors=nemotron_parse_actors,
+        #         nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+        #         nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
+        #     )
+        #     _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        #     return
 
-        db = _lancedb().connect(lancedb_uri)
-        table = None
-        open_err: Optional[Exception] = None
-        for _ in range(3):
-            try:
-                table = db.open_table(LANCEDB_TABLE)
-                open_err = None
-                break
-            except Exception as e:
-                open_err = e
-                # Create table if missing, then retry open.
-                _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
-                time.sleep(2)
-        if table is None:
-            raise RuntimeError(
-                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
-            ) from open_err
-        try:
-            if int(table.count_rows()) == 0:
-                print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
-                _print_heuristic_resources(
-                    ctx=ctx,
-                    ingestor=ingestor,
-                    ray_cluster_address=ray_address,
-                    input_type=input_type,
-                    page_elements_actors=page_elements_actors,
-                    ocr_actors=ocr_actors,
-                    embed_actors=embed_actors,
-                    nemotron_parse_actors=nemotron_parse_actors,
-                    nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-                    nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-                )
-                _print_pages_per_second(processed_pages, ingest_elapsed_s)
-                return
-        except Exception:
-            pass
+        # db = _lancedb().connect(lancedb_uri)
+        # table = None
+        # open_err: Optional[Exception] = None
+        # for _ in range(3):
+        #     try:
+        #         table = db.open_table(LANCEDB_TABLE)
+        #         open_err = None
+        #         break
+        #     except Exception as e:
+        #         open_err = e
+        #         # Create table if missing, then retry open.
+        #         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+        #         time.sleep(2)
+        # if table is None:
+        #     raise RuntimeError(
+        #         f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
+        #     ) from open_err
+        # try:
+        #     if int(table.count_rows()) == 0:
+        #         print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+        #         _print_heuristic_resources(
+        #             ctx=ctx,
+        #             ingestor=ingestor,
+        #             ray_cluster_address=ray_address,
+        #             input_type=input_type,
+        #             page_elements_actors=page_elements_actors,
+        #             ocr_actors=ocr_actors,
+        #             embed_actors=embed_actors,
+        #             nemotron_parse_actors=nemotron_parse_actors,
+        #             nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+        #             nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
+        #         )
+        #         _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        #         return
+        # except Exception:
+        #     pass
 
-        # Resolve the HF model ID for recall query embedding so aliases
-        # (e.g. "nemo_retriever_v1") map to the correct model.
-        from nemo_retriever.model import resolve_embed_model
+        # # Resolve the HF model ID for recall query embedding so aliases
+        # # (e.g. "nemo_retriever_v1") map to the correct model.
+        # from nemo_retriever.model import resolve_embed_model
 
-        _recall_model = resolve_embed_model(str(embed_model_name))
+        # _recall_model = resolve_embed_model(str(embed_model_name))
 
-        cfg = RecallConfig(
-            lancedb_uri=str(lancedb_uri),
-            lancedb_table=str(LANCEDB_TABLE),
-            embedding_model=_recall_model,
-            embedding_http_endpoint=embed_invoke_url,
-            top_k=10,
-            ks=(1, 5, 10),
-            hybrid=hybrid,
-        )
+        # cfg = RecallConfig(
+        #     lancedb_uri=str(lancedb_uri),
+        #     lancedb_table=str(LANCEDB_TABLE),
+        #     embedding_model=_recall_model,
+        #     embedding_http_endpoint=embed_invoke_url,
+        #     top_k=10,
+        #     ks=(1, 5, 10),
+        #     hybrid=hybrid,
+        # )
 
-        _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
+        # _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
 
-        print("\nRecall metrics (matching nemo_retriever.recall.core):")
-        for k, v in metrics.items():
-            print(f"  {k}: {v:.4f}")
-        _print_heuristic_resources(
-            ctx=ctx,
-            ingestor=ingestor,
-            ray_cluster_address=ray_address,
-            input_type=input_type,
-            page_elements_actors=page_elements_actors,
-            ocr_actors=ocr_actors,
-            embed_actors=embed_actors,
-            nemotron_parse_actors=nemotron_parse_actors,
-            nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-            nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-        )
-        _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        # print("\nRecall metrics (matching nemo_retriever.recall.core):")
+        # for k, v in metrics.items():
+        #     print(f"  {k}: {v:.4f}")
+        # _print_heuristic_resources(
+        #     ctx=ctx,
+        #     ingestor=ingestor,
+        #     ray_cluster_address=ray_address,
+        #     input_type=input_type,
+        #     page_elements_actors=page_elements_actors,
+        #     ocr_actors=ocr_actors,
+        #     embed_actors=embed_actors,
+        #     nemotron_parse_actors=nemotron_parse_actors,
+        #     nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
+        #     nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
+        # )
+        # _print_pages_per_second(processed_pages, ingest_elapsed_s)
     finally:
         # Restore real stdio before closing the mirror file so exception hooks
         # and late flushes never write to a closed stream wrapper.
