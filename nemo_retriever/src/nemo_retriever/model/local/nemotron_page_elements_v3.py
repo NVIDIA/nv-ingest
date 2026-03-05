@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 from torch import nn
 import torch
 import numpy as np
+from ._hf_cache import configure_global_hf_cache_base
 from ..model import HuggingFaceModel, RunMode
 
 from nemotron_page_elements_v3.model import define_model as define_model_page_elements
@@ -29,6 +30,7 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
     def __init__(self) -> None:
         super().__init__(self.model_name)
+        configure_global_hf_cache_base()
         self._model = define_model_page_elements(self.model_name)
         self._page_elements_input_shape = (1024, 1024)
 

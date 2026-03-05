@@ -5,6 +5,7 @@
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from ._hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 from nemotron_graphic_elements_v1.model import define_model as define_model_graphic_elements
@@ -31,6 +32,7 @@ class NemotronGraphicElementsV1(BaseModel):
         self,
     ) -> None:
         super().__init__()
+        configure_global_hf_cache_base()
         self._model = define_model_graphic_elements(self.model_name)
         self._graphic_elements_input_shape = (1024, 1024)
 

@@ -11,6 +11,7 @@ from pathlib import Path  # noqa: F401
 
 import numpy as np
 import torch
+from ._hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 from PIL import Image
@@ -31,6 +32,7 @@ class NemotronOCRV1(BaseModel):
         model_dir: Optional[str] = None,
     ) -> None:
         super().__init__()
+        configure_global_hf_cache_base()
         from nemotron_ocr.inference.pipeline import NemotronOCR  # local-only import
 
         if model_dir:
