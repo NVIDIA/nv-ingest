@@ -376,14 +376,6 @@ class BatchIngestor(Ingestor):
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
 
-    def _map_batches_logged(self, stage_name: str, fn: Any, **kwargs: Any) -> rd.Dataset:
-        """Log map_batches call details before submitting the stage to Ray Data."""
-        fn_name = getattr(fn, "__name__", fn.__class__.__name__)
-        print(f"[batch.map_batches] stage={stage_name} fn={fn_name}")
-        for key in sorted(kwargs.keys()):
-            print(f"  {key}={kwargs[key]!r}")
-        return self._rd_dataset.map_batches(fn, **kwargs)
-
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
         Add local files for batch processing.
@@ -623,7 +615,7 @@ class BatchIngestor(Ingestor):
 
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract.doc_to_pdf",
             DocToPdfConversionActor,
             batch_size=1,
@@ -639,7 +631,7 @@ class BatchIngestor(Ingestor):
                 end_page=kwargs.get("end_page"),
             )
         )
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract.pdf_split",
             pdf_split_actor,
             batch_size=pdf_split_batch_size,
@@ -649,7 +641,7 @@ class BatchIngestor(Ingestor):
 
         # Pre-split pdfs are now ready for extraction — the main CPU bottleneck.
         extraction_actor = PDFExtractionActor(**kwargs)
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract.pdf_extract",
             extraction_actor,
             batch_size=pdf_extract_batch_size,
@@ -680,7 +672,7 @@ class BatchIngestor(Ingestor):
             )
             if parse_invoke_url:
                 parse_flags["invoke_url"] = parse_invoke_url
-            self._rd_dataset = self._map_batches_logged(
+            self._rd_dataset = self._rd_dataset.map_batches(
                 "extract.nemotron_parse",
                 NemotronParseActor,
                 batch_size=int(nemotron_parse_batch_size),
@@ -692,7 +684,7 @@ class BatchIngestor(Ingestor):
         else:
 
             # Page-element detection with a GPU actor pool.
-            self._rd_dataset = self._map_batches_logged(
+            self._rd_dataset = self._rd_dataset.map_batches(
                 "extract.page_elements",
                 PageElementDetectionActor,
                 batch_size=page_elements_batch_size,
@@ -730,7 +722,7 @@ class BatchIngestor(Ingestor):
                 ocr_flags["inference_batch_size"] = int(kwargs["ocr_inference_batch_size"])
 
             if ocr_flags:
-                self._rd_dataset = self._map_batches_logged(
+                self._rd_dataset = self._rd_dataset.map_batches(
                     "extract.ocr",
                     OCRActor,
                     batch_size=detect_batch_size,
@@ -756,7 +748,7 @@ class BatchIngestor(Ingestor):
         self._extract_txt_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
 
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract_txt.split",
             TxtSplitActor,
             batch_size=4,
@@ -780,7 +772,7 @@ class BatchIngestor(Ingestor):
         self._extract_html_kwargs = resolved.model_dump(mode="python")
         self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
 
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract_html.split",
             HtmlSplitActor,
             batch_size=4,
@@ -818,7 +810,7 @@ class BatchIngestor(Ingestor):
         audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
         asr_batch_size = kwargs.get("asr_batch_size", 8)
 
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract_audio.chunk",
             MediaChunkActor,
             batch_size=audio_chunk_batch_size,
@@ -826,7 +818,7 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "extract_audio.asr",
             ASRActor,
             batch_size=asr_batch_size,
@@ -924,26 +916,31 @@ class BatchIngestor(Ingestor):
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
-        text_elements_modality = resolved.text_elements_modality or embed_modality
-        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        embed_granularity = resolved.embed_granularity
         self._tasks.append(("embed", dict(kwargs)))
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        # Prepare content rows before embedding.
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
         from functools import partial
-        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
+        from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
-        _explode_fn = partial(
-            explode_content_to_rows,
-            modality=embed_modality,
-            text_elements_modality=text_elements_modality,
-            structured_elements_modality=structured_elements_modality,
-        )
-        self._rd_dataset = self._map_batches_logged(
-            "embed.explode",
-            _explode_fn,
+        if embed_granularity == "page":
+            _row_fn = partial(
+                collapse_content_to_page_rows,
+                modality=embed_modality,
+            )
+        else:
+            text_elements_modality = resolved.text_elements_modality or embed_modality
+            structured_elements_modality = resolved.structured_elements_modality or embed_modality
+            _row_fn = partial(
+                explode_content_to_rows,
+                modality=embed_modality,
+                text_elements_modality=text_elements_modality,
+                structured_elements_modality=structured_elements_modality,
+            )
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _row_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,
@@ -956,7 +953,7 @@ class BatchIngestor(Ingestor):
         else:
             embed_actor_num_gpus = float(getattr(self, "_gpu_embed", self._embed_gpu_default))
 
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "embed.actor",
             _BatchEmbedActor,
             batch_size=embed_batch_size,
@@ -994,7 +991,7 @@ class BatchIngestor(Ingestor):
         self._vdb_upload_kwargs = dict(vdb_kwargs)
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
-        self._rd_dataset = self._map_batches_logged(
+        self._rd_dataset = self._rd_dataset.map_batches(
             "vdb_upload.write",
             _LanceDBWriteActor,
             batch_format="pandas",

@@ -6,6 +6,19 @@
 
 from __future__ import annotations
 
+import sys
+import warnings
+
+# Suppress the pynvml deprecation FutureWarning before any submodule imports torch.
+# The pynvml 13.x shim installs a PynvmlFinder via .pth at Python startup that warns
+# on every `import pynvml`.  We both add a warnings filter and mark the finder as
+# already warned so that spawned subprocesses (which get a fresh finder) stay quiet.
+warnings.filterwarnings("ignore", message="The pynvml package is deprecated", category=FutureWarning)
+for _finder in sys.meta_path:
+    if type(_finder).__name__ == "PynvmlFinder":
+        _finder.has_warned_pynvml = True
+        break
+
 from .retriever import retriever as _retriever_cls
 
 __all__ = ["__version__", "create_ingestor", "get_version", "get_version_info", "ingestor", "retriever"]

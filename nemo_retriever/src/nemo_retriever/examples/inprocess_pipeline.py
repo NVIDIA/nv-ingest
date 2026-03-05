@@ -189,6 +189,11 @@ def main(
         "--structured-elements-modality",
         help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
     ),
+    embed_granularity: str = typer.Option(
+        "element",
+        "--embed-granularity",
+        help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
+    ),
 ) -> None:
     _ = input_type
 
@@ -215,6 +220,7 @@ def main(
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
+                    embed_granularity=embed_granularity,
                 )
             )
             .vdb_upload(
@@ -241,6 +247,7 @@ def main(
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
+                    embed_granularity=embed_granularity,
                 )
             )
             .vdb_upload(
@@ -283,6 +290,7 @@ def main(
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
+                    embed_granularity=embed_granularity,
                 )
             )
             .vdb_upload(
@@ -324,6 +332,7 @@ def main(
                     embed_modality=embed_modality,
                     text_elements_modality=text_elements_modality,
                     structured_elements_modality=structured_elements_modality,
+                    embed_granularity=embed_granularity,
                 )
             )
             .vdb_upload(

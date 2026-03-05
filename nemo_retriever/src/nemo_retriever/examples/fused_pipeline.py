@@ -166,6 +166,11 @@ def main(
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
     ),
+    embed_granularity: str = typer.Option(
+        "element",
+        "--embed-granularity",
+        help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
@@ -203,6 +208,7 @@ def main(
             .embed(
                 EmbedParams(
                     model_name="nemo_retriever_v1",
+                    embed_granularity=embed_granularity,
                     fused_tuning={
                         "fused_workers": int(fused_workers),
                         "fused_batch_size": int(fused_batch_size),

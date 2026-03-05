@@ -230,6 +230,53 @@ def explode_content_to_rows(
     return pd.DataFrame(new_rows).reset_index(drop=True)
 
 
+def collapse_content_to_page_rows(
+    batch_df: Any,
+    *,
+    text_column: str = "text",
+    content_columns: Sequence[str] = _CONTENT_COLUMNS,
+    modality: str = "text",
+) -> Any:
+    """Collapse each page into a single row for page-level embedding.
+
+    For each row in *batch_df*:
+    - Concatenates the page text with all structured content text (tables,
+      charts, infographics) into one combined string in ``text_column``.
+    - Uses the **full page image** (no cropping) when *modality* requires
+      images.
+    - Tags the row with ``_embed_modality = modality``.
+
+    This produces **one embedding per page**.
+
+    Parameters
+    ----------
+    modality : str
+        Embedding modality for every row (default ``"text"``).
+    """
+    if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
+        return batch_df
+
+    batch_df = batch_df.copy()
+
+    # Concatenate all text content per page using the existing helper.
+    batch_df[text_column] = batch_df.apply(
+        lambda row: _combine_text_with_content(row, text_column, content_columns),
+        axis=1,
+    )
+
+    # Full page image (no cropping) for image modalities.
+    if modality in IMAGE_MODALITIES:
+        if "page_image" in batch_df.columns:
+            batch_df["_image_b64"] = batch_df["page_image"].apply(
+                lambda pi: pi.get("image_b64") if isinstance(pi, dict) else None
+            )
+        else:
+            batch_df["_image_b64"] = None
+
+    batch_df["_embed_modality"] = modality
+    return batch_df
+
+
 def _embed_group(
     group_df: pd.DataFrame,
     *,
@@ -1373,21 +1420,30 @@ class InProcessIngestor(Ingestor):
         """
         resolved = _coerce_params(params, EmbedParams, kwargs)
         embed_modality = resolved.embed_modality
-        text_elements_modality = resolved.text_elements_modality or embed_modality
-        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        embed_granularity = resolved.embed_granularity
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
-        self._tasks.append(
-            (
-                explode_content_to_rows,
-                {
-                    "modality": embed_modality,
-                    "text_elements_modality": text_elements_modality,
-                    "structured_elements_modality": structured_elements_modality,
-                },
+        if embed_granularity == "page":
+            # Page-level: one row per page with concatenated text and full page image.
+            self._tasks.append(
+                (
+                    collapse_content_to_page_rows,
+                    {"modality": embed_modality},
+                )
             )
-        )
+        else:
+            # Element-level (default): one row per table/chart/infographic.
+            text_elements_modality = resolved.text_elements_modality or embed_modality
+            structured_elements_modality = resolved.structured_elements_modality or embed_modality
+            self._tasks.append(
+                (
+                    explode_content_to_rows,
+                    {
+                        "modality": embed_modality,
+                        "text_elements_modality": text_elements_modality,
+                        "structured_elements_modality": structured_elements_modality,
+                    },
+                )
+            )
 
         embed_kwargs = {
             **resolved.model_dump(
