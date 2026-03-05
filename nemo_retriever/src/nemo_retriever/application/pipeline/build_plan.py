@@ -63,7 +63,7 @@ def stage_names_from_flags(
     elif extract_tables:
         yield "enrich_table"
     if extract_charts and use_graphic_elements:
-        yield "enrich_chart_structure"
+        yield "enrich_graphic_elements"
     elif extract_charts:
         yield "enrich_chart"
     if embed_text:

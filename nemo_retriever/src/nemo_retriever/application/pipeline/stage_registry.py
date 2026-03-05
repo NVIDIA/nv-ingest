@@ -24,7 +24,7 @@ def _enrich_table_structure(df: pd.DataFrame, **kwargs: Any) -> tuple[pd.DataFra
     return out_df, {}
 
 
-def _enrich_chart_structure(df: pd.DataFrame, **kwargs: Any) -> tuple[pd.DataFrame, Dict[str, Any]]:
+def _enrich_graphic_elements(df: pd.DataFrame, **kwargs: Any) -> tuple[pd.DataFrame, Dict[str, Any]]:
     """Thin wrapper so ``graphic_elements_ocr_page_elements`` matches the ``(df, info)`` contract."""
     out_df = graphic_elements_ocr_page_elements(df, **kwargs)
     return out_df, {}
@@ -37,6 +37,6 @@ STAGE_REGISTRY: Dict[str, StageHandler] = {
     "enrich_table": extract_table_data_from_primitives_df,
     "enrich_table_structure": _enrich_table_structure,
     "enrich_chart": extract_chart_data_from_primitives_df,
-    "enrich_chart_structure": _enrich_chart_structure,
+    "enrich_graphic_elements": _enrich_graphic_elements,
     "embed_text": embed_text_from_primitives_df,
 }
