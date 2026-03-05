@@ -585,13 +585,13 @@ def main(
         help="Optional remote endpoint URL for OCR model inference.",
     ),
     ocr_model_batch_size: int = typer.Option(
-        16,
+        32,
         "--ocr-model-batch-size",
         min=1,
         help="Model inference chunk size for OCRActor only.",
     ),
     ocr_ray_batch_size: int = typer.Option(
-        16,
+        32,
         "--ocr-ray-batch-size",
         min=1,
         help="Ray Data batch size for OCR stage.",
@@ -620,13 +620,13 @@ def main(
         help="Optional remote endpoint URL for page-elements model inference.",
     ),
     page_elements_model_batch_size: int = typer.Option(
-        16,
+        32,
         "--page-elements-model-batch-size",
         min=1,
         help="Model inference chunk size for PageElementDetectionActor only.",
     ),
     page_elements_ray_batch_size: int = typer.Option(
-        16,
+        32,
         "--page-elements-ray-batch-size",
         min=1,
         help="Ray Data batch size for page-elements stage.",
