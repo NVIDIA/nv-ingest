@@ -980,14 +980,14 @@ def main(
 
         print("Starting embedding...")
         embedding_start = time.perf_counter()
-        embedding_results_dataset = ingestor.embed(
+        embedding_results_dataset = (ingestor.embed(
             params=EmbedParams(
                 model_name=str(embed_model_name),
                 embed_invoke_url=embed_invoke_url,
                 embed_modality=embed_modality,
             ),
             input_dataset=ingest_dataset,
-        ).materialize()
+        )).materialize()
 
         embedding_elapsed_s = time.perf_counter() - embedding_start
         embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
