@@ -91,12 +91,11 @@ datasets:
     recall_match_mode: pdf_page
     recall_adapter: page_plus_one
 
-  # FinanceBench is document-level recall. Provide a JSON ground-truth file path
-  # via query_csv when enabling recall for this dataset.
+  # FinanceBench is document-level recall using the repository fixture JSON.
   financebench:
     path: /datasets/nv-ingest/financebench
-    query_csv: null
+    query_csv: data/financebench_train.json
     input_type: pdf
-    recall_required: false
+    recall_required: true
     recall_match_mode: pdf_only
     recall_adapter: financebench_json
