@@ -369,7 +369,8 @@ class Agent:
                     self.message_history.extend(tool_messages)
                     ended_successfully = False
                     if self.config.end_tool in tool_calls:
-                        _correct_val = self.tool_map[self.config.end_tool].correct_call_return_value  # type: ignore[attr-defined]
+                        end_tool = self.tool_map[self.config.end_tool]
+                        _correct_val = end_tool.correct_call_return_value  # type: ignore[attr-defined]
                         for tm in tool_messages:
                             if tm["name"] == self.config.end_tool and tm["content"][0]["text"] == _correct_val:
                                 ended_successfully = True

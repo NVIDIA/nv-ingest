@@ -764,7 +764,10 @@ def report_llm_usage(
         int,
         typer.Option(
             "--max-error-len",
-            help="Maximum number of characters to print per error string when using --list-errors. Use 0 for no truncation.",
+            help=(
+                "Maximum number of characters to print per error string"
+                " when using --list-errors. Use 0 for no truncation."
+            ),
         ),
     ] = 0,
 ):

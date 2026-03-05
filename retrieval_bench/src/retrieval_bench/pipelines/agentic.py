@@ -423,7 +423,10 @@ class AgenticRetrievalPipeline(BasePipeline):
                 source = "none"
                 try:
                     if hasattr(llm, "_per_query_usage"):
-                        llm._per_query_usage[str(qid)] = {"prompt_tokens": 0, "completion_tokens": 0}  # type: ignore[attr-defined]
+                        llm._per_query_usage[str(qid)] = {  # type: ignore[attr-defined]
+                            "prompt_tokens": 0,
+                            "completion_tokens": 0,
+                        }
 
                     token = _CURRENT_QUERY_ID.set(str(qid))
                     try:
@@ -519,7 +522,8 @@ class AgenticRetrievalPipeline(BasePipeline):
                     completed += 1
                     if completed == 1 or completed % 10 == 0 or completed == total_queries:
                         print(
-                            f"  Agent queries completed: {completed}/{total_queries} (concurrency={self.num_concurrent})"
+                            f"  Agent queries completed: {completed}/{total_queries}"
+                            f" (concurrency={self.num_concurrent})"
                         )
 
         tasks = [

@@ -152,7 +152,11 @@ class _NemotronColEmbedVLV2State:
     def _corpus_cache_path(self, dataset_name: str) -> Path:
         dataset_slug = str(dataset_name).replace("/", "__")
         model_slug = self.model_id.split("/")[-1].replace("/", "__")
-        key = f"{dataset_name}::{self.model_id}::images::max_input_tiles={int(self.max_input_tiles)}::use_thumbnail={bool(self.use_thumbnail)}"
+        key = (
+            f"{dataset_name}::{self.model_id}::images"
+            f"::max_input_tiles={int(self.max_input_tiles)}"
+            f"::use_thumbnail={bool(self.use_thumbnail)}"
+        )
         key_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
         filename = f"corpus_image_embeddings__{dataset_slug}__{model_slug}__{key_hash}.pt"
         return self.cache_dir / filename
