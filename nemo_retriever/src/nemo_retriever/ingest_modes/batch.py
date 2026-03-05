@@ -480,6 +480,8 @@ class BatchIngestor(Ingestor):
         if "page_elements_api_key" in kwargs:
             detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
 
+        detect_kwargs["inference_batch_size"] = self._requested_plan.get_page_elements_batch_size()
+
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -648,7 +650,7 @@ class BatchIngestor(Ingestor):
             if "ocr_api_key" in kwargs:
                 ocr_flags["api_key"] = kwargs["ocr_api_key"]
             if "ocr_inference_batch_size" in kwargs and kwargs["ocr_inference_batch_size"] is not None:
-                ocr_flags["inference_batch_size"] = int(kwargs["ocr_inference_batch_size"])
+                ocr_flags["ocr_inference_batch_size"] = int(kwargs["ocr_inference_batch_size"])
 
             if ocr_flags:
                 self._rd_dataset = self._rd_dataset.map_batches(

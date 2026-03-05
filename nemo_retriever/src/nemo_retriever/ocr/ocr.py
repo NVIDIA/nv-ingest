@@ -605,9 +605,11 @@ class OCRActor:
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
         inference_batch_size: int = 8,
+        ocr_inference_batch_size: Optional[int] = None,
         remote_max_pool_workers: int = 16,
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
+        **kwargs: Any,
     ) -> None:
         import warnings
 
@@ -622,7 +624,13 @@ class OCRActor:
             remote_max_retries=int(remote_max_retries),
             remote_max_429_retries=int(remote_max_429_retries),
         )
-        self._inference_batch_size = int(inference_batch_size)
+        # Prefer OCR-specific kwarg when present; keep generic name for backwards compatibility.
+        inferred_batch_size = (
+            ocr_inference_batch_size
+            if ocr_inference_batch_size is not None
+            else kwargs.get("ocr_inference_batch_size", inference_batch_size)
+        )
+        self._inference_batch_size = int(inferred_batch_size)
         if self._invoke_url:
             self._model = None
         else:
