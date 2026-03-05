@@ -1043,6 +1043,10 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
+    def get_dataset(self) -> rd.Dataset | None:
+        """Return the current in-memory Ray Dataset for this ingestor."""
+        return self._rd_dataset
+
     def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
@@ -1065,7 +1069,7 @@ class BatchIngestor(Ingestor):
         # num_pages = self._rd_dataset.count()
         # elapsed = time.monotonic() - t0
 
-        return self._rd_dataset
+        return self
 
         # print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
         # _debug_log(

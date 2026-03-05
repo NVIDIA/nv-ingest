@@ -955,18 +955,16 @@ def main(
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
-        ingest_dataset = ingestor.ingest(
+        ingestor = ingestor.ingest(
             params=IngestExecuteParams(
                 runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
                 runtime_metrics_prefix=runtime_metrics_prefix,
             )
         )
-        print(f"ingest_dataset: {ingest_dataset}")
-        print(f"Type of ingest_dataset: {type(ingest_dataset)}")
 
-        ingest_results = ingest_dataset.materialize()
+        ingest_results = ingestor.get_dataset().materialize()
 
-        #TODO: Remove this hardcoded num_pages once I come up with strategy I want to us
+        #TODO: Remove this hardcoded num_pages once I come up with strategy I want to use
         num_pages = 54730
         print(f"ingest_results: {ingest_results}")
         print(f"Type of ingest_results: {type(ingest_results)}")
@@ -986,8 +984,8 @@ def main(
                 embed_invoke_url=embed_invoke_url,
                 embed_modality=embed_modality,
             ),
-            input_dataset=ingest_dataset,
-        )).materialize()
+            input_dataset=ingest_results,
+        )).get_dataset().materialize()
 
         embedding_elapsed_s = time.perf_counter() - embedding_start
         embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
