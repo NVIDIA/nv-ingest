@@ -582,70 +582,45 @@ class OCRActor:
         )
     """
 
-    __slots__ = (
-        "_model",
-        "_extract_tables",
-        "_extract_charts",
-        "_extract_infographics",
-        "_invoke_url",
-        "_api_key",
-        "_request_timeout_s",
-        "_remote_retry",
-        "_inference_batch_size",
-    )
+    __slots__ = ("ocr_kwargs", "_model", "_remote_retry")
 
-    def __init__(
-        self,
-        *,
-        extract_tables: bool = False,
-        extract_charts: bool = False,
-        extract_infographics: bool = False,
-        ocr_invoke_url: Optional[str] = None,
-        invoke_url: Optional[str] = None,
-        api_key: Optional[str] = None,
-        request_timeout_s: float = 120.0,
-        inference_batch_size: int = 8,
-        remote_max_pool_workers: int = 16,
-        remote_max_retries: int = 10,
-        remote_max_429_retries: int = 5,
-    ) -> None:
+    def __init__(self, **ocr_kwargs: Any) -> None:
         import warnings
 
         if Image is not None:
             warnings.filterwarnings("ignore", category=Image.DecompressionBombWarning)
 
-        self._invoke_url = (ocr_invoke_url or invoke_url or "").strip()
-        self._api_key = api_key
-        self._request_timeout_s = float(request_timeout_s)
+        self.ocr_kwargs = dict(ocr_kwargs)
+        invoke_url = str(self.ocr_kwargs.get("ocr_invoke_url") or self.ocr_kwargs.get("invoke_url") or "").strip()
+        if invoke_url and "invoke_url" not in self.ocr_kwargs:
+            self.ocr_kwargs["invoke_url"] = invoke_url
+
+        # Normalize common constructor kwargs to expected runtime types/defaults.
+        self.ocr_kwargs["extract_tables"] = bool(self.ocr_kwargs.get("extract_tables", False))
+        self.ocr_kwargs["extract_charts"] = bool(self.ocr_kwargs.get("extract_charts", False))
+        self.ocr_kwargs["extract_infographics"] = bool(self.ocr_kwargs.get("extract_infographics", False))
+        self.ocr_kwargs["request_timeout_s"] = float(self.ocr_kwargs.get("request_timeout_s", 120.0))
+        self.ocr_kwargs["inference_batch_size"] = int(self.ocr_kwargs.get("inference_batch_size", 8))
+
         self._remote_retry = RemoteRetryParams(
-            remote_max_pool_workers=int(remote_max_pool_workers),
-            remote_max_retries=int(remote_max_retries),
-            remote_max_429_retries=int(remote_max_429_retries),
+            remote_max_pool_workers=int(self.ocr_kwargs.get("remote_max_pool_workers", 16)),
+            remote_max_retries=int(self.ocr_kwargs.get("remote_max_retries", 10)),
+            remote_max_429_retries=int(self.ocr_kwargs.get("remote_max_429_retries", 5)),
         )
-        self._inference_batch_size = int(inference_batch_size)
-        if self._invoke_url:
+        if invoke_url:
             self._model = None
         else:
             from nemo_retriever.model.local import NemotronOCRV1
 
             self._model = NemotronOCRV1()
-        self._extract_tables = bool(extract_tables)
-        self._extract_charts = bool(extract_charts)
-        self._extract_infographics = bool(extract_infographics)
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:
             return ocr_page_elements(
                 batch_df,
                 model=self._model,
-                invoke_url=self._invoke_url,
-                api_key=self._api_key,
-                request_timeout_s=self._request_timeout_s,
-                extract_tables=self._extract_tables,
-                extract_charts=self._extract_charts,
-                extract_infographics=self._extract_infographics,
-                inference_batch_size=self._inference_batch_size,
                 remote_retry=self._remote_retry,
+                **self.ocr_kwargs,
                 **override_kwargs,
             )
         except BaseException as e:

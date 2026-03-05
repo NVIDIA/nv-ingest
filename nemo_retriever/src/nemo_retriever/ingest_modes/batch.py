@@ -653,9 +653,8 @@ class BatchIngestor(Ingestor):
             ocr_flags["inference_batch_size"] = self._requested_plan.get_ocr_batch_size()
 
             if ocr_flags:
-                ocr_actor = OCRActor(**ocr_flags)
                 self._rd_dataset = self._rd_dataset.map_batches(
-                    ocr_actor,
+                    OCRActor,
                     batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
                     num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
@@ -664,6 +663,7 @@ class BatchIngestor(Ingestor):
                         min_size=self._requested_plan.get_ocr_min_actors(),
                         max_size=self._requested_plan.get_ocr_max_actors(),
                     ),
+                    fn_constructor_kwargs=ocr_flags,
                 )
 
         return self
