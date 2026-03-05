@@ -987,10 +987,11 @@ def main(
                 embed_modality=embed_modality,
             ),
             input_dataset=ingest_dataset,
-        )
+        ).materialize()
 
         embedding_elapsed_s = time.perf_counter() - embedding_start
         embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
+        print(ingest_results_message)
         print(embedding_results_message)
 
         # _print_detection_summary(detection_summary)
