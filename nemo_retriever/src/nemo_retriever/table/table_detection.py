@@ -355,7 +355,7 @@ def table_structure_ocr_page_elements(
             else:
                 # Local batched inference.
                 for _, _, crop_array in crops:
-                    chw = torch.from_numpy(crop_array).permute(2, 0, 1).contiguous().to(dtype=torch.float32) / 255.0
+                    chw = torch.from_numpy(crop_array).permute(2, 0, 1).contiguous().to(dtype=torch.float32)
                     h, w = crop_array.shape[:2]
                     x = chw.unsqueeze(0)  # BCHW
                     try:
