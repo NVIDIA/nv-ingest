@@ -1,8 +1,8 @@
-﻿# NeMo Retriever Library
+﻿# NeMo Retriever Library — Library Mode Quick Start
 
 NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for PDFs that parses document structure—including text, tables, charts, and infographics—creates embeddings, optionally stores them in LanceDB, and performs recall evaluation.
 
-This quick start guide walks you through setting up a CUDA 13–compatible NeMo Retriever Library environment, installing the library and its dependencies, and running GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB, with optional Ray- and NIM-based scaling and built‑in recall benchmarking.
+This quick start guide shows how to run NeMo Retriever in library mode, directly from your application, without Docker. You’ll set up a CUDA 13–compatible environment, install the library and its dependencies, and run GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB. The examples cover two deployment options: loading Hugging Face models locally on your GPU, and pointing the same library‑mode pipeline at locally deployed NeMo Retriever NIM endpoints for embedding and OCR, with optional Ray‑based scaling and built‑in recall benchmarking.
 
 ## 1. Prerequisites
 
