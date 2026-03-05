@@ -29,6 +29,8 @@ from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 
+logger = logging.getLogger(__name__)
+
 app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
@@ -103,27 +105,6 @@ def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tupl
     logging.getLogger(__name__).info("Writing combined pipeline logs to %s", str(target))
     return fh, original_stdout, original_stderr
 
-
-def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
-    """
-    Estimate pages processed by counting unique (source_id, page_number) pairs.
-
-    Falls back to table row count if page-level fields are unavailable.
-    """
-    try:
-        db = _lancedb().connect(uri)
-        table = db.open_table(table_name)
-    except Exception:
-        return None
-
-    try:
-        df = table.to_pandas()[["source_id", "page_number"]]
-        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
-    except Exception:
-        try:
-            return int(table.count_rows())
-        except Exception:
-            return None
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -277,85 +258,6 @@ def _param_source_label(ctx: typer.Context, name: str) -> str:
     return s
 
 
-# def _print_heuristic_resources(
-#     *,
-#     ctx: typer.Context,
-#     ingestor: object,
-#     ray_cluster_address: Optional[str],
-#     input_type: str,
-#     page_elements_actors: Optional[int],
-#     ocr_actors: Optional[int],
-#     embed_actors: Optional[int],
-#     nemotron_parse_actors: float,
-#     nemotron_parse_gpus_per_actor: float,
-#     nemotron_parse_ray_batch_size: float,
-# ) -> None:
-#     """Pretty-print resolved resources, heuristic outputs, and source provenance."""
-#     details = resolve_resource_details(ray_cluster_address=ray_cluster_address)
-#     override_cpu_count = int(getattr(ingestor, "_num_cpus", details.cpu_count))
-#     override_gpu_count = int(getattr(ingestor, "_num_gpus", details.gpu_count))
-
-#     use_nemotron_parse_only = (
-#         float(nemotron_parse_actors) > 0.0
-#         and float(nemotron_parse_gpus_per_actor) > 0.0
-#         and float(nemotron_parse_ray_batch_size) > 0.0
-#     )
-#     if input_type in {"pdf", "doc"}:
-#         detect_stage_count = 1  # extract_tables/charts are enabled in this example.
-#         concurrent_gpu_stage_count = (
-#             (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
-#         )
-#     else:
-#         concurrent_gpu_stage_count = 1
-
-#     heuristic = resolve_batch_worker_plan(
-#         override_cpu_count=override_cpu_count,
-#         override_gpu_count=override_gpu_count,
-#         override_page_elements_actors=page_elements_actors,
-#         override_ocr_actors=ocr_actors,
-#         override_embed_actors=embed_actors,
-#         concurrent_gpu_stage_count=concurrent_gpu_stage_count,
-#     )
-
-#     print("\nHeuristic resource resolution:")
-#     print(f"  cpu_count: {override_cpu_count} (source={details.cpu_source})")
-#     print(f"  gpu_count: {override_gpu_count} (source={details.gpu_source})")
-#     print(f"  auto_detect_source: {details.auto_source}")
-#     print("  workers:")
-#     print(
-#         "    page_elements="
-#         f"{int(getattr(ingestor, '_page_elements_workers', heuristic.page_elements_workers))} "
-#         f"(source={'user' if page_elements_actors is not None else 'heuristic'})"
-#     )
-#     print(
-#         "    detect="
-#         f"{int(getattr(ingestor, '_detect_workers', heuristic.detect_workers))} "
-#         f"(source={'user' if ocr_actors is not None else 'heuristic'})"
-#     )
-#     print(
-#         "    embed="
-#         f"{int(getattr(ingestor, '_embed_workers', heuristic.embed_workers))} "
-#         f"(source={'user' if embed_actors is not None else 'heuristic'})"
-#     )
-
-#     print("  gpu_per_stage:")
-#     print(
-#         "    page_elements="
-#         f"{float(getattr(ingestor, '_gpu_page_elements', heuristic.page_elements_num_gpus)):.3f} "
-#         f"(source={_param_source_label(ctx, 'page_elements_gpus_per_actor')})"
-#     )
-#     print(
-#         "    ocr="
-#         f"{float(getattr(ingestor, '_gpu_ocr', heuristic.detect_num_gpus)):.3f} "
-#         f"(source={_param_source_label(ctx, 'ocr_gpus_per_actor')})"
-#     )
-#     print(
-#         "    embed="
-#         f"{float(getattr(ingestor, '_gpu_embed', heuristic.embed_num_gpus)):.3f} "
-#         f"(source={_param_source_label(ctx, 'embed_gpus_per_actor')})"
-#     )
-
-
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """
     Ensure the local LanceDB URI exists and table can be opened.
@@ -442,6 +344,11 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 @app.command()
 def main(
     ctx: typer.Context,
+    debug: bool = typer.Option(
+        False,
+        "--debug/--no-debug",
+        help="Enable debug-level logging for this full pipeline run.",
+    ),
     detection_summary_file: Optional[Path] = typer.Option(
         None,
         "--detection-summary-file",
@@ -455,17 +362,29 @@ def main(
         min=1,
         help="Actor count for embedding stage. Omit to use resource heuristic.",
     ),
-    embed_cpus_per_actor: float = typer.Option(
-        1.0,
+    embed_batch_size: Optional[int] = typer.Option(
+        None,
+        "--embed-batch-size",
+        min=1,
+        help="Ray Data batch size for embedding stage.",
+    ),
+    embed_cpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--embed-cpus-per-actor",
         min=0.1,
-        help="CPUs reserved per embedding actor.",
+        help="CPUs reserved per embedding actor. Omit to use resource heuristic.",
     ),
-    embed_gpus_per_actor: float = typer.Option(
-        0.5,
+    embed_gpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--embed-gpus-per-actor",
         min=0.0,
-        help="GPUs reserved per embedding actor.",
+        max=1.0,
+        help="GPUs reserved per embedding actor. Omit to use resource heuristic.",
+    ),
+    embed_granularity: str = typer.Option(
+        "element",
+        "--embed-granularity",
+        help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
     embed_invoke_url: Optional[str] = typer.Option(
         None,
@@ -482,12 +401,6 @@ def main(
         "--embed-modality",
         help="Default embedding modality for all element types: "
         "'text', 'image', or 'text_image' ('image_text' is also accepted).",
-    ),
-    embed_ray_batch_size: int = typer.Option(
-        256,
-        "--embed-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for embedding stage.",
     ),
     hybrid: bool = typer.Option(
         False,
@@ -518,7 +431,7 @@ def main(
         help="Optional file to collect all pipeline + Ray driver logs for this run.",
     ),
     # fmt: off
-    nemotron_parse_actors: float = typer.Option(
+    nemotron_parse_actors: Optional[int] = typer.Option(
         0.0,
         "--nemotron-parse-actors",
         min=0.0,
@@ -528,15 +441,16 @@ def main(
         ),  # noqa: E501
     ),
     # fmt: on
-    nemotron_parse_gpus_per_actor: float = typer.Option(
+    nemotron_parse_gpus_per_actor: Optional[float] = typer.Option(
         0.0,
         "--nemotron-parse-gpus-per-actor",
         min=0.0,
+        max=1.0,
         help="GPUs reserved per Nemotron Parse actor.",
     ),
-    nemotron_parse_ray_batch_size: float = typer.Option(
+    nemotron_parse_batch_size: Optional[int] = typer.Option(
         0.0,
-        "--nemotron-parse-ray-batch-size",
+        "--nemotron-parse-batch-size",
         min=0.0,
         help="Ray Data batch size for Nemotron Parse stage "
         "(enables parse-only mode when > 0.0 with parse workers/GPU).",
@@ -547,16 +461,23 @@ def main(
         min=1,
         help="Actor count for OCR stage. Omit to use resource heuristic.",
     ),
-    ocr_cpus_per_actor: float = typer.Option(
-        1.0,
+    ocr_batch_size: Optional[int] = typer.Option(
+        None,
+        "--ocr-batch-size",
+        min=1,
+        help="Batch size for OCR Ray stage and OCR inference batch size.",
+    ),
+    ocr_cpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--ocr-cpus-per-actor",
         min=0.1,
         help="CPUs reserved per OCR actor.",
     ),
-    ocr_gpus_per_actor: float = typer.Option(
-        0.1,
+    ocr_gpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--ocr-gpus-per-actor",
         min=0.0,
+        max=1.0,
         help="GPUs reserved per OCR actor.",
     ),
     ocr_invoke_url: Optional[str] = typer.Option(
@@ -564,34 +485,29 @@ def main(
         "--ocr-invoke-url",
         help="Optional remote endpoint URL for OCR model inference.",
     ),
-    ocr_model_batch_size: int = typer.Option(
-        64,
-        "--ocr-model-batch-size",
-        min=1,
-        help="Model inference chunk size for OCRActor only.",
-    ),
-    ocr_ray_batch_size: int = typer.Option(
-        64,
-        "--ocr-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for OCR stage.",
-    ),
     page_elements_actors: Optional[int] = typer.Option(
         None,
         "--page-elements-actors",
         min=1,
         help="Actor count for page-elements stage. Omit to use resource heuristic.",
     ),
-    page_elements_cpus_per_actor: float = typer.Option(
-        1.0,
+    page_elements_batch_size: Optional[int] = typer.Option(
+        None,
+        "--page-elements-batch-size",
+        min=1,
+        help="Page Elements batch size for both Ray stage and model inference batch size.",
+    ),
+    page_elements_cpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--page-elements-cpus-per-actor",
         min=0.1,
         help="CPUs reserved per page-elements actor.",
     ),
-    page_elements_gpus_per_actor: float = typer.Option(
-        0.1,
+    page_elements_gpus_per_actor: Optional[float] = typer.Option(
+        None,
         "--page-elements-gpus-per-actor",
         min=0.0,
+        max=1.0,
         help="GPUs reserved per page-elements actor.",
     ),
     page_elements_invoke_url: Optional[str] = typer.Option(
@@ -599,32 +515,20 @@ def main(
         "--page-elements-invoke-url",
         help="Optional remote endpoint URL for page-elements model inference.",
     ),
-    page_elements_model_batch_size: int = typer.Option(
-        64,
-        "--page-elements-model-batch-size",
-        min=1,
-        help="Model inference chunk size for PageElementDetectionActor only.",
-    ),
-    page_elements_ray_batch_size: int = typer.Option(
-        64,
-        "--page-elements-ray-batch-size",
-        min=1,
-        help="Ray Data batch size for page-elements stage.",
-    ),
-    pdf_extract_batch_size: int = typer.Option(
-        8,
+    pdf_extract_batch_size: Optional[int] = typer.Option(
+        None,
         "--pdf-extract-batch-size",
         min=1,
         help="Batch size for PDF extraction stage.",
     ),
-    pdf_extract_cpus_per_task: float = typer.Option(
-        2.0,
+    pdf_extract_cpus_per_task: Optional[float] = typer.Option(
+        None,
         "--pdf-extract-cpus-per-task",
-        min=0.1,
+        min=1.0,
         help="CPUs reserved per PDF extraction task.",
     ),
-    pdf_extract_tasks: int = typer.Option(
-        12,
+    pdf_extract_tasks: Optional[int] = typer.Option(
+        None,
         "--pdf-extract-tasks",
         min=1,
         help="Number of CPU tasks for PDF extraction stage.",
@@ -654,16 +558,6 @@ def main(
         "--ray-log-to-driver/--no-ray-log-to-driver",
         help="Forward Ray worker logs to the driver (recommended with --log-file).",
     ),
-    debug: bool = typer.Option(
-        False,
-        "--debug/--no-debug",
-        help="Enable debug-level logging for this full pipeline run.",
-    ),
-    embed_granularity: str = typer.Option(
-        "element",
-        "--embed-granularity",
-        help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
-    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -676,14 +570,6 @@ def main(
         None,
         "--runtime-metrics-prefix",
         help="Optional filename prefix for per-run metrics artifacts.",
-    ),
-    start_ray: bool = typer.Option(
-        False,
-        "--start-ray",
-        help=(
-            "Start a Ray head node (ray start --head) and connect to it. "
-            "Dashboard at http://127.0.0.1:8265. Ignores --ray-address."
-        ),
     ),
     structured_elements_modality: Optional[str] = typer.Option(
         None,
@@ -724,11 +610,6 @@ def main(
                 f"{float(embed_gpus_per_actor):.3f} to 0.0"
             )
             embed_gpus_per_actor = 0.0
-
-        # Resolve Ray: start a head node, connect to given address, or run in-process
-        if start_ray:
-            subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
-            ray_address = "auto"
 
         input_dir = Path(input_dir)
         if input_type == "txt":
@@ -814,7 +695,7 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
-                        inference_batch_size=int(page_elements_model_batch_size),
+                        inference_batch_size=int(page_elements_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -823,11 +704,11 @@ def main(
                             "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
-                            "page_elements_batch_size": int(page_elements_ray_batch_size),
+                            "page_elements_batch_size": int(page_elements_batch_size),
                             "page_elements_workers": page_elements_actors,
                             "detect_workers": ocr_actors,
-                            "detect_batch_size": int(ocr_ray_batch_size),
-                            "ocr_inference_batch_size": int(ocr_model_batch_size),
+                            "detect_batch_size": int(ocr_batch_size),
+                            "ocr_inference_batch_size": int(ocr_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
                             "gpu_page_elements": float(page_elements_gpus_per_actor),
@@ -835,7 +716,7 @@ def main(
                             "gpu_embed": float(embed_gpus_per_actor),
                             "nemotron_parse_workers": float(nemotron_parse_actors),
                             "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                            "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
+                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
                         },
                     )
                 )
@@ -848,7 +729,7 @@ def main(
                         structured_elements_modality=structured_elements_modality,
                         batch_tuning={
                             "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_ray_batch_size),
+                            "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
                     )
@@ -880,7 +761,7 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
-                        inference_batch_size=int(page_elements_model_batch_size),
+                        inference_batch_size=int(page_elements_batch_size),
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -889,11 +770,11 @@ def main(
                             "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                             "pdf_split_batch_size": int(pdf_split_batch_size),
                             "pdf_extract_batch_size": int(pdf_extract_batch_size),
-                            "page_elements_batch_size": int(page_elements_ray_batch_size),
+                            "page_elements_batch_size": int(page_elements_batch_size),
                             "page_elements_workers": page_elements_actors,
                             "detect_workers": ocr_actors,
-                            "detect_batch_size": int(ocr_ray_batch_size),
-                            "ocr_inference_batch_size": int(ocr_model_batch_size),
+                            "detect_batch_size": int(ocr_batch_size),
+                            "ocr_inference_batch_size": int(ocr_batch_size),
                             "page_elements_cpus_per_actor": float(page_elements_cpus_per_actor),
                             "ocr_cpus_per_actor": float(ocr_cpus_per_actor),
                             "gpu_page_elements": float(page_elements_gpus_per_actor),
@@ -901,39 +782,39 @@ def main(
                             "gpu_embed": float(embed_gpus_per_actor),
                             "nemotron_parse_workers": float(nemotron_parse_actors),
                             "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                            "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
+                            "nemotron_parse_batch_size": float(nemotron_parse_batch_size),
                         },
                     )
                 )
-                # .embed(
-                #     EmbedParams(
-                #         model_name=str(embed_model_name),
-                #         embed_invoke_url=embed_invoke_url,
-                #         embed_modality=embed_modality,
-                #         text_elements_modality=text_elements_modality,
-                #         structured_elements_modality=structured_elements_modality,
-                #         batch_tuning={
-                #             "embed_workers": embed_actors,
-                #             "embed_batch_size": int(embed_ray_batch_size),
-                #             "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                #         },
-                #     )
-                # )
-                # .vdb_upload(
-                #     VdbUploadParams(
-                #         lancedb={
-                #             "lancedb_uri": lancedb_uri,
-                #             "table_name": LANCEDB_TABLE,
-                #             "overwrite": True,
-                #             "create_index": True,
-                #             "hybrid": hybrid,
-                #         }
-                #     )
-                # )
+                .embed(
+                    EmbedParams(
+                        model_name=str(embed_model_name),
+                        embed_invoke_url=embed_invoke_url,
+                        embed_modality=embed_modality,
+                        text_elements_modality=text_elements_modality,
+                        structured_elements_modality=structured_elements_modality,
+                        batch_tuning={
+                            "embed_workers": embed_actors,
+                            "embed_batch_size": int(embed_batch_size),
+                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                        },
+                    )
+                )
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
 
 
-        print("Running extraction...")
+        logger.info("Running extraction...")
         total_time_start = time.perf_counter()
         ingest_start = time.perf_counter()
         ingest_results = ingestor.ingest(
@@ -943,144 +824,64 @@ def main(
             )
         ).get_dataset().materialize()
 
-        results_path = "/home/local/jdyer/results/ingest_results.parquet"
-        ingest_results.write_parquet(results_path)
-        print(f"Wrote ingest results to {results_path}")
-
-        #TODO: Remove this hardcoded num_pages once I come up with strategy I want to use
-        num_pages = 54730
-        print(f"ingest_results: {ingest_results}")
-        print(f"Type of ingest_results: {type(ingest_results)}")
-
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        # processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
-        # detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
-        
-        ingest_results_message = f"Processed pages: {num_pages} in {ingest_elapsed_s:.2f} seconds @ PPS: {num_pages / ingest_elapsed_s:.2f} / second"
-        print(ingest_results_message)
-
-        print("Starting embedding...")
-        embedding_start = time.perf_counter()
-        embedding_results_dataset = (ingestor.embed(
-            params=EmbedParams(
-                model_name=str(embed_model_name),
-                embed_invoke_url=embed_invoke_url,
-                embed_modality=embed_modality,
-            ),
-            input_dataset=ingest_results,
-        )).get_dataset().materialize()
-
-        embedding_elapsed_s = time.perf_counter() - embedding_start
-        embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
-        total_time_elapsed_s = time.perf_counter() - total_time_start
-        total_time_message = f"Total time: {total_time_elapsed_s:.2f} seconds @ PPS: {num_pages / total_time_elapsed_s:.2f} / second"
-        print(ingest_results_message)
-        print(embedding_results_message)
-        print(total_time_message)
-
-        pandas_df = ingestor.get_dataset().to_pandas(limit=100)
-        print(f"pandas_df: {pandas_df}")
-        print(f"Type of pandas_df: {type(pandas_df)}")
-
-        # _print_detection_summary(detection_summary)
-        # if detection_summary_file is not None:
-        #     _write_detection_summary(detection_summary_file, detection_summary)
-        #     print(f"Wrote detection summary JSON to {Path(detection_summary_file).expanduser().resolve()}")
+        logger.info(f"Ingestion complete in {ingest_elapsed_s:.2f} seconds")
 
         ray.shutdown()
 
-        # # ---------------------------------------------------------------------------
-        # # Recall calculation
-        # # ---------------------------------------------------------------------------
-        # query_csv = Path(query_csv)
-        # if not query_csv.exists():
-        #     print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
-        #     _print_heuristic_resources(
-        #         ctx=ctx,
-        #         ingestor=ingestor,
-        #         ray_cluster_address=ray_address,
-        #         input_type=input_type,
-        #         page_elements_actors=page_elements_actors,
-        #         ocr_actors=ocr_actors,
-        #         embed_actors=embed_actors,
-        #         nemotron_parse_actors=nemotron_parse_actors,
-        #         nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-        #         nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-        #     )
-        #     _print_pages_per_second(processed_pages, ingest_elapsed_s)
-        #     return
+        # ---------------------------------------------------------------------------
+        # Recall calculation
+        # ---------------------------------------------------------------------------
+        query_csv = Path(query_csv)
+        if not query_csv.exists():
+            logger.warning(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+            return
 
-        # db = _lancedb().connect(lancedb_uri)
-        # table = None
-        # open_err: Optional[Exception] = None
-        # for _ in range(3):
-        #     try:
-        #         table = db.open_table(LANCEDB_TABLE)
-        #         open_err = None
-        #         break
-        #     except Exception as e:
-        #         open_err = e
-        #         # Create table if missing, then retry open.
-        #         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
-        #         time.sleep(2)
-        # if table is None:
-        #     raise RuntimeError(
-        #         f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
-        #     ) from open_err
-        # try:
-        #     if int(table.count_rows()) == 0:
-        #         print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
-        #         _print_heuristic_resources(
-        #             ctx=ctx,
-        #             ingestor=ingestor,
-        #             ray_cluster_address=ray_address,
-        #             input_type=input_type,
-        #             page_elements_actors=page_elements_actors,
-        #             ocr_actors=ocr_actors,
-        #             embed_actors=embed_actors,
-        #             nemotron_parse_actors=nemotron_parse_actors,
-        #             nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-        #             nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-        #         )
-        #         _print_pages_per_second(processed_pages, ingest_elapsed_s)
-        #         return
-        # except Exception:
-        #     pass
+        db = _lancedb().connect(lancedb_uri)
+        table = None
+        open_err: Optional[Exception] = None
+        for _ in range(3):
+            try:
+                table = db.open_table(LANCEDB_TABLE)
+                open_err = None
+                break
+            except Exception as e:
+                open_err = e
+                # Create table if missing, then retry open.
+                _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+                time.sleep(2)
+        if table is None:
+            raise RuntimeError(
+                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
+            ) from open_err
+        try:
+            if int(table.count_rows()) == 0:
+                logger.warning(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+                return
+        except Exception:
+            pass
 
-        # # Resolve the HF model ID for recall query embedding so aliases
-        # # (e.g. "nemo_retriever_v1") map to the correct model.
-        # from nemo_retriever.model import resolve_embed_model
+        # Resolve the HF model ID for recall query embedding so aliases
+        # (e.g. "nemo_retriever_v1") map to the correct model.
+        from nemo_retriever.model import resolve_embed_model
 
-        # _recall_model = resolve_embed_model(str(embed_model_name))
+        _recall_model = resolve_embed_model(str(embed_model_name))
 
-        # cfg = RecallConfig(
-        #     lancedb_uri=str(lancedb_uri),
-        #     lancedb_table=str(LANCEDB_TABLE),
-        #     embedding_model=_recall_model,
-        #     embedding_http_endpoint=embed_invoke_url,
-        #     top_k=10,
-        #     ks=(1, 5, 10),
-        #     hybrid=hybrid,
-        # )
+        cfg = RecallConfig(
+            lancedb_uri=str(lancedb_uri),
+            lancedb_table=str(LANCEDB_TABLE),
+            embedding_model=_recall_model,
+            embedding_http_endpoint=embed_invoke_url,
+            top_k=10,
+            ks=(1, 5, 10),
+            hybrid=hybrid,
+        )
 
-        # _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
+        _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
 
-        # print("\nRecall metrics (matching nemo_retriever.recall.core):")
-        # for k, v in metrics.items():
-        #     print(f"  {k}: {v:.4f}")
-        # _print_heuristic_resources(
-        #     ctx=ctx,
-        #     ingestor=ingestor,
-        #     ray_cluster_address=ray_address,
-        #     input_type=input_type,
-        #     page_elements_actors=page_elements_actors,
-        #     ocr_actors=ocr_actors,
-        #     embed_actors=embed_actors,
-        #     nemotron_parse_actors=nemotron_parse_actors,
-        #     nemotron_parse_gpus_per_actor=nemotron_parse_gpus_per_actor,
-        #     nemotron_parse_ray_batch_size=nemotron_parse_ray_batch_size,
-        # )
-        # _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        logger.info("\nRecall metrics (matching nemo_retriever.recall.core):")
+        for k, v in metrics.items():
+            logger.info(f"  {k}: {v:.4f}")
     finally:
         # Restore real stdio before closing the mirror file so exception hooks
         # and late flushes never write to a closed stream wrapper.
