@@ -49,7 +49,7 @@ def _collect_gpu_metadata() -> tuple[int | None, str | None]:
             capture_output=True,
             text=True,
         )
-    except (OSError, ValueError):
+    except OSError:
         return None, None
 
     output_lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
@@ -69,14 +69,15 @@ def _collect_run_metadata() -> dict[str, Any]:
     except OSError:
         host = "unknown"
 
-    try:
-        python_version = sys.version.split()[0] or "unknown"
-    except Exception:
+    version_info = getattr(sys, "version_info", None)
+    if version_info is None:
         python_version = "unknown"
+    else:
+        python_version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
 
     try:
-        ray_version = metadata.version("ray") or "unknown"
-    except (metadata.PackageNotFoundError, OSError):
+        ray_version = metadata.version("ray")
+    except metadata.PackageNotFoundError:
         ray_version = "unknown"
 
     gpu_count, cuda_driver = _collect_gpu_metadata()

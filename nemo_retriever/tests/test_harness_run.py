@@ -162,14 +162,13 @@ def test_execute_runs_does_not_write_sweep_results_file(monkeypatch, tmp_path: P
 
 
 def test_collect_run_metadata_falls_back_without_gpu_or_ray(monkeypatch) -> None:
+    def _raise_package_not_found(_name: str) -> str:
+        raise harness_run.metadata.PackageNotFoundError()
+
     monkeypatch.setattr(harness_run.socket, "gethostname", lambda: "")
-    monkeypatch.setattr(
-        harness_run.metadata,
-        "version",
-        lambda _name: (_ for _ in ()).throw(harness_run.metadata.PackageNotFoundError()),
-    )
+    monkeypatch.setattr(harness_run.metadata, "version", _raise_package_not_found)
     monkeypatch.setattr(harness_run, "_collect_gpu_metadata", lambda: (None, None))
-    monkeypatch.setattr(harness_run.sys, "version", "")
+    monkeypatch.setattr(harness_run.sys, "version_info", None)
 
     assert harness_run._collect_run_metadata() == {
         "host": "unknown",
