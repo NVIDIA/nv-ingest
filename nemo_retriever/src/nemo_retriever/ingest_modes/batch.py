@@ -355,11 +355,11 @@ class BatchIngestor(Ingestor):
         self._available_gpu_count = self._cluster_resources.available_gpu_count()
         logger.info(self._cluster_resources)
 
-        # 2. Resolve requested resources
-        self._requested_resources = resolve_requested_plan(
+        # 2. Resolve requested plan for the Ray DAG that will be built
+        self._requested_plan = resolve_requested_plan(
             cluster_resources=self._cluster_resources
-        ) # Contains the requested resources
-        logger.info(self._requested_resources)
+        )
+        logger.info(self._requested_plan)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
