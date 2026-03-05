@@ -54,6 +54,16 @@ _HEAVY_INTERNAL = [
     "nemo_retriever.page_elements.page_elements",
     "nemo_retriever.ocr",
     "nemo_retriever.ocr.ocr",
+    # -- chart (nv_ingest_api → cv2) ----------------------------------------
+    "nemo_retriever.chart",
+    "nemo_retriever.chart.chart_detection",
+    "nemo_retriever.chart.commands",
+    "nemo_retriever.chart.processor",
+    "nemo_retriever.chart.config",
+    "nemo_retriever.chart.stage",
+    # -- table (nv_ingest_api → cv2) ----------------------------------------
+    "nemo_retriever.table",
+    "nemo_retriever.table.table_detection",
     # -- PDF (pypdfium2, nv_ingest_api via pdf/__init__ → __main__ → stage) --
     "nemo_retriever.pdf",
     "nemo_retriever.pdf.__main__",
