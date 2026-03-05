@@ -457,7 +457,7 @@ def main(
         help="Actor count for OCR stage. Omit to use resource heuristic.",
     ),
     ocr_batch_size: Optional[int] = typer.Option(
-        None,
+        0,
         "--ocr-batch-size",
         help="Batch size for OCR Ray stage and OCR inference batch size.",
     ),
