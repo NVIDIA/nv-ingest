@@ -30,6 +30,7 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.ray_resource_hueristics import (
+    resolve_available_resources,
     resolve_effective_resources,
 )
 from nemo_retriever.utils.ray_resource_hueristics import pretty_print_worker_heuristic_summary
@@ -335,35 +336,48 @@ class BatchIngestor(Ingestor):
         ctx.enable_rich_progress_bars = True
         ctx.use_ray_tqdm = False
 
-        # Query Ray cluster resources when available, otherwise local resources.
-        system_resources = resolve_effective_resources()
-        self._num_gpus = int(system_resources.gpu_count)
-        self._num_cpus = int(system_resources.cpu_count)
-        base_heuristic = resolve_batch_worker_plan(
-            override_cpu_count=self._num_cpus,
-            override_gpu_count=self._num_gpus,
-        )
-        self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
 
-        # Gather information about the Ray cluster.
-        ray_nodes = [node for node in ray.nodes() if bool(node.get("Alive", False))]
-        node_ips = [node["NodeManagerAddress"] for node in ray_nodes if node.get("NodeManagerAddress")]
+        # Ok here is what we need to know for scheduling the actors:
+        # 1. Gather either the local system resources or the Ray cluster resources (generalized with nothing to do about counts just raw system resources)
+        # 1a. -> available_resources = available_resources(ray) -> ClusterResources(BaseModel) Batch mode is always a Ray cluster whether local or remote
+        # 2. Resolve the requested resources. Those are either provided by the user OR inferred from the ray resource hueristics defaults
+        # 2a. -> requested_resources = resolve_requested_resources() -> RequestedResources(BaseModel)
+        # 3. Compute final values that will be scheduled based on available_resources and requested_resources
+        # 3a. -> final_resources = compute_final_resources(available_resources, requested_resources) -> FinalResources(BaseModel)
 
-        if self._debug:
-            _debug_log(
-                logger=self._logger,
-                location="ingest_modes/batch.py:BatchIngestor.__init__",
-                message="Ray nodes",
-                data={"nodes": ray_nodes},
-            )
+        # 1. Gather available resources
+        available_resources = resolve_available_resources(ray)
+        print(available_resources)
 
-        if self._debug:
-            _debug_log(
-                logger=self._logger,
-                location="ingest_modes/batch.py:BatchIngestor.__init__",
-                message="Ray node IPs",
-                data={"node_ips": node_ips},
-            )
+        # # Query Ray cluster resources when available, otherwise local resources.
+        # system_resources = resolve_effective_resources()
+        # self._num_gpus = int(system_resources.gpu_count)
+        # self._num_cpus = int(system_resources.cpu_count)
+        # base_heuristic = resolve_batch_worker_plan(
+        #     override_cpu_count=self._num_cpus,
+        #     override_gpu_count=self._num_gpus,
+        # )
+        # self._cpu_only_stage_num_gpus = float(base_heuristic.cpu_only_stage_num_gpus)
+
+        # # Gather information about the Ray cluster.
+        # ray_nodes = [node for node in ray.nodes() if bool(node.get("Alive", False))]
+        # node_ips = [node["NodeManagerAddress"] for node in ray_nodes if node.get("NodeManagerAddress")]
+
+        # if self._debug:
+        #     _debug_log(
+        #         logger=self._logger,
+        #         location="ingest_modes/batch.py:BatchIngestor.__init__",
+        #         message="Ray nodes",
+        #         data={"nodes": ray_nodes},
+        #     )
+
+        # if self._debug:
+        #     _debug_log(
+        #         logger=self._logger,
+        #         location="ingest_modes/batch.py:BatchIngestor.__init__",
+        #         message="Ray node IPs",
+        #         data={"node_ips": node_ips},
+        #     )
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
