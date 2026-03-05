@@ -481,13 +481,11 @@ def main(
     page_elements_actors: Optional[int] = typer.Option(
         0,
         "--page-elements-actors",
-        min=1,
         help="Actor count for page-elements stage. Omit to use resource heuristic.",
     ),
     page_elements_batch_size: Optional[int] = typer.Option(
         0,
         "--page-elements-batch-size",
-        min=1,
         help="Page Elements batch size for both Ray stage and model inference batch size.",
     ),
     page_elements_cpus_per_actor: Optional[float] = typer.Option(
