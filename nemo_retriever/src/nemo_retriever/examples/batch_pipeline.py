@@ -585,13 +585,13 @@ def main(
         help="Optional remote endpoint URL for OCR model inference.",
     ),
     ocr_model_batch_size: int = typer.Option(
-        32,
+        64,
         "--ocr-model-batch-size",
         min=1,
         help="Model inference chunk size for OCRActor only.",
     ),
     ocr_ray_batch_size: int = typer.Option(
-        32,
+        64,
         "--ocr-ray-batch-size",
         min=1,
         help="Ray Data batch size for OCR stage.",
