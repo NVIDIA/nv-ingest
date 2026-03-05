@@ -33,7 +33,6 @@ from nemo_retriever.utils.ray_resource_hueristics import (
     resolve_cluster_resources,
 )
 from nemo_retriever.utils.ray_resource_hueristics import pretty_print_worker_heuristic_summary
-from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
