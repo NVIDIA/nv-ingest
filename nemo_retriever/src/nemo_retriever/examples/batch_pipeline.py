@@ -470,7 +470,7 @@ def main(
         help="CPUs reserved per embedding actor.",
     ),
     embed_gpus_per_actor: float = typer.Option(
-        0.25,
+        0.5,
         "--embed-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per embedding actor.",
