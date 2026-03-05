@@ -108,3 +108,63 @@ def test_load_runs_config_parses_runs_list(tmp_path: Path) -> None:
     assert len(runs) == 2
     assert runs[0]["name"] == "r1"
     assert runs[0]["overrides"]["gpu_embed"] == 0.25
+
+
+def test_load_harness_config_supports_recall_adapter_and_match_mode(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf,page\nq,doc,0\n", encoding="utf-8")
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                "  dataset: tiny",
+                "  preset: base",
+                "presets:",
+                "  base: {}",
+                "datasets:",
+                "  tiny:",
+                f"    path: {dataset_dir}",
+                f"    query_csv: {query_csv}",
+                "    recall_required: true",
+                "    recall_adapter: page_plus_one",
+                "    recall_match_mode: pdf_page",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_harness_config(config_file=str(cfg_path))
+    assert cfg.recall_adapter == "page_plus_one"
+    assert cfg.recall_match_mode == "pdf_page"
+
+
+def test_load_harness_config_rejects_invalid_recall_adapter(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf_page\nq,doc_1\n", encoding="utf-8")
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                "  dataset: tiny",
+                "  preset: base",
+                "presets:",
+                "  base: {}",
+                "datasets:",
+                "  tiny:",
+                f"    path: {dataset_dir}",
+                f"    query_csv: {query_csv}",
+                "    recall_required: true",
+                "    recall_adapter: unknown_adapter",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="recall_adapter must be one of"):
+        load_harness_config(config_file=str(cfg_path))

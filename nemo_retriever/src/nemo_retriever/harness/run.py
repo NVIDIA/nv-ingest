@@ -34,6 +34,7 @@ from nemo_retriever.harness.config import (
     load_runs_config,
 )
 from nemo_retriever.harness.parsers import StreamMetrics
+from nemo_retriever.harness.recall_adapters import prepare_recall_query_file
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -48,7 +49,7 @@ def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     return str(p)
 
 
-def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path]:
+def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path]:
     runtime_dir = artifact_dir / "runtime_metrics"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     if cfg.write_detection_file:
@@ -56,7 +57,11 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
     else:
         # Keep detection summary out of top-level artifacts unless explicitly requested.
         detection_summary_file = runtime_dir / ".detection_summary.json"
-    query_csv = Path(cfg.query_csv) if cfg.query_csv else (artifact_dir / "__query_csv_missing__.csv")
+    query_csv = prepare_recall_query_file(
+        query_csv=Path(cfg.query_csv) if cfg.query_csv else None,
+        recall_adapter=cfg.recall_adapter,
+        output_dir=runtime_dir,
+    )
 
     cmd = [
         sys.executable,
@@ -67,6 +72,8 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         cfg.input_type,
         "--query-csv",
         str(query_csv),
+        "--recall-match-mode",
+        cfg.recall_match_mode,
         "--no-recall-details",
         "--pdf-extract-workers",
         str(cfg.pdf_extract_workers),
@@ -117,7 +124,7 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
     if cfg.hybrid:
         cmd += ["--hybrid"]
 
-    return cmd, runtime_dir, detection_summary_file
+    return cmd, runtime_dir, detection_summary_file, query_csv
 
 
 def _evaluate_run_outcome(
@@ -206,7 +213,7 @@ def _run_subprocess_with_tty(cmd: list[str], metrics: StreamMetrics) -> int:
 
 
 def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str, Any]:
-    cmd, runtime_dir, detection_summary_file = _build_command(cfg, artifact_dir, run_id)
+    cmd, runtime_dir, detection_summary_file, effective_query_csv = _build_command(cfg, artifact_dir, run_id)
     command_text = " ".join(shlex.quote(token) for token in cmd)
     (artifact_dir / "command.txt").write_text(command_text + "\n", encoding="utf-8")
 
@@ -243,8 +250,11 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
             "dataset_dir": cfg.dataset_dir,
             "preset": cfg.preset,
             "query_csv": cfg.query_csv,
+            "effective_query_csv": str(effective_query_csv),
             "input_type": cfg.input_type,
             "recall_required": cfg.recall_required,
+            "recall_match_mode": cfg.recall_match_mode,
+            "recall_adapter": cfg.recall_adapter,
             "ray_address": cfg.ray_address,
             "hybrid": cfg.hybrid,
             "embed_model_name": cfg.embed_model_name,
