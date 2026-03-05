@@ -736,26 +736,8 @@ class BatchIngestor(Ingestor):
             **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
 
-        def _endpoint_count(raw: Any) -> int:
-            s = str(raw or "").strip()
-            if not s:
-                return 0
-            return len([p for p in s.split(",") if p.strip()])
-
         if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
             kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
-
-        endpoint_count = _endpoint_count(kwargs.get("embedding_endpoint"))
-        if endpoint_count > 0 and int(embed_workers) != int(endpoint_count):
-            logging.warning(
-                "embed endpoint list has %d endpoint(s); overriding embed_workers from %d to %d",
-                endpoint_count,
-                int(embed_workers),
-                int(endpoint_count),
-            )
-            embed_workers = int(endpoint_count)
-        elif embed_workers < 1:
-            raise RuntimeError("embed.actor resolved to 0 actors. Increase embed_workers before running embedding.")
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
