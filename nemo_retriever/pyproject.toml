@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel>=0.46.2"]
+requires = ["setuptools>=78.1.1", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -36,7 +36,7 @@ dependencies = [
   "fastapi>=0.114.0",
   "uvicorn[standard]>=0.30.0",
   "httpx>=0.27.0",
-  "requests>=2.31.0",
+  "requests>=2.32.5",
   "pydantic>=2.8.0",
   "typer>=0.12.0",
   "rich>=13.7.0",
