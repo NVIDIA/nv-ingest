@@ -10,7 +10,6 @@ Run with: uv run python -m nemo_retriever.examples.batch_pipeline <input-dir>
 import json
 import logging
 import os
-import subprocess
 import sys
 import time
 from collections import defaultdict
@@ -104,7 +103,6 @@ def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tupl
     )
     logging.getLogger(__name__).info("Writing combined pipeline logs to %s", str(target))
     return fh, original_stdout, original_stderr
-
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -316,14 +314,6 @@ def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
     return doc, page
 
 
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int) -> bool:
-    doc, page = _gold_to_doc_page(golden_key)
-    specific_page = f"{doc}_{page}"
-    entire_document = f"{doc}_-1"
-    top = (retrieved_keys or [])[: int(k)]
-    return (specific_page in top) or (entire_document in top)
-
-
 def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     try:
         res = json.loads(hit.get("metadata", "{}"))
@@ -349,12 +339,30 @@ def main(
         "--debug/--no-debug",
         help="Enable debug-level logging for this full pipeline run.",
     ),
+    input_path: Path = typer.Argument(
+        ...,
+        help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        path_type=Path,
+    ),
     detection_summary_file: Optional[Path] = typer.Option(
         None,
         "--detection-summary-file",
         path_type=Path,
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
+    ),
+    recall_match_mode: str = typer.Option(
+        "pdf_page",
+        "--recall-match-mode",
+        help="Recall match mode: 'pdf_page' or 'pdf_only'.",
+    ),
+    no_recall_details: bool = typer.Option(
+        False,
+        "--no-recall-details",
+        help=(
+            "Do not print per-query retrieval details (query, gold, hits). "
+            "Only the missed-gold summary and recall metrics are printed."
+        ),
     ),
     embed_actors: Optional[int] = typer.Option(
         0,
@@ -568,9 +576,34 @@ def main(
         "--text-elements-modality",
         help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
     ),
+    use_table_structure: bool = typer.Option(
+        False,
+        "--use-table-structure",
+        help="Enable the combined table-structure + OCR stage for tables (requires extract_tables).",
+    ),
+    table_output_format: Optional[str] = typer.Option(
+        None,
+        "--table-output-format",
+        help=(
+            "Table output format: 'pseudo_markdown' (OCR-only) or 'markdown' "
+            "(table-structure + OCR). Defaults to 'markdown' when table-structure "
+            "is enabled, 'pseudo_markdown' otherwise."
+        ),
+    ),
+    table_structure_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--table-structure-invoke-url",
+        help=(
+            "Optional remote endpoint URL for table-structure model inference "
+            "(used when --table-output-format=markdown)."
+        ),
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
+        if recall_match_mode not in {"pdf_page", "pdf_only"}:
+            raise ValueError(f"Unsupported --recall-match-mode: {recall_match_mode}")
+
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
@@ -598,17 +631,30 @@ def main(
             )
             embed_gpus_per_actor = 0.0
 
-        input_dir = Path(input_dir)
+        input_path = Path(input_path)
+        if input_path.is_file():
+            file_patterns = [str(input_path)]
+        elif input_path.is_dir():
+            ext_map = {
+                "txt": ["*.txt"],
+                "html": ["*.html"],
+                "doc": ["*.docx", "*.pptx"],
+            }
+            exts = ext_map.get(input_type, ["*.pdf"])
+            file_patterns = [str(input_path / e) for e in exts]
+        else:
+            raise typer.BadParameter(f"Path does not exist: {input_path}")
+
+        ingestor = create_ingestor(
+            run_mode="batch",
+            params=IngestorCreateParams(
+                ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
+            ),
+        )
+
         if input_type == "txt":
-            glob_pattern = str(input_dir / "*.txt")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(
-                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
-                ),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -633,15 +679,8 @@ def main(
                 )
             )
         elif input_type == "html":
-            glob_pattern = str(input_dir / "*.html")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(
-                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
-                ),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -666,16 +705,8 @@ def main(
                 )
             )
         elif input_type == "doc":
-            # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
-            doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(
-                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
-                ),
-            )
             ingestor = (
-                ingestor.files(doc_globs)
+                ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
                         extract_text=True,
@@ -683,6 +714,9 @@ def main(
                         extract_charts=True,
                         extract_infographics=False,
                         inference_batch_size=int(page_elements_batch_size),
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -734,21 +768,18 @@ def main(
                 )
             )
         else:
-            pdf_glob = str(input_dir / "*.pdf")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(
-                    ray_address=ray_address, ray_log_to_driver=ray_log_to_driver, debug=bool(debug)
-                ),
-            )
             ingestor = (
-                ingestor.files(pdf_glob).extract(
+                ingestor.files(file_patterns)
+                .extract(
                     ExtractParams(
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
                         inference_batch_size=page_elements_batch_size,
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -800,16 +831,18 @@ def main(
                 )
             )
 
-
         logger.info("Running extraction...")
-        total_time_start = time.perf_counter()
         ingest_start = time.perf_counter()
-        ingest_results = ingestor.ingest(
-            params=IngestExecuteParams(
-                runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
-                runtime_metrics_prefix=runtime_metrics_prefix,
+        (
+            ingestor.ingest(
+                params=IngestExecuteParams(
+                    runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
+                    runtime_metrics_prefix=runtime_metrics_prefix,
+                )
             )
-        ).get_dataset().materialize()
+            .get_dataset()
+            .materialize()
+        )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         logger.info(f"Ingestion complete in {ingest_elapsed_s:.2f} seconds")
@@ -862,6 +895,7 @@ def main(
             top_k=10,
             ks=(1, 5, 10),
             hybrid=hybrid,
+            match_mode=recall_match_mode,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)

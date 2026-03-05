@@ -15,8 +15,6 @@ import glob
 import json
 import logging
 import os
-import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import timedelta
 from functools import partial
@@ -28,6 +26,7 @@ import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
+from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.ray_resource_hueristics import (
@@ -324,32 +323,36 @@ class BatchIngestor(Ingestor):
             logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize Ray for distributed execution.
-        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver),
-        runtime_env={
-            "env_vars": {
-                "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
-                "LOG_LEVEL": "INFO"
-            }
-        })
+        ray.init(
+            address=ray_address or "local",
+            ignore_reinit_error=True,
+            log_to_driver=bool(ray_log_to_driver),
+            runtime_env={
+                "env_vars": {
+                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
+                    "LOG_LEVEL": "INFO",
+                }
+            },
+        )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
         ctx = rd.DataContext.get_current()
         ctx.enable_rich_progress_bars = True
         ctx.use_ray_tqdm = False
 
-
-        # Ok here is what we need to know for scheduling the actors:
-        # 1. Gather either the local system resources or the Ray cluster resources (generalized with nothing to do about counts just raw system resources)
-        # 1a. -> available_resources = available_resources(ray) -> ClusterResources(BaseModel) Batch mode is always a Ray cluster whether local or remote
-        # 2. Resolve the requested resources. Those are either provided by the user OR inferred from the ray resource hueristics defaults
+        # Scheduling flow:
+        # 1. Gather local/cluster resources (batch mode always runs on Ray).
+        # 1a. available_resources(ray) -> ClusterResources(BaseModel).
+        # 2. Resolve requested resources from user overrides or heuristics defaults.
         # 2a. -> requested_resources = resolve_requested_resources() -> RequestedResources(BaseModel)
-        # 3. Compute final values that will be scheduled based on available_resources and requested_resources
-        # 3a. -> final_resources = compute_final_resources(available_resources, requested_resources) -> FinalResources(BaseModel)
-        # 4. Examine the finer details of the GPUs available. Ray does not expose this to use so we must trigger a remote call on each node
-        # 4a. -> Determine the batch_size that should be used for each model based on the GPU vram available
+        # 3. Compute final values from available + requested resources.
+        # 3a. -> final_resources = compute_final_resources(
+        #         available_resources, requested_resources
+        #       ) -> FinalResources(BaseModel)
+        # 4. Probe per-node GPU details (e.g. memory) via remote calls when needed.
 
         # 1. Gather available resources
-        self._cluster_resources = gather_cluster_resources(ray) # Contains both total and available resources
+        self._cluster_resources = gather_cluster_resources(ray)  # Contains both total and available resources
         self._total_cpu_count = self._cluster_resources.total_cpu_count()
         self._total_gpu_count = self._cluster_resources.total_gpu_count()
         self._available_cpu_count = self._cluster_resources.available_cpu_count()
@@ -357,9 +360,7 @@ class BatchIngestor(Ingestor):
         logger.info(self._cluster_resources)
 
         # 2. Resolve requested plan for the Ray DAG that will be built
-        self._requested_plan = resolve_requested_plan(
-            cluster_resources=self._cluster_resources
-        )
+        self._requested_plan = resolve_requested_plan(cluster_resources=self._cluster_resources)
         logger.info(self._requested_plan)
 
         # Builder-style task configuration recorded for later execution.
@@ -488,9 +489,8 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
         )
 
-
-        # PDF SPLIT - Splits each PDF document into individual pages. 
-        # To help amortize downstream processing if PDFs have vastly different numbers of pages. 
+        # PDF SPLIT - Splits each PDF document into individual pages.
+        # To help amortize downstream processing if PDFs have vastly different numbers of pages.
         # This is a CPU-only stage. This "Actor" is technically scheduled as a Task
         self._rd_dataset = self._rd_dataset.map_batches(
             PDFSplitActor(
@@ -504,7 +504,6 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
         )
 
-
         # PDF EXTRACTION - Extracts text, tables, charts, infographics, etc. from the PDF pages.
         # This is a CPU-only stage and is the main CPU bottleneck of the entire DAG
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -515,14 +514,15 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
 
-
         # In further stages we don't prefer individual rows as batching is more performant.
         # Here we set the target number of rows per block to either
         # nemotron-parse batch size or the page-elements batch size, depending on which is used.
         if self._use_nemotron_parse_only:
-            
+
             # Set the target number of rows per block to the nemotron-parse batch size
-            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=self._requested_plan.get_nemotron_parse_batch_size())
+            self._rd_dataset = self._rd_dataset.repartition(
+                target_num_rows_per_block=self._requested_plan.get_nemotron_parse_batch_size()
+            )
 
             parse_flags: dict[str, Any] = {}
             if kwargs.get("extract_tables") is True:
@@ -550,12 +550,18 @@ class BatchIngestor(Ingestor):
                 batch_size=self._requested_plan.get_nemotron_parse_batch_size(),
                 batch_format="pandas",
                 num_gpus=self._requested_plan.get_nemotron_parse_gpus_per_actor(),
-                compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_nemotron_parse_initial_actors(), min_size=self._requested_plan.get_nemotron_parse_min_actors(), max_size=self._requested_plan.get_nemotron_parse_max_actors()),
+                compute=rd.ActorPoolStrategy(
+                    initial_size=self._requested_plan.get_nemotron_parse_initial_actors(),
+                    min_size=self._requested_plan.get_nemotron_parse_min_actors(),
+                    max_size=self._requested_plan.get_nemotron_parse_max_actors(),
+                ),
                 fn_constructor_kwargs=parse_flags,
             )
         else:
             # Set the target number of rows per block to the page-elements batch size
-            self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=self._requested_plan.get_page_elements_batch_size())
+            self._rd_dataset = self._rd_dataset.repartition(
+                target_num_rows_per_block=self._requested_plan.get_page_elements_batch_size()
+            )
 
             # Page-element detection with a GPU actor pool.
             self._rd_dataset = self._rd_dataset.map_batches(
@@ -563,13 +569,63 @@ class BatchIngestor(Ingestor):
                 batch_size=self._requested_plan.get_page_elements_batch_size(),
                 batch_format="pandas",
                 num_gpus=self._requested_plan.get_page_elements_gpus_per_actor(),
-                compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_page_elements_initial_actors(), min_size=self._requested_plan.get_page_elements_min_actors(), max_size=self._requested_plan.get_page_elements_max_actors()),
+                compute=rd.ActorPoolStrategy(
+                    initial_size=self._requested_plan.get_page_elements_initial_actors(),
+                    min_size=self._requested_plan.get_page_elements_min_actors(),
+                    max_size=self._requested_plan.get_page_elements_max_actors(),
+                ),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
+            use_table_structure = bool(kwargs.get("use_table_structure", False))
+            from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
+
+            validate_table_structure_flags(
+                use_table_structure, str(kwargs.get("table_output_format", "pseudo_markdown"))
+            )
+
+            # When use_table_structure is True, tables go through
+            # the combined table-structure + OCR stage instead of OCR-only.
+            if use_table_structure and kwargs.get("extract_tables") is True:
+                ts_ocr_flags: dict[str, Any] = {}
+                for k in (
+                    "api_key",
+                    "request_timeout_s",
+                    "remote_max_pool_workers",
+                    "remote_max_retries",
+                    "remote_max_429_retries",
+                ):
+                    if k in kwargs:
+                        ts_ocr_flags[k] = kwargs[k]
+                ts_invoke_url = kwargs.get("table_structure_invoke_url")
+                if ts_invoke_url:
+                    ts_ocr_flags["table_structure_invoke_url"] = ts_invoke_url
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+                if ocr_invoke_url:
+                    ts_ocr_flags["ocr_invoke_url"] = ocr_invoke_url
+                if "ocr_request_timeout_s" in kwargs:
+                    ts_ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+                if "ocr_api_key" in kwargs:
+                    ts_ocr_flags["api_key"] = kwargs["ocr_api_key"]
+
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    TableStructureActor,
+                    batch_size=self._requested_plan.get_ocr_batch_size(),
+                    batch_format="pandas",
+                    num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_ocr_initial_actors(),
+                        min_size=self._requested_plan.get_ocr_min_actors(),
+                        max_size=self._requested_plan.get_ocr_max_actors(),
+                    ),
+                    fn_constructor_kwargs=ts_ocr_flags,
+                )
+
             # OCR-based extraction for tables/charts/infographics (single stage).
+            # When use_table_structure is True, tables are handled above;
+            # charts/infographics still go through OCR.
             ocr_flags = {}
-            if kwargs.get("extract_tables") is True:
+            if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True
@@ -600,7 +656,11 @@ class BatchIngestor(Ingestor):
                     batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
                     num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
-                    compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_ocr_initial_actors(), min_size=self._requested_plan.get_ocr_min_actors(), max_size=self._requested_plan.get_ocr_max_actors()),
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_ocr_initial_actors(),
+                        min_size=self._requested_plan.get_ocr_min_actors(),
+                        max_size=self._requested_plan.get_ocr_max_actors(),
+                    ),
                     fn_constructor_kwargs=ocr_flags,
                 )
 
@@ -745,7 +805,9 @@ class BatchIngestor(Ingestor):
         self._tasks.append(("embed", dict(kwargs)))
 
         # We want to create Ray batches that are of the same size as the embed_batch_size.
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=self._requested_plan.get_embed_batch_size())
+        self._rd_dataset = self._rd_dataset.repartition(
+            target_num_rows_per_block=self._requested_plan.get_embed_batch_size()
+        )
 
         if embed_granularity == "page":
             _row_fn = partial(
@@ -771,7 +833,7 @@ class BatchIngestor(Ingestor):
         # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
-            embed_actor_num_gpus = 0 # We do not need GPU resources if invoking a remote NIM endpoint
+            embed_actor_num_gpus = 0  # We do not need GPU resources if invoking a remote NIM endpoint
         else:
             embed_actor_num_gpus = self._requested_plan.get_embed_gpus_per_actor()
 
@@ -779,8 +841,12 @@ class BatchIngestor(Ingestor):
             _BatchEmbedActor,
             batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
-            num_gpus=embed_actor_num_gpus, # pulled from if statement above
-            compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_embed_initial_actors(), min_size=self._requested_plan.get_embed_min_actors(), max_size=self._requested_plan.get_embed_max_actors()),
+            num_gpus=embed_actor_num_gpus,  # pulled from if statement above
+            compute=rd.ActorPoolStrategy(
+                initial_size=self._requested_plan.get_embed_initial_actors(),
+                min_size=self._requested_plan.get_embed_min_actors(),
+                max_size=self._requested_plan.get_embed_max_actors(),
+            ),
             fn_constructor_kwargs={"params": resolved},
         )
 

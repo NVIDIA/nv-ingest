@@ -6,6 +6,8 @@ active:
   query_csv: data/jp20_query_gt.csv
   input_type: pdf
   recall_required: true
+  recall_match_mode: pdf_page
+  recall_adapter: none
   artifacts_dir: null
   ray_address: null
   lancedb_uri: lancedb
@@ -68,3 +70,33 @@ datasets:
     query_csv: data/jp20_query_gt.csv
     input_type: pdf
     recall_required: true
+    recall_match_mode: pdf_page
+    recall_adapter: none
+
+  earnings:
+    path: /datasets/nv-ingest/earnings_consulting
+    query_csv: data/earnings_consulting_multimodal.csv
+    input_type: pdf
+    recall_required: true
+    recall_match_mode: pdf_page
+    recall_adapter: page_plus_one
+
+  # Wiring for bo10k-style CSVs with zero-based page numbers.
+  # Keep recall optional by default until a local query CSV path is configured.
+  bo10k:
+    path: /datasets/nv-ingest/bo10k
+    query_csv: null
+    input_type: pdf
+    recall_required: false
+    recall_match_mode: pdf_page
+    recall_adapter: page_plus_one
+
+  # FinanceBench is document-level recall. Provide a JSON ground-truth file path
+  # via query_csv when enabling recall for this dataset.
+  financebench:
+    path: /datasets/nv-ingest/financebench
+    query_csv: null
+    input_type: pdf
+    recall_required: false
+    recall_match_mode: pdf_only
+    recall_adapter: financebench_json
