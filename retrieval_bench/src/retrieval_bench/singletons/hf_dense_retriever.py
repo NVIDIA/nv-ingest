@@ -36,18 +36,9 @@ try:
 except ImportError as e:  # pragma: no cover
     raise ImportError("Required dependencies not installed for HF dense retriever. Install: torch") from e
 
-
-def _hash_corpus_ids10(corpus_ids: Sequence[str]) -> str:
-    h = hashlib.sha256()
-    for cid in corpus_ids:
-        h.update(str(cid).encode("utf-8"))
-        h.update(b"\n")
-    return h.hexdigest()[:10]
-
-
-def _slugify(value: str) -> str:
-    v = (value or "").strip().replace("/", "__")
-    return v or "unnamed"
+from retrieval_bench.singletons._shared import hash_corpus_ids10 as _hash_corpus_ids10
+from retrieval_bench.singletons._shared import slugify as _slugify
+from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
 
 
 def _last_token_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
@@ -346,29 +337,6 @@ class _HfDenseState:
         )
         return emb
 
-    def _try_preload_corpus_to_gpu(self, corpus_embeddings_cpu: torch.Tensor) -> Optional[torch.Tensor]:
-        try:
-            return corpus_embeddings_cpu.to(self.device, non_blocking=True)
-        except Exception as e:
-            oom_types = tuple(
-                t
-                for t in (
-                    getattr(torch, "OutOfMemoryError", None),
-                    getattr(getattr(torch, "cuda", None), "OutOfMemoryError", None),
-                )
-                if isinstance(t, type)
-            )
-            is_oom = False
-            if oom_types and isinstance(e, oom_types):
-                is_oom = True
-            elif isinstance(e, RuntimeError) and "out of memory" in str(e).lower():
-                is_oom = True
-            if not is_oom:
-                raise
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            return None
-
     def embed_query(self, query_text: str) -> torch.Tensor:
         if isinstance(self.query_prefix, str) and self.query_prefix:
             q = str(self.query_prefix) + str(query_text)
@@ -532,8 +500,8 @@ class HfDenseSingletonRetriever:
             ):
                 # Already initialized for the same corpus; only (possibly) update GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(
-                        self._state.corpus_embeddings_cpu
+                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
+                        self._state.corpus_embeddings_cpu, self._state.device
                     )
                 if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
@@ -553,7 +521,7 @@ class HfDenseSingletonRetriever:
 
             self._state.corpus_embeddings_gpu = None
             if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(emb_cpu)
+                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu, self._state.device)
 
     def retrieve(
         self, query: str, *, return_markdown: bool = False, excluded_ids: Optional[Sequence[str]] = None

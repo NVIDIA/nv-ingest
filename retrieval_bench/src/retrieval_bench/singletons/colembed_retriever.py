@@ -31,6 +31,8 @@ except ImportError as e:  # pragma: no cover
         "Please install at least: torch (and for actual retrieval: transformers, optionally flash-attn)."
     ) from e
 
+from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
+
 
 class _ColEmbedState:
     def __init__(
@@ -154,35 +156,6 @@ class _ColEmbedState:
         torch.save(emb, tmp_path)
         os.replace(tmp_path, cache_path)
         return emb
-
-    def _try_preload_corpus_to_gpu(self, corpus_embeddings_cpu: torch.Tensor) -> Optional[torch.Tensor]:
-        try:
-            return corpus_embeddings_cpu.to(self.device, non_blocking=True)
-        except Exception as e:
-            # PyTorch OOM exception types differ across versions. Prefer catching the
-            # specific OOM type when available, but fall back to RuntimeError message
-            # matching (common for "CUDA out of memory" failures).
-            oom_types = tuple(
-                t
-                for t in (
-                    getattr(torch, "OutOfMemoryError", None),
-                    getattr(getattr(torch, "cuda", None), "OutOfMemoryError", None),
-                )
-                if isinstance(t, type)
-            )
-
-            is_oom = False
-            if oom_types and isinstance(e, oom_types):
-                is_oom = True
-            elif isinstance(e, RuntimeError) and "out of memory" in str(e).lower():
-                is_oom = True
-
-            if not is_oom:
-                raise
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            return None
 
     def _embed_query(self, query: str) -> torch.Tensor:
         # Returns CPU tensor [seq_len, embed_dim]
@@ -321,7 +294,9 @@ class ColEmbedSingletonRetriever:
             # Optional preload to GPU for faster repeated retrieval.
             self._state.corpus_embeddings_gpu = None
             if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(corpus_embeddings_cpu)
+                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
+                    corpus_embeddings_cpu, self._state.device
+                )
 
     def retrieve(
         self, query: str, *, return_markdown: bool = False

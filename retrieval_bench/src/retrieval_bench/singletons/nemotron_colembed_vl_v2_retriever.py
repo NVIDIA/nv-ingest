@@ -36,6 +36,8 @@ except ImportError as e:  # pragma: no cover
         "Please install at least: torch (and for actual retrieval: transformers, optionally flash-attn)."
     ) from e
 
+from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
+
 
 def _set_tiling_knobs_if_present(model: Any, *, max_input_tiles: int, use_thumbnail: bool) -> None:
     """
@@ -236,32 +238,6 @@ class _NemotronColEmbedVLV2State:
         os.replace(tmp_path, cache_path)
         return emb, lengths
 
-    def _try_preload_corpus_to_gpu(self, corpus_embeddings_cpu: torch.Tensor) -> Optional[torch.Tensor]:
-        try:
-            return corpus_embeddings_cpu.to(self.device, non_blocking=True)
-        except Exception as e:
-            oom_types = tuple(
-                t
-                for t in (
-                    getattr(torch, "OutOfMemoryError", None),
-                    getattr(getattr(torch, "cuda", None), "OutOfMemoryError", None),
-                )
-                if isinstance(t, type)
-            )
-
-            is_oom = False
-            if oom_types and isinstance(e, oom_types):
-                is_oom = True
-            elif isinstance(e, RuntimeError) and "out of memory" in str(e).lower():
-                is_oom = True
-
-            if not is_oom:
-                raise
-
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            return None
-
     def _embed_query(self, query: str) -> torch.Tensor:
         # Returns CPU tensor [q_seq, dim]
         with torch.no_grad():
@@ -271,8 +247,10 @@ class _NemotronColEmbedVLV2State:
         return q_emb[0]
 
     def _score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        assert self.corpus_embeddings_cpu is not None
-        assert self.corpus_token_lengths_cpu is not None
+        if self.corpus_embeddings_cpu is None:
+            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
+        if self.corpus_token_lengths_cpu is None:
+            raise RuntimeError("corpus_token_lengths_cpu is not set; call init() first")
 
         num_corpus = self.corpus_embeddings_cpu.shape[0]
         scores_cpu = torch.empty((num_corpus,), dtype=torch.float32, device="cpu")
@@ -411,9 +389,7 @@ class NemotronColEmbedVLV2SingletonRetriever:
             ):
                 # Only adjust GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(
-                        self._state.corpus_embeddings_cpu
-                    )
+                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(self._state.corpus_embeddings_cpu)
                 if preload_corpus_to_gpu and self._state.corpus_token_lengths_gpu is None:
                     self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
                         self._state.device, non_blocking=True
@@ -444,7 +420,7 @@ class NemotronColEmbedVLV2SingletonRetriever:
             self._state.corpus_embeddings_gpu = None
             self._state.corpus_token_lengths_gpu = None
             if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(emb_cpu)
+                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu)
                 self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
                     self._state.device, non_blocking=True
                 )
