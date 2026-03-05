@@ -21,8 +21,6 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
-from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
-from nemo_retriever.utils.ray_resource_hueristics import resolve_resource_details
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
@@ -279,83 +277,83 @@ def _param_source_label(ctx: typer.Context, name: str) -> str:
     return s
 
 
-def _print_heuristic_resources(
-    *,
-    ctx: typer.Context,
-    ingestor: object,
-    ray_cluster_address: Optional[str],
-    input_type: str,
-    page_elements_actors: Optional[int],
-    ocr_actors: Optional[int],
-    embed_actors: Optional[int],
-    nemotron_parse_actors: float,
-    nemotron_parse_gpus_per_actor: float,
-    nemotron_parse_ray_batch_size: float,
-) -> None:
-    """Pretty-print resolved resources, heuristic outputs, and source provenance."""
-    details = resolve_resource_details(ray_cluster_address=ray_cluster_address)
-    override_cpu_count = int(getattr(ingestor, "_num_cpus", details.cpu_count))
-    override_gpu_count = int(getattr(ingestor, "_num_gpus", details.gpu_count))
+# def _print_heuristic_resources(
+#     *,
+#     ctx: typer.Context,
+#     ingestor: object,
+#     ray_cluster_address: Optional[str],
+#     input_type: str,
+#     page_elements_actors: Optional[int],
+#     ocr_actors: Optional[int],
+#     embed_actors: Optional[int],
+#     nemotron_parse_actors: float,
+#     nemotron_parse_gpus_per_actor: float,
+#     nemotron_parse_ray_batch_size: float,
+# ) -> None:
+#     """Pretty-print resolved resources, heuristic outputs, and source provenance."""
+#     details = resolve_resource_details(ray_cluster_address=ray_cluster_address)
+#     override_cpu_count = int(getattr(ingestor, "_num_cpus", details.cpu_count))
+#     override_gpu_count = int(getattr(ingestor, "_num_gpus", details.gpu_count))
 
-    use_nemotron_parse_only = (
-        float(nemotron_parse_actors) > 0.0
-        and float(nemotron_parse_gpus_per_actor) > 0.0
-        and float(nemotron_parse_ray_batch_size) > 0.0
-    )
-    if input_type in {"pdf", "doc"}:
-        detect_stage_count = 1  # extract_tables/charts are enabled in this example.
-        concurrent_gpu_stage_count = (
-            (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
-        )
-    else:
-        concurrent_gpu_stage_count = 1
+#     use_nemotron_parse_only = (
+#         float(nemotron_parse_actors) > 0.0
+#         and float(nemotron_parse_gpus_per_actor) > 0.0
+#         and float(nemotron_parse_ray_batch_size) > 0.0
+#     )
+#     if input_type in {"pdf", "doc"}:
+#         detect_stage_count = 1  # extract_tables/charts are enabled in this example.
+#         concurrent_gpu_stage_count = (
+#             (detect_stage_count + 1) if use_nemotron_parse_only else (1 + detect_stage_count + 1)
+#         )
+#     else:
+#         concurrent_gpu_stage_count = 1
 
-    heuristic = resolve_batch_worker_plan(
-        override_cpu_count=override_cpu_count,
-        override_gpu_count=override_gpu_count,
-        override_page_elements_actors=page_elements_actors,
-        override_ocr_actors=ocr_actors,
-        override_embed_actors=embed_actors,
-        concurrent_gpu_stage_count=concurrent_gpu_stage_count,
-    )
+#     heuristic = resolve_batch_worker_plan(
+#         override_cpu_count=override_cpu_count,
+#         override_gpu_count=override_gpu_count,
+#         override_page_elements_actors=page_elements_actors,
+#         override_ocr_actors=ocr_actors,
+#         override_embed_actors=embed_actors,
+#         concurrent_gpu_stage_count=concurrent_gpu_stage_count,
+#     )
 
-    print("\nHeuristic resource resolution:")
-    print(f"  cpu_count: {override_cpu_count} (source={details.cpu_source})")
-    print(f"  gpu_count: {override_gpu_count} (source={details.gpu_source})")
-    print(f"  auto_detect_source: {details.auto_source}")
-    print("  workers:")
-    print(
-        "    page_elements="
-        f"{int(getattr(ingestor, '_page_elements_workers', heuristic.page_elements_workers))} "
-        f"(source={'user' if page_elements_actors is not None else 'heuristic'})"
-    )
-    print(
-        "    detect="
-        f"{int(getattr(ingestor, '_detect_workers', heuristic.detect_workers))} "
-        f"(source={'user' if ocr_actors is not None else 'heuristic'})"
-    )
-    print(
-        "    embed="
-        f"{int(getattr(ingestor, '_embed_workers', heuristic.embed_workers))} "
-        f"(source={'user' if embed_actors is not None else 'heuristic'})"
-    )
+#     print("\nHeuristic resource resolution:")
+#     print(f"  cpu_count: {override_cpu_count} (source={details.cpu_source})")
+#     print(f"  gpu_count: {override_gpu_count} (source={details.gpu_source})")
+#     print(f"  auto_detect_source: {details.auto_source}")
+#     print("  workers:")
+#     print(
+#         "    page_elements="
+#         f"{int(getattr(ingestor, '_page_elements_workers', heuristic.page_elements_workers))} "
+#         f"(source={'user' if page_elements_actors is not None else 'heuristic'})"
+#     )
+#     print(
+#         "    detect="
+#         f"{int(getattr(ingestor, '_detect_workers', heuristic.detect_workers))} "
+#         f"(source={'user' if ocr_actors is not None else 'heuristic'})"
+#     )
+#     print(
+#         "    embed="
+#         f"{int(getattr(ingestor, '_embed_workers', heuristic.embed_workers))} "
+#         f"(source={'user' if embed_actors is not None else 'heuristic'})"
+#     )
 
-    print("  gpu_per_stage:")
-    print(
-        "    page_elements="
-        f"{float(getattr(ingestor, '_gpu_page_elements', heuristic.page_elements_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'page_elements_gpus_per_actor')})"
-    )
-    print(
-        "    ocr="
-        f"{float(getattr(ingestor, '_gpu_ocr', heuristic.detect_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'ocr_gpus_per_actor')})"
-    )
-    print(
-        "    embed="
-        f"{float(getattr(ingestor, '_gpu_embed', heuristic.embed_num_gpus)):.3f} "
-        f"(source={_param_source_label(ctx, 'embed_gpus_per_actor')})"
-    )
+#     print("  gpu_per_stage:")
+#     print(
+#         "    page_elements="
+#         f"{float(getattr(ingestor, '_gpu_page_elements', heuristic.page_elements_num_gpus)):.3f} "
+#         f"(source={_param_source_label(ctx, 'page_elements_gpus_per_actor')})"
+#     )
+#     print(
+#         "    ocr="
+#         f"{float(getattr(ingestor, '_gpu_ocr', heuristic.detect_num_gpus)):.3f} "
+#         f"(source={_param_source_label(ctx, 'ocr_gpus_per_actor')})"
+#     )
+#     print(
+#         "    embed="
+#         f"{float(getattr(ingestor, '_gpu_embed', heuristic.embed_num_gpus)):.3f} "
+#         f"(source={_param_source_label(ctx, 'embed_gpus_per_actor')})"
+#     )
 
 
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
