@@ -37,7 +37,7 @@ except ImportError:
 
 from vidore_benchmark.pipeline_evaluation.base_pipeline import BasePipeline
 from retrieval_bench.pipeline_evaluation.tracing import write_query_trace
-from retrieval_bench.pipelines.backends import VALID_BACKENDS, init_backend
+from retrieval_bench.pipelines.backends import VALID_BACKENDS, infer_bright_task_key, init_backend
 
 from retrieval_bench.nemo_agentic.agent import Agent
 from retrieval_bench.nemo_agentic.configs import AgentConfig, LLMConfig
@@ -288,19 +288,6 @@ class AgenticRetrievalPipeline(BasePipeline):
             print("Error: CUDA is not available. This pipeline requires a GPU.")
             sys.exit(1)
 
-    @staticmethod
-    def _infer_bright_task_key(dataset_name: Any) -> Optional[str]:
-        try:
-            ds = str(dataset_name or "").strip()
-        except Exception:
-            return None
-        if not ds:
-            return None
-        parts = [p for p in ds.split("/") if p]
-        if len(parts) >= 2 and parts[0].lower() == "bright":
-            return parts[1]
-        return None
-
     # -----------------------------------------------------------------------
     # Async query loop
     # -----------------------------------------------------------------------
@@ -542,7 +529,7 @@ class AgenticRetrievalPipeline(BasePipeline):
         super().index(corpus_ids=corpus_ids, corpus_images=corpus_images, corpus_texts=corpus_texts)
 
         dataset_name = self.dataset_name
-        task_key = self._infer_bright_task_key(dataset_name)
+        task_key = infer_bright_task_key(dataset_name)
 
         corpus = [{"image": img, "markdown": md} for img, md in zip(corpus_images, corpus_texts)]
 

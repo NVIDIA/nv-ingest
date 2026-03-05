@@ -12,6 +12,21 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
+
+def infer_bright_task_key(dataset_name: Any) -> Optional[str]:
+    """Extract the BRIGHT task key (e.g. 'biology') from a dataset name like 'bright/biology'."""
+    try:
+        ds = str(dataset_name or "").strip()
+    except Exception:
+        return None
+    if not ds:
+        return None
+    parts = [p for p in ds.split("/") if p]
+    if len(parts) >= 2 and parts[0].lower() == "bright":
+        return parts[1]
+    return None
+
+
 VALID_BACKENDS = {
     "llama-nv-embed-reasoning-3b",
     "llama-nemoretriever-colembed-3b-v1",
