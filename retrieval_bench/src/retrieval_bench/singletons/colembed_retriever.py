@@ -164,7 +164,8 @@ class _ColEmbedState:
         return q_emb[0]  # [seq_len, dim]
 
     def _score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        assert self.corpus_embeddings_cpu is not None
+        if self.corpus_embeddings_cpu is None:
+            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
 
         num_corpus = self.corpus_embeddings_cpu.shape[0]
         scores_cpu = torch.empty(num_corpus, dtype=torch.float32, device="cpu")

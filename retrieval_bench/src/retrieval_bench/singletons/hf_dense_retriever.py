@@ -348,7 +348,8 @@ class _HfDenseState:
         return emb[0]  # [dim] on CPU
 
     def score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        assert self.corpus_embeddings_cpu is not None
+        if self.corpus_embeddings_cpu is None:
+            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
         num_docs = self.corpus_embeddings_cpu.shape[0]
         scores_cpu = torch.empty((num_docs,), dtype=torch.float32, device="cpu")
 
