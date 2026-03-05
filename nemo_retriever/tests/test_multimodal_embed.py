@@ -64,6 +64,10 @@ _HEAVY_INTERNAL = [
     # -- table (nv_ingest_api → cv2) ----------------------------------------
     "nemo_retriever.table",
     "nemo_retriever.table.table_detection",
+    "nemo_retriever.table.config",
+    "nemo_retriever.table.stage",
+    "nemo_retriever.table.commands",
+    "nemo_retriever.table.processor",
     # -- PDF (pypdfium2, nv_ingest_api via pdf/__init__ → __main__ → stage) --
     "nemo_retriever.pdf",
     "nemo_retriever.pdf.__main__",
@@ -73,10 +77,21 @@ _HEAVY_INTERNAL = [
     "nemo_retriever.pdf.extract",
     "nemo_retriever.pdf.split",
 ]
+# Track which modules we injected (vs. ones already loaded) so we can
+# remove only our stubs after the import, preventing leaks into other
+# test files that need the real modules.
+_injected: list[str] = []
 for _mod_name in _HEAVY_INTERNAL:
-    sys.modules.setdefault(_mod_name, MagicMock())
+    if _mod_name not in sys.modules:
+        sys.modules[_mod_name] = MagicMock()
+        _injected.append(_mod_name)
 
 from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows  # noqa: E402
+
+# Clean up injected mocks so they don't poison imports in other test files.
+for _mod_name in _injected:
+    sys.modules.pop(_mod_name, None)
+del _injected
 
 
 # ===================================================================

@@ -190,6 +190,7 @@ def explode_content_to_rows(
         if isinstance(page_text, str) and page_text.strip():
             page_row = _deep_copy_row(row_dict)
             page_row["_embed_modality"] = text_mod
+            page_row["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 page_row["_image_b64"] = page_image_b64
             new_rows.append(page_row)
@@ -209,6 +210,7 @@ def explode_content_to_rows(
                 content_row = _deep_copy_row(row_dict)
                 content_row[text_column] = t.strip()
                 content_row["_embed_modality"] = struct_mod
+                content_row["_content_type"] = col
                 if struct_mod in IMAGE_MODALITIES and page_image_b64:
                     bbox = item.get("bbox_xyxy_norm")
                     if bbox and len(bbox) == 4:
@@ -225,6 +227,7 @@ def explode_content_to_rows(
         if not exploded_any:
             preserved = _deep_copy_row(row_dict)
             preserved["_embed_modality"] = text_mod
+            preserved["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 preserved["_image_b64"] = page_image_b64
             new_rows.append(preserved)
@@ -787,6 +790,9 @@ def upload_embeddings_to_lancedb_inprocess(
             entries = getattr(r, ocr_col, None)
             if isinstance(entries, list):
                 metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
+        ct = getattr(r, "_content_type", None)
+        if isinstance(ct, str) and ct:
+            metadata_obj["content_type"] = ct
         source_obj: Dict[str, Any] = {"source_id": str(path)}
 
         row_out: Dict[str, Any] = {

@@ -1002,6 +1002,7 @@ class ChartGraphicElementsOCRActor:
         "_api_key",
         "_request_timeout_s",
         "_remote_retry",
+        "_inference_batch_size",
     )
 
     def __init__(
@@ -1015,6 +1016,7 @@ class ChartGraphicElementsOCRActor:
         remote_max_pool_workers: int = 16,
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
+        inference_batch_size: int = 8,
     ) -> None:
         self._graphic_elements_invoke_url = (graphic_elements_invoke_url or "").strip()
         self._ocr_invoke_url = (ocr_invoke_url or invoke_url or "").strip()
@@ -1025,6 +1027,7 @@ class ChartGraphicElementsOCRActor:
             remote_max_retries=int(remote_max_retries),
             remote_max_429_retries=int(remote_max_429_retries),
         )
+        self._inference_batch_size = int(inference_batch_size)
 
         if self._graphic_elements_invoke_url:
             self._graphic_elements_model = None
@@ -1051,6 +1054,7 @@ class ChartGraphicElementsOCRActor:
                 api_key=self._api_key,
                 request_timeout_s=self._request_timeout_s,
                 remote_retry=self._remote_retry,
+                inference_batch_size=self._inference_batch_size,
                 **override_kwargs,
             )
         except BaseException as e:

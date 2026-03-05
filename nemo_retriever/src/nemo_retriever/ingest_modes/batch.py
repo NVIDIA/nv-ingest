@@ -198,6 +198,9 @@ class _LanceDBWriteActor:
                 entries = getattr(row, ocr_col, None)
                 if isinstance(entries, list):
                     metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
+            ct = getattr(row, "_content_type", None)
+            if isinstance(ct, str) and ct:
+                metadata_obj["content_type"] = ct
             source_obj = {"source_id": str(path)}
 
             row_out = {

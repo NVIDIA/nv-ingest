@@ -280,9 +280,7 @@ class TestChartGraphicElementsOCRActor:
         """Actor should never raise; errors go into metadata columns."""
         from nemo_retriever.chart.chart_detection import ChartGraphicElementsOCRActor
 
-        with patch(
-            "nemo_retriever.chart.chart_detection.ChartGraphicElementsOCRActor.__init__", return_value=None
-        ):
+        with patch("nemo_retriever.chart.chart_detection.ChartGraphicElementsOCRActor.__init__", return_value=None):
             actor = ChartGraphicElementsOCRActor.__new__(ChartGraphicElementsOCRActor)
             actor._graphic_elements_model = None
             actor._ocr_model = None
@@ -362,9 +360,7 @@ class TestBuildPlanChartStructure:
     def test_no_extract_charts_yields_no_chart_stage(self) -> None:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags
 
-        names = list(
-            stage_names_from_flags(extract_charts=False, use_graphic_elements=True)
-        )
+        names = list(stage_names_from_flags(extract_charts=False, use_graphic_elements=True))
         assert "enrich_chart_structure" not in names
         assert "enrich_chart" not in names
 
