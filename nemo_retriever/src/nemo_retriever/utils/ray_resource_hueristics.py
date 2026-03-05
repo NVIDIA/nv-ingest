@@ -241,6 +241,7 @@ class Resources(BaseModel):
 
     cpu_count: int
     gpu_count: int
+    source: str = "Ray"
 
     def __str__(self) -> str:
         return f"Resources(cpu_count={self.cpu_count}, gpu_count={self.gpu_count}, source={self.source})"
