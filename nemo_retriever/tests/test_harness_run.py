@@ -45,10 +45,13 @@ def test_build_command_uses_hidden_detection_file_by_default(tmp_path: Path) -> 
         query_csv=str(query_csv),
         write_detection_file=False,
     )
-    cmd, runtime_dir, detection_file = _build_command(cfg, tmp_path, run_id="r1")
+    cmd, runtime_dir, detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
     assert "--detection-summary-file" in cmd
+    assert "--recall-match-mode" in cmd
+    assert "pdf_page" in cmd
     assert detection_file.parent == runtime_dir
     assert detection_file.name == ".detection_summary.json"
+    assert effective_query_csv == query_csv
 
 
 def test_build_command_uses_top_level_detection_file_when_enabled(tmp_path: Path) -> None:
@@ -64,10 +67,35 @@ def test_build_command_uses_top_level_detection_file_when_enabled(tmp_path: Path
         query_csv=str(query_csv),
         write_detection_file=True,
     )
-    cmd, runtime_dir, detection_file = _build_command(cfg, tmp_path, run_id="r1")
+    cmd, runtime_dir, detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
     assert "--detection-summary-file" in cmd
     assert detection_file.parent == tmp_path
     assert detection_file.name == "detection_summary.json"
+    assert effective_query_csv == query_csv
+
+
+def test_build_command_applies_page_plus_one_adapter(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf,page\nq,doc_name.pdf,0\n", encoding="utf-8")
+
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="earnings",
+        preset="single_gpu",
+        query_csv=str(query_csv),
+        recall_adapter="page_plus_one",
+    )
+    cmd, runtime_dir, _detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
+
+    assert effective_query_csv.parent == runtime_dir
+    assert effective_query_csv.name == "query_adapter.page_plus_one.csv"
+    assert "--query-csv" in cmd
+    assert str(effective_query_csv) in cmd
+    csv_contents = effective_query_csv.read_text(encoding="utf-8")
+    assert "query,pdf_page" in csv_contents
+    assert "q,doc_name_1" in csv_contents
 
 
 def test_run_entry_session_artifact_dir_uses_run_name(monkeypatch, tmp_path: Path) -> None:

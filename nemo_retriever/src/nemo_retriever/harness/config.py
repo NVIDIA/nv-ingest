@@ -15,6 +15,7 @@ NEMO_RETRIEVER_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = NEMO_RETRIEVER_ROOT.parent
 DEFAULT_TEST_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "test_configs.yaml"
 DEFAULT_NIGHTLY_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "nightly_config.yaml"
+VALID_RECALL_ADAPTERS = {"none", "page_plus_one", "financebench_json"}
 
 TUNING_FIELDS = {
     "pdf_extract_workers",
@@ -45,6 +46,8 @@ class HarnessConfig:
     query_csv: str | None = None
     input_type: str = "pdf"
     recall_required: bool = True
+    recall_match_mode: str = "pdf_page"
+    recall_adapter: str = "none"
 
     artifacts_dir: str | None = None
     ray_address: str | None = None
@@ -85,6 +88,12 @@ class HarnessConfig:
 
         if self.input_type not in {"pdf", "txt", "html", "doc"}:
             errors.append(f"input_type must be one of pdf/txt/html/doc, got '{self.input_type}'")
+
+        if self.recall_match_mode not in {"pdf_page", "pdf_only"}:
+            errors.append("recall_match_mode must be one of pdf_page/pdf_only")
+
+        if self.recall_adapter not in VALID_RECALL_ADAPTERS:
+            errors.append(f"recall_adapter must be one of {sorted(VALID_RECALL_ADAPTERS)}")
 
         for name in TUNING_FIELDS:
             val = getattr(self, name)
@@ -143,6 +152,8 @@ def _apply_env_overrides(config_dict: dict[str, Any]) -> None:
         "HARNESS_QUERY_CSV": ("query_csv", str),
         "HARNESS_INPUT_TYPE": ("input_type", str),
         "HARNESS_RECALL_REQUIRED": ("recall_required", _parse_bool),
+        "HARNESS_RECALL_MATCH_MODE": ("recall_match_mode", str),
+        "HARNESS_RECALL_ADAPTER": ("recall_adapter", str),
         "HARNESS_ARTIFACTS_DIR": ("artifacts_dir", str),
         "HARNESS_RAY_ADDRESS": ("ray_address", str),
         "HARNESS_LANCEDB_URI": ("lancedb_uri", str),
