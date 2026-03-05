@@ -67,16 +67,6 @@ class NemotronParseModelConfig:
 
 
 @dataclass
-class GraphicElementsModelConfig:
-    """Config to recreate a NemotronGraphicElementsV1 model."""
-
-    def create(self) -> Any:
-        from nemo_retriever.model.local import NemotronGraphicElementsV1
-
-        return NemotronGraphicElementsV1()
-
-
-@dataclass
 class EmbeddingModelConfig:
     """Config to recreate an embedding model (VL or non-VL)."""
 
@@ -150,7 +140,6 @@ class GPUTaskDescriptor:
 def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
     """Extract a picklable model config from live kwargs, or None."""
     from nemo_retriever.page_elements import detect_page_elements_v3
-    from nemo_retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
     from nemo_retriever.ocr.ocr import nemotron_parse_page_elements, ocr_page_elements
     from .inprocess import collapse_content_to_page_rows, embed_text_main_text_embed, explode_content_to_rows
 
@@ -158,11 +147,6 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
         if kwargs.get("invoke_url"):
             return None  # Remote endpoint, no local model
         return PageElementsModelConfig()
-
-    if func is detect_graphic_elements_v1_from_page_elements_v3:
-        if kwargs.get("invoke_url"):
-            return None  # Remote endpoint, no local model
-        return GraphicElementsModelConfig()
 
     if func is ocr_page_elements:
         if kwargs.get("invoke_url"):

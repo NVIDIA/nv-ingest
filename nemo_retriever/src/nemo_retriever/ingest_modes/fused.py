@@ -16,7 +16,9 @@ from typing import Any, Dict
 
 import ray.data as rd
 
-from nemo_retriever.chart.chart_detection import detect_graphic_elements_v1_from_page_elements_v3
+from nemo_retriever.chart.chart_detection import (
+    graphic_elements_ocr_page_elements,
+)
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
@@ -39,6 +41,7 @@ def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None
         "page_elements_invoke_url",
         "ocr_invoke_url",
         "table_structure_invoke_url",
+        "graphic_elements_invoke_url",
         "embedding_endpoint",
         "embed_invoke_url",
     )
@@ -124,12 +127,16 @@ class _FusedModelActor:
             model=self._page_elements_model,
             **self._detect_kwargs,
         )
-        if self._ge_model is not None:
-            detected = detect_graphic_elements_v1_from_page_elements_v3(
+
+        # Charts: combined graphic-elements + OCR stage (like table-structure + OCR).
+        ocr_extract_charts = self._extract_charts
+        if self._use_graphic_elements and self._extract_charts:
+            detected = graphic_elements_ocr_page_elements(
                 detected,
-                model=self._ge_model,
-                inference_batch_size=int(self._detect_kwargs.get("inference_batch_size", 8)),
+                graphic_elements_model=self._ge_model,
+                ocr_model=self._ocr_model,
             )
+            ocr_extract_charts = False  # Charts already handled.
 
         if self._extract_tables and self._use_table_structure:
             # Tables go through combined table-structure + OCR stage.
@@ -143,18 +150,16 @@ class _FusedModelActor:
                 detected,
                 model=self._ocr_model,
                 extract_tables=False,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
-                use_graphic_elements=self._use_graphic_elements,
             )
         else:
             ocred = ocr_page_elements(
                 detected,
                 model=self._ocr_model,
                 extract_tables=self._extract_tables,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
-                use_graphic_elements=self._use_graphic_elements,
             )
         if self._embed_granularity == "page":
             prepared = collapse_content_to_page_rows(
