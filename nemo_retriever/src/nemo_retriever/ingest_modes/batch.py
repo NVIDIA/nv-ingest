@@ -929,11 +929,24 @@ class BatchIngestor(Ingestor):
     @staticmethod
     def _has_error(v: Any) -> bool:
         """Recursively detect whether a value contains error-like payloads."""
+
+        def _is_populated_error_field(key: str, value: Any) -> bool:
+            if value is None:
+                return False
+            if key == "failed" and isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return bool(value.strip())
+            if isinstance(value, (list, tuple, set, dict)):
+                return len(value) > 0
+            return bool(value)
+
         if v is None:
             return False
         if isinstance(v, dict):
-            if any(k in v for k in ("error", "errors", "exception", "traceback", "failed")):
-                return True
+            for k in ("error", "errors", "exception", "traceback", "failed"):
+                if k in v and _is_populated_error_field(k, v.get(k)):
+                    return True
             return any(BatchIngestor._has_error(x) for x in v.values())
         if isinstance(v, list):
             return any(BatchIngestor._has_error(x) for x in v)
