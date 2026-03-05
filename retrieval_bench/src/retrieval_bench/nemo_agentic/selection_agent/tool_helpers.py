@@ -61,9 +61,7 @@ class LogSelectedDocs(BaseTool):
     _name: Optional[str] = "log_selected_documents"
 
     def __init__(self, top_k: int, candidate_docids: List[str]):
-        self.correct_call_return_value = (
-            "The results have been successfully logged and the interaction ended."
-        )
+        self.correct_call_return_value = "The results have been successfully logged and the interaction ended."
         self.top_k = int(top_k)
         self.allowed_doc_ids = set(candidate_docids)
 
