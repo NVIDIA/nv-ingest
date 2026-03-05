@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 from torch import nn
 import torch
 import numpy as np
-from ._hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 from ..model import HuggingFaceModel, RunMode
 
 from nemotron_page_elements_v3.model import define_model as define_model_page_elements

@@ -11,7 +11,7 @@ from typing import List, Optional, Sequence
 
 import torch
 
-from ._hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:

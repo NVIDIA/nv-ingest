@@ -19,7 +19,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from ._hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 
 logger = logging.getLogger(__name__)
 

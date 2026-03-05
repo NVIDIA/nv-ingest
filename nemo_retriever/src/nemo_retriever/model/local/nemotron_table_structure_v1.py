@@ -5,7 +5,7 @@
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
-from ._hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 from nemotron_table_structure_v1.model import define_model as define_model_table_structure

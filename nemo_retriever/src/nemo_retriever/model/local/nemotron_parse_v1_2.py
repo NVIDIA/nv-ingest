@@ -11,7 +11,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from ._hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 
