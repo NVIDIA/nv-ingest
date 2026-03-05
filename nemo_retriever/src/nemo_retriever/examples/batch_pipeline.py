@@ -470,7 +470,7 @@ def main(
         help="CPUs reserved per embedding actor.",
     ),
     embed_gpus_per_actor: float = typer.Option(
-        0.1,
+        0.25,
         "--embed-gpus-per-actor",
         min=0.0,
         help="GPUs reserved per embedding actor.",
@@ -492,7 +492,7 @@ def main(
         "'text', 'image', or 'text_image' ('image_text' is also accepted).",
     ),
     embed_ray_batch_size: int = typer.Option(
-        64,
+        128,
         "--embed-ray-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
