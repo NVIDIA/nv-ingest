@@ -954,15 +954,14 @@ def main(
             print(f"Froze resource configuration to {frozen_path}")
 
         print("Running extraction...")
+        total_time_start = time.perf_counter()
         ingest_start = time.perf_counter()
-        ingestor = ingestor.ingest(
+        ingest_results = ingestor.ingest(
             params=IngestExecuteParams(
                 runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
                 runtime_metrics_prefix=runtime_metrics_prefix,
             )
-        )
-
-        ingest_results = ingestor.get_dataset().materialize()
+        ).get_dataset().materialize()
 
         #TODO: Remove this hardcoded num_pages once I come up with strategy I want to use
         num_pages = 54730
@@ -989,8 +988,11 @@ def main(
 
         embedding_elapsed_s = time.perf_counter() - embedding_start
         embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
+        total_time_elapsed_s = time.perf_counter() - total_time_start
+        total_time_message = f"Total time: {total_time_elapsed_s:.2f} seconds @ PPS: {num_pages / total_time_elapsed_s:.2f} / second"
         print(ingest_results_message)
         print(embedding_results_message)
+        print(total_time_message)
 
         # _print_detection_summary(detection_summary)
         # if detection_summary_file is not None:
