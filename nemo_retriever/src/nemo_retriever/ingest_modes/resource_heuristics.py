@@ -49,8 +49,8 @@ def _read_env_float(name: str, default: float, *, minimum: float = 0.0) -> float
 
 CPU_THRESHOLD_WORKERS = 64
 
-HIGH_CPU_PAGE_ELEMENTS_PER_GPU = 4
-HIGH_CPU_OCR_PER_GPU = 4
+HIGH_CPU_PAGE_ELEMENTS_PER_GPU = 6
+HIGH_CPU_OCR_PER_GPU = 6
 HIGH_CPU_EMBED_PER_GPU = 2
 
 LOW_CPU_PAGE_ELEMENTS_PER_GPU = 3

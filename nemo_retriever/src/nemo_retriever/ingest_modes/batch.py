@@ -636,6 +636,9 @@ class BatchIngestor(Ingestor):
         self._page_elements_workers = int(page_elements_workers)
         self._detect_workers = int(detect_workers)
 
+        print(f"page_elements_workers: {page_elements_workers}")
+        print(f"detect_workers: {detect_workers}")
+
         # Reserve CPUs for GPU actors, then divide the rest among extract workers.
         if use_nemotron_parse_only:
             total_gpu_cpus = int(nemotron_parse_workers) * ocr_cpus_per_actor
