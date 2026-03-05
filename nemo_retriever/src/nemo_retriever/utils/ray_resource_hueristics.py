@@ -359,7 +359,7 @@ class ClusterResources(BaseModel):
 
 
 
-def resolve_available_resources(ray: object) -> ClusterResources:
+def resolve_cluster_resources(ray: object) -> ClusterResources:
     """Resolve available CPU/GPU resources from a Ray cluster."""
 
     if not ray.is_initialized():

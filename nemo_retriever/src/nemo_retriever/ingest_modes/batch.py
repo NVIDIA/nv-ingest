@@ -30,8 +30,7 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.ray_resource_hueristics import (
-    resolve_available_resources,
-    resolve_effective_resources,
+    resolve_cluster_resources,
 )
 from nemo_retriever.utils.ray_resource_hueristics import pretty_print_worker_heuristic_summary
 from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
@@ -346,7 +345,7 @@ class BatchIngestor(Ingestor):
         # 3a. -> final_resources = compute_final_resources(available_resources, requested_resources) -> FinalResources(BaseModel)
 
         # 1. Gather available resources
-        available_resources = resolve_available_resources(ray)
+        available_resources = resolve_cluster_resources(ray)
         print(available_resources)
 
         # # Query Ray cluster resources when available, otherwise local resources.
