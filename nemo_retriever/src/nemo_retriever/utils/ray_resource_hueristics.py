@@ -352,14 +352,14 @@ def resolve_requested_plan(
         raise ValueError("No GPUs available")
 
     def _resolve_int(override: Optional[int], default: int, multiply_by_available_num_gpu: bool) -> int:
-        if override is not None:
+        if override is not None and override > 0:
             return int(override)
         if multiply_by_available_num_gpu:
             return int(default * available_gpu_count)
         return int(default)
 
     def _resolve_float(override: Optional[float], default: float, multiply_by_available_num_gpu: bool) -> float:
-        if override is not None:
+        if override is not None and override > 0.0:
             return float(override)
         if multiply_by_available_num_gpu:
             return float(default * available_gpu_count)
