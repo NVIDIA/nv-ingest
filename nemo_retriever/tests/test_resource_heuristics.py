@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from nemo_retriever.ingest_modes import resource_heuristics as rh
+from nemo_retriever.utils import ray_resource_hueristics as rh
 
 
 def test_read_env_int_and_float_fallback_and_minimum(monkeypatch: pytest.MonkeyPatch) -> None:

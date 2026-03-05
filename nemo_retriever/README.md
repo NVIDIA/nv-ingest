@@ -151,7 +151,7 @@ Environment variable names for heuristic knobs:
 
 ### `~/.nemo-retriever/config.yaml`
 
-If present, this file is read automatically. You can also generate one from current resolved values with `freeze_resource_config()` in `resource_heuristics.py`.
+If present, this file is read automatically. You can also generate one from current resolved values with `freeze_resource_config()` in `ray_resource_hueristics.py`.
 
 Example:
 

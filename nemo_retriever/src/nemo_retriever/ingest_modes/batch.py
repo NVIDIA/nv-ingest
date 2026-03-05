@@ -29,11 +29,11 @@ from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
-from nemo_retriever.ingest_modes.resource_heuristics import (
+from nemo_retriever.utils.ray_resource_hueristics import (
     resolve_effective_resources,
 )
-from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
+from nemo_retriever.utils.ray_resource_hueristics import pretty_print_worker_heuristic_summary
+from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
 
 from ..ingestor import Ingestor
 from ..params import ASRParams

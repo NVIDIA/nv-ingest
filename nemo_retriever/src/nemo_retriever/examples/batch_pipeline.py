@@ -21,9 +21,9 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
-from nemo_retriever.ingest_modes.resource_heuristics import freeze_resource_config as freeze_resource_config_file
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
-from nemo_retriever.ingest_modes.resource_heuristics import resolve_resource_details
+from nemo_retriever.utils.ray_resource_hueristics import freeze_resource_config as freeze_resource_config_file
+from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
+from nemo_retriever.utils.ray_resource_hueristics import resolve_resource_details
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
