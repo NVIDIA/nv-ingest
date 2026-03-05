@@ -196,13 +196,9 @@ def _join_yolox_table_structure_and_ocr_output(
     # Sort rows top-to-bottom and columns left-to-right so that
     # assign_boxes indices correspond to spatial positions.
     if yolox_cell_preds["row"].shape[0] > 0:
-        yolox_cell_preds["row"] = yolox_cell_preds["row"][
-            yolox_cell_preds["row"][:, 1].argsort()
-        ]
+        yolox_cell_preds["row"] = yolox_cell_preds["row"][yolox_cell_preds["row"][:, 1].argsort()]
     if yolox_cell_preds["column"].shape[0] > 0:
-        yolox_cell_preds["column"] = yolox_cell_preds["column"][
-            yolox_cell_preds["column"][:, 0].argsort()
-        ]
+        yolox_cell_preds["column"] = yolox_cell_preds["column"][yolox_cell_preds["column"][:, 0].argsort()]
 
     ocr_boxes = np.array(ocr_boxes)
     ocr_boxes_ = np.array(
