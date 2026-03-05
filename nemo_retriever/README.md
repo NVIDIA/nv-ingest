@@ -50,7 +50,7 @@ uv pip install -e ./nemo_retriever
 uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs
 ```
 
-Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. Recall is skipped if the query CSV file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, install the CUDA 13 runtime and set `LD_LIBRARY_PATH` as shown above.
+Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. For document-level recall, use `--recall-match-mode pdf_only` with `query,expected_pdf` data. Recall is skipped if the query file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, install the CUDA 13 runtime and set `LD_LIBRARY_PATH` as shown above.
 
 For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
 
@@ -64,6 +64,11 @@ For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt
 - CLI entrypoint is nested under `retriever harness`.
 - First pass is LanceDB-only and enforces recall-required pass/fail by default.
 - Single-run artifact directories default to `<dataset>_<timestamp>`.
+- Dataset-specific recall adapters are supported via config:
+  - `recall_adapter: none` (default passthrough)
+  - `recall_adapter: page_plus_one` (convert zero-indexed `page` CSVs to `pdf_page`)
+  - `recall_adapter: financebench_json` (convert FinanceBench JSON to `query,expected_pdf`)
+  - `recall_match_mode: pdf_page|pdf_only` controls recall matching mode.
 
 ### Single run
 

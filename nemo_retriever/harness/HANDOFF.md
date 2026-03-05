@@ -24,6 +24,8 @@ It captures what exists now, what was intentionally chosen, and what to iterate 
   - Stream parsing for ingest/throughput/recall metrics.
 - `nemo_retriever/src/nemo_retriever/harness/artifacts.py`
   - Artifact/session directory creation and session summary writing.
+- `nemo_retriever/src/nemo_retriever/harness/recall_adapters.py`
+  - Dataset-specific query normalization adapters for recall inputs.
 - `nemo_retriever/harness/test_configs.yaml`
   - Active defaults, presets, dataset presets.
 - `nemo_retriever/harness/nightly_config.yaml`
@@ -36,6 +38,10 @@ It captures what exists now, what was intentionally chosen, and what to iterate 
 - Two main presets are available:
   - `single_gpu`
   - `dgx_8gpu`
+- Adapter-capable datasets:
+  - `earnings` uses `recall_adapter: page_plus_one` (`page` -> `pdf_page` conversion).
+  - `bo10k` wiring is included (adapter + mode), with recall disabled by default until query path is set.
+  - `financebench` wiring is included for `pdf_only` matching with `financebench_json` adapter, with recall disabled by default until query path is set.
 
 ## Current CLI Usage
 
