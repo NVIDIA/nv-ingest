@@ -359,25 +359,21 @@ def main(
     embed_actors: Optional[int] = typer.Option(
         0,
         "--embed-actors",
-        min=1,
         help="Actor count for embedding stage. Omit to use resource heuristic.",
     ),
     embed_batch_size: Optional[int] = typer.Option(
         0,
         "--embed-batch-size",
-        min=1,
         help="Ray Data batch size for embedding stage.",
     ),
     embed_cpus_per_actor: Optional[float] = typer.Option(
         0.0,
         "--embed-cpus-per-actor",
-        min=0.1,
         help="CPUs reserved per embedding actor. Omit to use resource heuristic.",
     ),
     embed_gpus_per_actor: Optional[float] = typer.Option(
         0.0,
         "--embed-gpus-per-actor",
-        min=0.0,
         max=1.0,
         help="GPUs reserved per embedding actor. Omit to use resource heuristic.",
     ),
@@ -458,19 +454,16 @@ def main(
     ocr_actors: Optional[int] = typer.Option(
         0,
         "--ocr-actors",
-        min=1,
         help="Actor count for OCR stage. Omit to use resource heuristic.",
     ),
     ocr_batch_size: Optional[int] = typer.Option(
         None,
         "--ocr-batch-size",
-        min=1,
         help="Batch size for OCR Ray stage and OCR inference batch size.",
     ),
     ocr_cpus_per_actor: Optional[float] = typer.Option(
         0.0,
         "--ocr-cpus-per-actor",
-        min=0.1,
         help="CPUs reserved per OCR actor.",
     ),
     ocr_gpus_per_actor: Optional[float] = typer.Option(
@@ -500,7 +493,6 @@ def main(
     page_elements_cpus_per_actor: Optional[float] = typer.Option(
         0.0,
         "--page-elements-cpus-per-actor",
-        min=0.1,
         help="CPUs reserved per page-elements actor.",
     ),
     page_elements_gpus_per_actor: Optional[float] = typer.Option(
@@ -524,13 +516,11 @@ def main(
     pdf_extract_cpus_per_task: Optional[float] = typer.Option(
         0.0,
         "--pdf-extract-cpus-per-task",
-        min=1.0,
         help="CPUs reserved per PDF extraction task.",
     ),
     pdf_extract_tasks: Optional[int] = typer.Option(
         0,
         "--pdf-extract-tasks",
-        min=1,
         help="Number of CPU tasks for PDF extraction stage.",
     ),
     pdf_split_batch_size: int = typer.Option(
