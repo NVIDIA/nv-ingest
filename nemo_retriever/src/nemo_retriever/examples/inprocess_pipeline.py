@@ -98,11 +98,10 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 
 @app.command()
 def main(
-    input_dir: Path = typer.Argument(
+    input_path: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
-        exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
@@ -194,14 +193,34 @@ def main(
         "--structured-elements-modality",
         help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
     ),
+    use_table_structure: bool = typer.Option(
+        False,
+        "--use-table-structure",
+        help="Enable the combined table-structure + OCR stage for tables (requires extract_tables).",
+    ),
+    table_output_format: Optional[str] = typer.Option(
+        None,
+        "--table-output-format",
+        help=(
+            "Table output format: 'pseudo_markdown' (OCR-only) or 'markdown' "
+            "(table-structure + OCR). Defaults to 'markdown' when table-structure "
+            "is enabled, 'pseudo_markdown' otherwise."
+        ),
+    ),
+    table_structure_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--table-structure-invoke-url",
+        help=(
+            "Optional remote endpoint URL for table-structure model inference "
+            "(used when --table-output-format=markdown)."
+        ),
+    ),
     embed_granularity: str = typer.Option(
         "element",
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
 ) -> None:
-    _ = input_type
-
     if gpu_devices is not None and num_gpus is not None:
         raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")
     if gpu_devices is not None:
@@ -211,12 +230,24 @@ def main(
     else:
         gpu_device_list = ["0"]
 
-    input_dir = Path(input_dir)
+    input_path = Path(input_path)
+    if input_path.is_file():
+        file_patterns = [str(input_path)]
+    elif input_path.is_dir():
+        ext_map = {
+            "txt": ["*.txt"],
+            "html": ["*.html"],
+            "doc": ["*.docx", "*.pptx"],
+        }
+        exts = ext_map.get(input_type, ["*.pdf"])
+        file_patterns = [str(input_path / e) for e in exts]
+    else:
+        raise typer.BadParameter(f"Path does not exist: {input_path}")
+
+    ingestor = create_ingestor(run_mode="inprocess")
     if input_type == "txt":
-        glob_pattern = str(input_dir / "*.txt")
-        ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
-            ingestor.files(glob_pattern)
+            ingestor.files(file_patterns)
             .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
             .embed(
                 EmbedParams(
@@ -241,10 +272,8 @@ def main(
             )
         )
     elif input_type == "html":
-        glob_pattern = str(input_dir / "*.html")
-        ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
-            ingestor.files(glob_pattern)
+            ingestor.files(file_patterns)
             .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
             .embed(
                 EmbedParams(
@@ -269,11 +298,8 @@ def main(
             )
         )
     elif input_type == "doc":
-        # DOCX/PPTX: same pipeline as PDF; inprocess loader converts to PDF then splits.
-        doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
-        ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
-            ingestor.files(doc_globs)
+            ingestor.files(file_patterns)
             .extract(
                 ExtractParams(
                     method="pdfium",
@@ -281,6 +307,9 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
@@ -313,10 +342,8 @@ def main(
             )
         )
     else:
-        glob_pattern = str(input_dir / "*.pdf")
-        ingestor = create_ingestor(run_mode="inprocess")
         ingestor = (
-            ingestor.files(glob_pattern)
+            ingestor.files(file_patterns)
             .extract(
                 ExtractParams(
                     method="pdfium",
@@ -324,6 +351,9 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
