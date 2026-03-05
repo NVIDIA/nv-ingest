@@ -924,6 +924,77 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
+    @staticmethod
+    def _has_error(v: Any) -> bool:
+        """Recursively detect whether a value contains error-like payloads."""
+        if v is None:
+            return False
+        if isinstance(v, dict):
+            if any(k in v for k in ("error", "errors", "exception", "traceback", "failed")):
+                return True
+            return any(BatchIngestor._has_error(x) for x in v.values())
+        if isinstance(v, list):
+            return any(BatchIngestor._has_error(x) for x in v)
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return False
+            # Parse JSON-like strings first, then fall back to keyword matching.
+            if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+                try:
+                    return BatchIngestor._has_error(json.loads(s))
+                except Exception:
+                    pass
+            low = s.lower()
+            return any(tok in low for tok in ("error", "exception", "traceback", "failed"))
+        return False
+
+    @staticmethod
+    def has_error(v: Any) -> bool:
+        """Public helper for checking if a scalar value carries an error."""
+        return BatchIngestor._has_error(v)
+
+    @staticmethod
+    def extract_error_rows(batch: Any) -> Any:
+        """
+        Return only rows that contain error-like payloads in known columns.
+
+        Expected to run with ``batch_format="pandas"`` from Ray Data.
+        """
+        if batch is None:
+            return batch
+        columns = getattr(batch, "columns", None)
+        if columns is None:
+            return batch
+        error_candidate_columns = (
+            "error",
+            "errors",
+            "exception",
+            "traceback",
+            "metadata",
+            "source",
+            "embedding",
+        )
+        cols = [c for c in error_candidate_columns if c in columns]
+        if not cols:
+            return batch.iloc[0:0]
+
+        mask = batch[cols[0]].apply(BatchIngestor._has_error).astype(bool)
+        for c in cols[1:]:
+            mask = mask | batch[c].apply(BatchIngestor._has_error).astype(bool)
+        return batch[mask]
+
+    def get_error_rows(self, dataset: rd.Dataset | None = None) -> rd.Dataset:
+        """
+        Build a dataset containing only error rows from this pipeline.
+
+        If ``dataset`` is omitted, uses the ingestor's current internal dataset.
+        """
+        target = dataset if dataset is not None else self._rd_dataset
+        if target is None:
+            raise RuntimeError("No Ray Dataset available to inspect for errors.")
+        return target.map_batches(self.extract_error_rows, batch_format="pandas")
+
     def get_dataset(self) -> rd.Dataset | None:
         """Return the current in-memory Ray Dataset for this ingestor."""
         return self._rd_dataset

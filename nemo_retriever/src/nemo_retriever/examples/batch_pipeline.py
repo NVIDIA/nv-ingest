@@ -20,6 +20,7 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
+from nemo_retriever.ingest_modes.batch import BatchIngestor
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
@@ -809,7 +810,8 @@ def main(
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()
-        (
+
+        ingest_results = (
             ingestor.ingest(
                 params=IngestExecuteParams(
                     runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
@@ -822,6 +824,19 @@ def main(
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         logger.info(f"Ingestion complete in {ingest_elapsed_s:.2f} seconds")
+
+        if isinstance(ingestor, BatchIngestor):
+            error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
+            error_count = int(error_rows.count())
+            if error_count > 0:
+                logger.error(
+                    "Detected %d error row(s) in ingest results. Showing top 5 and exiting before recall.",
+                    error_count,
+                )
+                for idx, row in enumerate(error_rows.take(min(5, error_count)), start=1):
+                    logger.error("Error row %d: %s", idx, json.dumps(row, default=str))
+                ray.shutdown()
+                raise typer.Exit(code=1)
 
         ray.shutdown()
 
