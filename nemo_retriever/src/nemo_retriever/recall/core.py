@@ -46,6 +46,8 @@ class RecallConfig:
     local_hf_device: Optional[str] = None
     local_hf_cache_dir: Optional[str] = None
     local_hf_batch_size: int = 64
+    # vLLM: when True and no endpoint, embed queries via vLLM Python API (same space as vLLM-ingested docs).
+    use_vllm: bool = False
 
 
 def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
@@ -161,6 +163,24 @@ def _embed_queries_local_hf(
         vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
     # Ensure list-of-list floats.
     return vecs.detach().to("cpu").tolist()
+
+
+def _embed_queries_vllm(
+    queries: List[str],
+    *,
+    model: str,
+    batch_size: int = 256,
+    prefix: str = "query: ",
+) -> List[List[float]]:
+    """Embed queries via vLLM API (same space as vLLM-ingested docs)."""
+    from nemo_retriever.text_embed.vllm import embed_via_vllm
+
+    return embed_via_vllm(
+        queries,
+        model=model,
+        batch_size=batch_size,
+        prefix=prefix,
+    )
 
 
 def _search_lancedb(
@@ -303,6 +323,16 @@ def retrieve_and_score(
             model=cfg.embedding_model,
             api_key=cfg.embedding_api_key,
             grpc=bool(use_grpc),
+        )
+    elif cfg.use_vllm:
+        from nemo_retriever.model import resolve_embed_model
+
+        embed_model = resolve_embed_model(cfg.embedding_model)
+        vectors = _embed_queries_vllm(
+            queries,
+            model=str(embed_model),
+            batch_size=int(cfg.local_hf_batch_size or 256),
+            prefix="query: ",
         )
     else:
         vectors = _embed_queries_local_hf(

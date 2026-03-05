@@ -171,6 +171,11 @@ def main(
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
+    embed_use_vllm: bool = typer.Option(
+        False,
+        "--embed-use-vllm/--no-embed-use-vllm",
+        help="Use vLLM Python API for embedding (docs and recall queries). Requires [embed-vllm] extra.",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
@@ -209,6 +214,7 @@ def main(
                 EmbedParams(
                     model_name="nemo_retriever_v1",
                     embed_granularity=embed_granularity,
+                    embed_use_vllm=embed_use_vllm,
                     fused_tuning={
                         "fused_workers": int(fused_workers),
                         "fused_batch_size": int(fused_batch_size),
@@ -285,6 +291,7 @@ def main(
             lancedb_uri=str(lancedb_uri),
             lancedb_table=str(LANCEDB_TABLE),
             embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+            use_vllm=embed_use_vllm,
             top_k=10,
             ks=(1, 5, 10),
         )

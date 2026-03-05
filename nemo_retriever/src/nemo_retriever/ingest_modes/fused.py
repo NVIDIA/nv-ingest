@@ -85,17 +85,31 @@ class _FusedModelActor:
         normalize = bool(kwargs.get("normalize", True))
         max_length = int(kwargs.get("max_length", 8192))
         model_name_raw = kwargs.get("model_name")
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
+        embed_use_vllm = bool(kwargs.get("embed_use_vllm", False))
+        from nemo_retriever.model import resolve_embed_model
+
+        resolved_model_id = resolve_embed_model(model_name_raw)
 
         self._page_elements_model = NemotronPageElementsV3()
         self._ocr_model = NemotronOCRV1()
-        self._embed_model = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
-        )
+        # Single constructor: vLLM branch only controls which kwargs are passed.
+        embedder_kwargs: dict[str, Any] = {"model_id": resolved_model_id}
+        if embed_use_vllm:
+            embedder_kwargs.update(
+                use_vllm=True,
+                gpu_memory_utilization=float(kwargs.get("gpu_memory_utilization", 0.45)),
+                enforce_eager=bool(kwargs.get("enforce_eager", False)),
+                compile_cache_dir=kwargs.get("compile_cache_dir"),
+                dimensions=kwargs.get("dimensions"),
+            )
+        else:
+            embedder_kwargs.update(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                normalize=normalize,
+                max_length=max_length,
+            )
+        self._embed_model = LlamaNemotronEmbed1BV2Embedder(**embedder_kwargs)
 
     def __call__(self, batch_df: Any) -> Any:
         detected = detect_page_elements_v3(

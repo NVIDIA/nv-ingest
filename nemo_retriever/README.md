@@ -23,6 +23,17 @@ uv pip install -e ./nemo_retriever
 
 This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
 
+### Optional extras
+
+- **`embed-vllm`** — vLLM embedding (bfloat16 + FLASH_ATTN). Use `--use-vllm` or `embed_use_vllm=True` in batch/inprocess. Install with:
+  ```bash
+  uv pip install -e './nemo_retriever[embed-vllm]'
+  ```
+- **`asr`** — Local ASR (Parakeet). Has a different `transformers` requirement than the core package; install only if you need local ASR:
+  ```bash
+  uv pip install -e './nemo_retriever[asr]'
+  ```
+
 ### OCR and CUDA 13 runtime
 
 The Nemotron OCR native extension requires **libcudart.so.13** (CUDA 13 runtime). If you see:
