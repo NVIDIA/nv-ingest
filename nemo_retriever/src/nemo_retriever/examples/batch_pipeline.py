@@ -964,17 +964,22 @@ def main(
         print(f"Type of ingest_dataset: {type(ingest_dataset)}")
 
         ingest_results = ingest_dataset.materialize()
+
+        #TODO: Remove this hardcoded num_pages once I come up with strategy I want to us
+        num_pages = 54730
         print(f"ingest_results: {ingest_results}")
         print(f"Type of ingest_results: {type(ingest_results)}")
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
-        detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
-        print("Extraction complete.")
-        _print_detection_summary(detection_summary)
-        if detection_summary_file is not None:
-            _write_detection_summary(detection_summary_file, detection_summary)
-            print(f"Wrote detection summary JSON to {Path(detection_summary_file).expanduser().resolve()}")
+        # processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
+        # detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
+        
+        print(f"Processed pages: {num_pages} in {ingest_elapsed_s:.2f} seconds @ PPS: {num_pages / ingest_elapsed_s:.2f} / second")
+
+        # _print_detection_summary(detection_summary)
+        # if detection_summary_file is not None:
+        #     _write_detection_summary(detection_summary_file, detection_summary)
+        #     print(f"Wrote detection summary JSON to {Path(detection_summary_file).expanduser().resolve()}")
 
         ray.shutdown()
 
