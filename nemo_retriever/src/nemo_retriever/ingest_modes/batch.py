@@ -613,7 +613,6 @@ class BatchIngestor(Ingestor):
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract.doc_to_pdf",
             DocToPdfConversionActor,
             batch_size=1,
             num_cpus=1,
@@ -625,7 +624,6 @@ class BatchIngestor(Ingestor):
         # To help amortize downstream processing if PDFs have vastly different numbers of pages. 
         # This is a CPU-only stage. This "Actor" is technically scheduled as a Task
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract.pdf_split",
             PDFSplitActor(
                 split_params=PdfSplitParams(
                     start_page=kwargs.get("start_page"),
@@ -641,7 +639,6 @@ class BatchIngestor(Ingestor):
         # PDF EXTRACTION - Extracts text, tables, charts, infographics, etc. from the PDF pages.
         # This is a CPU-only stage and is the main CPU bottleneck of the entire DAG
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract.pdf_extract",
             PDFExtractionActor(**kwargs),
             batch_size=self._requested_plan.get_pdf_extract_batch_size(),
             batch_format="pandas",
@@ -680,7 +677,6 @@ class BatchIngestor(Ingestor):
             if parse_invoke_url:
                 parse_flags["invoke_url"] = parse_invoke_url
             self._rd_dataset = self._rd_dataset.map_batches(
-                "extract.nemotron_parse",
                 NemotronParseActor,
                 batch_size=self._requested_plan.get_nemotron_parse_batch_size(),
                 batch_format="pandas",
@@ -694,7 +690,6 @@ class BatchIngestor(Ingestor):
 
             # Page-element detection with a GPU actor pool.
             self._rd_dataset = self._rd_dataset.map_batches(
-                "extract.page_elements",
                 PageElementDetectionActor,
                 batch_size=self._requested_plan.get_page_elements_batch_size(),
                 batch_format="pandas",
@@ -732,7 +727,6 @@ class BatchIngestor(Ingestor):
 
             if ocr_flags:
                 self._rd_dataset = self._rd_dataset.map_batches(
-                    "extract.ocr",
                     OCRActor,
                     batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
@@ -758,7 +752,6 @@ class BatchIngestor(Ingestor):
         self._tasks.append(("extract_txt", dict(self._extract_txt_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract_txt.split",
             TxtSplitActor,
             batch_size=4,
             batch_format="pandas",
@@ -782,7 +775,6 @@ class BatchIngestor(Ingestor):
         self._tasks.append(("extract_html", dict(self._extract_html_kwargs)))
 
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract_html.split",
             HtmlSplitActor,
             batch_size=4,
             batch_format="pandas",
@@ -820,7 +812,6 @@ class BatchIngestor(Ingestor):
         asr_batch_size = kwargs.get("asr_batch_size", 8)
 
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract_audio.chunk",
             MediaChunkActor,
             batch_size=audio_chunk_batch_size,
             batch_format="pandas",
@@ -828,7 +819,6 @@ class BatchIngestor(Ingestor):
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
         self._rd_dataset = self._rd_dataset.map_batches(
-            "extract_audio.asr",
             ASRActor,
             batch_size=asr_batch_size,
             batch_format="pandas",
@@ -963,7 +953,6 @@ class BatchIngestor(Ingestor):
             embed_actor_num_gpus = float(getattr(self, "_gpu_embed", self._embed_gpu_default))
 
         self._rd_dataset = self._rd_dataset.map_batches(
-            "embed.actor",
             _BatchEmbedActor,
             batch_size=embed_batch_size,
             batch_format="pandas",
@@ -1001,7 +990,6 @@ class BatchIngestor(Ingestor):
 
         # Streaming write stage — single actor, CPU-only, no GPU needed.
         self._rd_dataset = self._rd_dataset.map_batches(
-            "vdb_upload.write",
             _LanceDBWriteActor,
             batch_format="pandas",
             num_cpus=1,
