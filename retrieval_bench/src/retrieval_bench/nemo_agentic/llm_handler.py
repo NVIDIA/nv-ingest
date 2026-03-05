@@ -182,7 +182,9 @@ class LLM:
         curr_step = logging_ctx["curr_step"]
 
         io_log_kwargs = {}
-        io_log_kwargs["output_json"] = dict(obj=response.model_dump(), log_dir=json_log_dir, filename=f"{curr_step}_response.json")
+        io_log_kwargs["output_json"] = dict(
+            obj=response.model_dump(), log_dir=json_log_dir, filename=f"{curr_step}_response.json"
+        )
         return response, metadata_kv, io_log_kwargs
 
     async def acompletion(self, messages: list[dict], tools: Optional[list[dict]] = None, **kwargs: Any):
@@ -212,7 +214,9 @@ class LLM:
             print(LLM_ERROR_PREFIX + " " + str(e))
             return LLM_ERROR_PREFIX + " " + str(e)
 
-        _, metadata_kv, post_io = self.post_completion(request_kwargs=request_kwargs, response=response, logging_ctx=logging_ctx)
+        _, metadata_kv, post_io = self.post_completion(
+            request_kwargs=request_kwargs, response=response, logging_ctx=logging_ctx
+        )
         io_log_kwargs.update(post_io)
 
         if self.config.instant_log:
@@ -228,4 +232,3 @@ class LLM:
                 pass
             return output
         return response
-

@@ -159,7 +159,9 @@ class Agent:
             )
         else:
             self.message_history.append(
-                utils.AgentErrorMessage(content=f"LLM failed with finish_reason '{response.choices[0].finish_reason}'").model_dump()
+                utils.AgentErrorMessage(
+                    content=f"LLM failed with finish_reason '{response.choices[0].finish_reason}'"
+                ).model_dump()
             )
         return io_log_data
 
@@ -285,9 +287,7 @@ class Agent:
                 content = "Error parsing tool arguments. Tool arguments not correctly formatted."
             if content is None:
                 content = await self.call_one_tool(fn_name=fn_name, fn_kwargs=fn_kwargs, store_state=True)
-            tool_messages.append(
-                {"content": content, "role": "tool", "tool_call_id": call_info["id"], "name": fn_name}
-            )
+            tool_messages.append({"content": content, "role": "tool", "tool_call_id": call_info["id"], "name": fn_name})
         return tool_messages
 
     def is_last_msg_error(self) -> bool:
@@ -346,7 +346,9 @@ class Agent:
         io_log_data = None
         while True:
             if self.config.max_steps is not None and self.steps >= self.config.max_steps:
-                self.message_history.append(utils.AgentErrorMessage(content="Agent reached maximum allowed iterations").model_dump())
+                self.message_history.append(
+                    utils.AgentErrorMessage(content="Agent reached maximum allowed iterations").model_dump()
+                )
 
             if self.is_last_msg_error():
                 break
@@ -358,7 +360,9 @@ class Agent:
             if not self.is_last_msg_error():
                 _tc = self.message_history[-1].get("tool_calls", [])
                 if _tc is None or len(_tc) == 0:
-                    self.message_history.append({"role": "user", "content": [{"type": "text", "text": self.auto_user_msg}]})
+                    self.message_history.append(
+                        {"role": "user", "content": [{"type": "text", "text": self.auto_user_msg}]}
+                    )
                 else:
                     tool_calls = [tc["function"]["name"] for tc in self.message_history[-1]["tool_calls"]]
                     tool_messages = await self.process_tool_calls()
@@ -389,7 +393,10 @@ class Agent:
 
     async def conclude_task(self, query: str, task_info: Optional[Any] = None) -> Dict[str, Any]:
         """Calculate final top_k results if needed and return artifacts."""
-        output_artifacts: Dict[str, Any] = {"agent_trajectories": self.message_history, "retrieval_log": self.retrieval_log}
+        output_artifacts: Dict[str, Any] = {
+            "agent_trajectories": self.message_history,
+            "retrieval_log": self.retrieval_log,
+        }
         if len(self.extra_data):
             output_artifacts["agent_extra_data"] = self.extra_data
 
@@ -421,7 +428,11 @@ class Agent:
                 selection_output = await asyncio.gather(
                     *(
                         self.selection_agent.select_topk(
-                            query=query, documents=selection_input, top_k=k, session_id=self.session_id, task_info=task_info
+                            query=query,
+                            documents=selection_input,
+                            top_k=k,
+                            session_id=self.session_id,
+                            task_info=task_info,
                         )
                         for k in selection_topk_list
                     )
@@ -440,4 +451,3 @@ class Agent:
                 if final_ans is not None:
                     output_artifacts[f"top{topk}_selection_result"] = final_ans
         return output_artifacts
-

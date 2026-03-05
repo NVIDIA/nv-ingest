@@ -10,7 +10,6 @@ Used by both DenseRetrievalPipeline and AgenticRetrievalPipeline.
 from __future__ import annotations
 
 import os
-import sys
 from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 VALID_BACKENDS = {
@@ -91,28 +90,28 @@ def _import_retriever(backend: str) -> Any:
     """Lazily import the singleton retriever for a given backend."""
     if backend == "llama-nv-embed-reasoning-3b":
         from retrieval_bench.singletons.hf_dense_retriever import retriever
+
         return retriever
     elif backend == "llama-nemoretriever-colembed-3b-v1":
         from retrieval_bench.singletons.colembed_retriever import retriever
+
         return retriever
     elif backend == "llama-nemotron-embed-vl-1b-v2":
         from retrieval_bench.singletons.nemotron_embed_vl_dense_retriever import retriever
+
         return retriever
     elif backend == "nemotron-colembed-vl-8b-v2":
         from retrieval_bench.singletons.nemotron_colembed_vl_v2_retriever import retriever
+
         return retriever
     else:
-        raise ValueError(
-            f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}"
-        )
+        raise ValueError(f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
 
 
 def get_backend_defaults(backend: str) -> Dict[str, Any]:
     """Return a copy of the default kwargs for a backend."""
     if backend not in VALID_BACKENDS:
-        raise ValueError(
-            f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}"
-        )
+        raise ValueError(f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
     return dict(_BACKEND_DEFAULTS[backend])
 
 
@@ -133,9 +132,7 @@ def init_backend(
     ``init_info`` contains backend-specific metadata for the infos dict.
     """
     if backend not in VALID_BACKENDS:
-        raise ValueError(
-            f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}"
-        )
+        raise ValueError(f"Unknown backend {backend!r}. Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
 
     cfg = get_backend_defaults(backend)
     if overrides:
@@ -152,9 +149,7 @@ def init_backend(
         )
 
         query_prefix_fallback = str(cfg.pop("query_prefix_fallback"))
-        query_prefix = get_bright_query_prefix_nemo(
-            task_key=task_key, fallback=query_prefix_fallback
-        )
+        query_prefix = get_bright_query_prefix_nemo(task_key=task_key, fallback=query_prefix_fallback)
 
         pooling = str(cfg.pop("pooling", "mean"))
         max_length = int(cfg.pop("max_length", 8192))
@@ -182,15 +177,17 @@ def init_backend(
             cache_dir="cache/hf_dense",
             preload_corpus_to_gpu=preload_corpus_to_gpu,
         )
-        init_info.update({
-            "model_id": model_id,
-            "pooling": pooling,
-            "task_key": task_key,
-            "query_prefix": str(query_prefix),
-            "doc_prefix": str(NEMO_REASONING_PASSAGE_PREFIX),
-            "max_length": max_length,
-            "score_scale": score_scale,
-        })
+        init_info.update(
+            {
+                "model_id": model_id,
+                "pooling": pooling,
+                "task_key": task_key,
+                "query_prefix": str(query_prefix),
+                "doc_prefix": str(NEMO_REASONING_PASSAGE_PREFIX),
+                "max_length": max_length,
+                "score_scale": score_scale,
+            }
+        )
         return retriever, model_id, init_info
 
     elif backend == "llama-nemoretriever-colembed-3b-v1":
@@ -248,18 +245,20 @@ def init_backend(
             max_input_tiles=max_input_tiles,
             use_thumbnail=use_thumbnail,
         )
-        init_info.update({
-            "model_id": model_id,
-            "device": device,
-            "doc_modality": doc_modality,
-            "doc_max_length": doc_max_length,
-            "query_max_length": query_max_length,
-            "max_input_tiles": max_input_tiles,
-            "use_thumbnail": use_thumbnail,
-            "corpus_batch_size": corpus_batch_size,
-            "corpus_chunk_size": corpus_chunk_size,
-            "preload_corpus_to_gpu": preload_corpus_to_gpu,
-        })
+        init_info.update(
+            {
+                "model_id": model_id,
+                "device": device,
+                "doc_modality": doc_modality,
+                "doc_max_length": doc_max_length,
+                "query_max_length": query_max_length,
+                "max_input_tiles": max_input_tiles,
+                "use_thumbnail": use_thumbnail,
+                "corpus_batch_size": corpus_batch_size,
+                "corpus_chunk_size": corpus_chunk_size,
+                "preload_corpus_to_gpu": preload_corpus_to_gpu,
+            }
+        )
         active = _NemotronEmbedVLAdapter(retriever)
         return active, model_id, init_info
 

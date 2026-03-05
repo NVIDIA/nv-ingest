@@ -342,7 +342,9 @@ class _NemotronVLDenseState:
 
         if meta is None:
             print(f"[cache] dense rebuild: {emb_path} (missing)")
-        elif not self._meta_matches(meta, dataset_name=dataset_name, corpus_ids_hash10=corpus_ids_hash10, num_docs=len(corpus_ids_list)):
+        elif not self._meta_matches(
+            meta, dataset_name=dataset_name, corpus_ids_hash10=corpus_ids_hash10, num_docs=len(corpus_ids_list)
+        ):
             print(f"[cache] dense rebuild: {emb_path} (meta_mismatch)")
         else:
             try:
@@ -350,7 +352,9 @@ class _NemotronVLDenseState:
                 if not isinstance(emb, torch.Tensor):
                     raise TypeError(f"Expected torch.Tensor in cache, got {type(emb)}")
                 if emb.shape[0] != len(corpus_ids_list):
-                    raise ValueError(f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus={len(corpus_ids_list)}")
+                    raise ValueError(
+                        f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus={len(corpus_ids_list)}"
+                    )
                 print(f"[cache] dense hit: {emb_path}")
                 return emb
             except Exception:
@@ -571,7 +575,9 @@ class NemotronEmbedVLDenseSingletonRetriever:
             ):
                 # Already initialized for the same corpus; only adjust GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(self._state.corpus_embeddings_cpu)
+                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(
+                        self._state.corpus_embeddings_cpu
+                    )
                 if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
                 return
@@ -633,4 +639,3 @@ class NemotronEmbedVLDenseSingletonRetriever:
 # Module-level singleton instance
 # ---------------------------------------------------------------------------
 retriever = NemotronEmbedVLDenseSingletonRetriever()
-

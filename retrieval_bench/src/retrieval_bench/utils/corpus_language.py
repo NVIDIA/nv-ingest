@@ -30,4 +30,3 @@ def corpus_language(dataset_name: str) -> Literal["english", "french"]:
 
 def is_french_corpus(dataset_name: str) -> bool:
     return corpus_language(dataset_name) == "french"
-

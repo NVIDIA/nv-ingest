@@ -204,4 +204,3 @@ class SelectionAgent:
                     )
                     return message_history, end_kwargs
                 message_history.extend(tool_messages)
-

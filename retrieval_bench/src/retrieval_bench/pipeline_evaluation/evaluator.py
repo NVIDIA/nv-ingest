@@ -270,7 +270,6 @@ def evaluate_retrieval(
     run.update(executed_run)
 
     expected_query_ids = list(query_ids)
-    expected_set = set(expected_query_ids)
     returned_set = set(run.keys())
 
     evaluated_query_ids = [qid for qid in expected_query_ids if qid in returned_set]
@@ -278,8 +277,7 @@ def evaluate_retrieval(
 
     if not evaluated_query_ids:
         raise ValueError(
-            "Pipeline returned no results for any expected query_ids. "
-            "Refusing to compute metrics on an empty set."
+            "Pipeline returned no results for any expected query_ids. " "Refusing to compute metrics on an empty set."
         )
 
     # Restrict evaluation to only queries we have both run + qrels for.
@@ -408,7 +406,9 @@ def evaluate_retrieval(
         pipeline_infos_summary.update(pipeline_infos)
         pipeline_infos_summary.pop("per_query_trace", None)
 
-    pipeline_infos_summary["llm_error_query_ids"] = sorted(llm_error_query_ids_from_traces, key=lambda x: int(x) if x.isdigit() else x)
+    pipeline_infos_summary["llm_error_query_ids"] = sorted(
+        llm_error_query_ids_from_traces, key=lambda x: int(x) if x.isdigit() else x
+    )
     if llm_any_usage:
         pipeline_infos_summary["llm_total_prompt_tokens"] = llm_total_prompt_tokens
         pipeline_infos_summary["llm_total_completion_tokens"] = llm_total_completion_tokens

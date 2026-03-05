@@ -212,7 +212,9 @@ class _NemotronColEmbedVLV2State:
                     raise TypeError(f"Expected torch.Tensor or dict cache, got {type(obj)}")
 
                 if int(emb.shape[0]) != int(len(corpus_ids)):
-                    raise ValueError(f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus_ids={len(corpus_ids)}")
+                    raise ValueError(
+                        f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus_ids={len(corpus_ids)}"
+                    )
                 if int(lengths.shape[0]) != int(emb.shape[0]):
                     lengths = torch.full((int(emb.shape[0]),), int(emb.shape[1]), dtype=torch.int32, device="cpu")
                 lengths = torch.clamp(lengths.to("cpu", dtype=torch.int32), min=0, max=int(emb.shape[1]))
@@ -406,9 +408,13 @@ class NemotronColEmbedVLV2SingletonRetriever:
             ):
                 # Only adjust GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(self._state.corpus_embeddings_cpu)
+                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(
+                        self._state.corpus_embeddings_cpu
+                    )
                 if preload_corpus_to_gpu and self._state.corpus_token_lengths_gpu is None:
-                    self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(self._state.device, non_blocking=True)
+                    self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
+                        self._state.device, non_blocking=True
+                    )
                 if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
                 if (not preload_corpus_to_gpu) and self._state.corpus_token_lengths_gpu is not None:
@@ -436,7 +442,9 @@ class NemotronColEmbedVLV2SingletonRetriever:
             self._state.corpus_token_lengths_gpu = None
             if preload_corpus_to_gpu:
                 self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(emb_cpu)
-                self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(self._state.device, non_blocking=True)
+                self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
+                    self._state.device, non_blocking=True
+                )
 
     def retrieve(
         self,
@@ -481,4 +489,3 @@ class NemotronColEmbedVLV2SingletonRetriever:
 # Module-level singleton instance
 # ---------------------------------------------------------------------------
 retriever = NemotronColEmbedVLV2SingletonRetriever()
-

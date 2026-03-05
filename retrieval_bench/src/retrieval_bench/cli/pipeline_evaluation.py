@@ -12,7 +12,6 @@ reporting commands that operate on saved results and traces.
 import importlib.util
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Annotated, Any, Optional, Set, Tuple
@@ -21,13 +20,9 @@ import typer
 
 from retrieval_bench.pipeline_evaluation import (
     BasePipeline,
-    aggregate_results,
-    evaluate_retrieval,
     get_available_datasets,
-    load_vidore_dataset,
-    print_dataset_info,
 )
-from retrieval_bench.pipeline_evaluation.tracing import default_trace_run_name, dataset_trace_dir
+from retrieval_bench.pipeline_evaluation.tracing import dataset_trace_dir
 from vidore_benchmark.utils.logging_utils import setup_logging
 
 logger = logging.getLogger(__name__)
@@ -157,8 +152,7 @@ def _filter_queries_by_ids(
     if missing:
         raise ValueError(
             "Some requested query IDs are not available after filtering (e.g. language).\n"
-            f"Missing IDs: {', '.join(missing[:50])}"
-            + (" ..." if len(missing) > 50 else "")
+            f"Missing IDs: {', '.join(missing[:50])}" + (" ..." if len(missing) > 50 else "")
         )
 
     filtered_query_ids: list[str] = []
@@ -199,8 +193,7 @@ def _filter_queries_by_positions(
         raise ValueError(
             "Some requested query indices are out of range.\n"
             f"Valid range: 0..{max(0, n-1)}\n"
-            f"Bad indices (first 50): {bad[:50]}"
-            + (" ..." if len(bad) > 50 else "")
+            f"Bad indices (first 50): {bad[:50]}" + (" ..." if len(bad) > 50 else "")
         )
 
     filtered_query_ids: list[str] = []
@@ -216,7 +209,6 @@ def _filter_queries_by_positions(
     filtered_qrels = {qid: qrels[qid] for qid in filtered_query_ids if qid in qrels}
     filtered_query_languages = {qid: query_languages.get(qid, "unknown") for qid in filtered_query_ids}
     return filtered_query_ids, filtered_queries, filtered_qrels, filtered_query_languages
-
 
 
 def _extract_aggregated_metric(obj: Any, metric: str) -> Optional[float]:
@@ -317,7 +309,9 @@ def _extract_wall_time_and_nq(obj: Any) -> Tuple[Optional[float], Optional[int]]
     return float(wall_ms), int(nq)
 
 
-def _compute_llm_summary_from_traces(traces_dir: str, trace_run_name: str, dataset_short: str) -> Optional[Tuple[int, int, int, int, Optional[float], int]]:
+def _compute_llm_summary_from_traces(
+    traces_dir: str, trace_run_name: str, dataset_short: str
+) -> Optional[Tuple[int, int, int, int, Optional[float], int]]:
     """
     Return (llm_error_count, prompt_tokens, completion_tokens, total_tokens, avg_trajectory_steps, num_traces)
     by scanning per-query trace files.
@@ -371,7 +365,6 @@ def _compute_llm_summary_from_traces(traces_dir: str, trace_run_name: str, datas
     return (llm_error_count, prompt_tokens, completion_tokens, total_tokens, avg_traj, num_traces)
 
 
-
 def _compute_llm_errors_from_traces(
     traces_dir: str, trace_run_name: str, dataset_short: str, *, max_error_len: int = 500
 ) -> Optional[list[tuple[str, str]]]:
@@ -406,7 +399,11 @@ def _compute_llm_errors_from_traces(
         if max_error_len <= 0:
             err_s = err
         else:
-            err_s = err if len(err) <= max_error_len else (err[:max_error_len] + f"... [truncated, original_len={len(err)}]")
+            err_s = (
+                err
+                if len(err) <= max_error_len
+                else (err[:max_error_len] + f"... [truncated, original_len={len(err)}]")
+            )
         out.append((qid_s, err_s))
 
     # Sort numerically when possible (query ids are usually numeric strings).
@@ -644,7 +641,9 @@ def compare_results(
             elif tok in full_by_short:
                 selected.append(full_by_short[tok])
             else:
-                raise typer.BadParameter(f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}")
+                raise typer.BadParameter(
+                    f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}"
+                )
 
     # Pipeline labels for columns.
     dirs: list[Path] = [Path(d) for d in results_dirs]
@@ -680,9 +679,9 @@ def compare_results(
 
     def _csv_escape(s: str) -> str:
         s = "" if s is None else str(s)
-        if any(ch in s for ch in [",", "\"", "\n", "\r"]):
-            s = s.replace("\"", "\"\"")
-            return f"\"{s}\""
+        if any(ch in s for ch in [",", '"', "\n", "\r"]):
+            s = s.replace('"', '""')
+            return f'"{s}"'
         return s
 
     if csv:
@@ -795,7 +794,9 @@ def report_llm_usage(
             elif tok in full_by_short:
                 selected.append(full_by_short[tok])
             else:
-                raise typer.BadParameter(f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}")
+                raise typer.BadParameter(
+                    f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}"
+                )
 
     # Table rows: (dataset_short, nq, err_count, pt, ct, tt, wall_ms_q, avg_traj, source)
     rows: list[tuple[str, str, str, str, str, str, str, str, str]] = []
@@ -899,11 +900,18 @@ def report_llm_usage(
             rows.append((ds_short, "-", "-", "-", "-", "-", "-", "-", "MISSING"))
 
     # Pretty print.
-    headers = ("dataset", "num_queries", "llm_errors", "prompt_tokens", "completion_tokens", "total_tokens", "wall_ms/q", "avg_traj_steps", "source")
-    col_w = [
-        max(len(headers[i]), max((len(r[i]) for r in rows), default=0))
-        for i in range(len(headers))
-    ]
+    headers = (
+        "dataset",
+        "num_queries",
+        "llm_errors",
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+        "wall_ms/q",
+        "avg_traj_steps",
+        "source",
+    )
+    col_w = [max(len(headers[i]), max((len(r[i]) for r in rows), default=0)) for i in range(len(headers))]
     table_width = sum(col_w) + 2 * (len(col_w) - 1)
     title = f"LLM usage report: {results_root}"
     rule_width = max(70, len(title), table_width)
@@ -972,7 +980,9 @@ def report_llm_usage(
         any_errs = False
         for ds in selected:
             ds_short = short_by_full[ds]
-            traces_dir_eff, trace_run_name_eff = trace_ctx_by_dataset.get(ds_short, (traces_dir, inferred_trace_run_name))
+            traces_dir_eff, trace_run_name_eff = trace_ctx_by_dataset.get(
+                ds_short, (traces_dir, inferred_trace_run_name)
+            )
             errs_from_traces = _compute_llm_errors_from_traces(
                 traces_dir_eff, trace_run_name_eff, ds_short, max_error_len=max_error_len
             )
@@ -1090,7 +1100,9 @@ def purge_llm_error_traces(
             elif tok in full_by_short:
                 selected.append(full_by_short[tok])
             else:
-                raise typer.BadParameter(f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}")
+                raise typer.BadParameter(
+                    f"Unknown dataset '{tok}'. Expected one of: {', '.join(short_by_full.values())}"
+                )
 
     inferred_trace_run_name = results_root.name
     total_marked = 0

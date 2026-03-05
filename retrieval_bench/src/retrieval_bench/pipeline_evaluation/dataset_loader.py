@@ -156,9 +156,7 @@ def _load_bright_split(
     return query_ids, queries, corpus_ids, corpus_images, corpus_texts, qrels, query_languages, excluded_ids_by_query
 
 
-def load_vidore_dataset(
-    dataset_name: str, split: str = "test", language: str = None
-) -> Tuple[
+def load_vidore_dataset(dataset_name: str, split: str = "test", language: str = None) -> Tuple[
     List[str],
     List[str],
     List[str],

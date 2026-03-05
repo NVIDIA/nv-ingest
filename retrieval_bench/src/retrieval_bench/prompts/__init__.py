@@ -11,4 +11,3 @@ __all__ = [
     "BRIGHT_SHORT_INSTRUCTIONS",
     "get_task_description",
 ]
-

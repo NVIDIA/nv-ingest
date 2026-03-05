@@ -23,20 +23,14 @@ class TempModuleConfig:
 
 config = TempModuleConfig(
     LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO"),
-    TROVE_LOGGING_DISABLE=os.environ.get("TROVE_LOGGING_DISABLE", "false").lower()
-    == "true",
-    TROVE_LOGGING_DISABLE_RICH=os.environ.get(
-        "TROVE_LOGGING_DISABLE_RICH", "false"
-    ).lower()
-    == "true",
+    TROVE_LOGGING_DISABLE=os.environ.get("TROVE_LOGGING_DISABLE", "false").lower() == "true",
+    TROVE_LOGGING_DISABLE_RICH=os.environ.get("TROVE_LOGGING_DISABLE_RICH", "false").lower() == "true",
 )
 
 
 # TROVE_LOGGING_FORMAT_STR_RICH = "%(funcName)s() %(message)s"
 TROVE_LOGGING_FORMAT_STR_RICH = "%(message)s"
-TROVE_LOGGING_FORMAT_STR = (
-    "%(asctime)s %(module)s:%(lineno)s, [%(funcName)s] (%(levelname)s)- %(message)s"
-)
+TROVE_LOGGING_FORMAT_STR = "%(asctime)s %(module)s:%(lineno)s, [%(funcName)s] (%(levelname)s)- %(message)s"
 TROVE_LOGGING_TIME_FORMAT_STR = "%H:%M:%S"
 
 STR_LOG_LEVEL_TO_INT = {
@@ -56,15 +50,11 @@ def ensure_str_log_level(level: Union[str, int]) -> str:
     """Ensures log level is valid and converts it to ``str`` levels recognized by python logging."""
     if isinstance(level, str):
         if level.upper() not in STR_LOG_LEVEL_TO_INT:
-            raise ValueError(
-                f"Log level can only be one of '{list(STR_LOG_LEVEL_TO_INT.keys())}'. Got '{level}'"
-            )
+            raise ValueError(f"Log level can only be one of '{list(STR_LOG_LEVEL_TO_INT.keys())}'. Got '{level}'")
         return level.upper()
     if isinstance(level, int):
         if level not in STR_LOG_LEVEL_TO_INT.values():
-            raise ValueError(
-                f"Log level can only be one of '{list(INT_LOG_LEVEL_TO_STR.keys())}'. Got '{level}'"
-            )
+            raise ValueError(f"Log level can only be one of '{list(INT_LOG_LEVEL_TO_STR.keys())}'. Got '{level}'")
         return INT_LOG_LEVEL_TO_STR[level]
     raise TypeError(f"Log level can only be 'int' or 'str'. Got '{type(level)}'")
 
@@ -160,4 +150,3 @@ def get_logger_with_config(
         logger.addHandler(handler)
     logging_config = LoggerConfig(level=log_level)
     return logger, logging_config
-

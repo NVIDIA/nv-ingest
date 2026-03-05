@@ -58,7 +58,7 @@ def _last_token_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Ten
     """
     # attention_mask: [bs, seq]
     # last_hidden_states: [bs, seq, dim]
-    left_padding = (attention_mask[:, -1].sum() == attention_mask.shape[0])
+    left_padding = attention_mask[:, -1].sum() == attention_mask.shape[0]
     if bool(left_padding):
         return last_hidden_states[:, -1]
     sequence_lengths = attention_mask.sum(dim=1) - 1
@@ -183,7 +183,9 @@ class _HfDenseState:
         if not torch.cuda.is_available():
             raise RuntimeError("CUDA is not available. This dense retriever requires an NVIDIA GPU.")
         if not str(self.device).startswith("cuda"):
-            raise RuntimeError(f"Invalid device '{self.device}'. This dense retriever is GPU-only; use 'cuda'/'cuda:0'.")
+            raise RuntimeError(
+                f"Invalid device '{self.device}'. This dense retriever is GPU-only; use 'cuda'/'cuda:0'."
+            )
 
         # Compatibility shim for torch/transformers version skew.
         from retrieval_bench.utils.torch_compat import patch_torch_is_autocast_enabled
@@ -206,7 +208,10 @@ class _HfDenseState:
         pool_slug = _slugify(self.pooling)
         key = f"{dataset_name}::{self.model_id}::{self.max_length}::{pool_slug}::{self.doc_prefix}::{corpus_ids_hash10}"
         key_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
-        return self.cache_dir / f"hf_dense__{ds_slug}__{model_slug}__len{self.max_length}__{pool_slug}__doc{doc_slug}__{key_hash}"
+        return (
+            self.cache_dir
+            / f"hf_dense__{ds_slug}__{model_slug}__len{self.max_length}__{pool_slug}__doc{doc_slug}__{key_hash}"
+        )
 
     def _meta_path(self, dataset_name: str, *, corpus_ids_hash10: str) -> Path:
         return self._index_dir(dataset_name, corpus_ids_hash10=corpus_ids_hash10) / "meta.json"
@@ -334,8 +339,11 @@ class _HfDenseState:
         tmp = emb_path.with_suffix(".pt.tmp")
         torch.save(emb, tmp)
         os.replace(tmp, emb_path)
-        self._write_meta_atomic(self._build_meta(dataset_name=dataset_name, corpus_ids_hash10=corpus_ids_hash10, num_docs=len(corpus_ids)),
-                                dataset_name=dataset_name, corpus_ids_hash10=corpus_ids_hash10)
+        self._write_meta_atomic(
+            self._build_meta(dataset_name=dataset_name, corpus_ids_hash10=corpus_ids_hash10, num_docs=len(corpus_ids)),
+            dataset_name=dataset_name,
+            corpus_ids_hash10=corpus_ids_hash10,
+        )
         return emb
 
     def _try_preload_corpus_to_gpu(self, corpus_embeddings_cpu: torch.Tensor) -> Optional[torch.Tensor]:
@@ -524,7 +532,9 @@ class HfDenseSingletonRetriever:
             ):
                 # Already initialized for the same corpus; only (possibly) update GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(self._state.corpus_embeddings_cpu)
+                    self._state.corpus_embeddings_gpu = self._state._try_preload_corpus_to_gpu(
+                        self._state.corpus_embeddings_cpu
+                    )
                 if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
                 return
@@ -582,4 +592,3 @@ class HfDenseSingletonRetriever:
 # Module-level singleton instance
 # ---------------------------------------------------------------------------
 retriever = HfDenseSingletonRetriever()
-

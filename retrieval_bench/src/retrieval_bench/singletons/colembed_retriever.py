@@ -138,7 +138,9 @@ class _ColEmbedState:
                 if not isinstance(emb, torch.Tensor):
                     raise TypeError(f"Expected torch.Tensor in cache, got {type(emb)}")
                 if emb.shape[0] != len(corpus_ids):
-                    raise ValueError(f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus_ids={len(corpus_ids)}")
+                    raise ValueError(
+                        f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus_ids={len(corpus_ids)}"
+                    )
                 return emb
             except Exception:
                 # fall through to recompute
@@ -360,4 +362,3 @@ class ColEmbedSingletonRetriever:
 # Module-level singleton instance
 # ---------------------------------------------------------------------------
 retriever = ColEmbedSingletonRetriever()
-

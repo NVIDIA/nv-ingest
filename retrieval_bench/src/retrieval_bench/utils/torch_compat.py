@@ -51,4 +51,3 @@ def patch_torch_is_autocast_enabled() -> None:
         setattr(torch, "is_autocast_enabled", _wrapped)
     except Exception:
         return
-

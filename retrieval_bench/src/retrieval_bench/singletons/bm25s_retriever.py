@@ -154,7 +154,7 @@ class _Bm25sState:
             import Stemmer  # type: ignore
         except ImportError as e:  # pragma: no cover
             raise ImportError(
-                'Missing dependencies for BM25S singleton. Install with `pip install bm25s PyStemmer` '
+                "Missing dependencies for BM25S singleton. Install with `pip install bm25s PyStemmer` "
                 "(or ensure they are in project dependencies)."
             ) from e
 
@@ -283,4 +283,3 @@ class Bm25sSingletonRetriever:
 # Module-level singleton instance
 # ---------------------------------------------------------------------------
 retriever = Bm25sSingletonRetriever()
-

@@ -14,9 +14,7 @@ class AgentErrorMessage(BaseModel):
     content: str
 
 
-def rrf_from_subquery_results(
-    retrieval_results: List[List[Dict[str, Any]]], k: int = 60
-) -> Dict[str, float]:
+def rrf_from_subquery_results(retrieval_results: List[List[Dict[str, Any]]], k: int = 60) -> Dict[str, float]:
     """Calculates the RRF score for retrieval results."""
     sorted_results: List[List[str]] = []
     for ret_rs in retrieval_results:
@@ -33,4 +31,3 @@ def rrf(sorted_results: List[List[str]], k: int = 60) -> Dict[str, float]:
             rank = i + 1
             rrf_scores[item] += 1 / (rank + k)
     return dict(rrf_scores)
-

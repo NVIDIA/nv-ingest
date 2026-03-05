@@ -122,4 +122,3 @@ def get_task_description(*, task_key: Optional[str], fallback: str) -> str:
         if isinstance(v, str) and v.strip():
             return v.strip()
     return str(fallback or "").strip()
-

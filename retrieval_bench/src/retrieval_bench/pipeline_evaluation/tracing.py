@@ -161,4 +161,3 @@ def write_query_trace(
     p = trace_path(traces_dir, trace_run_name, dataset_dir, query_id)
     write_trace_file(p, payload)
     return p
-

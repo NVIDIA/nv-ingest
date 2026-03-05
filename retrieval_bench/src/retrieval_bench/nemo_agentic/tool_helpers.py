@@ -13,7 +13,6 @@ fastmcp integration has been removed; this module only provides:
 
 from __future__ import annotations
 
-import asyncio
 import json
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Set, Union
@@ -128,9 +127,7 @@ class FinalResults(BaseTool):
     _name: Optional[str] = "final_results"
 
     def __init__(self, top_k: Optional[int] = None):
-        self.correct_call_return_value = (
-            "The results have been successfully logged and the interaction ended."
-        )
+        self.correct_call_return_value = "The results have been successfully logged and the interaction ended."
         self.top_k = top_k
 
         tk_ins = ""
@@ -196,9 +193,7 @@ The successful_search field should be set to true if you believed you have found
         if not all(isinstance(i, str) for i in doc_ids):
             raise TypeError("Items in `doc_ids` must be of type string (i.e., python's `str` type).")
         if not isinstance(search_successful, str):
-            raise TypeError(
-                f"The `search_successful` argument must be a string. Got `{type(search_successful)}` type."
-            )
+            raise TypeError(f"The `search_successful` argument must be a string. Got `{type(search_successful)}` type.")
         if search_successful not in ["true", "false", "partial"]:
             raise ToolError(
                 f"`search_successful` must be one of `true`, `false`, or `partial`. Got `{search_successful}` instead."
@@ -256,4 +251,3 @@ async def retrieve_with_guarantees(
         if num_new >= top_k:
             break
     return output_list
-

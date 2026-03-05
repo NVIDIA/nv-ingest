@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
     import torch
@@ -41,10 +41,7 @@ class DenseRetrievalPipeline(BasePipeline):
 
     def __init__(self, *, backend: str, top_k: int = 100, **kwargs: Any) -> None:
         if backend not in VALID_BACKENDS:
-            raise ValueError(
-                f"Unknown backend {backend!r}. "
-                f"Must be one of: {', '.join(sorted(VALID_BACKENDS))}"
-            )
+            raise ValueError(f"Unknown backend {backend!r}. " f"Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
         self.backend = backend
         self.model_id = backend
         self.top_k = int(top_k)
@@ -126,9 +123,7 @@ class DenseRetrievalPipeline(BasePipeline):
                 t0 = time.perf_counter()
 
                 try:
-                    results[str(query_id)] = self._active_retriever.retrieve(
-                        str(query_text), excluded_ids=excluded_ids
-                    )
+                    results[str(query_id)] = self._active_retriever.retrieve(str(query_text), excluded_ids=excluded_ids)
                 except TypeError:
                     results[str(query_id)] = self._active_retriever.retrieve(str(query_text))
 

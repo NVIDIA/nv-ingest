@@ -18,7 +18,7 @@ import os
 import re
 import sys
 import time
-from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 
@@ -48,6 +48,7 @@ from retrieval_bench.nemo_agentic.tool_helpers import BaseTool, FinalResults, Re
 # ---------------------------------------------------------------------------
 # RetrieveTool adapter
 # ---------------------------------------------------------------------------
+
 
 class RetrieveTool(RetrieveToolBase):
     """
@@ -91,18 +92,22 @@ class RetrieveTool(RetrieveToolBase):
 
         try:
             scores, markdowns = self.retriever.retrieve(
-                str(query), return_markdown=True, excluded_ids=self.excluded_ids,
+                str(query),
+                return_markdown=True,
+                excluded_ids=self.excluded_ids,
             )
         except TypeError:
             scores, markdowns = self.retriever.retrieve(str(query), return_markdown=True)
 
         results: List[Dict[str, Any]] = []
         for doc_id, score in scores.items():
-            results.append({
-                "id": str(doc_id),
-                "score": float(score),
-                "text": str(markdowns.get(doc_id, "")),
-            })
+            results.append(
+                {
+                    "id": str(doc_id),
+                    "score": float(score),
+                    "text": str(markdowns.get(doc_id, "")),
+                }
+            )
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:effective_top_k]
 
@@ -111,9 +116,8 @@ class RetrieveTool(RetrieveToolBase):
 # Result extraction helpers
 # ---------------------------------------------------------------------------
 
-def extract_final_doc_ids(
-    output_artifacts: Dict[str, Any], *, final_top_k: int = 10
-) -> Tuple[List[str], str]:
+
+def extract_final_doc_ids(output_artifacts: Dict[str, Any], *, final_top_k: int = 10) -> Tuple[List[str], str]:
     """
     Extract the agent's final ranked doc ids with structured fallbacks.
 
@@ -143,7 +147,7 @@ def extract_final_doc_ids(
     if isinstance(rrf_scores, dict) and rrf_scores:
         try:
             sorted_ids = sorted(rrf_scores, key=rrf_scores.get, reverse=True)
-            return [str(i) for i in sorted_ids[:int(final_top_k)]], "rrf"
+            return [str(i) for i in sorted_ids[: int(final_top_k)]], "rrf"
         except Exception:
             pass
 
@@ -151,9 +155,9 @@ def extract_final_doc_ids(
     if isinstance(sel, dict):
         doc_ids = sel.get("doc_ids")
         if isinstance(doc_ids, list) and doc_ids and all(isinstance(i, str) for i in doc_ids):
-            return list(doc_ids)[:int(final_top_k)], "selection_agent"
+            return list(doc_ids)[: int(final_top_k)], "selection_agent"
     if isinstance(sel, list) and sel and all(isinstance(i, str) for i in sel):
-        return list(sel)[:int(final_top_k)], "selection_agent"
+        return list(sel)[: int(final_top_k)], "selection_agent"
 
     return [], "none"
 
@@ -161,6 +165,7 @@ def extract_final_doc_ids(
 # ---------------------------------------------------------------------------
 # LLM usage-tracking wrapper
 # ---------------------------------------------------------------------------
+
 
 def _wrap_llm_for_usage_tracking(llm: LLM) -> LLM:
     llm._accumulated_usage = {"prompt_tokens": 0, "completion_tokens": 0}  # type: ignore[attr-defined]
@@ -208,6 +213,7 @@ def _wrap_llm_for_usage_tracking(llm: LLM) -> LLM:
 # Pipeline
 # ---------------------------------------------------------------------------
 
+
 class AgenticRetrievalPipeline(BasePipeline):
     """
     Dense retrieval augmented with an LLM agent that iteratively refines results.
@@ -241,10 +247,7 @@ class AgenticRetrievalPipeline(BasePipeline):
         **backend_kwargs: Any,
     ) -> None:
         if backend not in VALID_BACKENDS:
-            raise ValueError(
-                f"Unknown backend {backend!r}. "
-                f"Must be one of: {', '.join(sorted(VALID_BACKENDS))}"
-            )
+            raise ValueError(f"Unknown backend {backend!r}. " f"Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
         self.backend = backend
         self.model_id = backend
         self.retriever_top_k = int(retriever_top_k)
@@ -405,7 +408,9 @@ class AgenticRetrievalPipeline(BasePipeline):
                 )
                 tool_map: Dict[str, BaseTool] = {"retrieve": retrieve_tool}
 
-                tk = int(agent_config.target_top_k) if agent_config.enforce_top_k and agent_config.target_top_k else None
+                tk = (
+                    int(agent_config.target_top_k) if agent_config.enforce_top_k and agent_config.target_top_k else None
+                )
                 tool_map["final_results"] = FinalResults(top_k=tk)
 
                 if not agent_config.disable_think:
@@ -443,11 +448,14 @@ class AgenticRetrievalPipeline(BasePipeline):
                     trace_entry["result_source"] = source
                     trace_entry["rrf_used"] = source == "rrf"
                     trace_entry["selection_agent_ran"] = any(
-                        isinstance(k, str) and k.startswith("top") and k.endswith("_selection_result") for k in output.keys()
+                        isinstance(k, str) and k.startswith("top") and k.endswith("_selection_result")
+                        for k in output.keys()
                     )
                     trace_entry["doc_ids"] = list(doc_ids)
                     retrieval_log = output.get("retrieval_log", []) if isinstance(output, dict) else []
-                    trace_entry["num_retrieval_calls"] = int(len(retrieval_log)) if isinstance(retrieval_log, list) else 0
+                    trace_entry["num_retrieval_calls"] = (
+                        int(len(retrieval_log)) if isinstance(retrieval_log, list) else 0
+                    )
                     agent_extra = output.get("agent_extra_data", None) if isinstance(output, dict) else None
                     trace_entry["query_rewriting_used"] = bool(isinstance(agent_extra, dict) and len(agent_extra) > 0)
                     rrf_scores = output.get("rrf_scores", None) if isinstance(output, dict) else None
@@ -505,14 +513,14 @@ class AgenticRetrievalPipeline(BasePipeline):
                             pipeline_trace=dict(trace_entry),
                         )
                     except Exception as e:
-                        print(
-                            f"WARNING: failed to write per-query trace for query_id={qid}: {type(e).__name__}: {e}"
-                        )
+                        print(f"WARNING: failed to write per-query trace for query_id={qid}: {type(e).__name__}: {e}")
 
                 async with completed_lock:
                     completed += 1
                     if completed == 1 or completed % 10 == 0 or completed == total_queries:
-                        print(f"  Agent queries completed: {completed}/{total_queries} (concurrency={self.num_concurrent})")
+                        print(
+                            f"  Agent queries completed: {completed}/{total_queries} (concurrency={self.num_concurrent})"
+                        )
 
         tasks = [
             asyncio.create_task(_process_query(q_idx=i, qid=str(qid), query_text=query_text))

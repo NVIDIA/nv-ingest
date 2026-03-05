@@ -35,7 +35,11 @@ app = typer.Typer(
     no_args_is_help=True,
 )
 
-app.add_typer(_pipeline_utils_app, name="utils", help="Reporting & trace utilities (list-datasets, report-results, compare-results, ...)")
+app.add_typer(
+    _pipeline_utils_app,
+    name="utils",
+    help="Reporting & trace utilities (list-datasets, report-results, compare-results, ...)",
+)
 
 
 @app.callback()
@@ -47,6 +51,7 @@ def main(log_level: Annotated[str, typer.Option("--log", help="Logging level")] 
 # ---------------------------------------------------------------------------
 # Query-id selector helpers (duplicated minimally from pipeline_evaluation)
 # ---------------------------------------------------------------------------
+
 
 def _parse_query_ids_selector(selector: str) -> Set[str]:
     selector = (selector or "").strip()
@@ -115,10 +120,25 @@ def _filter_queries_by_positions(query_ids, queries, qrels, query_languages, req
 # ---------------------------------------------------------------------------
 
 _METRICS = [
-    "ndcg_cut_1", "ndcg_cut_5", "ndcg_cut_10", "ndcg_cut_20", "ndcg_cut_100",
-    "recall_1", "recall_5", "recall_10", "recall_20", "recall_50", "recall_100",
-    "P_1", "P_5", "P_10", "P_20",
-    "map", "map_cut_1", "map_cut_10", "map_cut_100",
+    "ndcg_cut_1",
+    "ndcg_cut_5",
+    "ndcg_cut_10",
+    "ndcg_cut_20",
+    "ndcg_cut_100",
+    "recall_1",
+    "recall_5",
+    "recall_10",
+    "recall_20",
+    "recall_50",
+    "recall_100",
+    "P_1",
+    "P_5",
+    "P_10",
+    "P_20",
+    "map",
+    "map_cut_1",
+    "map_cut_10",
+    "map_cut_100",
     "recip_rank",
 ]
 
@@ -142,8 +162,8 @@ def _run_evaluation(
 
     # Load dataset
     try:
-        query_ids, queries, corpus_ids, corpus_images, corpus_texts, qrels, query_languages, excluded_ids_by_query = load_vidore_dataset(
-            dataset_name=dataset_name, split=split, language=language
+        query_ids, queries, corpus_ids, corpus_images, corpus_texts, qrels, query_languages, excluded_ids_by_query = (
+            load_vidore_dataset(dataset_name=dataset_name, split=split, language=language)
         )
     except Exception as e:
         print(f"\nError loading dataset: {e}\n")
@@ -155,12 +175,20 @@ def _run_evaluation(
             if _query_ids_are_numeric(query_ids):
                 requested = _parse_query_ids_selector(query_ids_selector)
                 query_ids, queries, qrels, query_languages = _filter_queries_by_ids(
-                    query_ids, queries, qrels, query_languages, requested,
+                    query_ids,
+                    queries,
+                    qrels,
+                    query_languages,
+                    requested,
                 )
             else:
                 requested_pos = _parse_index_selector(query_ids_selector)
                 query_ids, queries, qrels, query_languages = _filter_queries_by_positions(
-                    query_ids, queries, qrels, query_languages, requested_pos,
+                    query_ids,
+                    queries,
+                    qrels,
+                    query_languages,
+                    requested_pos,
                 )
         except ValueError as e:
             print(f"\nError parsing/applying --query-ids: {e}\n")
@@ -248,7 +276,8 @@ def _run_evaluation(
         if isinstance(missing_num, int) and missing_num > 0:
             typer.secho(
                 f"WARNING: {missing_num}/{expected_num} expected queries were not evaluated.",
-                fg=typer.colors.RED, bold=True,
+                fg=typer.colors.RED,
+                bold=True,
             )
 
 
@@ -288,7 +317,9 @@ def _display_results(aggregated: Dict[str, Any], timing_info: Any) -> None:
                 else:
                     print(f"  {metric:40s}: {value:.2f}")
     else:
-        timing_metrics = {k: v for k, v in aggregated.items() if k.startswith(("total_", "average_", "queries_", "num_"))}
+        timing_metrics = {
+            k: v for k, v in aggregated.items() if k.startswith(("total_", "average_", "queries_", "num_"))
+        }
         retrieval_metrics = {k: v for k, v in aggregated.items() if k not in timing_metrics}
 
         if retrieval_metrics:
@@ -315,10 +346,7 @@ def _display_results(aggregated: Dict[str, Any], timing_info: Any) -> None:
 # Commands
 # ---------------------------------------------------------------------------
 
-_backend_help = (
-    "Dense retriever backend. One of: "
-    + ", ".join(sorted(VALID_BACKENDS))
-)
+_backend_help = "Dense retriever backend. One of: " + ", ".join(sorted(VALID_BACKENDS))
 
 
 @app.command("dense-retrieval")
@@ -329,16 +357,20 @@ def dense_retrieval(
     language: Annotated[Optional[str], typer.Option(help="Language filter (e.g. 'english')")] = None,
     split: Annotated[str, typer.Option(help="Dataset split")] = "test",
     query_ids_selector: Annotated[
-        Optional[str], typer.Option("--query-ids", help="Query-id selector, e.g. '0-99,120'"),
+        Optional[str],
+        typer.Option("--query-ids", help="Query-id selector, e.g. '0-99,120'"),
     ] = None,
     output_file: Annotated[Optional[str], typer.Option(help="Path to save results JSON")] = None,
     trace_run_name: Annotated[Optional[str], typer.Option(help="Trace subdirectory name")] = None,
     traces_dir: Annotated[str, typer.Option(help="Traces root directory")] = "traces",
     show_dataset_info: Annotated[bool, typer.Option(help="Show dataset info")] = True,
     pipeline_args: Annotated[
-        Optional[str], typer.Option(help="JSON string of additional backend overrides"),
+        Optional[str],
+        typer.Option(help="JSON string of additional backend overrides"),
     ] = None,
-    cache_only: Annotated[bool, typer.Option("--cache-only", help="Only build corpus embedding cache, skip evaluation")] = False,
+    cache_only: Annotated[
+        bool, typer.Option("--cache-only", help="Only build corpus embedding cache, skip evaluation")
+    ] = False,
 ):
     """
     Evaluate a dense retrieval backend on a dataset.
@@ -399,14 +431,16 @@ def agentic_retrieval(
     language: Annotated[Optional[str], typer.Option(help="Language filter (e.g. 'english')")] = None,
     split: Annotated[str, typer.Option(help="Dataset split")] = "test",
     query_ids_selector: Annotated[
-        Optional[str], typer.Option("--query-ids", help="Query-id selector, e.g. '0-99,120'"),
+        Optional[str],
+        typer.Option("--query-ids", help="Query-id selector, e.g. '0-99,120'"),
     ] = None,
     output_file: Annotated[Optional[str], typer.Option(help="Path to save results JSON")] = None,
     trace_run_name: Annotated[Optional[str], typer.Option(help="Trace subdirectory name")] = None,
     traces_dir: Annotated[str, typer.Option(help="Traces root directory")] = "traces",
     show_dataset_info: Annotated[bool, typer.Option(help="Show dataset info")] = True,
     pipeline_args: Annotated[
-        Optional[str], typer.Option(help="JSON string of additional overrides (backend and agent)"),
+        Optional[str],
+        typer.Option(help="JSON string of additional overrides (backend and agent)"),
     ] = None,
 ):
     """

@@ -2,4 +2,3 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Selection agent subpackage for NeMo agentic retrieval."""
-

@@ -47,4 +47,3 @@ class LLMConfig(BaseModel):
     strict_error_handling: bool = False
     drop_params: bool = False
     allowed_openai_params: Optional[List[str]] = None
-
