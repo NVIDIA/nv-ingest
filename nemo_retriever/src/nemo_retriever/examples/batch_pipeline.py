@@ -887,8 +887,7 @@ def main(
                 ),
             )
             ingestor = (
-                ingestor.files(pdf_glob)
-                .extract(
+                ingestor.files(pdf_glob).extract(
                     ExtractParams(
                         extract_text=True,
                         extract_tables=True,
@@ -919,31 +918,31 @@ def main(
                         },
                     )
                 )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_ray_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
+                # .embed(
+                #     EmbedParams(
+                #         model_name=str(embed_model_name),
+                #         embed_invoke_url=embed_invoke_url,
+                #         embed_modality=embed_modality,
+                #         text_elements_modality=text_elements_modality,
+                #         structured_elements_modality=structured_elements_modality,
+                #         batch_tuning={
+                #             "embed_workers": embed_actors,
+                #             "embed_batch_size": int(embed_ray_batch_size),
+                #             "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                #         },
+                #     )
+                # )
+                # .vdb_upload(
+                #     VdbUploadParams(
+                #         lancedb={
+                #             "lancedb_uri": lancedb_uri,
+                #             "table_name": LANCEDB_TABLE,
+                #             "overwrite": True,
+                #             "create_index": True,
+                #             "hybrid": hybrid,
+                #         }
+                #     )
+                # )
             )
 
         if freeze_resource_config or freeze_resource_config_path is not None:
@@ -955,12 +954,15 @@ def main(
 
         print("Running extraction...")
         ingest_start = time.perf_counter()
-        ingestor.ingest(
+        ingest_dataset = ingestor.ingest(
             params=IngestExecuteParams(
                 runtime_metrics_dir=str(runtime_metrics_dir) if runtime_metrics_dir is not None else None,
                 runtime_metrics_prefix=runtime_metrics_prefix,
             )
         )
+        print(f"ingest_dataset: {ingest_dataset}")
+        print(f"Type of ingest_dataset: {type(ingest_dataset)}")
+
         ingest_elapsed_s = time.perf_counter() - ingest_start
         processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)

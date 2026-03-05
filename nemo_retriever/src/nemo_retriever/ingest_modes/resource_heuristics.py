@@ -18,7 +18,7 @@ batch ingestor to derive:
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 import yaml
 
@@ -47,15 +47,9 @@ def _read_env_float(name: str, default: float, *, minimum: float = 0.0) -> float
     return max(minimum, value)
 
 
-CPU_THRESHOLD_WORKERS = 64
-
-HIGH_CPU_PAGE_ELEMENTS_PER_GPU = 6
-HIGH_CPU_OCR_PER_GPU = 6
-HIGH_CPU_EMBED_PER_GPU = 2
-
-LOW_CPU_PAGE_ELEMENTS_PER_GPU = 3
-LOW_CPU_OCR_PER_GPU = 3
-LOW_CPU_EMBED_PER_GPU = 3
+PAGE_ELEMENTS_PER_GPU = 6
+OCR_PER_GPU = 6
+EMBED_PER_GPU = 2
 
 CPU_ONLY_STAGE_NUM_GPUS = 0.0
 HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS = 0.5
@@ -65,169 +59,6 @@ MAX_GPU_PER_STAGE = 1.0
 
 ENV_BATCH_NUM_CPUS = "NEMO_RETRIEVER_BATCH_NUM_CPUS"
 ENV_BATCH_NUM_GPUS = "NEMO_RETRIEVER_BATCH_NUM_GPUS"
-
-# Default per-model VRAM ceiling (bytes) used for future scheduling heuristics.
-DEFAULT_MODEL_MAX_VRAM_BYTES = 3 * 1024 * 1024 * 1024  # 3GB
-MODEL_MAX_VRAM_BYTES: dict[tuple[str, int], int] = {
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 64): 15 * 1024 * 1024 * 1024,  # 15GB
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 128): 25 * 1024 * 1024 * 1024,  # 25GB
-    ("nvidia/llama-3.2-nv-embedqa-1b-v2", 256): 50 * 1024 * 1024 * 1024,  # 50GB
-    ("nemotron-page-elements-v3", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-page-elements-v3", 64): 15 * 1024 * 1024 * 1024,  # 15GB
-    ("nemotron-page-elements-v3", 128): 25 * 1024 * 1024 * 1024,  # 25GB
-    ("nemotron-page-elements-v3", 256): 50 * 1024 * 1024 * 1024,  # 50GB
-    ("nemotron-ocr-v1", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 64): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-ocr-v1", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 1): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 4): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 8): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 16): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 32): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 64): DEFAULT_MODEL_MAX_VRAM_BYTES,
-    ("nemotron-parse-v1.2", 128): DEFAULT_MODEL_MAX_VRAM_BYTES,
-}
-
-
-def estimate_model_actor_capacity_by_gpu(
-    cluster_gpu_info: dict[str, dict[int, dict[str, Any]]],
-    desired_model_actor_instances: dict[str, int],
-    model_max_vram_bytes: dict[tuple[str, int], int] | None = None,
-) -> dict[str, dict[tuple[str, int], dict[str, int]]]:
-    """Estimate per-model actor counts and batch sizes per GPU.
-
-    For each ``(node_id, gpu_id)``, this function:
-    1) scales the desired per-model actor ratio by the largest feasible integer
-       multiplier that can fit at each model's minimum VRAM profile, then
-    2) chooses the largest batch sizes per model that jointly fit within the
-       GPU's free memory for that actor allocation.
-
-    The returned structure is:
-    ``{model_name: {(node_id, gpu_id): {"actors": int, "batch_size": int}}}``.
-    """
-    model_limits = model_max_vram_bytes or MODEL_MAX_VRAM_BYTES
-
-    # Group model entries as: model -> [(batch_size, required_bytes), ...],
-    # sorted by batch size ascending for easy min-profile lookup.
-    model_profiles: dict[str, list[tuple[int, int]]] = {}
-    for (model_name, batch_size), required_bytes in model_limits.items():
-        if int(batch_size) <= 0 or int(required_bytes) <= 0:
-            continue
-        model_profiles.setdefault(str(model_name), []).append((int(batch_size), int(required_bytes)))
-    for model_name in model_profiles:
-        model_profiles[model_name].sort(key=lambda item: item[0])
-
-    desired_ratios: dict[str, int] = {}
-    for model_name, count in (desired_model_actor_instances or {}).items():
-        if model_name in model_profiles and int(count) > 0:
-            desired_ratios[str(model_name)] = int(count)
-
-    result: dict[str, dict[tuple[str, int], dict[str, int]]] = {model_name: {} for model_name in desired_ratios}
-
-    if not desired_ratios:
-        return result
-
-    bytes_per_mib = 1024 * 1024
-    for node_id, gpu_map in (cluster_gpu_info or {}).items():
-        if not isinstance(gpu_map, dict):
-            continue
-        for gpu_id_raw, gpu_info in gpu_map.items():
-            try:
-                gpu_id = int(gpu_id_raw)
-            except (TypeError, ValueError):
-                continue
-            if not isinstance(gpu_info, dict):
-                continue
-
-            try:
-                free_mib = float(gpu_info.get("free", 0))
-            except (TypeError, ValueError):
-                free_mib = 0.0
-            free_bytes = int(max(0.0, free_mib) * bytes_per_mib)
-
-            # Minimum per-ratio memory unit using each model's smallest profile.
-            ratio_unit_bytes = 0
-            for model_name, desired_count in desired_ratios.items():
-                min_required_bytes = model_profiles[model_name][0][1]
-                ratio_unit_bytes += int(desired_count) * int(min_required_bytes)
-
-            scale = 0
-            if ratio_unit_bytes > 0:
-                scale = int(free_bytes // ratio_unit_bytes)
-
-            if scale <= 0:
-                for model_name in desired_ratios:
-                    result[model_name][(str(node_id), gpu_id)] = {"actors": 0, "batch_size": 0}
-                continue
-
-            actor_counts: dict[str, int] = {
-                model_name: int(desired_ratios[model_name]) * int(scale) for model_name in desired_ratios
-            }
-
-            # Start from largest batch for each model.
-            profile_index_by_model: dict[str, int] = {
-                model_name: len(model_profiles[model_name]) - 1 for model_name in desired_ratios
-            }
-
-            def _total_bytes() -> int:
-                total = 0
-                for model_name, actors in actor_counts.items():
-                    idx = profile_index_by_model[model_name]
-                    required_bytes = model_profiles[model_name][idx][1]
-                    total += int(actors) * int(required_bytes)
-                return total
-
-            # Reduce batch sizes only as needed until aggregate memory fits.
-            while _total_bytes() > free_bytes:
-                best_model_to_reduce: str | None = None
-                best_saved_bytes = 0
-                for model_name, idx in profile_index_by_model.items():
-                    if idx <= 0:
-                        continue
-                    current_required = model_profiles[model_name][idx][1]
-                    next_required = model_profiles[model_name][idx - 1][1]
-                    saved = actor_counts[model_name] * (current_required - next_required)
-                    if saved > best_saved_bytes:
-                        best_saved_bytes = saved
-                        best_model_to_reduce = model_name
-
-                if best_model_to_reduce is None:
-                    break
-                profile_index_by_model[best_model_to_reduce] -= 1
-
-            # If still not fitting, reduce ratio scale until it does.
-            while _total_bytes() > free_bytes and scale > 0:
-                scale -= 1
-                actor_counts = {
-                    model_name: int(desired_ratios[model_name]) * int(scale) for model_name in desired_ratios
-                }
-
-            if scale <= 0:
-                for model_name in desired_ratios:
-                    result[model_name][(str(node_id), gpu_id)] = {"actors": 0, "batch_size": 0}
-                continue
-
-            for model_name in desired_ratios:
-                batch_size = int(model_profiles[model_name][profile_index_by_model[model_name]][0])
-                result[model_name][(str(node_id), gpu_id)] = {
-                    "actors": int(actor_counts[model_name]),
-                    "batch_size": batch_size,
-                }
-
-    return result
 
 
 @ray.remote
@@ -330,13 +161,9 @@ def _as_float(value: object, *, minimum: float) -> Optional[float]:
 
 @dataclass(frozen=True)
 class _ResolvedHeuristicConfig:
-    cpu_threshold_workers: int
-    high_cpu_page_elements_per_gpu: int
-    high_cpu_ocr_per_gpu: int
-    high_cpu_embed_per_gpu: int
-    low_cpu_page_elements_per_gpu: int
-    low_cpu_ocr_per_gpu: int
-    low_cpu_embed_per_gpu: int
+    page_elements_per_gpu: int
+    ocr_per_gpu: int
+    embed_per_gpu: int
     cpu_only_stage_num_gpus: float
     high_overlap_page_elements_num_gpus: float
     high_overlap_ocr_num_gpus: float
@@ -360,13 +187,9 @@ def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) ->
     """Resolve heuristic constants with precedence defaults -> config -> env."""
     cfg = _load_config(filepath)
 
-    cpu_threshold_workers = _as_int(_cfg_get(cfg, "heuristics", "cpu_threshold_workers"), minimum=1)
-    high_cpu_page_elements_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "high_cpu_page_elements_per_gpu"), minimum=1)
-    high_cpu_ocr_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "high_cpu_ocr_per_gpu"), minimum=1)
-    high_cpu_embed_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "high_cpu_embed_per_gpu"), minimum=1)
-    low_cpu_page_elements_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "low_cpu_page_elements_per_gpu"), minimum=1)
-    low_cpu_ocr_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "low_cpu_ocr_per_gpu"), minimum=1)
-    low_cpu_embed_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "low_cpu_embed_per_gpu"), minimum=1)
+    page_elements_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "page_elements_per_gpu"), minimum=1)
+    ocr_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "ocr_per_gpu"), minimum=1)
+    embed_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "embed_per_gpu"), minimum=1)
 
     cpu_only_stage_num_gpus = _as_float(_cfg_get(cfg, "heuristics", "cpu_only_stage_num_gpus"), minimum=0.0)
     high_overlap_page_elements_num_gpus = _as_float(
@@ -377,47 +200,19 @@ def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) ->
     max_gpu_per_stage = _as_float(_cfg_get(cfg, "heuristics", "max_gpu_per_stage"), minimum=0.0)
 
     return _ResolvedHeuristicConfig(
-        cpu_threshold_workers=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_CPU_THRESHOLD_WORKERS",
-            cpu_threshold_workers if cpu_threshold_workers is not None else CPU_THRESHOLD_WORKERS,
+        page_elements_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU",
+            (page_elements_per_gpu if page_elements_per_gpu is not None else PAGE_ELEMENTS_PER_GPU),
             minimum=1,
         ),
-        high_cpu_page_elements_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_HIGH_CPU_PAGE_ELEMENTS_PER_GPU",
-            (
-                high_cpu_page_elements_per_gpu
-                if high_cpu_page_elements_per_gpu is not None
-                else HIGH_CPU_PAGE_ELEMENTS_PER_GPU
-            ),
+        ocr_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_OCR_PER_GPU",
+            ocr_per_gpu if ocr_per_gpu is not None else OCR_PER_GPU,
             minimum=1,
         ),
-        high_cpu_ocr_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_HIGH_CPU_OCR_PER_GPU",
-            high_cpu_ocr_per_gpu if high_cpu_ocr_per_gpu is not None else HIGH_CPU_OCR_PER_GPU,
-            minimum=1,
-        ),
-        high_cpu_embed_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_HIGH_CPU_EMBED_PER_GPU",
-            high_cpu_embed_per_gpu if high_cpu_embed_per_gpu is not None else HIGH_CPU_EMBED_PER_GPU,
-            minimum=1,
-        ),
-        low_cpu_page_elements_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_LOW_CPU_PAGE_ELEMENTS_PER_GPU",
-            (
-                low_cpu_page_elements_per_gpu
-                if low_cpu_page_elements_per_gpu is not None
-                else LOW_CPU_PAGE_ELEMENTS_PER_GPU
-            ),
-            minimum=1,
-        ),
-        low_cpu_ocr_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_LOW_CPU_OCR_PER_GPU",
-            low_cpu_ocr_per_gpu if low_cpu_ocr_per_gpu is not None else LOW_CPU_OCR_PER_GPU,
-            minimum=1,
-        ),
-        low_cpu_embed_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_LOW_CPU_EMBED_PER_GPU",
-            low_cpu_embed_per_gpu if low_cpu_embed_per_gpu is not None else LOW_CPU_EMBED_PER_GPU,
+        embed_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_EMBED_PER_GPU",
+            embed_per_gpu if embed_per_gpu is not None else EMBED_PER_GPU,
             minimum=1,
         ),
         cpu_only_stage_num_gpus=_read_env_float(
@@ -588,7 +383,6 @@ class WorkerHeuristicResult:
 
     cpu_count: int
     gpu_count: int
-    profile_name: str
     page_elements_per_gpu: int
     ocr_per_gpu: int
     embed_per_gpu: int
@@ -605,7 +399,6 @@ class WorkerHeuristicResult:
     page_elements_num_gpus: float
     detect_num_gpus: float
     embed_num_gpus: float
-    cpu_threshold_workers: int
 
 
 def _detect_local_gpu_count() -> int:
@@ -673,16 +466,9 @@ def resolve_batch_worker_plan(
     cpu_count = max(1, cpu_count)
     gpu_count = max(0, gpu_count)
 
-    if cpu_count >= cfg.cpu_threshold_workers:
-        profile_name = "high_cpu"
-        page_elements_per_gpu = cfg.high_cpu_page_elements_per_gpu
-        ocr_per_gpu = cfg.high_cpu_ocr_per_gpu
-        embed_per_gpu = cfg.high_cpu_embed_per_gpu
-    else:
-        profile_name = "low_cpu"
-        page_elements_per_gpu = cfg.low_cpu_page_elements_per_gpu
-        ocr_per_gpu = cfg.low_cpu_ocr_per_gpu
-        embed_per_gpu = cfg.low_cpu_embed_per_gpu
+    page_elements_per_gpu = cfg.page_elements_per_gpu
+    ocr_per_gpu = cfg.ocr_per_gpu
+    embed_per_gpu = cfg.embed_per_gpu
 
     if gpu_count > 0:
         heuristic_page_elements_workers = max(1, gpu_count * page_elements_per_gpu)
@@ -715,7 +501,6 @@ def resolve_batch_worker_plan(
     result = WorkerHeuristicResult(
         cpu_count=cpu_count,
         gpu_count=gpu_count,
-        profile_name=profile_name,
         page_elements_per_gpu=page_elements_per_gpu,
         ocr_per_gpu=ocr_per_gpu,
         embed_per_gpu=embed_per_gpu,
@@ -732,11 +517,10 @@ def resolve_batch_worker_plan(
         page_elements_num_gpus=page_elements_num_gpus,
         detect_num_gpus=detect_num_gpus,
         embed_num_gpus=embed_num_gpus,
-        cpu_threshold_workers=cfg.cpu_threshold_workers,
     )
     _debug_print(
         "Worker plan: "
-        f"profile={result.profile_name}, cpu={result.cpu_count}, gpu={result.gpu_count}, "
+        f"cpu={result.cpu_count}, gpu={result.gpu_count}, "
         f"workers(page_elements={result.page_elements_workers}, "
         "detect={result.detect_workers}, embed={result.embed_workers}), "
         f"gpu_per_stage(page_elements={result.page_elements_num_gpus:.3f}, "
@@ -763,7 +547,6 @@ def format_worker_heuristic_summary(
         [
             "Batch worker heuristic configuration:",
             f"  resources: cpu={result.cpu_count}, gpu={result.gpu_count}",
-            f"  profile: {result.profile_name} (threshold={result.cpu_threshold_workers})",
             (
                 "  per_gpu_ratio: "
                 f"PageElementDetectionActor={result.page_elements_per_gpu}, "
@@ -839,13 +622,9 @@ def freeze_resource_config(
             "gpu_count": int(resources.gpu_count),
         },
         "heuristics": {
-            "cpu_threshold_workers": int(settings.cpu_threshold_workers),
-            "high_cpu_page_elements_per_gpu": int(settings.high_cpu_page_elements_per_gpu),
-            "high_cpu_ocr_per_gpu": int(settings.high_cpu_ocr_per_gpu),
-            "high_cpu_embed_per_gpu": int(settings.high_cpu_embed_per_gpu),
-            "low_cpu_page_elements_per_gpu": int(settings.low_cpu_page_elements_per_gpu),
-            "low_cpu_ocr_per_gpu": int(settings.low_cpu_ocr_per_gpu),
-            "low_cpu_embed_per_gpu": int(settings.low_cpu_embed_per_gpu),
+            "page_elements_per_gpu": int(settings.page_elements_per_gpu),
+            "ocr_per_gpu": int(settings.ocr_per_gpu),
+            "embed_per_gpu": int(settings.embed_per_gpu),
             "cpu_only_stage_num_gpus": float(settings.cpu_only_stage_num_gpus),
             "high_overlap_page_elements_num_gpus": float(settings.high_overlap_page_elements_num_gpus),
             "high_overlap_ocr_num_gpus": float(settings.high_overlap_ocr_num_gpus),

@@ -30,12 +30,10 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.ingest_modes.resource_heuristics import (
-    estimate_model_actor_capacity_by_gpu,
     resolve_effective_resources,
 )
 from nemo_retriever.ingest_modes.resource_heuristics import pretty_print_worker_heuristic_summary
 from nemo_retriever.ingest_modes.resource_heuristics import resolve_batch_worker_plan
-from nemo_retriever.ingest_modes.resource_heuristics import _get_gpu_memory_info
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -307,10 +305,6 @@ class _BatchEmbedActor:
 
 class BatchIngestor(Ingestor):
     RUN_MODE = "batch"
-    _EMBED_MODEL_CAPACITY_KEY = "nvidia/llama-3.2-nv-embedqa-1b-v2"
-    _PAGE_ELEMENTS_MODEL_CAPACITY_KEY = "nemotron-page-elements-v3"
-    _OCR_MODEL_CAPACITY_KEY = "nemotron-ocr-v1"
-    _NEMOTRON_PARSE_MODEL_CAPACITY_KEY = "nemotron-parse-v1.2"
 
     def __init__(
         self,
@@ -356,63 +350,13 @@ class BatchIngestor(Ingestor):
                 data={"nodes": ray_nodes},
             )
 
-        # Schedule one GPU-memory probe task per alive node by pinning each task
-        # to that node's implicit "node:<ip>" resource.
-        node_probe_refs: list[tuple[str, ray.ObjectRef]] = []
-        for node_ip in node_ips:
-            print(f"Scheduling GPU probe on node: {node_ip}")
-            node_probe_refs.append(
-                (
-                    node_ip,
-                    _get_gpu_memory_info.options(resources={f"node:{node_ip}": 0.001}).remote(),
-                )
+        if self._debug:
+            _debug_log(
+                logger=self._logger,
+                location="ingest_modes/batch.py:BatchIngestor.__init__",
+                message="Ray node IPs",
+                data={"node_ips": node_ips},
             )
-
-        self._cluster_gpu_info = {}
-        for node_ip, probe_ref in node_probe_refs:
-            try:
-                node_gpu_info = ray.get(probe_ref)
-                self._cluster_gpu_info[node_ip] = node_gpu_info
-            except Exception as exc:
-                logging.warning("GPU probe failed on node %s: %s", node_ip, exc)
-
-        # Log debug if configured.
-        _debug_log(
-            logger=self._logger,
-            location="ingest_modes/batch.py:BatchIngestor.__init__",
-            message="Collected per-node GPU memory snapshots",
-            data={"nodes": len(self._cluster_gpu_info), "node_ids": list(self._cluster_gpu_info.keys())},
-        )
-
-        # TODO: Replace with actual hueristics gathered ...
-        desired_model_actor_instances = {
-            self._EMBED_MODEL_CAPACITY_KEY: 2,
-            self._PAGE_ELEMENTS_MODEL_CAPACITY_KEY: 4,
-            self._OCR_MODEL_CAPACITY_KEY: 4,
-            self._NEMOTRON_PARSE_MODEL_CAPACITY_KEY: 0,
-        }
-        self._model_actor_capacity = estimate_model_actor_capacity_by_gpu(
-            self._cluster_gpu_info, desired_model_actor_instances
-        )
-        self._model_actor_capacity_by_model = {
-            model_name: sum(
-                max(0, int(gpu_limits.get("actors", 0)))
-                for gpu_limits in per_gpu.values()
-                if isinstance(gpu_limits, dict)
-            )
-            for model_name, per_gpu in self._model_actor_capacity.items()
-        }
-
-        # Log debug if configured.
-        _debug_log(
-            logger=self._logger,
-            location="ingest_modes/batch.py:BatchIngestor.__init__",
-            message="Model actor capacity",
-            data={
-                "model_actor_capacity": self._model_actor_capacity,
-                "model_actor_capacity_by_model": self._model_actor_capacity_by_model,
-            },
-        )
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -424,22 +368,6 @@ class BatchIngestor(Ingestor):
         self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
-
-    def _cap_actor_workers(self, *, stage_name: str, model_name: str, requested_workers: int) -> int:
-        requested = max(0, int(requested_workers))
-        if model_name not in self._model_actor_capacity_by_model:
-            return requested
-
-        max_allowed = max(0, int(self._model_actor_capacity_by_model[model_name]))
-        if requested > max_allowed:
-            logging.warning(
-                "%s capped by model actor capacity for %s: %d -> %d",
-                stage_name,
-                model_name,
-                requested,
-                max_allowed,
-            )
-        return min(requested, max_allowed)
 
     def _map_batches_logged(self, stage_name: str, fn: Any, **kwargs: Any) -> rd.Dataset:
         """Log map_batches call details before submitting the stage to Ray Data."""
@@ -601,36 +529,12 @@ class BatchIngestor(Ingestor):
             )
             detect_workers = int(ocr_endpoints)
 
-        page_elements_workers = self._cap_actor_workers(
-            stage_name="extract.page_elements",
-            model_name=self._PAGE_ELEMENTS_MODEL_CAPACITY_KEY,
-            requested_workers=page_elements_workers,
-        )
-        detect_workers = self._cap_actor_workers(
-            stage_name="extract.ocr",
-            model_name=self._OCR_MODEL_CAPACITY_KEY,
-            requested_workers=detect_workers,
-        )
-        capped_nemotron_parse_workers = self._cap_actor_workers(
-            stage_name="extract.nemotron_parse",
-            model_name=self._NEMOTRON_PARSE_MODEL_CAPACITY_KEY,
-            requested_workers=nemotron_parse_workers,
-        )
         use_nemotron_parse_only = (
-            capped_nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+            nemotron_parse_workers > 0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
         )
-        if requested_use_nemotron_parse_only and not use_nemotron_parse_only:
-            logging.warning(
-                "nemotron parse-only mode disabled after model capacity capping: "
-                "requested_workers=%d capped_workers=%d",
-                int(nemotron_parse_workers),
-                int(capped_nemotron_parse_workers),
-            )
-        nemotron_parse_workers = int(capped_nemotron_parse_workers)
         if not use_nemotron_parse_only and page_elements_workers < 1:
             raise RuntimeError(
-                "extract.page_elements resolved to 0 actors after applying model capacity limits. "
-                "Reduce model memory usage or free GPU memory before running extraction."
+                "extract.page_elements resolved to 0 actors. Increase page_elements_workers before running extraction."
             )
 
         self._page_elements_workers = int(page_elements_workers)
@@ -651,16 +555,6 @@ class BatchIngestor(Ingestor):
         self._extract_pdf_extract_workers_default = max(1, cpus_for_extract // 2)
         pdf_extract_workers = kwargs.pop("pdf_extract_workers", self._extract_pdf_extract_workers_default)
         pdf_extract_workers = self._page_elements_workers * self._num_gpus
-
-        # TODO: removed in favor of using the model actor capacity.
-        # if use_nemotron_parse_only:
-        #     total_gpu_requested = float(gpu_nemotron_parse) * float(nemotron_parse_workers) + float(gpu_embed) * 1.0
-        # else:
-        #     total_gpu_requested = (
-        #         float(gpu_page_elements) * float(page_elements_workers)
-        #         + float(gpu_ocr) * float(detect_workers * detect_stage_count)
-        #         + float(gpu_embed) * 1.0
-        #     )
 
         # Store per-stage GPU allocations for downstream stages (e.g. embed).
         self._gpu_page_elements = gpu_page_elements
@@ -999,17 +893,8 @@ class BatchIngestor(Ingestor):
                 int(endpoint_count),
             )
             embed_workers = int(endpoint_count)
-        elif endpoint_count == 0:
-            embed_workers = self._cap_actor_workers(
-                stage_name="embed.actor",
-                model_name=self._EMBED_MODEL_CAPACITY_KEY,
-                requested_workers=embed_workers,
-            )
-            if embed_workers < 1:
-                raise RuntimeError(
-                    "embed.actor resolved to 0 actors after applying model capacity limits. "
-                    "Reduce embedding model memory usage or free GPU memory before running embedding."
-                )
+        elif embed_workers < 1:
+            raise RuntimeError("embed.actor resolved to 0 actors. Increase embed_workers before running embedding.")
 
         self._embed_workers = int(embed_workers)
         pretty_print_worker_heuristic_summary(
@@ -1158,63 +1043,65 @@ class BatchIngestor(Ingestor):
         )
         runtime_metrics_dir = run_params.runtime_metrics_dir
         runtime_metrics_prefix = run_params.runtime_metrics_prefix
-        t0 = time.monotonic()
-        num_pages = self._rd_dataset.count()
-        elapsed = time.monotonic() - t0
+        # t0 = time.monotonic()
+        # num_pages = self._rd_dataset.count()
+        # elapsed = time.monotonic() - t0
 
-        print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
-        _debug_log(
-            logger=self._logger,
-            location="ingest_modes/batch.py:ingest",
-            message="Pipeline completed with aggregate throughput",
-            data={
-                "input_files": len(self._input_documents),
-                "num_pages": int(num_pages),
-                "elapsed_seconds": float(elapsed),
-                "pages_per_second_total": float(num_pages / elapsed) if elapsed > 0 else None,
-                "runtime_metrics_dir": runtime_metrics_dir,
-            },
-        )
+        return self._rd_dataset
 
-        # Best-effort runtime metrics capture for per-run stage-level debugging.
-        if runtime_metrics_dir:
-            metrics_dir = Path(runtime_metrics_dir)
-            metrics_dir.mkdir(parents=True, exist_ok=True)
-            prefix = (runtime_metrics_prefix or "run").strip() or "run"
+        # print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
+        # _debug_log(
+        #     logger=self._logger,
+        #     location="ingest_modes/batch.py:ingest",
+        #     message="Pipeline completed with aggregate throughput",
+        #     data={
+        #         "input_files": len(self._input_documents),
+        #         "num_pages": int(num_pages),
+        #         "elapsed_seconds": float(elapsed),
+        #         "pages_per_second_total": float(num_pages / elapsed) if elapsed > 0 else None,
+        #         "runtime_metrics_dir": runtime_metrics_dir,
+        #     },
+        # )
 
-            stats_path = metrics_dir / f"{prefix}.rd_dataset.stats.txt"
-            timeline_path = metrics_dir / f"{prefix}.ray.timeline.json"
-            summary_path = metrics_dir / f"{prefix}.runtime.summary.json"
+        # # Best-effort runtime metrics capture for per-run stage-level debugging.
+        # if runtime_metrics_dir:
+        #     metrics_dir = Path(runtime_metrics_dir)
+        #     metrics_dir.mkdir(parents=True, exist_ok=True)
+        #     prefix = (runtime_metrics_prefix or "run").strip() or "run"
 
-            stats_text = ""
-            try:
-                stats_text = str(self._rd_dataset.stats())
-                stats_path.write_text(stats_text, encoding="utf-8")
-            except Exception as e:
-                print(f"Warning: failed writing dataset stats: {e}")
+        #     stats_path = metrics_dir / f"{prefix}.rd_dataset.stats.txt"
+        #     timeline_path = metrics_dir / f"{prefix}.ray.timeline.json"
+        #     summary_path = metrics_dir / f"{prefix}.runtime.summary.json"
 
-            try:
-                ray.timeline(filename=str(timeline_path))
-            except Exception as e:
-                print(f"Warning: failed writing ray timeline: {e}")
+        #     stats_text = ""
+        #     try:
+        #         stats_text = str(self._rd_dataset.stats())
+        #         stats_path.write_text(stats_text, encoding="utf-8")
+        #     except Exception as e:
+        #         print(f"Warning: failed writing dataset stats: {e}")
 
-            try:
-                summary = {
-                    "input_files": int(len(self._input_documents)),
-                    "num_pages": int(num_pages),
-                    "elapsed_seconds": float(elapsed),
-                    "stats_path": str(stats_path),
-                    "timeline_path": str(timeline_path),
-                }
-                summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-            except Exception as e:
-                print(f"Warning: failed writing runtime summary: {e}")
+        #     try:
+        #         ray.timeline(filename=str(timeline_path))
+        #     except Exception as e:
+        #         print(f"Warning: failed writing ray timeline: {e}")
 
-        # Create LanceDB vector index after all streaming writes are complete.
-        if hasattr(self, "_vdb_upload_kwargs") and self._vdb_upload_kwargs:
-            self._create_lancedb_index()
+        #     try:
+        #         summary = {
+        #             "input_files": int(len(self._input_documents)),
+        #             "num_pages": int(num_pages),
+        #             "elapsed_seconds": float(elapsed),
+        #             "stats_path": str(stats_path),
+        #             "timeline_path": str(timeline_path),
+        #         }
+        #         summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        #     except Exception as e:
+        #         print(f"Warning: failed writing runtime summary: {e}")
 
-        return num_pages
+        # # Create LanceDB vector index after all streaming writes are complete.
+        # if hasattr(self, "_vdb_upload_kwargs") and self._vdb_upload_kwargs:
+        #     self._create_lancedb_index()
+
+        # return num_pages
 
     def _create_lancedb_index(self) -> None:
         """Create the LanceDB vector index after streaming writes finish."""
