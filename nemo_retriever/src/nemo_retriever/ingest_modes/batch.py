@@ -779,7 +779,6 @@ class BatchIngestor(Ingestor):
             _BatchEmbedActor,
             batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
-            num_cpus=self._requested_plan.get_embed_cpus_per_actor(),
             num_gpus=embed_actor_num_gpus, # pulled from if statement above
             compute=rd.ActorPoolStrategy(initial_size=self._requested_plan.get_embed_initial_actors(), min_size=self._requested_plan.get_embed_min_actors(), max_size=self._requested_plan.get_embed_max_actors()),
             fn_constructor_kwargs={"params": resolved},
