@@ -144,7 +144,7 @@ def _resolve_path_like(value: str | None, base_path: Path = REPO_ROOT) -> str | 
     return str(p)
 
 
-def _resolve_dataset_dir_path(value: str, *, user_name: str | None = None) -> str:
+def _resolve_dataset_dir_path(value: str) -> str:
     p = Path(value).expanduser()
     if not p.is_absolute():
         return str((REPO_ROOT / p).resolve())
@@ -158,7 +158,7 @@ def _resolve_dataset_dir_path(value: str, *, user_name: str | None = None) -> st
     except ValueError:
         return str(resolved)
 
-    user = user_name or os.environ.get("USER")
+    user = os.environ.get("USER")
     if not user:
         return str(resolved)
 
@@ -177,12 +177,7 @@ def _resolve_query_csv_path(value: str | None, *, config_path: Path) -> str | No
     if p.is_absolute():
         return str(p.resolve())
 
-    candidate_bases: list[Path] = [config_path.parent, REPO_ROOT]
-    cwd = Path.cwd()
-    if cwd not in candidate_bases:
-        candidate_bases.append(cwd)
-
-    resolved_candidates = [(base / p).resolve() for base in candidate_bases]
+    resolved_candidates = [(base / p).resolve() for base in (config_path.parent, REPO_ROOT)]
     for candidate in resolved_candidates:
         if candidate.exists():
             return str(candidate)
