@@ -620,13 +620,13 @@ def main(
         help="Optional remote endpoint URL for page-elements model inference.",
     ),
     page_elements_model_batch_size: int = typer.Option(
-        32,
+        64,
         "--page-elements-model-batch-size",
         min=1,
         help="Model inference chunk size for PageElementDetectionActor only.",
     ),
     page_elements_ray_batch_size: int = typer.Option(
-        32,
+        64,
         "--page-elements-ray-batch-size",
         min=1,
         help="Ray Data batch size for page-elements stage.",
@@ -638,7 +638,7 @@ def main(
         help="Batch size for PDF extraction stage.",
     ),
     pdf_extract_cpus_per_task: float = typer.Option(
-        2.0,
+        1.0,
         "--pdf-extract-cpus-per-task",
         min=0.1,
         help="CPUs reserved per PDF extraction task.",
