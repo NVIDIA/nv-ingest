@@ -963,6 +963,10 @@ def main(
             )
         ).get_dataset().materialize()
 
+        results_path = "/home/local/jdyer/results/ingest_results.parquet"
+        ingest_results.write_parquet(results_path)
+        print(f"Wrote ingest results to {results_path}")
+
         #TODO: Remove this hardcoded num_pages once I come up with strategy I want to use
         num_pages = 54730
         print(f"ingest_results: {ingest_results}")
