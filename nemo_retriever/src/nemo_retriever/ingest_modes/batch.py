@@ -321,7 +321,14 @@ class BatchIngestor(Ingestor):
             logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize Ray for distributed execution.
-        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver))
+        print(f"NEMO_RETRIEVER_HF_CACHE_DIR: {os.getenv('NEMO_RETRIEVER_HF_CACHE_DIR')}")
+        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver),
+        runtime_env={
+            "env_vars": {
+                "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
+                "LOG_LEVEL": "INFO"
+            }
+        })
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
         ctx = rd.DataContext.get_current()
