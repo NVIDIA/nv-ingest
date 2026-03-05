@@ -135,6 +135,11 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     && uv pip install ./api/dist/*.whl \
     && uv pip install ./client/dist/*.whl
 
+# Remove Ray's Java JAR (ray_dist.jar). It bundles shaded Jackson (e.g. jackson-core) and is only
+# needed for Ray's Java API / cross-language. This image runs Python-only; removing it drops
+# the bundled Java deps and reduces image size.
+RUN rm -f /opt/nv_ingest_runtime/lib/python3.12/site-packages/ray/jars/ray_dist.jar
+
 RUN rm -rf src
 
 FROM nv_ingest_install AS runtime

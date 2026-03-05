@@ -229,6 +229,7 @@ scripts/private_local/
 test_results/
 sweep_results/
 artifacts/
+nemo_retriever/artifacts/
 
 # Ignore cursor rules
 .cursor
