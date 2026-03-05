@@ -492,7 +492,7 @@ def main(
         "'text', 'image', or 'text_image' ('image_text' is also accepted).",
     ),
     embed_ray_batch_size: int = typer.Option(
-        256,
+        124,
         "--embed-ray-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
@@ -585,7 +585,7 @@ def main(
         help="Optional remote endpoint URL for OCR model inference.",
     ),
     ocr_model_batch_size: int = typer.Option(
-        8,
+        16,
         "--ocr-model-batch-size",
         min=1,
         help="Model inference chunk size for OCRActor only.",
@@ -620,13 +620,13 @@ def main(
         help="Optional remote endpoint URL for page-elements model inference.",
     ),
     page_elements_model_batch_size: int = typer.Option(
-        8,
+        16,
         "--page-elements-model-batch-size",
         min=1,
         help="Model inference chunk size for PageElementDetectionActor only.",
     ),
     page_elements_ray_batch_size: int = typer.Option(
-        24,
+        16,
         "--page-elements-ray-batch-size",
         min=1,
         help="Ray Data batch size for page-elements stage.",
