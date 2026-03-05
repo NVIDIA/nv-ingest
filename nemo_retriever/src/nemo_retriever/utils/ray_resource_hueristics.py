@@ -29,7 +29,7 @@ NEMOTRON_PARSE_INITIAL_ACTORS = 1  # Hueristic initial num actors per GPU (initi
 NEMOTRON_PARSE_MIN_ACTORS = 1  # Hueristic minimum num actors per GPU (min_size of ActorPoolStrategy). Ray tries to never let running actors fall below this number.  # noqa: E501
 NEMOTRON_PARSE_MAX_ACTORS = 4  # Hueristic baseline num actors per GPU (max_size of ActorPoolStrategy). Ray will grow to this size when resources are available.  # noqa: E501
 NEMOTRON_PARSE_GPUS_PER_ACTOR = (
-    0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on.
+    0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on. # noqa: E501
 )
 NEMOTRON_PARSE_BATCH_SIZE = 64  # Ray batch size AND Nemotron Parse inference batch size
 
@@ -45,7 +45,7 @@ PAGE_ELEMENTS_INITIAL_ACTORS = 2  # Hueristic initial num actors per GPU (initia
 PAGE_ELEMENTS_MIN_ACTORS = 1  # Hueristic minimum num actors per GPU (min_size of ActorPoolStrategy). Ray tries to never let running actors fall below this number.  # noqa: E501
 PAGE_ELEMENTS_MAX_ACTORS = 6  # Hueristic baseline num actors per GPU (max_size of ActorPoolStrategy). Ray will grow to this size when resources are available.  # noqa: E501
 PAGE_ELEMENTS_GPUS_PER_ACTOR = (
-    0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on.
+    0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on. # noqa: E501
 )
 PAGE_ELEMENTS_BATCH_SIZE = 32  # Ray batch size AND PAGE-ELEMENTS inference batch size
 
