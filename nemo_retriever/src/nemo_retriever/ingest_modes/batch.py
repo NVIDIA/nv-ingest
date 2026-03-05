@@ -684,8 +684,6 @@ class BatchIngestor(Ingestor):
             )
         else:
 
-            page_elements_batch_size = page_elements_batch_size
-
             # Page-element detection with a GPU actor pool.
             self._rd_dataset = self._map_batches_logged(
                 "extract.page_elements",
@@ -831,7 +829,12 @@ class BatchIngestor(Ingestor):
         )
         return self
 
-    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
+    def embed(
+        self,
+        params: EmbedParams | None = None,
+        input_dataset: rd.Dataset | None = None,
+        **kwargs: Any,
+    ) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
 
@@ -847,7 +850,15 @@ class BatchIngestor(Ingestor):
           (e.g. ``"http://embedding:8000/v1"``).  When set, the actor
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
+        - ``input_dataset``: optional Ray Dataset to embed instead of the
+          currently configured internal dataset.
         """
+        if input_dataset is not None:
+            self._rd_dataset = input_dataset
+        if self._rd_dataset is None:
+            raise RuntimeError(
+                "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
+            )
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
         kwargs = {

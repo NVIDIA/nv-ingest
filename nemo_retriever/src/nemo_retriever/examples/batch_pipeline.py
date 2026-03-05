@@ -945,6 +945,7 @@ def main(
                 # )
             )
 
+
         if freeze_resource_config or freeze_resource_config_path is not None:
             frozen_path = freeze_resource_config_file(
                 output_path=freeze_resource_config_path,
@@ -974,7 +975,23 @@ def main(
         # processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         # detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
         
-        print(f"Processed pages: {num_pages} in {ingest_elapsed_s:.2f} seconds @ PPS: {num_pages / ingest_elapsed_s:.2f} / second")
+        ingest_results_message = f"Processed pages: {num_pages} in {ingest_elapsed_s:.2f} seconds @ PPS: {num_pages / ingest_elapsed_s:.2f} / second"
+        print(ingest_results_message)
+
+        print("Starting embedding...")
+        embedding_start = time.perf_counter()
+        embedding_results_dataset = ingestor.embed(
+            params=EmbedParams(
+                model_name=str(embed_model_name),
+                embed_invoke_url=embed_invoke_url,
+                embed_modality=embed_modality,
+            ),
+            input_dataset=ingest_dataset,
+        )
+
+        embedding_elapsed_s = time.perf_counter() - embedding_start
+        embedding_results_message = f"Embedded pages: {num_pages} in {embedding_elapsed_s:.2f} seconds @ PPS: {num_pages / embedding_elapsed_s:.2f} / second"
+        print(embedding_results_message)
 
         # _print_detection_summary(detection_summary)
         # if detection_summary_file is not None:
