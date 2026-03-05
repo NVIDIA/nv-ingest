@@ -679,7 +679,7 @@ class BatchIngestor(Ingestor):
                 batch_size=int(nemotron_parse_batch_size),
                 batch_format="pandas",
                 num_gpus=float(gpu_nemotron_parse),
-                compute=rd.ActorPoolStrategy(min_size=1, max_size=int(nemotron_parse_workers)),
+                compute=rd.ActorPoolStrategy(initial_size=4, min_size=1, max_size=int(nemotron_parse_workers)),
                 fn_constructor_kwargs=parse_flags,
             )
         else:
@@ -693,7 +693,7 @@ class BatchIngestor(Ingestor):
                 batch_size=page_elements_batch_size,
                 batch_format="pandas",
                 num_gpus=gpu_page_elements,
-                compute=rd.ActorPoolStrategy(min_size=1, max_size=page_elements_workers),
+                compute=rd.ActorPoolStrategy(initial_size=4, min_size=1, max_size=page_elements_workers),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
