@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import List, Optional, Sequence
 
 import torch
@@ -46,6 +47,9 @@ class LlamaNemotronEmbed1BV2Embedder:
         MODEL_ID = self.model_id or "nvidia/llama-3.2-nv-embedqa-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = configure_global_hf_cache_base(self.hf_cache_dir)
+        cache_env_dir = os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR")
+        print(f"cache_env_dir: {cache_env_dir}")
+        print(f"hf_cache_dir: {hf_cache_dir}")
         self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, cache_dir=hf_cache_dir, trust_remote_code=True)
         self._model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True, cache_dir=hf_cache_dir)
         self._model = self._model.to(dev)
