@@ -38,7 +38,7 @@ OCR_INITIAL_ACTORS = 2  # Hueristic initial num actors per GPU (initial_size of 
 OCR_MIN_ACTORS = 1  # Hueristic minimum num actors per GPU (min_size of ActorPoolStrategy). Ray tries to never let running actors fall below this number.  # noqa: E501
 OCR_MAX_ACTORS = 6  # Hueristic baseline num actors per GPU (max_size of ActorPoolStrategy). Ray will grow to this size when resources are available.  # noqa: E501
 OCR_GPUS_PER_ACTOR = 0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on.
-OCR_BATCH_SIZE = 64  # Ray batch size AND OCR inference batch size
+OCR_BATCH_SIZE = 32  # Ray batch size AND OCR inference batch size
 
 # PAGE-ELEMENTS Actor constants (PER-GPU)
 PAGE_ELEMENTS_INITIAL_ACTORS = 2  # Hueristic initial num actors per GPU (initial_size of ActorPoolStrategy). Ray starts up this many actors on start-up.  # noqa: E501
@@ -47,7 +47,7 @@ PAGE_ELEMENTS_MAX_ACTORS = 6  # Hueristic baseline num actors per GPU (max_size 
 PAGE_ELEMENTS_GPUS_PER_ACTOR = (
     0.1  # Hueristic baseline num GPUs per actor. Used to determine which GPU to schedule the actor on.
 )
-PAGE_ELEMENTS_BATCH_SIZE = 64  # Ray batch size AND PAGE-ELEMENTS inference batch size
+PAGE_ELEMENTS_BATCH_SIZE = 32  # Ray batch size AND PAGE-ELEMENTS inference batch size
 
 # PDF EXTRACTOR constants (PER-GPU) - reason being more GPU means more CPU needed to feed the models and keep up
 PDF_EXTRACT_BATCH_SIZE = 8  # Ray batch size AND PDF extraction batch size
