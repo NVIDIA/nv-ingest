@@ -815,7 +815,6 @@ class BatchIngestor(Ingestor):
             _LanceDBWriteActor,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=self._cpu_only_stage_num_gpus,
             compute=rd.ActorPoolStrategy(size=1),
             fn_constructor_kwargs={"params": p},
         )
