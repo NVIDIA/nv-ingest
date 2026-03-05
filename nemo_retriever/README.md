@@ -1,4 +1,4 @@
-# NeMo Retriever Library
+﻿# NeMo Retriever Library
 
 NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for PDFs that parses document structure—including text, tables, charts, and infographics—creates embeddings, optionally stores them in LanceDB, and performs recall evaluation.
 
@@ -40,6 +40,7 @@ Install the latest nightly builds of the NeMo Retriever Library so you can test 
 In this step, you install the core library, its API layer, and the client package, ensuring the ingestion pipeline and related tooling all come from a consistent, up‑to‑date version set.
 
 In your terminal, run the following commands from any location.
+
 
 ```bash
 uv pip install -i https://test.pypi.org/simple nemo-retriever==2026.3.3.dev20260303 nemo-retriever-api==2026.3.3.dev20260303 nemo-retriever-client==2026.3.3.dev20260303 --no-deps
