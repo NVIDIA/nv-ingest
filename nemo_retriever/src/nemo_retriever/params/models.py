@@ -135,6 +135,7 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_workers: float = 0.0
     gpu_nemotron_parse: float = 0.0
     nemotron_parse_batch_size: float = 0.0
+    inference_batch_size: int = 8
 
 
 class FusedTuningParams(_ParamsModel):
