@@ -27,7 +27,7 @@ from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
-from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.recall.core import RecallConfig, is_hit_at_k, retrieve_and_score
 
 app = typer.Typer()
 
@@ -315,14 +315,6 @@ def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
     return doc, page
 
 
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int) -> bool:
-    doc, page = _gold_to_doc_page(golden_key)
-    specific_page = f"{doc}_{page}"
-    entire_document = f"{doc}_-1"
-    top = (retrieved_keys or [])[: int(k)]
-    return (specific_page in top) or (entire_document in top)
-
-
 def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     try:
         res = json.loads(hit.get("metadata", "{}"))
@@ -342,11 +334,10 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 
 @app.command()
 def main(
-    input_dir: Path = typer.Argument(
+    input_path: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
+        help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
         path_type=Path,
-        exists=True,
     ),
     input_type: str = typer.Option(
         "pdf",
@@ -374,6 +365,11 @@ def main(
             "Path to query CSV for recall evaluation. Default: bo767_query_gt.csv "
             "(current directory). Recall is skipped if the file does not exist."
         ),
+    ),
+    recall_match_mode: str = typer.Option(
+        "pdf_page",
+        "--recall-match-mode",
+        help="Recall match mode: 'pdf_page' or 'pdf_only'.",
     ),
     no_recall_details: bool = typer.Option(
         False,
@@ -539,6 +535,11 @@ def main(
         "--structured-elements-modality",
         help="Embedding modality override for table/chart/infographic rows. Falls back to --embed-modality.",
     ),
+    embed_granularity: str = typer.Option(
+        "element",
+        "--embed-granularity",
+        help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
+    ),
     runtime_metrics_dir: Optional[Path] = typer.Option(
         None,
         "--runtime-metrics-dir",
@@ -581,9 +582,34 @@ def main(
         "--hybrid/--no-hybrid",
         help="Enable LanceDB hybrid mode (dense + FTS text).",
     ),
+    use_table_structure: bool = typer.Option(
+        False,
+        "--use-table-structure",
+        help="Enable the combined table-structure + OCR stage for tables (requires extract_tables).",
+    ),
+    table_output_format: Optional[str] = typer.Option(
+        None,
+        "--table-output-format",
+        help=(
+            "Table output format: 'pseudo_markdown' (OCR-only) or 'markdown' "
+            "(table-structure + OCR). Defaults to 'markdown' when table-structure "
+            "is enabled, 'pseudo_markdown' otherwise."
+        ),
+    ),
+    table_structure_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--table-structure-invoke-url",
+        help=(
+            "Optional remote endpoint URL for table-structure model inference "
+            "(used when --table-output-format=markdown)."
+        ),
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
+        if recall_match_mode not in {"pdf_page", "pdf_only"}:
+            raise ValueError(f"Unsupported --recall-match-mode: {recall_match_mode}")
+
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
@@ -610,15 +636,27 @@ def main(
             subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
             ray_address = "auto"
 
-        input_dir = Path(input_dir)
+        input_path = Path(input_path)
+        if input_path.is_file():
+            file_patterns = [str(input_path)]
+        elif input_path.is_dir():
+            ext_map = {
+                "txt": ["*.txt"],
+                "html": ["*.html"],
+                "doc": ["*.docx", "*.pptx"],
+            }
+            exts = ext_map.get(input_type, ["*.pdf"])
+            file_patterns = [str(input_path / e) for e in exts]
+        else:
+            raise typer.BadParameter(f"Path does not exist: {input_path}")
+
+        ingestor = create_ingestor(
+            run_mode="batch",
+            params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
+        )
         if input_type == "txt":
-            glob_pattern = str(input_dir / "*.txt")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -627,6 +665,7 @@ def main(
                         embed_modality=embed_modality,
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
+                        embed_granularity=embed_granularity,
                     )
                 )
                 .vdb_upload(
@@ -642,13 +681,8 @@ def main(
                 )
             )
         elif input_type == "html":
-            glob_pattern = str(input_dir / "*.html")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(
                     EmbedParams(
@@ -657,6 +691,7 @@ def main(
                         embed_modality=embed_modality,
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
+                        embed_granularity=embed_granularity,
                     )
                 )
                 .vdb_upload(
@@ -672,20 +707,17 @@ def main(
                 )
             )
         elif input_type == "doc":
-            # DOCX/PPTX: same pipeline as PDF; DocToPdfConversionActor converts before split.
-            doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(doc_globs)
+                ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -736,19 +768,17 @@ def main(
                 )
             )
         else:
-            pdf_glob = str(input_dir / "*.pdf")
-            ingestor = create_ingestor(
-                run_mode="batch",
-                params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
-            )
             ingestor = (
-                ingestor.files(pdf_glob)
+                ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_table_structure=use_table_structure,
+                        table_output_format=table_output_format,
+                        table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
@@ -868,6 +898,7 @@ def main(
             top_k=10,
             ks=(1, 5, 10),
             hybrid=hybrid,
+            match_mode=recall_match_mode,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
@@ -887,7 +918,10 @@ def main(
                 _raw_hits,
             )
         ):
-            doc, page = _gold_to_doc_page(g)
+            if recall_match_mode == "pdf_only":
+                doc, page = str(g), ""
+            else:
+                doc, page = _gold_to_doc_page(g)
 
             scored_hits: list[tuple[str, float | None]] = []
             for h in hits:
@@ -896,11 +930,14 @@ def main(
                     scored_hits.append((key, dist))
 
             top_keys = [k for (k, _d) in scored_hits]
-            hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+            hit = is_hit_at_k(g, top_keys, cfg.top_k, match_mode=recall_match_mode)
 
             if not no_recall_details:
                 print(f"\nQuery {i}: {q}")
-                print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
+                if recall_match_mode == "pdf_only":
+                    print(f"  Gold: {g}  (file: {doc}{ext})")
+                else:
+                    print(f"  Gold: {g}  (file: {doc}{ext}, page: {page})")
                 print(f"  Hit@{cfg.top_k}: {hit}")
                 print("  Top hits:")
                 if not scored_hits:
@@ -913,15 +950,24 @@ def main(
                             print(f"    {rank:02d}. {key}  distance={dist:.6f}")
 
             if not hit:
-                missed_gold.append((f"{doc}{ext}", str(page)))
+                if recall_match_mode == "pdf_only":
+                    missed_gold.append((f"{doc}{ext}", ""))
+                else:
+                    missed_gold.append((f"{doc}{ext}", str(page)))
 
         missed_unique = sorted(set(missed_gold), key=lambda x: (x[0], x[1]))
-        print("\nMissed gold (unique doc/page):")
+        if recall_match_mode == "pdf_only":
+            print("\nMissed gold (unique docs):")
+        else:
+            print("\nMissed gold (unique doc/page):")
         if not missed_unique:
             print("  (none)")
         else:
             for doc_page, page in missed_unique:
-                print(f"  {doc_page} page {page}")
+                if recall_match_mode == "pdf_only":
+                    print(f"  {doc_page}")
+                else:
+                    print(f"  {doc_page} page {page}")
         print(f"\nTotal missed: {len(missed_unique)} / {len(_gold)}")
 
         print("\nRecall metrics (matching nemo_retriever.recall.core):")

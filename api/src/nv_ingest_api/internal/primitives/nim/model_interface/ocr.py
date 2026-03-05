@@ -24,6 +24,7 @@ DEFAULT_OCR_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_MODEL_NAME = "scene_text_wrapper"
 NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME = "scene_text_ensemble"
 NEMORETRIEVER_OCR_BLS_MODEL_NAME = "scene_text_python"
+NEMORETRIEVER_OCR_PIPELINE_MODEL_NAME = "pipeline"
 
 
 logger = logging.getLogger(__name__)
@@ -238,8 +239,13 @@ class OCRModelInterfaceBase(ModelInterface):
             NEMORETRIEVER_OCR_MODEL_NAME,
             NEMORETRIEVER_OCR_ENSEMBLE_MODEL_NAME,
             NEMORETRIEVER_OCR_BLS_MODEL_NAME,
+            NEMORETRIEVER_OCR_PIPELINE_MODEL_NAME,
         ]:
-            response = response.transpose((1, 0))
+            if response.ndim == 2:
+                response = response.transpose((1, 0))
+            elif response.ndim == 1 and response.shape[0] > 3 and response.shape[0] % 3 == 0:
+                batch_size = response.shape[0] // 3
+                response = response.reshape(batch_size, 3).transpose(1, 0)
 
         # If we have shape (3,), convert to (3, 1)
         if response.ndim == 1 and response.shape == (3,):

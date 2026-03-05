@@ -32,6 +32,7 @@ from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, Ne
 from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
+from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
 try:
@@ -228,6 +229,53 @@ def explode_content_to_rows(
             new_rows.append(preserved)
 
     return pd.DataFrame(new_rows).reset_index(drop=True)
+
+
+def collapse_content_to_page_rows(
+    batch_df: Any,
+    *,
+    text_column: str = "text",
+    content_columns: Sequence[str] = _CONTENT_COLUMNS,
+    modality: str = "text",
+) -> Any:
+    """Collapse each page into a single row for page-level embedding.
+
+    For each row in *batch_df*:
+    - Concatenates the page text with all structured content text (tables,
+      charts, infographics) into one combined string in ``text_column``.
+    - Uses the **full page image** (no cropping) when *modality* requires
+      images.
+    - Tags the row with ``_embed_modality = modality``.
+
+    This produces **one embedding per page**.
+
+    Parameters
+    ----------
+    modality : str
+        Embedding modality for every row (default ``"text"``).
+    """
+    if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
+        return batch_df
+
+    batch_df = batch_df.copy()
+
+    # Concatenate all text content per page using the existing helper.
+    batch_df[text_column] = batch_df.apply(
+        lambda row: _combine_text_with_content(row, text_column, content_columns),
+        axis=1,
+    )
+
+    # Full page image (no cropping) for image modalities.
+    if modality in IMAGE_MODALITIES:
+        if "page_image" in batch_df.columns:
+            batch_df["_image_b64"] = batch_df["page_image"].apply(
+                lambda pi: pi.get("image_b64") if isinstance(pi, dict) else None
+            )
+        else:
+            batch_df["_image_b64"] = None
+
+    batch_df["_embed_modality"] = modality
+    return batch_df
 
 
 def _embed_group(
@@ -1287,9 +1335,50 @@ class InProcessIngestor(Ingestor):
                     )
                 )
 
+            use_table_structure = bool(kwargs.get("use_table_structure", False))
+            from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
+
+            validate_table_structure_flags(
+                use_table_structure, str(kwargs.get("table_output_format", "pseudo_markdown"))
+            )
+
+            # When use_table_structure is True, tables go through
+            # the combined table-structure + OCR stage instead of OCR-only.
+            if use_table_structure and kwargs.get("extract_tables") is True:
+                print("Adding table-structure+OCR extraction task")
+                ts_invoke_url = kwargs.get("table_structure_invoke_url", "")
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                )
+
+                ts_ocr_kwargs: dict[str, Any] = {}
+                if ts_invoke_url:
+                    ts_ocr_kwargs["table_structure_invoke_url"] = ts_invoke_url
+                    ts_ocr_kwargs["table_structure_model"] = None
+                else:
+                    from nemo_retriever.model.local import NemotronTableStructureV1
+
+                    ts_ocr_kwargs["table_structure_model"] = NemotronTableStructureV1()
+
+                if ocr_invoke_url:
+                    ts_ocr_kwargs["ocr_invoke_url"] = ocr_invoke_url
+                    ts_ocr_kwargs["ocr_model"] = None
+                else:
+                    ocr_model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                    ts_ocr_kwargs["ocr_model"] = ocr_model
+
+                ts_ocr_kwargs.update(_stage_remote_kwargs("ocr"))
+                self._tasks.append((table_structure_ocr_page_elements, ts_ocr_kwargs))
+
             # OCR-based extraction for tables/charts/infographics.
+            # When use_table_structure is True, tables are handled above;
+            # charts/infographics still go through OCR.
             ocr_flags = {}
-            if kwargs.get("extract_tables") is True:
+            if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True
@@ -1373,21 +1462,30 @@ class InProcessIngestor(Ingestor):
         """
         resolved = _coerce_params(params, EmbedParams, kwargs)
         embed_modality = resolved.embed_modality
-        text_elements_modality = resolved.text_elements_modality or embed_modality
-        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        embed_granularity = resolved.embed_granularity
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
-        self._tasks.append(
-            (
-                explode_content_to_rows,
-                {
-                    "modality": embed_modality,
-                    "text_elements_modality": text_elements_modality,
-                    "structured_elements_modality": structured_elements_modality,
-                },
+        if embed_granularity == "page":
+            # Page-level: one row per page with concatenated text and full page image.
+            self._tasks.append(
+                (
+                    collapse_content_to_page_rows,
+                    {"modality": embed_modality},
+                )
             )
-        )
+        else:
+            # Element-level (default): one row per table/chart/infographic.
+            text_elements_modality = resolved.text_elements_modality or embed_modality
+            structured_elements_modality = resolved.structured_elements_modality or embed_modality
+            self._tasks.append(
+                (
+                    explode_content_to_rows,
+                    {
+                        "modality": embed_modality,
+                        "text_elements_modality": text_elements_modality,
+                        "structured_elements_modality": structured_elements_modality,
+                    },
+                )
+            )
 
         embed_kwargs = {
             **resolved.model_dump(

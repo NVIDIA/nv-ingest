@@ -27,6 +27,7 @@ import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
+from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 
@@ -665,9 +666,52 @@ class BatchIngestor(Ingestor):
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
+            use_table_structure = bool(kwargs.get("use_table_structure", False))
+            from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
+
+            validate_table_structure_flags(
+                use_table_structure, str(kwargs.get("table_output_format", "pseudo_markdown"))
+            )
+
+            # When use_table_structure is True, tables go through
+            # the combined table-structure + OCR stage instead of OCR-only.
+            if use_table_structure and kwargs.get("extract_tables") is True:
+                ts_ocr_flags: dict[str, Any] = {}
+                for k in (
+                    "api_key",
+                    "request_timeout_s",
+                    "remote_max_pool_workers",
+                    "remote_max_retries",
+                    "remote_max_429_retries",
+                ):
+                    if k in kwargs:
+                        ts_ocr_flags[k] = kwargs[k]
+                ts_invoke_url = kwargs.get("table_structure_invoke_url")
+                if ts_invoke_url:
+                    ts_ocr_flags["table_structure_invoke_url"] = ts_invoke_url
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+                if ocr_invoke_url:
+                    ts_ocr_flags["ocr_invoke_url"] = ocr_invoke_url
+                if "ocr_request_timeout_s" in kwargs:
+                    ts_ocr_flags["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+                if "ocr_api_key" in kwargs:
+                    ts_ocr_flags["api_key"] = kwargs["ocr_api_key"]
+
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    TableStructureActor,
+                    batch_size=detect_batch_size,
+                    batch_format="pandas",
+                    num_cpus=ocr_cpus_per_actor,
+                    num_gpus=gpu_ocr,
+                    compute=rd.ActorPoolStrategy(size=detect_workers),
+                    fn_constructor_kwargs=ts_ocr_flags,
+                )
+
             # OCR-based extraction for tables/charts/infographics (single stage).
+            # When use_table_structure is True, tables are handled above;
+            # charts/infographics still go through OCR.
             ocr_flags = {}
-            if kwargs.get("extract_tables") is True:
+            if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True:
                 ocr_flags["extract_charts"] = True
@@ -849,25 +893,31 @@ class BatchIngestor(Ingestor):
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
-        text_elements_modality = resolved.text_elements_modality or embed_modality
-        structured_elements_modality = resolved.structured_elements_modality or embed_modality
+        embed_granularity = resolved.embed_granularity
         self._tasks.append(("embed", dict(kwargs)))
 
-        # Explode content rows before embedding so each table/chart/infographic
-        # gets its own embedding vector (mirrors nv-ingest per-element embeddings).
+        # Prepare content rows before embedding.
         self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
 
         from functools import partial
-        from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows
+        from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
-        _explode_fn = partial(
-            explode_content_to_rows,
-            modality=embed_modality,
-            text_elements_modality=text_elements_modality,
-            structured_elements_modality=structured_elements_modality,
-        )
+        if embed_granularity == "page":
+            _row_fn = partial(
+                collapse_content_to_page_rows,
+                modality=embed_modality,
+            )
+        else:
+            text_elements_modality = resolved.text_elements_modality or embed_modality
+            structured_elements_modality = resolved.structured_elements_modality or embed_modality
+            _row_fn = partial(
+                explode_content_to_rows,
+                modality=embed_modality,
+                text_elements_modality=text_elements_modality,
+                structured_elements_modality=structured_elements_modality,
+            )
         self._rd_dataset = self._rd_dataset.map_batches(
-            _explode_fn,
+            _row_fn,
             batch_size=embed_batch_size,
             batch_format="pandas",
             num_cpus=1,

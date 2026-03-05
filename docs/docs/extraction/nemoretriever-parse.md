@@ -9,6 +9,7 @@ to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
+- Run the Ray batch pipeline with nemotron-parse (library mode)
 
 !!! note
 
@@ -21,7 +22,6 @@ Currently, the limitations to using `nemotron-parse` with the NeMo Retriever Lib
 
 - Extraction with `nemotron-parse` only supports PDFs, not image files. For more information, refer to [Troubleshoot NeMo Retriever Library](troubleshoot.md).
 - `nemotron-parse` is not supported on RTX Pro 6000, B200, or H200 NVL. For more information, refer to the [Nemotron Parse Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html#nemotron-parse).
-
 
 ## Run the NIM Locally by Using Docker Compose
 
@@ -104,6 +104,27 @@ Instead of running NeMo Retriever Library locally, you can use NVCF to perform i
         For more Python examples, refer to [NeMo Retriever Library: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
+## Run the Ray batch pipeline with `nemotron-parse`
+
+When the `nemotron-parse` model is used in the retriever batch pipeline, the `page-elements` and `nemotron-ocr` stages are skipped in the Ray pipeline, because their functionality is handled by the `nemotron-parse` actor. This behavior applies when you run the pipeline from the command line (for instance, by using `batch_pipeline.py` in library mode).
+
+To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero:
+​
+- `--nemotron-parse-workers` — The number of Ray workers to run `nemotron-parse`.
+- `--gpu-nemotron-parse` — The GPU fraction to allocate for each worker (for example, 0.25 to run four workers on a single GPU).
+- `--nemotron-parse-batch-size` — The batch size for each `nemotron-parse` request.
+
+
+For example, to run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on, use the following code:
+
+```shell
+python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
+  --nemotron-parse-workers 16 \
+  --gpu-nemotron-parse .25 \
+  --nemotron-parse-batch-size 32
+```
+
+Replace `/path/to/pdfs` with the path to your input directory (for example, `/home/local/jdyer/datasets/jp20`).
 
 ## Related Topics
 
