@@ -1,8 +1,12 @@
-﻿# NeMo Retriever Library — Library Mode Quick Start
+# NeMo Retriever Library — Library Mode Quick Start
 
 NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for PDFs that parses document structure—including text, tables, charts, and infographics—creates embeddings, optionally stores them in LanceDB, and performs recall evaluation.
 
-This quick start guide shows how to run NeMo Retriever in library mode, directly from your application, without Docker. You’ll set up a CUDA 13–compatible environment, install the library and its dependencies, and run GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB. The examples cover two deployment options: loading Hugging Face models locally on your GPU, and pointing the same library‑mode pipeline at locally deployed NeMo Retriever NIM endpoints for embedding and OCR, with optional Ray‑based scaling and built‑in recall benchmarking.
+This quick start guide shows how to run NeMo Retriever in **library mode**, directly from your application, without Docker. In library mode, NeMo Retriever Library supports two deployment options:
+- Load Hugging Face models locally on your GPU.
+- Use locally deployed NeMo Retriever NIM endpoints for embedding and OCR.
+
+You’ll set up a CUDA 13–compatible environment, install the library and its dependencies, and run GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB, with optional Ray‑based scaling and built‑in recall benchmarking.
 
 ## 1. Prerequisites
 
@@ -150,7 +154,7 @@ This uses the module form of the NeMo Retriever Library batch pipeline example a
 
 NeMo Retriever Library includes a lightweight benchmark harness that lets you run repeatable evaluations and sweeps without using Docker. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
-9.1 Configuration
+### 9.1 Configuration
 
 The harness is configured using the following configuration files:
 
