@@ -642,7 +642,7 @@ nimOperator:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
-      tag: 1.7.0
+      tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -707,7 +707,7 @@ nimOperator:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-      tag: 1.6.0
+      tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -753,7 +753,7 @@ nimOperator:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-      tag: 1.6.0
+      tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -798,8 +798,8 @@ nimOperator:
   embedqa:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-      tag: 1.10.1
+      repository: nvcr.io/nim/nvidia/llama-nemotron-embed-1b-v2
+      tag: 1.13.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -882,8 +882,8 @@ nimOperator:
   llama_3_2_nv_rerankqa_1b_v2:
     enabled: false
     image:
-      repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-      tag: 1.8.0
+      repository: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2
+      tag: 1.10.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -927,7 +927,7 @@ nimOperator:
     enabled: false
     image:
       repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
-      tag: 1.5.0
+      tag: 1.6.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -1018,7 +1018,7 @@ nimOperator:
     enabled: false
     image:
       repository: nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us
-      tag: 1.4.0
+      tag: 1.5.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
