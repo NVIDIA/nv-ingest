@@ -862,19 +862,16 @@ def main(
             error_count = int(error_rows.count())
             if error_count > 0:
                 error_file = Path("ingest_errors.json").resolve()
+                max_error_rows_to_write = 5
+                error_rows_to_write = error_rows.take(min(max_error_rows_to_write, error_count))
                 with error_file.open("w", encoding="utf-8") as fh:
-                    fh.write("[\n")
-                    first = True
-                    for row in error_rows.iter_rows():
-                        if not first:
-                            fh.write(",\n")
-                        fh.write(json.dumps(row, default=str))
-                        first = False
-                    fh.write("\n]\n")
+                    json.dump(error_rows_to_write, fh, indent=2, default=str)
+                    fh.write("\n")
                 logger.error(
-                    "Detected %d error row(s) in ingest results. Wrote full rows "
+                    "Detected %d error row(s) in ingest results. Wrote first %d row(s) "
                     "to %s. Showing top 5 extracted errors and exiting before recall.",
                     error_count,
+                    len(error_rows_to_write),
                     str(error_file),
                 )
                 for idx, row in enumerate(error_rows.take(min(5, error_count)), start=1):
