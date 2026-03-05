@@ -747,7 +747,7 @@ def main(
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
-                        extract_infographics=True,
+                        extract_infographics=False,
                         inference_batch_size=page_elements_batch_size,
                         page_elements_invoke_url=page_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
