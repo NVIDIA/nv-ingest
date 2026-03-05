@@ -1,9 +1,7 @@
 import sys
 import types
-from pathlib import Path
 
 import pytest
-import yaml
 
 from nemo_retriever.utils import ray_resource_hueristics as rh
 
@@ -48,37 +46,53 @@ def test_resolve_effective_resources_without_ray(monkeypatch: pytest.MonkeyPatch
     assert out.gpu_count >= 0
 
 
-def test_resolve_batch_worker_plan_high_cpu_with_overrides() -> None:
-    out = rh.resolve_batch_worker_plan(
-        override_cpu_count=128,
-        override_gpu_count=2,
-        override_page_elements_actors=9,
-        override_ocr_actors=8,
-        override_embed_actors=7,
-        concurrent_gpu_stage_count=3,
-    )
-    assert out.profile_name == "high_cpu"
-    assert out.page_elements_workers == 9
-    assert out.detect_workers == 8
-    assert out.embed_workers == 7
-    assert out.page_elements_num_gpus == rh.HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS
-    assert out.detect_num_gpus == rh.HIGH_OVERLAP_OCR_NUM_GPUS
-    assert out.embed_num_gpus == rh.HIGH_OVERLAP_EMBED_NUM_GPUS
+def test_resolve_effective_resources_precedence_env_then_args(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(sys.modules, "ray", None)
+    monkeypatch.setenv(rh.ENV_BATCH_NUM_CPUS, "11")
+    monkeypatch.setenv(rh.ENV_BATCH_NUM_GPUS, "3")
+
+    from_env = rh.resolve_effective_resources()
+    assert from_env.cpu_count == 11
+    assert from_env.gpu_count == 3
+
+    from_args = rh.resolve_effective_resources(override_cpu_count=13, override_gpu_count=4)
+    assert from_args.cpu_count == 13
+    assert from_args.gpu_count == 4
 
 
-def test_resolve_batch_worker_plan_low_cpu_scaled_gpu_allocation() -> None:
+def test_resolve_batch_worker_plan_scaled_gpu_allocation() -> None:
     out = rh.resolve_batch_worker_plan(
         override_cpu_count=8,
         override_gpu_count=1,
         concurrent_gpu_stage_count=4,
     )
-    assert out.profile_name == "low_cpu"
     assert out.page_elements_workers >= 1
     assert out.detect_workers >= 1
     assert out.embed_workers >= 1
     assert out.page_elements_num_gpus == pytest.approx(0.25)
     assert out.detect_num_gpus == pytest.approx(0.25)
     assert out.embed_num_gpus == pytest.approx(0.25)
+
+
+def test_resolve_batch_worker_plan_high_overlap_allocation() -> None:
+    out = rh.resolve_batch_worker_plan(
+        override_cpu_count=8,
+        override_gpu_count=2,
+        concurrent_gpu_stage_count=3,
+    )
+    assert out.page_elements_num_gpus == rh.HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS
+    assert out.detect_num_gpus == rh.HIGH_OVERLAP_OCR_NUM_GPUS
+    assert out.embed_num_gpus == rh.HIGH_OVERLAP_EMBED_NUM_GPUS
+
+
+def test_resolve_batch_worker_plan_env_heuristics(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU", "4")
+    monkeypatch.setenv("NEMO_RETRIEVER_BATCH_OCR_PER_GPU", "5")
+    monkeypatch.setenv("NEMO_RETRIEVER_BATCH_EMBED_PER_GPU", "6")
+    out = rh.resolve_batch_worker_plan(override_cpu_count=8, override_gpu_count=2)
+    assert out.page_elements_workers == 8
+    assert out.detect_workers == 10
+    assert out.embed_workers == 12
 
 
 def test_format_and_pretty_print_worker_heuristic_summary() -> None:
@@ -96,142 +110,3 @@ def test_format_and_pretty_print_worker_heuristic_summary() -> None:
     rh.pretty_print_worker_heuristic_summary(out, print_fn=printed.append)
     assert len(printed) == 1
     assert "final_workers:" in printed[0]
-
-
-def test_get_resources_precedence_autodetect_then_config_then_env_then_args(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setitem(sys.modules, "ray", None)
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text("resources:\n  cpu_count: 8\n  gpu_count: 2\n", encoding="utf-8")
-
-    from_config = rh.resolve_effective_resources(resource_config_path=config_path)
-    assert from_config.cpu_count == 8
-    assert from_config.gpu_count == 2
-
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_CPUS, "11")
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_GPUS, "3")
-    from_env = rh.resolve_effective_resources(resource_config_path=config_path)
-    assert from_env.cpu_count == 11
-    assert from_env.gpu_count == 3
-
-    from_args = rh.resolve_effective_resources(
-        resource_config_path=config_path,
-        override_cpu_count=13,
-        override_gpu_count=4,
-    )
-    assert from_args.cpu_count == 13
-    assert from_args.gpu_count == 4
-
-
-def test_resolve_batch_worker_plan_uses_config_and_env_precedence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(
-        (
-            "heuristics:\n"
-            "  cpu_threshold_workers: 4\n"
-            "  max_gpu_per_stage: 0.2\n"
-            "  high_overlap_page_elements_num_gpus: 0.4\n"
-            "  high_overlap_ocr_num_gpus: 0.9\n"
-            "  high_overlap_embed_num_gpus: 0.3\n"
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setenv("NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE", "0.6")
-
-    out = rh.resolve_batch_worker_plan(
-        override_cpu_count=8,
-        override_gpu_count=2,
-        concurrent_gpu_stage_count=4,
-        resource_config_path=config_path,
-    )
-    assert out.profile_name == "high_cpu"
-    assert out.cpu_threshold_workers == 4
-    # 2 GPUs / 4 stages = 0.5, capped by env max_gpu_per_stage=0.6.
-    assert out.page_elements_num_gpus == pytest.approx(0.5)
-
-    overlap = rh.resolve_batch_worker_plan(
-        override_cpu_count=8,
-        override_gpu_count=2,
-        concurrent_gpu_stage_count=3,
-        resource_config_path=config_path,
-    )
-    assert overlap.page_elements_num_gpus == pytest.approx(0.4)
-    assert overlap.detect_num_gpus == pytest.approx(0.9)
-    assert overlap.embed_num_gpus == pytest.approx(0.3)
-
-
-def test_freeze_writes_default_home_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    home = tmp_path / "home"
-    home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setitem(sys.modules, "ray", None)
-
-    out_path = rh.freeze_resource_config()
-    assert out_path == home / ".nemo-retriever" / "config.yaml"
-    assert out_path.exists()
-
-    payload = yaml.safe_load(out_path.read_text(encoding="utf-8"))
-    assert isinstance(payload, dict)
-    assert "resources" in payload
-    assert "heuristics" in payload
-    assert "cpu_count" in payload["resources"]
-    assert "cpu_threshold_workers" in payload["heuristics"]
-
-
-def test_get_resources_precedence_partial_args_only_override_provided_fields(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setitem(sys.modules, "ray", None)
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text("resources:\n  cpu_count: 10\n  gpu_count: 2\n", encoding="utf-8")
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_CPUS, "12")
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_GPUS, "4")
-
-    only_cpu_arg = rh.resolve_effective_resources(resource_config_path=config_path, override_cpu_count=20)
-    assert only_cpu_arg.cpu_count == 20
-    # GPU still comes from env (higher precedence than config).
-    assert only_cpu_arg.gpu_count == 4
-
-    only_gpu_arg = rh.resolve_effective_resources(resource_config_path=config_path, override_gpu_count=6)
-    # CPU still comes from env (higher precedence than config).
-    assert only_gpu_arg.cpu_count == 12
-    assert only_gpu_arg.gpu_count == 6
-
-
-def test_resolve_batch_worker_plan_resource_inputs_follow_precedence(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    monkeypatch.setitem(sys.modules, "ray", None)
-    config_path = tmp_path / "config.yaml"
-    config_path.write_text(
-        "resources:\n  cpu_count: 8\n  gpu_count: 1\nheuristics:\n  cpu_threshold_workers: 6\n",
-        encoding="utf-8",
-    )
-
-    # No env, no explicit args -> resources come from config.
-    from_config = rh.resolve_batch_worker_plan(resource_config_path=config_path, concurrent_gpu_stage_count=2)
-    assert from_config.cpu_count == 8
-    assert from_config.gpu_count == 1
-    assert from_config.profile_name == "high_cpu"
-
-    # Env overrides config.
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_CPUS, "4")
-    monkeypatch.setenv(rh.ENV_BATCH_NUM_GPUS, "3")
-    from_env = rh.resolve_batch_worker_plan(resource_config_path=config_path, concurrent_gpu_stage_count=3)
-    assert from_env.cpu_count == 4
-    assert from_env.gpu_count == 3
-    assert from_env.profile_name == "low_cpu"
-
-    # Explicit args override env/config/autodetect.
-    from_args = rh.resolve_batch_worker_plan(
-        resource_config_path=config_path,
-        override_cpu_count=16,
-        override_gpu_count=2,
-        concurrent_gpu_stage_count=3,
-    )
-    assert from_args.cpu_count == 16
-    assert from_args.gpu_count == 2
-    assert from_args.profile_name == "high_cpu"

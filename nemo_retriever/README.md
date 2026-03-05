@@ -92,18 +92,14 @@ Then run your pipeline as above (e.g. `--ray-address auto` for the CLI, or `ray_
 By default, batch mode computes resources using this order:
 
 1. Auto-detected resources (Ray cluster if connected, otherwise local machine)
-2. `~/.nemo-retriever/config.yaml` (if present)
-3. Environment variables
-4. Explicit function arguments (highest precedence)
+2. Environment variables
+3. Explicit function arguments (highest precedence)
 
 This means defaults are deterministic but easy to override when you need fixed behavior.
 
 ### Default behavior
 
 - `cpu_count` / `gpu_count` are detected from Ray (`cluster_resources`) or local host.
-- Worker counts are derived from CPU profile:
-  - **high_cpu** when `cpu_count >= cpu_threshold_workers`
-  - **low_cpu** otherwise
 - Worker heuristics:
   - `page_elements_workers = gpu_count * page_elements_per_gpu`
   - `detect_workers = gpu_count * ocr_per_gpu`
@@ -117,63 +113,29 @@ This means defaults are deterministic but easy to override when you need fixed b
 
 | Variable | Where to set | Meaning |
 |---|---|---|
-| `resources.cpu_count` | `config.yaml` | Base CPU count override before env/args |
-| `resources.gpu_count` | `config.yaml` | Base GPU count override before env/args |
 | `NEMO_RETRIEVER_BATCH_NUM_CPUS` | env | Override resolved CPU count |
 | `NEMO_RETRIEVER_BATCH_NUM_GPUS` | env | Override resolved GPU count |
 | `override_cpu_count`, `override_gpu_count` | function args | Highest-priority CPU/GPU override |
-| `heuristics.cpu_threshold_workers` | `config.yaml` | CPU threshold for high/low profile |
-| `heuristics.high_cpu_page_elements_per_gpu` | `config.yaml` or env | Page-elements workers per GPU in high-CPU profile |
-| `heuristics.high_cpu_ocr_per_gpu` | `config.yaml` or env | OCR workers per GPU in high-CPU profile |
-| `heuristics.high_cpu_embed_per_gpu` | `config.yaml` or env | Embed workers per GPU in high-CPU profile |
-| `heuristics.low_cpu_page_elements_per_gpu` | `config.yaml` or env | Page-elements workers per GPU in low-CPU profile |
-| `heuristics.low_cpu_ocr_per_gpu` | `config.yaml` or env | OCR workers per GPU in low-CPU profile |
-| `heuristics.low_cpu_embed_per_gpu` | `config.yaml` or env | Embed workers per GPU in low-CPU profile |
-| `heuristics.cpu_only_stage_num_gpus` | `config.yaml` or env | GPU request for CPU-only stages (usually `0.0`) |
-| `heuristics.high_overlap_page_elements_num_gpus` | `config.yaml` or env | Page-elements GPU share in 3-stage overlap mode |
-| `heuristics.high_overlap_ocr_num_gpus` | `config.yaml` or env | OCR GPU share in 3-stage overlap mode |
-| `heuristics.high_overlap_embed_num_gpus` | `config.yaml` or env | Embed GPU share in 3-stage overlap mode |
-| `heuristics.max_gpu_per_stage` | `config.yaml` or env | Cap for per-stage GPU share in non-overlap mode |
+| `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU` | env | Page-elements workers per GPU |
+| `NEMO_RETRIEVER_BATCH_OCR_PER_GPU` | env | OCR workers per GPU |
+| `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU` | env | Embed workers per GPU |
+| `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS` | env | GPU request for CPU-only stages (usually `0.0`) |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS` | env | Page-elements GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS` | env | OCR GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS` | env | Embed GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE` | env | Cap for per-stage GPU share in non-overlap mode |
 
 Environment variable names for heuristic knobs:
-- `NEMO_RETRIEVER_BATCH_CPU_THRESHOLD_WORKERS`
-- `NEMO_RETRIEVER_BATCH_HIGH_CPU_PAGE_ELEMENTS_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_HIGH_CPU_OCR_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_HIGH_CPU_EMBED_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_LOW_CPU_PAGE_ELEMENTS_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_LOW_CPU_OCR_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_LOW_CPU_EMBED_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_NUM_CPUS`
+- `NEMO_RETRIEVER_BATCH_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_OCR_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU`
 - `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS`
 - `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS`
 - `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS`
 - `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS`
 - `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE`
-
-### `~/.nemo-retriever/config.yaml`
-
-If present, this file is read automatically. You can also generate one from current resolved values with `freeze_resource_config()` in `ray_resource_hueristics.py`.
-
-Example:
-
-```yaml
-resources:
-  cpu_count: 64
-  gpu_count: 4
-
-heuristics:
-  cpu_threshold_workers: 64
-  high_cpu_page_elements_per_gpu: 4
-  high_cpu_ocr_per_gpu: 4
-  high_cpu_embed_per_gpu: 2
-  low_cpu_page_elements_per_gpu: 3
-  low_cpu_ocr_per_gpu: 3
-  low_cpu_embed_per_gpu: 3
-  cpu_only_stage_num_gpus: 0.0
-  high_overlap_page_elements_num_gpus: 0.5
-  high_overlap_ocr_num_gpus: 1.0
-  high_overlap_embed_num_gpus: 0.5
-  max_gpu_per_stage: 1.0
-```
 
 ### Running multiple NIM service instances on multi-GPU hosts
 

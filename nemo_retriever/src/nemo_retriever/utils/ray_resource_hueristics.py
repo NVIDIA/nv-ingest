@@ -4,23 +4,13 @@
 
 from __future__ import annotations
 
-import ray
-
-"""Helpers for inferring batch-stage worker and GPU allocations.
-
-This module centralizes small, environment-overridable heuristics used by the
-batch ingestor to derive:
-
-- worker pool sizes from available CPU/GPU resources, and
-- per-stage logical GPU requests for Ray Data actor stages.
-"""
-
 import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Optional
 
-import yaml
+import ray
+
+"""Helpers for inferring batch-stage worker and GPU allocations."""
 
 
 def _read_env_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -76,24 +66,14 @@ def _get_gpu_memory_info() -> dict[int, int]:
         nvmlDeviceGetBrand,
     )
 
-    # Initialize the NVML library
     nvmlInit()
-
     driver_version = nvmlSystemGetDriverVersion()
-
-    # Get the number of available GPUs
     device_count = nvmlDeviceGetCount()
 
     gpu_info = {}
-
-    # Iterate over each GPU to get memory information
     for i in range(device_count):
-        # Get a handle to the device
         handle = nvmlDeviceGetHandleByIndex(i)
-
-        # Get memory information (total, free, used) in bytes
         info = nvmlDeviceGetMemoryInfo(handle)
-
         gpu_info[i] = {
             "drvier_version": driver_version,
             "gpu_name": nvmlDeviceGetName(handle),
@@ -104,57 +84,17 @@ def _get_gpu_memory_info() -> dict[int, int]:
             "free": info.free // (1024**2),
         }
 
-    # Shutdown the NVML library when finished
     nvmlShutdown()
-
     return gpu_info
 
 
 def _debug_print(message: str) -> None:
-    """Emit a lightweight resource-resolution debug message."""
     print(f"[resource_heuristics] {message}")
-
-
-def _default_config_path() -> Path:
-    """Return the default resource heuristic config path."""
-    return Path.home() / ".nemo-retriever" / "config.yaml"
-
-
-def _coerce_path(filepath: str | os.PathLike[str] | None) -> Path:
-    return Path(filepath).expanduser() if filepath is not None else _default_config_path()
-
-
-def _load_config(filepath: str | os.PathLike[str] | None = None) -> dict:
-    """Load YAML config, returning an empty mapping when absent/invalid."""
-    path = _coerce_path(filepath)
-    if not path.exists():
-        return {}
-    try:
-        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    return loaded if isinstance(loaded, dict) else {}
-
-
-def _cfg_get(cfg: dict, *keys: str) -> object:
-    cur: object = cfg
-    for key in keys:
-        if not isinstance(cur, dict) or key not in cur:
-            return None
-        cur = cur[key]
-    return cur
 
 
 def _as_int(value: object, *, minimum: int) -> Optional[int]:
     try:
         return max(minimum, int(value)) if value is not None else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _as_float(value: object, *, minimum: float) -> Optional[float]:
-    try:
-        return max(minimum, float(value)) if value is not None else None
     except (TypeError, ValueError):
         return None
 
@@ -180,192 +120,6 @@ class ResourceResolutionDetails:
     cpu_source: str
     gpu_source: str
     auto_source: str
-    config_path: Optional[str]
-
-
-def _resolve_heuristic_config(filepath: str | os.PathLike[str] | None = None) -> _ResolvedHeuristicConfig:
-    """Resolve heuristic constants with precedence defaults -> config -> env."""
-    cfg = _load_config(filepath)
-
-    page_elements_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "page_elements_per_gpu"), minimum=1)
-    ocr_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "ocr_per_gpu"), minimum=1)
-    embed_per_gpu = _as_int(_cfg_get(cfg, "heuristics", "embed_per_gpu"), minimum=1)
-
-    cpu_only_stage_num_gpus = _as_float(_cfg_get(cfg, "heuristics", "cpu_only_stage_num_gpus"), minimum=0.0)
-    high_overlap_page_elements_num_gpus = _as_float(
-        _cfg_get(cfg, "heuristics", "high_overlap_page_elements_num_gpus"), minimum=0.0
-    )
-    high_overlap_ocr_num_gpus = _as_float(_cfg_get(cfg, "heuristics", "high_overlap_ocr_num_gpus"), minimum=0.0)
-    high_overlap_embed_num_gpus = _as_float(_cfg_get(cfg, "heuristics", "high_overlap_embed_num_gpus"), minimum=0.0)
-    max_gpu_per_stage = _as_float(_cfg_get(cfg, "heuristics", "max_gpu_per_stage"), minimum=0.0)
-
-    return _ResolvedHeuristicConfig(
-        page_elements_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU",
-            (page_elements_per_gpu if page_elements_per_gpu is not None else PAGE_ELEMENTS_PER_GPU),
-            minimum=1,
-        ),
-        ocr_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_OCR_PER_GPU",
-            ocr_per_gpu if ocr_per_gpu is not None else OCR_PER_GPU,
-            minimum=1,
-        ),
-        embed_per_gpu=_read_env_int(
-            "NEMO_RETRIEVER_BATCH_EMBED_PER_GPU",
-            embed_per_gpu if embed_per_gpu is not None else EMBED_PER_GPU,
-            minimum=1,
-        ),
-        cpu_only_stage_num_gpus=_read_env_float(
-            "NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS",
-            cpu_only_stage_num_gpus if cpu_only_stage_num_gpus is not None else CPU_ONLY_STAGE_NUM_GPUS,
-            minimum=0.0,
-        ),
-        high_overlap_page_elements_num_gpus=_read_env_float(
-            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS",
-            (
-                high_overlap_page_elements_num_gpus
-                if high_overlap_page_elements_num_gpus is not None
-                else HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS
-            ),
-            minimum=0.0,
-        ),
-        high_overlap_ocr_num_gpus=_read_env_float(
-            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS",
-            high_overlap_ocr_num_gpus if high_overlap_ocr_num_gpus is not None else HIGH_OVERLAP_OCR_NUM_GPUS,
-            minimum=0.0,
-        ),
-        high_overlap_embed_num_gpus=_read_env_float(
-            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS",
-            high_overlap_embed_num_gpus if high_overlap_embed_num_gpus is not None else HIGH_OVERLAP_EMBED_NUM_GPUS,
-            minimum=0.0,
-        ),
-        max_gpu_per_stage=_read_env_float(
-            "NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE",
-            max_gpu_per_stage if max_gpu_per_stage is not None else MAX_GPU_PER_STAGE,
-            minimum=0.0,
-        ),
-    )
-
-
-def _detect_auto_resources(ray_cluster_address: Optional[str] = None) -> SystemResources:
-    """Detect base CPU/GPU resources from Ray (if available) or local machine."""
-    local_cpu_count = int(os.cpu_count() or 1)
-    local_gpu_count = int(_detect_local_gpu_count())
-    source = "local"
-
-    try:
-        import ray
-    except Exception:
-        _debug_print(
-            "Auto-detect: Ray unavailable; using local resources " f"(cpu={local_cpu_count}, gpu={local_gpu_count})."
-        )
-        return SystemResources(cpu_count=local_cpu_count, gpu_count=local_gpu_count, source=source)
-
-    detected_cpu_count = local_cpu_count
-    detected_gpu_count = local_gpu_count
-    try:
-        if ray.is_initialized():
-            resources = ray.cluster_resources() or ray.available_resources()
-            detected_cpu_count = int(resources.get("CPU", local_cpu_count))
-            detected_gpu_count = int(resources.get("GPU", local_gpu_count))
-            source = "ray"
-        elif ray_cluster_address:
-            ray.init(address=ray_cluster_address, ignore_reinit_error=True, log_to_driver=False)
-            try:
-                resources = ray.cluster_resources() or ray.available_resources()
-                detected_cpu_count = int(resources.get("CPU", local_cpu_count))
-                detected_gpu_count = int(resources.get("GPU", local_gpu_count))
-                source = "ray"
-            finally:
-                ray.shutdown()
-    except Exception:
-        pass
-
-    detected = SystemResources(
-        cpu_count=max(1, detected_cpu_count),
-        gpu_count=max(0, detected_gpu_count),
-        source=source,
-    )
-    _debug_print(
-        "Auto-detect: "
-        f"source={detected.source}, cpu={detected.cpu_count}, gpu={detected.gpu_count}, "
-        f"ray_cluster_address={ray_cluster_address!r}"
-    )
-    return detected
-
-
-def resolve_resource_details(
-    *,
-    ray_cluster_address: Optional[str] = None,
-    resource_config_path: str | os.PathLike[str] | None = None,
-    override_cpu_count: Optional[int] = None,
-    override_gpu_count: Optional[int] = None,
-) -> ResourceResolutionDetails:
-    """Resolve CPU/GPU counts and annotate precedence source for each value."""
-    auto = _detect_auto_resources(ray_cluster_address=ray_cluster_address)
-    cfg = _load_config(resource_config_path)
-    cfg_path = _coerce_path(resource_config_path)
-    cfg_exists = cfg_path.exists()
-    cfg_cpu_count = _as_int(_cfg_get(cfg, "resources", "cpu_count"), minimum=1)
-    cfg_gpu_count = _as_int(_cfg_get(cfg, "resources", "gpu_count"), minimum=0)
-
-    resolved_cpu_count = int(auto.cpu_count)
-    resolved_gpu_count = int(auto.gpu_count)
-    cpu_source = f"auto:{auto.source}"
-    gpu_source = f"auto:{auto.source}"
-
-    if cfg_cpu_count is not None:
-        resolved_cpu_count = int(cfg_cpu_count)
-        cpu_source = "config"
-    if cfg_gpu_count is not None:
-        resolved_gpu_count = int(cfg_gpu_count)
-        gpu_source = "config"
-
-    raw_env_cpu = os.getenv(ENV_BATCH_NUM_CPUS)
-    if raw_env_cpu is not None:
-        env_cpu = _as_int(raw_env_cpu, minimum=1)
-        if env_cpu is not None:
-            resolved_cpu_count = int(env_cpu)
-            cpu_source = "env"
-
-    raw_env_gpu = os.getenv(ENV_BATCH_NUM_GPUS)
-    if raw_env_gpu is not None:
-        env_gpu = _as_int(raw_env_gpu, minimum=0)
-        if env_gpu is not None:
-            resolved_gpu_count = int(env_gpu)
-            gpu_source = "env"
-
-    if override_cpu_count is not None:
-        resolved_cpu_count = max(1, int(override_cpu_count))
-        cpu_source = "arg"
-    if override_gpu_count is not None:
-        resolved_gpu_count = max(0, int(override_gpu_count))
-        gpu_source = "arg"
-
-    resolved = ResourceResolutionDetails(
-        cpu_count=resolved_cpu_count,
-        gpu_count=resolved_gpu_count,
-        cpu_source=cpu_source,
-        gpu_source=gpu_source,
-        auto_source=auto.source,
-        config_path=str(cfg_path) if cfg_exists else None,
-    )
-    _debug_print(
-        "Resolved resources: "
-        f"cpu={resolved.cpu_count} (source={resolved.cpu_source}), "
-        f"gpu={resolved.gpu_count} (source={resolved.gpu_source}), "
-        f"config_path={resolved.config_path or '(not found)'}"
-    )
-    if raw_env_cpu is not None or raw_env_gpu is not None:
-        _debug_print(
-            f"Environment overrides: {ENV_BATCH_NUM_CPUS}={raw_env_cpu!r}, " f"{ENV_BATCH_NUM_GPUS}={raw_env_gpu!r}"
-        )
-    if override_cpu_count is not None or override_gpu_count is not None:
-        _debug_print(
-            "Argument overrides: "
-            f"override_cpu_count={override_cpu_count!r}, override_gpu_count={override_gpu_count!r}"
-        )
-    return resolved
 
 
 @dataclass(frozen=True)
@@ -401,8 +155,53 @@ class WorkerHeuristicResult:
     embed_num_gpus: float
 
 
+def _resolve_heuristic_config() -> _ResolvedHeuristicConfig:
+    """Resolve heuristic constants with precedence defaults -> env."""
+    return _ResolvedHeuristicConfig(
+        page_elements_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU",
+            PAGE_ELEMENTS_PER_GPU,
+            minimum=1,
+        ),
+        ocr_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_OCR_PER_GPU",
+            OCR_PER_GPU,
+            minimum=1,
+        ),
+        embed_per_gpu=_read_env_int(
+            "NEMO_RETRIEVER_BATCH_EMBED_PER_GPU",
+            EMBED_PER_GPU,
+            minimum=1,
+        ),
+        cpu_only_stage_num_gpus=_read_env_float(
+            "NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS",
+            CPU_ONLY_STAGE_NUM_GPUS,
+            minimum=0.0,
+        ),
+        high_overlap_page_elements_num_gpus=_read_env_float(
+            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS",
+            HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS,
+            minimum=0.0,
+        ),
+        high_overlap_ocr_num_gpus=_read_env_float(
+            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS",
+            HIGH_OVERLAP_OCR_NUM_GPUS,
+            minimum=0.0,
+        ),
+        high_overlap_embed_num_gpus=_read_env_float(
+            "NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS",
+            HIGH_OVERLAP_EMBED_NUM_GPUS,
+            minimum=0.0,
+        ),
+        max_gpu_per_stage=_read_env_float(
+            "NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE",
+            MAX_GPU_PER_STAGE,
+            minimum=0.0,
+        ),
+    )
+
+
 def _detect_local_gpu_count() -> int:
-    """Detect local GPU count from torch first, then CUDA_VISIBLE_DEVICES."""
     try:
         import torch
 
@@ -413,21 +212,113 @@ def _detect_local_gpu_count() -> int:
     cuda_visible_devices = (os.getenv("CUDA_VISIBLE_DEVICES") or "").strip()
     if not cuda_visible_devices or cuda_visible_devices in {"-1", "none", "None"}:
         return 0
-
     return len([device for device in cuda_visible_devices.split(",") if device.strip()])
+
+
+def _detect_auto_resources(ray_cluster_address: Optional[str] = None) -> SystemResources:
+    local_cpu_count = int(os.cpu_count() or 1)
+    local_gpu_count = int(_detect_local_gpu_count())
+    source = "local"
+
+    try:
+        import ray
+    except Exception:
+        _debug_print(
+            f"Auto-detect: Ray unavailable; using local resources (cpu={local_cpu_count}, gpu={local_gpu_count})."
+        )
+        return SystemResources(cpu_count=local_cpu_count, gpu_count=local_gpu_count, source=source)
+
+    detected_cpu_count = local_cpu_count
+    detected_gpu_count = local_gpu_count
+    try:
+        if ray.is_initialized():
+            resources = ray.cluster_resources() or ray.available_resources()
+            detected_cpu_count = int(resources.get("CPU", local_cpu_count))
+            detected_gpu_count = int(resources.get("GPU", local_gpu_count))
+            source = "ray"
+        elif ray_cluster_address:
+            ray.init(address=ray_cluster_address, ignore_reinit_error=True, log_to_driver=False)
+            try:
+                resources = ray.cluster_resources() or ray.available_resources()
+                detected_cpu_count = int(resources.get("CPU", local_cpu_count))
+                detected_gpu_count = int(resources.get("GPU", local_gpu_count))
+                source = "ray"
+            finally:
+                ray.shutdown()
+    except Exception:
+        pass
+
+    detected = SystemResources(
+        cpu_count=max(1, detected_cpu_count),
+        gpu_count=max(0, detected_gpu_count),
+        source=source,
+    )
+    _debug_print(
+        f"Auto-detect: source={detected.source}, cpu={detected.cpu_count}, gpu={detected.gpu_count}, "
+        f"ray_cluster_address={ray_cluster_address!r}"
+    )
+    return detected
+
+
+def resolve_resource_details(
+    *,
+    ray_cluster_address: Optional[str] = None,
+    override_cpu_count: Optional[int] = None,
+    override_gpu_count: Optional[int] = None,
+) -> ResourceResolutionDetails:
+    """Resolve CPU/GPU counts and annotate precedence source for each value."""
+    auto = _detect_auto_resources(ray_cluster_address=ray_cluster_address)
+
+    resolved_cpu_count = int(auto.cpu_count)
+    resolved_gpu_count = int(auto.gpu_count)
+    cpu_source = f"auto:{auto.source}"
+    gpu_source = f"auto:{auto.source}"
+
+    raw_env_cpu = os.getenv(ENV_BATCH_NUM_CPUS)
+    if raw_env_cpu is not None:
+        env_cpu = _as_int(raw_env_cpu, minimum=1)
+        if env_cpu is not None:
+            resolved_cpu_count = int(env_cpu)
+            cpu_source = "env"
+
+    raw_env_gpu = os.getenv(ENV_BATCH_NUM_GPUS)
+    if raw_env_gpu is not None:
+        env_gpu = _as_int(raw_env_gpu, minimum=0)
+        if env_gpu is not None:
+            resolved_gpu_count = int(env_gpu)
+            gpu_source = "env"
+
+    if override_cpu_count is not None:
+        resolved_cpu_count = max(1, int(override_cpu_count))
+        cpu_source = "arg"
+    if override_gpu_count is not None:
+        resolved_gpu_count = max(0, int(override_gpu_count))
+        gpu_source = "arg"
+
+    resolved = ResourceResolutionDetails(
+        cpu_count=resolved_cpu_count,
+        gpu_count=resolved_gpu_count,
+        cpu_source=cpu_source,
+        gpu_source=gpu_source,
+        auto_source=auto.source,
+    )
+    _debug_print(
+        "Resolved resources: "
+        f"cpu={resolved.cpu_count} (source={resolved.cpu_source}), "
+        f"gpu={resolved.gpu_count} (source={resolved.gpu_source})"
+    )
+    return resolved
 
 
 def resolve_effective_resources(
     ray_cluster_address: Optional[str] = None,
     *,
-    resource_config_path: str | os.PathLike[str] | None = None,
     override_cpu_count: Optional[int] = None,
     override_gpu_count: Optional[int] = None,
 ) -> SystemResources:
-    """Return resources with precedence autodetect -> config file -> env/args."""
+    """Return resources with precedence autodetect -> env -> args."""
     details = resolve_resource_details(
         ray_cluster_address=ray_cluster_address,
-        resource_config_path=resource_config_path,
         override_cpu_count=override_cpu_count,
         override_gpu_count=override_gpu_count,
     )
@@ -442,18 +333,13 @@ def resolve_batch_worker_plan(
     override_ocr_actors: Optional[int] = None,
     override_embed_actors: Optional[int] = None,
     concurrent_gpu_stage_count: Optional[int] = None,
-    resource_config_path: str | os.PathLike[str] | None = None,
     ray_cluster_address: Optional[str] = None,
 ) -> WorkerHeuristicResult:
-    """Resolve worker counts and stage GPU defaults for batch ingest stages.
-
-    Explicit worker overrides take precedence over heuristic values.
-    """
-    cfg = _resolve_heuristic_config(resource_config_path)
+    """Resolve worker counts and stage GPU defaults for batch ingest stages."""
+    cfg = _resolve_heuristic_config()
     if override_cpu_count is None or override_gpu_count is None:
         detected = resolve_effective_resources(
             ray_cluster_address=ray_cluster_address,
-            resource_config_path=resource_config_path,
             override_cpu_count=override_cpu_count,
             override_gpu_count=override_gpu_count,
         )
@@ -466,14 +352,10 @@ def resolve_batch_worker_plan(
     cpu_count = max(1, cpu_count)
     gpu_count = max(0, gpu_count)
 
-    page_elements_per_gpu = cfg.page_elements_per_gpu
-    ocr_per_gpu = cfg.ocr_per_gpu
-    embed_per_gpu = cfg.embed_per_gpu
-
     if gpu_count > 0:
-        heuristic_page_elements_workers = max(1, gpu_count * page_elements_per_gpu)
-        heuristic_detect_workers = max(1, gpu_count * ocr_per_gpu)
-        heuristic_embed_workers = max(1, gpu_count * embed_per_gpu)
+        heuristic_page_elements_workers = max(1, gpu_count * cfg.page_elements_per_gpu)
+        heuristic_detect_workers = max(1, gpu_count * cfg.ocr_per_gpu)
+        heuristic_embed_workers = max(1, gpu_count * cfg.embed_per_gpu)
     else:
         heuristic_page_elements_workers = 1
         heuristic_detect_workers = 1
@@ -501,9 +383,9 @@ def resolve_batch_worker_plan(
     result = WorkerHeuristicResult(
         cpu_count=cpu_count,
         gpu_count=gpu_count,
-        page_elements_per_gpu=page_elements_per_gpu,
-        ocr_per_gpu=ocr_per_gpu,
-        embed_per_gpu=embed_per_gpu,
+        page_elements_per_gpu=cfg.page_elements_per_gpu,
+        ocr_per_gpu=cfg.ocr_per_gpu,
+        embed_per_gpu=cfg.embed_per_gpu,
         heuristic_page_elements_workers=heuristic_page_elements_workers,
         heuristic_detect_workers=heuristic_detect_workers,
         heuristic_embed_workers=heuristic_embed_workers,
@@ -521,8 +403,8 @@ def resolve_batch_worker_plan(
     _debug_print(
         "Worker plan: "
         f"cpu={result.cpu_count}, gpu={result.gpu_count}, "
-        f"workers(page_elements={result.page_elements_workers}, "
-        "detect={result.detect_workers}, embed={result.embed_workers}), "
+        f"workers(page_elements={result.page_elements_workers}, detect={result.detect_workers}, "
+        f"embed={result.embed_workers}), "
         f"gpu_per_stage(page_elements={result.page_elements_num_gpus:.3f}, "
         f"detect={result.detect_num_gpus:.3f}, embed={result.embed_num_gpus:.3f})"
     )
@@ -599,38 +481,3 @@ def pretty_print_worker_heuristic_summary(
             final_embed_workers=final_embed_workers,
         )
     )
-
-
-def freeze_resource_config(
-    output_path: str | os.PathLike[str] | None = None,
-    *,
-    ray_cluster_address: Optional[str] = None,
-) -> Path:
-    """Persist the current resolved resource/heuristic configuration to YAML.
-
-    By default this writes to ``$HOME/.nemo-retriever/config.yaml``.
-    """
-    target = _coerce_path(output_path)
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    settings = _resolve_heuristic_config(target)
-    resources = resolve_effective_resources(ray_cluster_address=ray_cluster_address, resource_config_path=target)
-
-    payload = {
-        "resources": {
-            "cpu_count": int(resources.cpu_count),
-            "gpu_count": int(resources.gpu_count),
-        },
-        "heuristics": {
-            "page_elements_per_gpu": int(settings.page_elements_per_gpu),
-            "ocr_per_gpu": int(settings.ocr_per_gpu),
-            "embed_per_gpu": int(settings.embed_per_gpu),
-            "cpu_only_stage_num_gpus": float(settings.cpu_only_stage_num_gpus),
-            "high_overlap_page_elements_num_gpus": float(settings.high_overlap_page_elements_num_gpus),
-            "high_overlap_ocr_num_gpus": float(settings.high_overlap_ocr_num_gpus),
-            "high_overlap_embed_num_gpus": float(settings.high_overlap_embed_num_gpus),
-            "max_gpu_per_stage": float(settings.max_gpu_per_stage),
-        },
-    }
-    target.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-    return target

@@ -21,7 +21,6 @@ from typing import Optional, TextIO
 import ray
 import typer
 from nemo_retriever import create_ingestor
-from nemo_retriever.utils.ray_resource_hueristics import freeze_resource_config as freeze_resource_config_file
 from nemo_retriever.utils.ray_resource_hueristics import resolve_batch_worker_plan
 from nemo_retriever.utils.ray_resource_hueristics import resolve_resource_details
 from nemo_retriever.params import EmbedParams
@@ -324,11 +323,6 @@ def _print_heuristic_resources(
     print(f"  cpu_count: {override_cpu_count} (source={details.cpu_source})")
     print(f"  gpu_count: {override_gpu_count} (source={details.gpu_source})")
     print(f"  auto_detect_source: {details.auto_source}")
-    if details.config_path:
-        print(f"  config_path: {details.config_path}")
-    else:
-        print("  config_path: (not found)")
-
     print("  workers:")
     print(
         "    page_elements="
@@ -496,18 +490,6 @@ def main(
         "--embed-ray-batch-size",
         min=1,
         help="Ray Data batch size for embedding stage.",
-    ),
-    freeze_resource_config: bool = typer.Option(
-        False,
-        "--freeze_resource_config",
-        help="Write resolved resource heuristic config to $HOME/.nemo-retriever/config.yaml before ingest starts.",
-    ),
-    freeze_resource_config_path: Optional[Path] = typer.Option(
-        None,
-        "--freeze_resource_config_path",
-        path_type=Path,
-        dir_okay=False,
-        help="Optional output path for frozen resource config YAML. Implies --freeze_resource_config behavior.",
     ),
     hybrid: bool = typer.Option(
         False,
@@ -945,13 +927,6 @@ def main(
                 # )
             )
 
-
-        if freeze_resource_config or freeze_resource_config_path is not None:
-            frozen_path = freeze_resource_config_file(
-                output_path=freeze_resource_config_path,
-                ray_cluster_address=ray_address,
-            )
-            print(f"Froze resource configuration to {frozen_path}")
 
         print("Running extraction...")
         total_time_start = time.perf_counter()
