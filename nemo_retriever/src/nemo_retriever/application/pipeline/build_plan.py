@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
 from .stage_registry import STAGE_REGISTRY
@@ -21,16 +22,44 @@ def build_stage_plan(stage_names: Sequence[str], *, stage_kwargs: Dict[str, Dict
     return plan
 
 
+def validate_table_structure_flags(
+    use_table_structure: bool,
+    table_output_format: str,
+) -> None:
+    """Validate the combination of use_table_structure and table_output_format.
+
+    Raises ValueError if table_output_format is 'markdown' but the stage is
+    disabled.  Emits a warning when the stage is enabled but the output format
+    is 'pseudo_markdown' (the user probably wants 'markdown').
+    """
+    if not use_table_structure and table_output_format == "markdown":
+        raise ValueError(
+            "table_output_format='markdown' requires use_table_structure=True. "
+            "Either set use_table_structure=True or use table_output_format='pseudo_markdown'."
+        )
+    if use_table_structure and table_output_format == "pseudo_markdown":
+        warnings.warn(
+            "use_table_structure is enabled but table_output_format is 'pseudo_markdown'; "
+            "consider using table_output_format='markdown' for proper cell/row/column layout.",
+            stacklevel=3,
+        )
+
+
 def stage_names_from_flags(
     *,
     extract_infographics: bool = False,
     extract_tables: bool = False,
+    use_table_structure: bool = False,
+    table_output_format: str = "pseudo_markdown",
     extract_charts: bool = False,
     embed_text: bool = False,
 ) -> Iterable[str]:
+    validate_table_structure_flags(use_table_structure, table_output_format)
     if extract_infographics:
         yield "enrich_infographic"
-    if extract_tables:
+    if extract_tables and use_table_structure:
+        yield "enrich_table_structure"
+    elif extract_tables:
         yield "enrich_table"
     if extract_charts:
         yield "enrich_chart"
