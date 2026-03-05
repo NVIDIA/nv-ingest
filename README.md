@@ -143,22 +143,6 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 ```python
 import time
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_client.client import Ingestor, NvIngestClient
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
-
-def main():
-    # Start the pipeline subprocess for library mode
-    run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
-
-    client = NvIngestClient(
-        message_client_allocator=SimpleClient,
-        message_client_port=7671,
-        message_client_hostname="localhost",
-    )
-
-    # gpu_cagra accelerated indexing is not available in milvus-lite
     # Provide a filename for milvus_uri to use milvus-lite
     milvus_uri = "milvus.db"
     collection_name = "test"
