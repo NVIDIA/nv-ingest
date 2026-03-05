@@ -82,4 +82,3 @@ async def explain_image(
     )
     response = response["response"]
     return response.choices[0].message.content
-

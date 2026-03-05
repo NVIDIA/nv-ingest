@@ -53,4 +53,3 @@ async def rewrite_query(llm: llm_handler.LLM, main_query: str, sub_query: str) -
     )
     response = response["response"]
     return response.choices[0].message.content
-

@@ -117,4 +117,3 @@ The message argument should explain your reasoning and justification for selecti
             if i not in self.allowed_doc_ids:
                 raise ToolError(f"Document with ID `{i}` is not among the candidate documents.")
         return self.correct_call_return_value
-
