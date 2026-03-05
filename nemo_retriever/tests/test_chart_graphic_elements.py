@@ -304,6 +304,7 @@ class TestChartGraphicElementsOCRActor:
 # ---------------------------------------------------------------------------
 
 
+@_needs_cv2
 class TestGraphicElementsOCRConfig:
     def test_load_config_defaults(self) -> None:
         from nemo_retriever.chart.config import load_graphic_elements_ocr_config_from_dict
@@ -347,7 +348,7 @@ class TestBuildPlanChartStructure:
                 use_graphic_elements=True,
             )
         )
-        assert "enrich_chart_structure" in names
+        assert "enrich_graphic_elements" in names
         assert "enrich_chart" not in names
 
     def test_no_graphic_elements_selects_default_chart_stage(self) -> None:
@@ -355,13 +356,13 @@ class TestBuildPlanChartStructure:
 
         names = list(stage_names_from_flags(extract_charts=True))
         assert "enrich_chart" in names
-        assert "enrich_chart_structure" not in names
+        assert "enrich_graphic_elements" not in names
 
     def test_no_extract_charts_yields_no_chart_stage(self) -> None:
         from nemo_retriever.application.pipeline.build_plan import stage_names_from_flags
 
         names = list(stage_names_from_flags(extract_charts=False, use_graphic_elements=True))
-        assert "enrich_chart_structure" not in names
+        assert "enrich_graphic_elements" not in names
         assert "enrich_chart" not in names
 
     def test_graphic_elements_flag_does_not_affect_table_stages(self) -> None:
@@ -377,7 +378,7 @@ class TestBuildPlanChartStructure:
             )
         )
         assert "enrich_table_structure" in names
-        assert "enrich_chart_structure" in names
+        assert "enrich_graphic_elements" in names
 
 
 # ---------------------------------------------------------------------------
