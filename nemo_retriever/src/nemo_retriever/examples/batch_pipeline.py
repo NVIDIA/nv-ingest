@@ -411,12 +411,6 @@ def main(
         "--hybrid/--no-hybrid",
         help="Enable LanceDB hybrid mode (dense + FTS text).",
     ),
-    input_dir: Path = typer.Argument(
-        ...,
-        help="Directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
-        path_type=Path,
-        exists=True,
-    ),
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
