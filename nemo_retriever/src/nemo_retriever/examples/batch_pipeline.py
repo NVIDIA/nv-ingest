@@ -508,7 +508,6 @@ def main(
     pdf_extract_batch_size: Optional[int] = typer.Option(
         0,
         "--pdf-extract-batch-size",
-        min=1,
         help="Batch size for PDF extraction stage.",
     ),
     pdf_extract_cpus_per_task: Optional[float] = typer.Option(
