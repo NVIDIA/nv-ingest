@@ -376,6 +376,7 @@ def ocr_page_elements(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
+    inference_batch_size: int = 8,
     remote_retry: RemoteRetryParams | None = None,
     **kwargs: Any,
 ) -> Any:
@@ -410,6 +411,7 @@ def ocr_page_elements(
     """
     if not isinstance(batch_df, pd.DataFrame):
         raise NotImplementedError("ocr_page_elements currently only supports pandas.DataFrame input.")
+
     invoke_url = (invoke_url or kwargs.get("ocr_invoke_url") or "").strip()
     use_remote = bool(invoke_url)
     if not use_remote and model is None:
@@ -498,32 +500,57 @@ def ocr_page_elements(
                         elif label_name == "infographic":
                             infographic_items.append(entry)
             else:
-                for label_name, bbox, crop_array in crops:
-                    # Use word-level merging for tables to preserve cell boundaries;
-                    # paragraph-level for charts/infographics where structure matters less.
-                    ml = "word" if label_name == "table" else "paragraph"
-                    preds = model.invoke(crop_array, merge_level=ml)
+                if inference_batch_size is None or inference_batch_size < 1:
+                    raise ValueError(
+                        f"inference_batch_size must be set and greater than 0. Value: {inference_batch_size}"
+                    )
 
-                    # Parse and assemble text.
+                local_batch_size = max(1, int(inference_batch_size))
+
+                # Tables require word-level merging; charts/infographics use paragraph-level.
+                # Group by merge level so each batched invoke uses one consistent setting.
+                local_jobs: Dict[str, List[Tuple[str, List[float], np.ndarray]]] = {"word": [], "paragraph": []}
+                for label_name, bbox, crop_array in crops:
+                    ml = "word" if label_name == "table" else "paragraph"
+                    local_jobs[ml].append((label_name, bbox, crop_array))
+
+                def _append_local_result(label_name: str, bbox: List[float], preds: Any) -> None:
                     blocks = _parse_ocr_result(preds)
                     if label_name == "table":
                         text = _blocks_to_pseudo_markdown(blocks)
                         if not text:
-                            text = _blocks_to_text(blocks)  # fallback
+                            text = _blocks_to_text(blocks)
                     else:
                         text = _blocks_to_text(blocks)
-
-                    entry = {
-                        "bbox_xyxy_norm": bbox,
-                        "text": text,
-                    }
-
+                    entry = {"bbox_xyxy_norm": bbox, "text": text}
                     if label_name == "table":
                         table_items.append(entry)
                     elif label_name == "chart":
                         chart_items.append(entry)
                     elif label_name == "infographic":
                         infographic_items.append(entry)
+
+                for ml, jobs in local_jobs.items():
+                    if not jobs:
+                        continue
+                    for start in range(0, len(jobs), local_batch_size):
+                        batch_jobs = jobs[start : start + local_batch_size]
+                        batch_crops = [crop_array for _, _, crop_array in batch_jobs]
+
+                        # Try batched invoke first; if backend does not return one response
+                        # per input, fall back to per-item to preserve correctness.
+                        try:
+                            batch_preds = model.invoke(batch_crops, merge_level=ml)
+                        except Exception:
+                            batch_preds = None
+
+                        if isinstance(batch_preds, list) and len(batch_preds) == len(batch_jobs):
+                            for (label_name, bbox, _), preds in zip(batch_jobs, batch_preds):
+                                _append_local_result(label_name, bbox, preds)
+                        else:
+                            for label_name, bbox, crop_array in batch_jobs:
+                                preds = model.invoke(crop_array, merge_level=ml)
+                                _append_local_result(label_name, bbox, preds)
 
         except BaseException as e:
             print(f"Warning: OCR failed: {type(e).__name__}: {e}")
@@ -545,6 +572,7 @@ def ocr_page_elements(
     for meta in all_ocr_meta:
         meta["timing"] = {"seconds": float(elapsed)}
 
+    # TODO: Is this actually a necessary copy?
     out = batch_df.copy()
     # Only overwrite content columns that this call is responsible for.
     # When extract_tables=False, preserve any existing `table` column
