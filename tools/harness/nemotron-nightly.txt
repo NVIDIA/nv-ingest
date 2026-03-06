@@ -6,4 +6,4 @@
 nemotron-page-elements-v3>=0.dev0
 nemotron-graphic-elements-v1>=0.dev0
 nemotron-table-structure-v1>=0.dev0
-nemotron-ocr>=0.dev0
+nemoretriever-ocr>=0.dev0

@@ -42,7 +42,7 @@ jobs:
             project_subdir: ""
           - id: llama-nemotron-embed-1b-v2
             url: https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2
-            # Repo layout matches nemotron-ocr-v1: Python project is nested under a same-named subdir.
+            # Repo layout matches nemoretriever-ocr-v1: Python project is nested under a same-named subdir.
             project_subdir: llama-nemotron-embed-1b-v2
           - id: llama-nemotron-rerank-1b-v2
             url: https://huggingface.co/nvidia/llama-nemotron-rerank-1b-v2
@@ -123,7 +123,7 @@ jobs:
           path: dist-out/${{ matrix.repo.id }}/*
 
   build_ocr_cuda:
-    # nemotron-ocr-v1 needs nvcc/CUDA headers to build its extension.
+    # nemoretriever-ocr-v1 needs nvcc/CUDA headers to build its extension.
     # Build with Python 3.12 to match upstream package constraints and
     # avoid producing an extension for the wrong Python ABI.
     runs-on: ubuntu-latest
@@ -170,7 +170,7 @@ jobs:
           echo "upload_to=${upload_to}" >> "$GITHUB_OUTPUT"
           echo "skip_existing=${skip_existing}" >> "$GITHUB_OUTPUT"
 
-      - name: Build nemotron-ocr-v1 (and maybe upload)
+      - name: Build nemoretriever-ocr-v1 (and maybe upload)
         env:
           TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
           PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
@@ -203,11 +203,11 @@ jobs:
 
           python --version
           python ci/scripts/nightly_build_publish.py \
-            --repo-id "nemotron-ocr-v1" \
-            --repo-url "https://huggingface.co/nvidia/nemotron-ocr-v1" \
+            --repo-id "nemoretriever-ocr-v1" \
+            --repo-url "https://huggingface.co/nvidia/nemoretriever-ocr-v1" \
             --work-dir ".work" \
             --dist-dir "dist-out" \
-            --project-subdir "nemotron-ocr" \
+            --project-subdir "nemoretriever-ocr" \
             --build-no-isolation \
             --venv-pip-install "hatchling" \
             --venv-pip-install "setuptools>=68" \
@@ -225,9 +225,9 @@ jobs:
           import zipfile
           from pathlib import Path
 
-          wheels = sorted(Path("dist-out/nemotron-ocr-v1").glob("*.whl"))
+          wheels = sorted(Path("dist-out/nemoretriever-ocr-v1").glob("*.whl"))
           if not wheels:
-              raise SystemExit("No wheel found in dist-out/nemotron-ocr-v1")
+              raise SystemExit("No wheel found in dist-out/nemoretriever-ocr-v1")
 
           py_tag = f"cpython-{sys.version_info.major}{sys.version_info.minor}"
           matches = []
@@ -253,5 +253,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: dist-nemotron-ocr-v1
-          path: dist-out/nemotron-ocr-v1/*
+          name: dist-nemoretriever-ocr-v1
+          path: dist-out/nemoretriever-ocr-v1/*

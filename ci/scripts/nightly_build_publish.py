@@ -278,7 +278,7 @@ def main() -> int:
     ap.add_argument(
         "--project-subdir",
         default="",
-        help="If the Python project lives in a subdirectory, build from there (e.g. 'nemotron-ocr')",
+        help="If the Python project lives in a subdirectory, build from there (e.g. 'nemoretriever-ocr')",
     )
     ap.add_argument(
         "--build-env",

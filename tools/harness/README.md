@@ -293,7 +293,7 @@ DATASET_DIR=/custom/path uv run nv-ingest-harness-run --case=e2e
 | `page_elements` | nemotron-page-elements-v3 model benchmarking (PyPi) | None | ✅ Available |
 | `graphic_elements` | nemotron-graphic-elements-v1 model benchmarking (PyPi) | None | ✅ Available |
 | `table_structure` | nemotron-table-structure-v1 model benchmarking (PyPi) | None | ✅ Available |
-| `ocr` | nemotron-ocr model benchmarking (PyPi) | None | ✅ Available |
+| `ocr` | nemoretriever-ocr model benchmarking (PyPi) | None | ✅ Available |
 
 **Note**: Legacy test cases (`dc20_e2e`, `dc20_v2_e2e`) have been moved to `scripts/private_local`.
 
@@ -525,7 +525,7 @@ Metrics are also logged via `kv_event_log()`:
 
 ## Model Testing
 
-The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install (via `uv pip install -e .`) includes the nemotron-* packages from Test PyPI (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemotron-ocr`). With vanilla pip, install the standard harness env first, then `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps` to get the nightly Nemotron packages from Test PyPI.
+The harness includes benchmark test cases for Nemotron document analysis models. These cases benchmark inference performance on image datasets without requiring the full nv-ingest service infrastructure. The default install (via `uv pip install -e .`) includes the nemotron-* packages from Test PyPI (`nemotron-page-elements-v3`, `nemotron-graphic-elements-v1`, `nemotron-table-structure-v1`, `nemoretriever-ocr`). With vanilla pip, install the standard harness env first, then `pip install -r tools/harness/nemotron-nightly.txt --force-reinstall --no-deps` to get the nightly Nemotron packages from Test PyPI.
 
 ### Available Model Benchmarks
 
@@ -534,7 +534,7 @@ The harness includes benchmark test cases for Nemotron document analysis models.
 | `page_elements` | [Nemotron Page Element v3](https://huggingface.co/nvidia/nemotron-page-elements-v3) | nemotron_page_elements_v3 | Document layout detection (tables, figures, text blocks, headers, etc.) |
 | `table_structure` | [Nemotron Table Structure v1](https://huggingface.co/nvidia/nemotron-table-structure-v1) | nemotron_table_structure_v1 | Table cell, row, and column detection |
 | `graphic_elements` | [Nemotron Graphic Element v1](https://huggingface.co/nvidia/nemotron-graphic-elements-v1) | nemotron_graphic_elements_v1 | Chart and graphic element detection |
-| `ocr` | [Nemotron OCR v1](https://huggingface.co/nvidia/nemotron-ocr-v1) | nemotron_ocr | Optical character recognition (text extraction with bounding boxes) |
+| `ocr` | [Nemotron OCR v1](https://huggingface.co/nvidia/nemoretriever-ocr-v1) | nemotron_ocr | Optical character recognition (text extraction with bounding boxes) |
 
 ### Usage
 
