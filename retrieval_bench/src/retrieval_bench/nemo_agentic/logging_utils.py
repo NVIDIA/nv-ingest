@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# taken from:
+# Adapted from BatsResearch/trove (Apache-2.0):
 # https://github.com/BatsResearch/trove/blob/main/src/trove/logging_utils.py
 """Simple utilities to create python loggers."""
 
@@ -15,23 +15,23 @@ from rich.logging import RichHandler
 
 
 @dataclass
-class TempModuleConfig:
-    TROVE_LOGGING_DISABLE: bool = False
+class LoggingModuleConfig:
+    LOGGING_DISABLE: bool = False
     LOG_LEVEL: str = "INFO"
-    TROVE_LOGGING_DISABLE_RICH: bool = False
+    LOGGING_DISABLE_RICH: bool = False
 
 
-config = TempModuleConfig(
+config = LoggingModuleConfig(
     LOG_LEVEL=os.environ.get("LOG_LEVEL", "INFO"),
-    TROVE_LOGGING_DISABLE=os.environ.get("TROVE_LOGGING_DISABLE", "false").lower() == "true",
-    TROVE_LOGGING_DISABLE_RICH=os.environ.get("TROVE_LOGGING_DISABLE_RICH", "false").lower() == "true",
+    LOGGING_DISABLE=os.environ.get("LOGGING_DISABLE", "false").lower() == "true",
+    LOGGING_DISABLE_RICH=os.environ.get("LOGGING_DISABLE_RICH", "false").lower() == "true",
 )
 
 
-# TROVE_LOGGING_FORMAT_STR_RICH = "%(funcName)s() %(message)s"
-TROVE_LOGGING_FORMAT_STR_RICH = "%(message)s"
-TROVE_LOGGING_FORMAT_STR = "%(asctime)s %(module)s:%(lineno)s, [%(funcName)s] (%(levelname)s)- %(message)s"
-TROVE_LOGGING_TIME_FORMAT_STR = "%H:%M:%S"
+# LOGGING_FORMAT_STR_RICH = "%(funcName)s() %(message)s"
+LOGGING_FORMAT_STR_RICH = "%(message)s"
+LOGGING_FORMAT_STR = "%(asctime)s %(module)s:%(lineno)s, [%(funcName)s] (%(levelname)s)- %(message)s"
+LOGGING_TIME_FORMAT_STR = "%H:%M:%S"
 
 STR_LOG_LEVEL_TO_INT = {
     "CRITICAL": logging.CRITICAL,
@@ -73,32 +73,32 @@ class LoggerConfig:
         return STR_LOG_LEVEL_TO_INT[self.level] == logging.WARNING
 
 
-class TroveLoggerWrapper:
+class LoggerWrapper:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
 
     def info(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.info(*args, **kwargs)
 
     def debug(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.debug(*args, **kwargs)
 
     def warning(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.warning(*args, **kwargs)
 
     def error(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.error(*args, **kwargs)
 
     def log(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.log(*args, **kwargs)
 
     def critical(self, *args, **kwargs):
-        if not config.TROVE_LOGGING_DISABLE:
+        if not config.LOGGING_DISABLE:
             return self._logger.critical(*args, **kwargs)
 
 
@@ -115,7 +115,7 @@ def get_logger_with_config(
     log_level: Optional[str] = None,
     rank: Optional[int] = None,
     force: bool = False,
-) -> Tuple[Union[logging.Logger, TroveLoggerWrapper], LoggerConfig]:
+) -> Tuple[Union[logging.Logger, LoggerWrapper], LoggerConfig]:
     """Creates and returns a logger instance and a config object."""
     logger = logging.getLogger(name)
     log_level = ensure_str_log_level(config.LOG_LEVEL if log_level is None else log_level)
@@ -124,15 +124,15 @@ def get_logger_with_config(
             logger.removeHandler(h)
     if not len(logger.handlers):
         logger.setLevel(getattr(logging, log_level))
-        if config.TROVE_LOGGING_DISABLE_RICH:
+        if config.LOGGING_DISABLE_RICH:
             handler = logging.StreamHandler()
             handler.setLevel(getattr(logging, log_level))
-            format_str = TROVE_LOGGING_FORMAT_STR
+            format_str = LOGGING_FORMAT_STR
             if rank is not None:
                 format_str = format_str.replace("%(asctime)s", f"%(asctime)s <R{rank}>")
-            if name != "trove":
+            if name:
                 format_str = f"[{name}] " + format_str
-            handler.setFormatter(logging.Formatter(format_str, TROVE_LOGGING_TIME_FORMAT_STR))
+            handler.setFormatter(logging.Formatter(format_str, LOGGING_TIME_FORMAT_STR))
         else:
             handler = RichHandler(
                 level=getattr(logging, log_level),
@@ -141,12 +141,12 @@ def get_logger_with_config(
                 locals_max_string=None,
             )
             handler.setLevel(getattr(logging, log_level))
-            format_str = TROVE_LOGGING_FORMAT_STR_RICH
+            format_str = LOGGING_FORMAT_STR_RICH
             if rank is not None:
-                format_str = f"<R{rank}> " + TROVE_LOGGING_FORMAT_STR_RICH
-            if name != "trove":
+                format_str = f"<R{rank}> " + LOGGING_FORMAT_STR_RICH
+            if name:
                 format_str = f"[{name}] " + format_str
-            handler.setFormatter(logging.Formatter(format_str, TROVE_LOGGING_TIME_FORMAT_STR))
+            handler.setFormatter(logging.Formatter(format_str, LOGGING_TIME_FORMAT_STR))
         logger.addHandler(handler)
     logging_config = LoggerConfig(level=log_level)
     return logger, logging_config
