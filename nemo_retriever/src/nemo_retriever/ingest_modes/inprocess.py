@@ -63,12 +63,7 @@ from ..html import html_file_to_chunks_df
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
-    if params is None:
-        return model_cls(**kwargs)
-    if kwargs:
-        return params.model_copy(update=kwargs)  # type: ignore[return-value]
-    return params
+from nemo_retriever.params.utils import coerce_params as _coerce_params
 
 
 def _combine_text_with_content(row, text_column, content_columns):
@@ -1248,14 +1243,9 @@ class InProcessIngestor(Ingestor):
                 )
             )
 
-        embed_kwargs = {
-            **resolved.model_dump(
-                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
-            ),
-            **resolved.runtime.model_dump(mode="python", exclude_none=True),
-        }
-        if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
-            embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
+        from nemo_retriever.params.utils import build_embed_kwargs
+
+        embed_kwargs = build_embed_kwargs(resolved)
 
         # Ensure embed_modality is forwarded to the embedding function.
         embed_kwargs["embed_modality"] = embed_modality
