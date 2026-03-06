@@ -860,7 +860,6 @@ def main(
             f"Ingestion complete. {num_rows} rows procesed in "
             f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
         )
-        logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
