@@ -392,7 +392,9 @@ class NemotronColEmbedVLV2SingletonRetriever:
             ):
                 # Only adjust GPU preload.
                 if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(self._state.corpus_embeddings_cpu)
+                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
+                        self._state.corpus_embeddings_cpu, self._state.device
+                    )
                 if preload_corpus_to_gpu and self._state.corpus_token_lengths_gpu is None:
                     self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
                         self._state.device, non_blocking=True
@@ -423,7 +425,7 @@ class NemotronColEmbedVLV2SingletonRetriever:
             self._state.corpus_embeddings_gpu = None
             self._state.corpus_token_lengths_gpu = None
             if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu)
+                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu, self._state.device)
                 self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
                     self._state.device, non_blocking=True
                 )
