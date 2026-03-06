@@ -11,6 +11,7 @@ from typing import List, Optional, Sequence
 import torch
 
 from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_model_registry import get_hf_revision
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
@@ -47,8 +48,19 @@ class LlamaNemotronEmbed1BV2Embedder:
         MODEL_ID = self.model_id or "nvidia/llama-nemotron-embed-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = configure_global_hf_cache_base(self.hf_cache_dir)
-        self._tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, cache_dir=hf_cache_dir, trust_remote_code=True)
-        self._model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True, cache_dir=hf_cache_dir)
+        _revision = get_hf_revision(MODEL_ID)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            MODEL_ID,
+            revision=_revision,
+            cache_dir=hf_cache_dir,
+            trust_remote_code=True,
+        )
+        self._model = AutoModel.from_pretrained(
+            MODEL_ID,
+            revision=_revision,
+            trust_remote_code=True,
+            cache_dir=hf_cache_dir,
+        )
         self._model = self._model.to(dev)
         self._model.eval()
         self._device = dev
