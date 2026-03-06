@@ -22,8 +22,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from dotenv import load_dotenv
 
-load_dotenv()
-
 _CURRENT_QUERY_ID: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "nemo_agentic_current_query_id", default=None
 )
@@ -246,6 +244,8 @@ class AgenticRetrievalPipeline(BasePipeline):
         # All remaining kwargs are forwarded as backend overrides.
         **backend_kwargs: Any,
     ) -> None:
+        load_dotenv()
+
         if backend not in VALID_BACKENDS:
             raise ValueError(f"Unknown backend {backend!r}. " f"Must be one of: {', '.join(sorted(VALID_BACKENDS))}")
         self.backend = backend
