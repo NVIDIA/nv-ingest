@@ -222,10 +222,10 @@ Use `results.json` for routine benchmark comparison, and use the files under `ru
 
 7. Artifact size profile
 
-Current benchmark runs show that LanceDB data dominates artifact footprint:
+Current benchmark runs show that the LanceDB data dominates the artifact footprint:
 
-- `bo20`: ~9.0 MiB total, ~8.6 MiB LanceDB  
-- `jp20`: ~36.8 MiB total, ~36.2 MiB LanceDB  
+- `bo20: ~9.0 MiB total, ~8.6 MiB LanceDB`  
+- `jp20: ~36.8 MiB total, ~36.2 MiB LanceDB` 
 
 ## Audio ingestion pipeline
 
