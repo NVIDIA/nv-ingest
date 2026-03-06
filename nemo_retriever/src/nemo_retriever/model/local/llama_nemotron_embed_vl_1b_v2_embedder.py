@@ -6,10 +6,11 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Optional, Sequence
 
 import torch
+
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
@@ -41,7 +42,7 @@ class LlamaNemotronEmbedVL1BV2Embedder:
 
         model_id = self.model_id or "nvidia/llama-nemotron-embed-vl-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
-        hf_cache_dir = self.hf_cache_dir or str(Path.home() / ".cache" / "huggingface")
+        hf_cache_dir = configure_global_hf_cache_base(self.hf_cache_dir)
 
         # flash_attention_2 requires the model on GPU at init time, so use
         # device_map when requesting it.  Fall back to sdpa/eager on CPU or
