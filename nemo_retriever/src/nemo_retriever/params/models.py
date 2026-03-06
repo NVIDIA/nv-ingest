@@ -42,6 +42,7 @@ class IngestorCreateParams(_ParamsModel):
     documents: list[str] = Field(default_factory=list)
     ray_address: Optional[str] = None
     ray_log_to_driver: bool = True
+    debug: bool = False
     base_url: str = "http://localhost:7670"
 
 
@@ -119,12 +120,13 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
     detect_batch_size: int = 24
-    page_elements_workers: int = 1
-    ocr_workers: int = 1
+    ocr_inference_batch_size: Optional[int] = None
+    page_elements_workers: Optional[int] = None
+    ocr_workers: Optional[int] = None
     detect_workers: Optional[int] = None
     page_elements_cpus_per_actor: float = 1
     ocr_cpus_per_actor: float = 1
-    embed_workers: int = 1
+    embed_workers: Optional[int] = None
     embed_batch_size: int = 256
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
@@ -133,6 +135,7 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_workers: float = 0.0
     gpu_nemotron_parse: float = 0.0
     nemotron_parse_batch_size: float = 0.0
+    inference_batch_size: int = 8
 
 
 class FusedTuningParams(_ParamsModel):
