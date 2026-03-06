@@ -22,11 +22,14 @@ Interface (module-level singleton):
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import time
 import threading
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch

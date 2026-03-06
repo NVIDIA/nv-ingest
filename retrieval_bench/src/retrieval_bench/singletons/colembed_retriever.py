@@ -17,11 +17,14 @@ The exported `retriever` object is a module-level singleton.
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import threading
 import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -145,8 +148,7 @@ class _ColEmbedState:
                     )
                 return emb
             except Exception:
-                # fall through to recompute
-                pass
+                logger.debug("Cache load failed for %s, recomputing", cache_path, exc_info=True)
 
         t0 = time.time()
         emb = self._embed_corpus_batched(corpus)

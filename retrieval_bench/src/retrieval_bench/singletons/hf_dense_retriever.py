@@ -23,12 +23,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import time
 import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -318,7 +321,7 @@ class _HfDenseState:
                     raise ValueError(f"Cached embeddings mismatch: cached={emb.shape[0]} vs corpus={len(corpus_ids)}")
                 return emb
             except Exception:
-                pass
+                logger.debug("Cache load failed for %s, recomputing", emb_path, exc_info=True)
 
         # Build from scratch.
         emb_path.parent.mkdir(parents=True, exist_ok=True)
