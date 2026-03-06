@@ -139,6 +139,11 @@ def main(
         "--page-elements-invoke-url",
         help="Optional remote endpoint URL for page-elements model inference.",
     ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
+    ),
     ocr_invoke_url: Optional[str] = typer.Option(
         None,
         "--ocr-invoke-url",
@@ -304,6 +309,7 @@ def main(
                     table_output_format=table_output_format,
                     table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
                         "nemotron_parse_workers": float(nemotron_parse_workers),
@@ -347,6 +353,7 @@ def main(
                     table_output_format=table_output_format,
                     table_structure_invoke_url=table_structure_invoke_url,
                     page_elements_invoke_url=page_elements_invoke_url,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
                     ocr_invoke_url=ocr_invoke_url,
                     batch_tuning={
                         "nemotron_parse_workers": float(nemotron_parse_workers),

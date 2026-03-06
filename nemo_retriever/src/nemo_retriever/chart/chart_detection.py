@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
 
 import base64
@@ -13,6 +13,8 @@ import time
 import traceback
 
 import pandas as pd
+from nemo_retriever.params import RemoteRetryParams
+from nemo_retriever.nim.nim import invoke_image_inference_batches
 
 try:
     import numpy as np
@@ -28,6 +30,19 @@ try:
     from PIL import Image
 except Exception:  # pragma: no cover
     Image = None  # type: ignore[assignment]
+
+_DEFAULT_GRAPHIC_ELEMENTS_LABELS: List[str] = [
+    "chart_title",
+    "x_title",
+    "y_title",
+    "xlabel",
+    "ylabel",
+    "other",
+    "legend_label",
+    "legend_title",
+    "mark_label",
+    "value_label",
+]
 
 
 def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
@@ -169,20 +184,26 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
         except Exception:
             return None
 
+    string_labels: Optional[List[str]] = None
+    if isinstance(labels, (list, tuple)) and labels and isinstance(labels[0], str):
+        string_labels = [str(x) for x in labels]
+
     b = _to_tensor(boxes)
-    l = _to_tensor(labels)  # noqa: E741
+    l = _to_tensor(labels) if string_labels is None else None  # noqa: E741
     s = _to_tensor(scores) if scores is not None else None
-    if b is None or l is None:
+    if b is None or (l is None and string_labels is None):
         return []
 
     if b.ndim != 2 or int(b.shape[-1]) != 4:
         return []
-    if l.ndim == 2 and int(l.shape[-1]) == 1:
-        l = l.squeeze(-1)  # noqa: E741
-    if l.ndim != 1:
-        return []
+    if l is not None:
+        if l.ndim == 2 and int(l.shape[-1]) == 1:
+            l = l.squeeze(-1)  # noqa: E741
+        if l.ndim != 1:
+            return []
 
-    n = int(min(b.shape[0], l.shape[0]))
+    n_labels = len(string_labels) if string_labels is not None else int(l.shape[0])
+    n = int(min(b.shape[0], n_labels))
     dets: List[Dict[str, Any]] = []
     for i in range(n):
         try:
@@ -191,10 +212,16 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
             continue
 
         label_i: Optional[int]
-        try:
-            label_i = int(l[i].item())
-        except Exception:
-            label_i = None
+        label_name: Optional[str]
+        if string_labels is not None:
+            label_i = i
+            label_name = string_labels[i]
+        else:
+            try:
+                label_i = int(l[i].item()) if l is not None else None
+            except Exception:
+                label_i = None
+            label_name = None
 
         score_f: Optional[float]
         if s is not None and s.ndim >= 1 and int(s.shape[0]) > i:
@@ -205,8 +232,7 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
         else:
             score_f = None
 
-        label_name = None
-        if label_i is not None and 0 <= label_i < len(label_names):
+        if label_name is None and label_i is not None and 0 <= label_i < len(label_names):
             label_name = label_names[label_i]
         if not label_name:
             label_name = f"label_{label_i}" if label_i is not None else "unknown"
@@ -220,6 +246,57 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
             }
         )
     return dets
+
+
+def _parse_nim_bounding_boxes(response_item: Any) -> List[Dict[str, Any]]:
+    bb = None
+    if isinstance(response_item, dict):
+        bb = response_item.get("bounding_boxes")
+    if not isinstance(bb, dict):
+        return []
+
+    dets: List[Dict[str, Any]] = []
+    for label_name, items in bb.items():
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            try:
+                bbox = [float(item["x_min"]), float(item["y_min"]), float(item["x_max"]), float(item["y_max"])]
+            except (KeyError, TypeError, ValueError):
+                continue
+            score = None
+            try:
+                score = float(item["confidence"])
+            except (KeyError, TypeError, ValueError):
+                pass
+            dets.append(
+                {
+                    "bbox_xyxy_norm": bbox,
+                    "label_name": str(label_name),
+                    "score": score,
+                }
+            )
+    return dets
+
+
+def _extract_remote_pred_item(response_item: Any) -> Any:
+    if isinstance(response_item, dict):
+        for k in ("prediction", "predictions", "output", "outputs", "data"):
+            v = response_item.get(k)
+            if isinstance(v, list) and v:
+                return v[0]
+            if v is not None:
+                return v
+    return response_item
+
+
+def _remote_response_to_detections(response_item: Any, *, label_names: List[str]) -> List[Dict[str, Any]]:
+    parsed = _parse_nim_bounding_boxes(response_item)
+    if parsed:
+        return parsed
+    return _prediction_to_detections(_extract_remote_pred_item(response_item), label_names=label_names)
 
 
 def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
@@ -238,11 +315,17 @@ def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
 def detect_graphic_elements_v1(
     batch_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    graphic_elements_invoke_url: Optional[str] = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
+    remote_retry: RemoteRetryParams | None = None,
     inference_batch_size: int = 8,
     output_column: str = "graphic_elements_v1",
     num_detections_column: str = "graphic_elements_v1_num_detections",
     counts_by_label_column: str = "graphic_elements_v1_counts_by_label",
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron Graphic Elements v1 on a pandas batch.
@@ -252,95 +335,147 @@ def detect_graphic_elements_v1(
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
 
-    label_names = _labels_from_model(model)
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
+    ge_url = (graphic_elements_invoke_url or invoke_url or kwargs.get("graphic_elements_invoke_url") or "").strip()
+    use_remote = bool(ge_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `graphic_elements_invoke_url` is not provided.")
+
+    label_names = _labels_from_model(model) if model is not None else []
+    if not label_names:
+        label_names = list(_DEFAULT_GRAPHIC_ELEMENTS_LABELS)
 
     tensors: List[Optional["torch.Tensor"]] = []
     shapes: List[Optional[Tuple[int, int]]] = []
+    row_b64s: List[Optional[str]] = []
     payloads: List[Dict[str, Any]] = []
     for _, row in batch_df.iterrows():
         try:
             b64 = row.get("page_image", {}).get("image_b64", None)
             if not b64:
                 raise ValueError("No usable image_b64 found in row.")
-            t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-            tensors.append(t)
-            shapes.append(orig_shape)
+            row_b64s.append(str(b64))
+            if use_remote:
+                tensors.append(None)
+                shapes.append(None)
+            else:
+                t, orig_shape = _decode_b64_image_to_chw_tensor(str(b64))
+                tensors.append(t)
+                shapes.append(orig_shape)
             payloads.append({"detections": []})
         except BaseException as e:
+            row_b64s.append(None)
             tensors.append(None)
             shapes.append(None)
             payloads.append(_error_payload(stage="decode_image", exc=e))
 
-    valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
-
-    for chunk_start in range(0, len(valid), int(inference_batch_size)):
-        idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
-        if not idxs:
-            continue
-
-        pre_list: List["torch.Tensor"] = []
-        orig_shapes: List[Tuple[int, int]] = []
-        for i in idxs:
-            t = tensors[i]
-            sh = shapes[i]
-            if t is None or sh is None:
-                continue
-            orig_shapes.append(sh)
-            x = t.unsqueeze(0)  # BCHW
+    if use_remote:
+        valid = [i for i, b64 in enumerate(row_b64s) if b64]
+        if valid:
+            valid_b64 = [cast(str, row_b64s[i]) for i in valid]
+            t0 = time.perf_counter()
             try:
-                pre = model.preprocess(x)
-            except Exception:
-                pre = x
-            if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
-                pre_list.append(pre[0])
-            elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                pre_list.append(pre)
-            else:
-                pre_list.append(t)
+                response_items = invoke_image_inference_batches(
+                    invoke_url=ge_url,
+                    image_b64_list=valid_b64,
+                    api_key=api_key,
+                    timeout_s=float(request_timeout_s),
+                    max_batch_size=int(inference_batch_size),
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
+                )
+                elapsed = time.perf_counter() - t0
+                if len(response_items) != len(valid):
+                    raise RuntimeError(
+                        f"Remote response count mismatch: expected {len(valid)}, got {len(response_items)}"
+                    )
+                for local_i, row_i in enumerate(valid):
+                    dets = _remote_response_to_detections(response_items[local_i], label_names=label_names)
+                    payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
+            except BaseException as e:
+                elapsed = time.perf_counter() - t0
+                for row_i in valid:
+                    payloads[row_i] = _error_payload(stage="remote_inference", exc=e) | {
+                        "timing": {"seconds": float(elapsed)}
+                    }
+    else:
+        valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
 
-        if not pre_list:
-            continue
+        for chunk_start in range(0, len(valid), int(inference_batch_size)):
+            idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
+            if not idxs:
+                continue
 
-        batch = torch.stack(pre_list, dim=0)
-        t0 = time.perf_counter()
-        try:
-            preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
-            elapsed = time.perf_counter() - t0
-            if isinstance(preds, list):
-                preds_list = preds
-            else:
-                preds_list = [preds]
-            if len(preds_list) != len(idxs):
-                raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
-            for local_j, row_i in enumerate(idxs):
-                dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
-                payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
-        except BaseException:
-            for local_j, row_i in enumerate(idxs):
-                t = tensors[row_i]
-                sh = shapes[row_i]
+            pre_list: List["torch.Tensor"] = []
+            orig_shapes: List[Tuple[int, int]] = []
+            for i in idxs:
+                t = tensors[i]
+                sh = shapes[i]
                 if t is None or sh is None:
                     continue
-                x = t.unsqueeze(0)
-                t1 = time.perf_counter()
+                orig_shapes.append(sh)
+                x = t.unsqueeze(0)  # BCHW
                 try:
+                    pre = model.preprocess(x)
+                except Exception:
+                    pre = x
+                if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
+                    pre_list.append(pre[0])
+                elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                    pre_list.append(pre)
+                else:
+                    pre_list.append(t)
+
+            if not pre_list:
+                continue
+
+            batch = torch.stack(pre_list, dim=0)
+            t0 = time.perf_counter()
+            try:
+                preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
+                elapsed = time.perf_counter() - t0
+                if isinstance(preds, list):
+                    preds_list = preds
+                else:
+                    preds_list = [preds]
+                if len(preds_list) != len(idxs):
+                    raise RuntimeError(
+                        "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                    )
+                for local_j, row_i in enumerate(idxs):
+                    dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
+                    payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
+            except BaseException:
+                for local_j, row_i in enumerate(idxs):
+                    t = tensors[row_i]
+                    sh = shapes[row_i]
+                    if t is None or sh is None:
+                        continue
+                    x = t.unsqueeze(0)
+                    t1 = time.perf_counter()
                     try:
-                        pre = model.preprocess(x)
-                    except Exception:
-                        pre = x
-                    if isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                        pre = pre.unsqueeze(0)
-                    pred = model.invoke(pre, sh)
-                    dets = _prediction_to_detections(pred, label_names=label_names)
-                    payloads[row_i] = {
-                        "detections": dets,
-                        "timing": {"seconds": float(time.perf_counter() - t1)},
-                        "error": None,
-                    }
-                except BaseException as e:
-                    payloads[row_i] = _error_payload(stage="invoke", exc=e) | {
-                        "timing": {"seconds": float(time.perf_counter() - t1)}
-                    }
+                        try:
+                            pre = model.preprocess(x)
+                        except Exception:
+                            pre = x
+                        if isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                            pre = pre.unsqueeze(0)
+                        pred = model.invoke(pre, sh)
+                        dets = _prediction_to_detections(pred, label_names=label_names)
+                        payloads[row_i] = {
+                            "detections": dets,
+                            "timing": {"seconds": float(time.perf_counter() - t1)},
+                            "error": None,
+                        }
+                    except BaseException as e:
+                        payloads[row_i] = _error_payload(stage="invoke", exc=e) | {
+                            "timing": {"seconds": float(time.perf_counter() - t1)}
+                        }
 
     out = batch_df.copy()
     out[output_column] = payloads
@@ -354,7 +489,12 @@ def detect_graphic_elements_v1(
 def detect_graphic_elements_v1_from_page_elements_v3(
     pages_df: Any,
     *,
-    model: Any,
+    model: Any = None,
+    graphic_elements_invoke_url: Optional[str] = None,
+    invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
+    request_timeout_s: float = 120.0,
+    remote_retry: RemoteRetryParams | None = None,
     inference_batch_size: int = 8,
     page_elements_column: str = "page_elements_v3",
     page_elements_counts_by_label_column: str = "page_elements_v3_counts_by_label",
@@ -362,6 +502,7 @@ def detect_graphic_elements_v1_from_page_elements_v3(
     output_column: str = "graphic_elements_v1",
     num_detections_column: str = "graphic_elements_v1_num_detections",
     counts_by_label_column: str = "graphic_elements_v1_counts_by_label",
+    **kwargs: Any,
 ) -> Any:
     """
     Run Nemotron Graphic Elements v1 only on cropped chart regions.
@@ -379,6 +520,16 @@ def detect_graphic_elements_v1_from_page_elements_v3(
         )
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
+
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
+    ge_url = (graphic_elements_invoke_url or invoke_url or kwargs.get("graphic_elements_invoke_url") or "").strip()
+    use_remote = bool(ge_url)
+    if not use_remote and model is None:
+        raise ValueError("A local `model` is required when `graphic_elements_invoke_url` is not provided.")
 
     out_payloads: List[Dict[str, Any]] = []
     out_total_dets: List[int] = []
@@ -465,91 +616,125 @@ def detect_graphic_elements_v1_from_page_elements_v3(
         out_counts.append({})
 
     if crop_b64s:
-        label_names = _labels_from_model(model)
+        label_names = _labels_from_model(model) if model is not None else []
+        if not label_names:
+            label_names = list(_DEFAULT_GRAPHIC_ELEMENTS_LABELS)
 
-        tensors: List[Optional["torch.Tensor"]] = []
-        shapes: List[Optional[Tuple[int, int]]] = []
         crop_payloads: List[Dict[str, Any]] = []
-        for b64 in crop_b64s:
-            try:
-                t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-                tensors.append(t)
-                shapes.append(orig_shape)
-                crop_payloads.append({"detections": []})
-            except BaseException as e:
-                tensors.append(None)
-                shapes.append(None)
-                crop_payloads.append(_error_payload(stage="decode_image", exc=e))
-
-        valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
-
-        for chunk_start in range(0, len(valid), int(inference_batch_size)):
-            idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
-            if not idxs:
-                continue
-
-            pre_list: List["torch.Tensor"] = []
-            orig_shapes: List[Tuple[int, int]] = []
-            for i in idxs:
-                t = tensors[i]
-                sh = shapes[i]
-                if t is None or sh is None:
-                    continue
-                orig_shapes.append(sh)
-                x = t.unsqueeze(0)
-                try:
-                    pre = model.preprocess(x)
-                except Exception:
-                    pre = x
-                if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
-                    pre_list.append(pre[0])
-                elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                    pre_list.append(pre)
-                else:
-                    pre_list.append(t)
-
-            if not pre_list:
-                continue
-
-            batch = torch.stack(pre_list, dim=0)
+        if use_remote:
             t0 = time.perf_counter()
             try:
-                preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
+                response_items = invoke_image_inference_batches(
+                    invoke_url=ge_url,
+                    image_b64_list=crop_b64s,
+                    api_key=api_key,
+                    timeout_s=float(request_timeout_s),
+                    max_batch_size=int(inference_batch_size),
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
+                )
                 elapsed = time.perf_counter() - t0
-                preds_list = preds if isinstance(preds, list) else [preds]
-                if len(preds_list) != len(idxs):
+                if len(response_items) != len(crop_b64s):
                     raise RuntimeError(
-                        "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                        f"Remote response count mismatch: expected {len(crop_b64s)}, got {len(response_items)}"
                     )
-                for local_j, crop_i in enumerate(idxs):
-                    dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
-                    crop_payloads[crop_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
-            except BaseException:
-                for crop_i in idxs:
-                    t = tensors[crop_i]
-                    sh = shapes[crop_i]
+                for response_item in response_items:
+                    dets = _remote_response_to_detections(response_item, label_names=label_names)
+                    crop_payloads.append({"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None})
+            except BaseException as e:
+                elapsed = time.perf_counter() - t0
+                crop_payloads = [
+                    _error_payload(stage="remote_inference", exc=e) | {"timing": {"seconds": float(elapsed)}}
+                    for _ in crop_b64s
+                ]
+        else:
+            tensors: List[Optional["torch.Tensor"]] = []
+            shapes: List[Optional[Tuple[int, int]]] = []
+            for b64 in crop_b64s:
+                try:
+                    t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
+                    tensors.append(t)
+                    shapes.append(orig_shape)
+                    crop_payloads.append({"detections": []})
+                except BaseException as e:
+                    tensors.append(None)
+                    shapes.append(None)
+                    crop_payloads.append(_error_payload(stage="decode_image", exc=e))
+
+            valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
+
+            for chunk_start in range(0, len(valid), int(inference_batch_size)):
+                idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
+                if not idxs:
+                    continue
+
+                pre_list: List["torch.Tensor"] = []
+                orig_shapes: List[Tuple[int, int]] = []
+                for i in idxs:
+                    t = tensors[i]
+                    sh = shapes[i]
                     if t is None or sh is None:
                         continue
+                    orig_shapes.append(sh)
                     x = t.unsqueeze(0)
-                    t1 = time.perf_counter()
                     try:
-                        try:
-                            pre = model.preprocess(x)
-                        except Exception:
-                            pre = x
-                        if isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                            pre = pre.unsqueeze(0)
-                        pred = model.invoke(pre, sh)
-                        dets = _prediction_to_detections(pred, label_names=label_names)
+                        pre = model.preprocess(x)
+                    except Exception:
+                        pre = x
+                    if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
+                        pre_list.append(pre[0])
+                    elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                        pre_list.append(pre)
+                    else:
+                        pre_list.append(t)
+
+                if not pre_list:
+                    continue
+
+                batch = torch.stack(pre_list, dim=0)
+                t0 = time.perf_counter()
+                try:
+                    preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
+                    elapsed = time.perf_counter() - t0
+                    preds_list = preds if isinstance(preds, list) else [preds]
+                    if len(preds_list) != len(idxs):
+                        raise RuntimeError(
+                            "Batched invoke returned unexpected output shape; falling back to per-image calls."
+                        )
+                    for local_j, crop_i in enumerate(idxs):
+                        dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
                         crop_payloads[crop_i] = {
                             "detections": dets,
-                            "timing": {"seconds": float(time.perf_counter() - t1)},
+                            "timing": {"seconds": float(elapsed)},
                             "error": None,
                         }
-                    except BaseException as e:
-                        crop_payloads[crop_i] = _error_payload(stage="invoke", exc=e) | {
-                            "timing": {"seconds": float(time.perf_counter() - t1)}
-                        }
+                except BaseException:
+                    for crop_i in idxs:
+                        t = tensors[crop_i]
+                        sh = shapes[crop_i]
+                        if t is None or sh is None:
+                            continue
+                        x = t.unsqueeze(0)
+                        t1 = time.perf_counter()
+                        try:
+                            try:
+                                pre = model.preprocess(x)
+                            except Exception:
+                                pre = x
+                            if isinstance(pre, torch.Tensor) and pre.ndim == 3:
+                                pre = pre.unsqueeze(0)
+                            pred = model.invoke(pre, sh)
+                            dets = _prediction_to_detections(pred, label_names=label_names)
+                            crop_payloads[crop_i] = {
+                                "detections": dets,
+                                "timing": {"seconds": float(time.perf_counter() - t1)},
+                                "error": None,
+                            }
+                        except BaseException as e:
+                            crop_payloads[crop_i] = _error_payload(stage="invoke", exc=e) | {
+                                "timing": {"seconds": float(time.perf_counter() - t1)}
+                            }
 
         for crop_i, region_ref in enumerate(crop_region_refs):
             payload = crop_payloads[crop_i] if crop_i < len(crop_payloads) else {"detections": []}
@@ -609,12 +794,22 @@ class ChartDetectionActor:
     """
 
     detect_kwargs: Dict[str, Any]
+    _graphic_elements_invoke_url: str = field(init=False, repr=False)
+    _model: Any = field(init=False, repr=False)
 
     def __init__(self, **detect_kwargs: Any) -> None:
         self.detect_kwargs = dict(detect_kwargs)
-        from nemo_retriever.model.local import NemotronGraphicElementsV1
+        self._graphic_elements_invoke_url = str(
+            self.detect_kwargs.get("graphic_elements_invoke_url") or self.detect_kwargs.get("invoke_url") or ""
+        ).strip()
+        if self._graphic_elements_invoke_url and "invoke_url" not in self.detect_kwargs:
+            self.detect_kwargs["invoke_url"] = self._graphic_elements_invoke_url
+        if self._graphic_elements_invoke_url:
+            self._model = None
+        else:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
 
-        self._model = NemotronGraphicElementsV1()
+            self._model = NemotronGraphicElementsV1()
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:

@@ -36,6 +36,7 @@ def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None
     remote_keys = (
         "invoke_url",
         "page_elements_invoke_url",
+        "graphic_elements_invoke_url",
         "ocr_invoke_url",
         "table_structure_invoke_url",
         "embedding_endpoint",
