@@ -69,6 +69,9 @@ For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt
   - `recall_adapter: page_plus_one` (convert zero-indexed `page` CSVs to `pdf_page`)
   - `recall_adapter: financebench_json` (convert FinanceBench JSON to `query,expected_pdf`)
   - `recall_match_mode: pdf_page|pdf_only` controls recall matching mode.
+- Dataset presets configured under `/datasets/nv-ingest/...` will fall back to `/raid/$USER/...` when the dataset is not present in `/datasets`.
+- Relative `query_csv` entries in harness YAML resolve from the config file directory first, then fall back to the repo root.
+- The default `financebench` dataset preset now points at `data/financebench_train.json` and enables recall out of the box.
 
 ### Single run
 
@@ -78,6 +81,9 @@ retriever harness run --dataset jp20 --preset single_gpu
 
 # Direct dataset path
 retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
+
+# Add repeatable run or session tags for later review
+retriever harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
 ```
 
 ### Sweep runs (explicit runs list)
@@ -91,19 +97,45 @@ retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
 ```bash
 retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
 retriever harness nightly --dry-run
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+```
+
+### Session inspection
+
+```bash
+# Print a compact table from a completed sweep/nightly session
+retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
+
+# Compare two session summaries by run name
+retriever harness compare \
+  nemo_retriever/artifacts/nightly_20260305_010203_UTC \
+  nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```
 
 ### Harness artifacts
 
 Each run writes a compact artifact set (no full stdout/stderr log persistence):
 
-- `results.json` (normalized metrics + pass/fail + config snapshot)
+- `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
 - `command.txt` (exact invoked command)
 - `runtime_metrics/` (Ray runtime summary + timeline files)
+
+Recall metrics in `results.json` are normalized as `recall_1`, `recall_5`, and `recall_10`.
 
 By default, detection totals are embedded into `results.json` under `detection_summary`.
 If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
 `nemo_retriever/harness/test_configs.yaml`.
+When tags are supplied with `--tag`, they are persisted in `results.json` and in session rollups for sweep/nightly runs.
+
+`results.json` also includes a nested `run_metadata` block for lightweight environment context:
+
+- `host`
+- `gpu_count`
+- `cuda_driver`
+- `ray_version`
+- `python_version`
+
+These fields use best-effort discovery and fall back to `null` or `"unknown"` rather than failing a run.
 
 Sweep/nightly sessions additionally write:
 

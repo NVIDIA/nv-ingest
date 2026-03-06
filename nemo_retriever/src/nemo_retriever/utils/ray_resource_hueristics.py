@@ -7,7 +7,6 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-import ray
 from pydantic import BaseModel, ConfigDict
 
 logger = logging.getLogger(__name__)
@@ -71,7 +70,6 @@ class NodeGpuInfo(BaseModel):
     gpus: dict[int, GpuInfo]
 
 
-@ray.remote
 def _get_gpu_memory_info() -> NodeGpuInfo:
     """Get the memory information for each GPU."""
     from pynvml import (
@@ -120,6 +118,13 @@ def _get_gpu_memory_info() -> NodeGpuInfo:
 
     nvmlShutdown()
     return NodeGpuInfo(gpus=gpu_info)
+
+
+def get_gpu_memory_info_remote() -> object:
+    """Return a Ray ObjectRef for ``_get_gpu_memory_info`` executed remotely."""
+    import ray
+
+    return ray.remote(_get_gpu_memory_info).remote()
 
 
 class Resources(BaseModel):
