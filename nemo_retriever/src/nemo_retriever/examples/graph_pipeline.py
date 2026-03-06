@@ -39,10 +39,12 @@ def example_run():
     data = [{"value": 1}, {"value": 2}, {"value": 3}]
 
     exec = RayDataExecutor(init_ray=True)
-    ds = exec.run(g, data, batch_size=2)
+    outputs = exec.run(g, data, batch_size=2)
 
-    # Print materialized dataset
-    print(ds.show())
+    # Print materialized datasets
+    for node_id, ds in outputs.items():
+        print(f"--- {node_id} ---")
+        print(ds.show())
 
 
 if __name__ == "__main__":

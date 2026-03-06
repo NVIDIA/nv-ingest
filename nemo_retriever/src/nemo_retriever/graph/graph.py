@@ -71,12 +71,18 @@ class Graph:
         """Add either a `Node` or an `AbstractOperator` to the graph.
 
         If given an operator, it is wrapped in a `Node` via `add_operator`.
-        If given a `Node`, it is added directly and becomes the root if the
-        graph has no root yet.
+        If given a `Node`, it is added directly, chained sequentially after the
+        current last node, and becomes the root if the graph has no root yet.
         Returns the added `Node`.
         """
         if isinstance(item, Node):
+            # Chain sequentially to the last node (same as add_operator)
+            last_node = None
+            if self.nodes:
+                last_node = next(reversed(self.nodes.values()))
             self.add_node(item)
+            if last_node is not None:
+                last_node.add_child(item)
             if self.root is None:
                 self.root = item
             return item

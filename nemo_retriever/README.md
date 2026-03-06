@@ -23,7 +23,7 @@ uv pip install -e ./nemo_retriever
 
 This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
 
-### OCR and CUDA 13 runtime (conda)
+### OCR and CUDA 13 runtime
 
 The Nemotron OCR native extension requires **libcudart.so.13** (CUDA 13 runtime). If you see:
 
@@ -31,27 +31,12 @@ The Nemotron OCR native extension requires **libcudart.so.13** (CUDA 13 runtime)
 ImportError: libcudart.so.13: cannot open shared object file: No such file or directory
 ```
 
-your system CUDA Toolkit is missing or older than 13. Use the provided conda environment to get the CUDA 13 runtime and UV without changing the system CTK:
+your system CUDA Toolkit is missing or older than 13. Install CUDA 13 runtime support on your host, or run the retriever Docker image which includes the required runtime.
 
-1. From the **nv-ingest root**:
+If CUDA libraries are installed in a non-standard path, expose them explicitly:
    ```bash
-   conda env create -f conda/environments/retriever_libcudart.yml
+   export LD_LIBRARY_PATH=/path/to/cuda/lib64:$LD_LIBRARY_PATH
    ```
-   (If the env already exists, use `conda env update -f conda/environments/retriever_libcudart.yml --name retriever_libcudart` to refresh it.)
-
-2. Activate the environment:
-   ```bash
-   conda activate retriever_libcudart
-   ```
-
-3. Expose the conda env's CUDA runtime so the OCR extension can load it (needed because conda does not set `LD_LIBRARY_PATH` for this env by default):
-   ```bash
-   export LD_LIBRARY_PATH=$CONDA_PREFIX/lib:$LD_LIBRARY_PATH
-   ```
-
-4. Follow the **Installation** steps above unchanged: `uv venv .retriever`, `source .retriever/bin/activate`, `uv pip install -e ./nemo_retriever`. The conda env supplies the `uv` binary and the CUDA 13 runtime (the dynamic linker finds `libcudart.so.13` in the conda env's `lib`).
-
-If your system already has a suitable CUDA 13 (or you are not using OCR), you can use the UV-only path above without the conda env.
 
 ## Quick start
 
@@ -65,9 +50,84 @@ uv pip install -e ./nemo_retriever
 uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs
 ```
 
-Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. Recall is skipped if the query CSV file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, use the conda-based workflow under **OCR and CUDA 13 runtime (conda)** above.
+Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. For document-level recall, use `--recall-match-mode pdf_only` with `query,expected_pdf` data. Recall is skipped if the query file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, install the CUDA 13 runtime and set `LD_LIBRARY_PATH` as shown above.
 
 For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
+
+## Harness (run, sweep, nightly)
+
+`nemo_retriever` includes a lightweight harness for benchmark orchestration without Docker.
+
+- Config files:
+  - `nemo_retriever/harness/test_configs.yaml`
+  - `nemo_retriever/harness/nightly_config.yaml`
+- CLI entrypoint is nested under `retriever harness`.
+- First pass is LanceDB-only and enforces recall-required pass/fail by default.
+- Single-run artifact directories default to `<dataset>_<timestamp>`.
+- Dataset-specific recall adapters are supported via config:
+  - `recall_adapter: none` (default passthrough)
+  - `recall_adapter: page_plus_one` (convert zero-indexed `page` CSVs to `pdf_page`)
+  - `recall_adapter: financebench_json` (convert FinanceBench JSON to `query,expected_pdf`)
+  - `recall_match_mode: pdf_page|pdf_only` controls recall matching mode.
+
+### Single run
+
+```bash
+# Dataset preset from test_configs.yaml (recall-required example)
+retriever harness run --dataset jp20 --preset single_gpu
+
+# Direct dataset path
+retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
+```
+
+### Sweep runs (explicit runs list)
+
+```bash
+retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
+```
+
+### Nightly session
+
+```bash
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
+retriever harness nightly --dry-run
+```
+
+### Harness artifacts
+
+Each run writes a compact artifact set (no full stdout/stderr log persistence):
+
+- `results.json` (normalized metrics + pass/fail + config snapshot)
+- `command.txt` (exact invoked command)
+- `runtime_metrics/` (Ray runtime summary + timeline files)
+
+By default, detection totals are embedded into `results.json` under `detection_summary`.
+If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
+`nemo_retriever/harness/test_configs.yaml`.
+
+Sweep/nightly sessions additionally write:
+
+- `session_summary.json` (overall pass/fail rollup)
+
+### Runtime metrics interpretation
+
+`runtime_metrics/` currently includes:
+
+- `run.runtime.summary.json`: high-level run totals (input files, pages, elapsed seconds)
+- `run.ray.timeline.json`: detailed Ray execution timeline for deeper profiling
+- `run.rd_dataset.stats.txt`: Ray dataset stats dump (can be empty on some runs)
+
+For routine benchmark comparison, `results.json` is the primary source.
+Use `runtime_metrics/` when investigating throughput regressions or stage-level behavior.
+
+### Artifact size profile
+
+Current observed runs show that per-run LanceDB data dominates footprint:
+
+- `bo20`: ~9.0 MiB total, ~8.6 MiB LanceDB (~96%)
+- `jp20`: ~36.8 MiB total, ~36.2 MiB LanceDB (~98%)
+
+So storage growth is mostly driven by `lancedb/`, not the summary JSON artifacts.
 
 ### Audio pipeline
 

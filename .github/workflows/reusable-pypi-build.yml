@@ -31,8 +31,6 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.runner }}
-    container:
-      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     outputs:
       version: ${{ steps.set-version.outputs.version }}
 
@@ -52,6 +50,11 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Validate release type
         run: |

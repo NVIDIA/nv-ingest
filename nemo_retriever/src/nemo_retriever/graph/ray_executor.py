@@ -76,16 +76,18 @@ class RayDataExecutor(Executor):
             base_ds = rd.from_items(data)
 
         order = self._topological_order(graph)
-        node_outputs: Dict[str, rd.Dataset] = {}
+        node_datasets: Dict[str, rd.Dataset] = {}
 
+        # Phase 1: build the full lazy DAG of map_batches calls without
+        # materialising any intermediate datasets.  Ray Data will fuse and
+        # pipeline the stages when the final dataset is executed.
         for node in order:
             # Determine input dataset by unioning parent outputs or use base_ds for root
             parents = [p for p in graph.nodes.values() if node.id in [c.id for c in p.children]]
             if not parents:
                 inp_ds = base_ds
             else:
-                # Union parent datasets
-                parent_ds_list = [node_outputs[p.id] for p in parents if p.id in node_outputs]
+                parent_ds_list = [node_datasets[p.id] for p in parents if p.id in node_datasets]
                 if not parent_ds_list:
                     inp_ds = base_ds
                 else:
@@ -93,24 +95,33 @@ class RayDataExecutor(Executor):
                     for other in parent_ds_list[1:]:
                         inp_ds = inp_ds.union(other)
 
+            # Build map_batches options: executor defaults < call-site kwargs < per-node kwargs.
             map_opts = dict(self._map_kwargs)
             map_opts.update(kwargs)
+            map_opts.update(node.map_kwargs)
 
             fn, ctor_kwargs = node.get_map_fn_and_constructor_kwargs()
-            if ctor_kwargs:
-                # pass fn_constructor_kwargs for actor-style classes
-                map_opts_local = dict(map_opts)
-                map_opts_local["fn_constructor_kwargs"] = ctor_kwargs
-                ds_out = inp_ds.map_batches(fn, **map_opts_local)
+            if ctor_kwargs is not None:
+                map_opts["fn_constructor_kwargs"] = ctor_kwargs
+            node_datasets[node.id] = inp_ds.map_batches(fn, **map_opts)
+
+        # Phase 2: find leaf nodes (nodes with no children in the reachable
+        # set) and materialise only those.  Because each leaf's dataset
+        # carries the full lineage of upstream lazy stages, materialising a
+        # leaf executes every ancestor stage as a single fused Ray Data plan.
+        reachable_ids = set(n.id for n in order)
+        leaf_ids = {
+            n.id for n in order
+            if not any(c.id in reachable_ids for c in n.children)
+        }
+
+        results: Dict[str, rd.Dataset] = {}
+        for node_id in node_datasets:
+            if node_id in leaf_ids:
+                results[node_id] = node_datasets[node_id].materialize()
             else:
-                ds_out = inp_ds.map_batches(fn, **map_opts)
+                # Intermediate (non-leaf) datasets are kept lazy; callers can
+                # materialise them on demand if needed.
+                results[node_id] = node_datasets[node_id]
 
-            # Materialize intermediate result to free resources as we proceed
-            node_outputs[node.id] = ds_out
-
-        # Materialize all outputs
-        # for k, v in node_outputs.items():
-        #     node_outputs[k] = v.materialize()
-        node_output = inp_ds.materialize()
-
-        return node_outputs
+        return results
