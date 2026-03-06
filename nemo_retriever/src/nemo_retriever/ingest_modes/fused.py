@@ -55,10 +55,8 @@ class _FusedModelActor:
     def __init__(self, **kwargs: Any) -> None:
         _assert_no_remote_endpoints(dict(kwargs), context="actor init")
 
+        from nemo_retriever.model import create_local_embedder
         from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-            LlamaNemotronEmbed1BV2Embedder,
-        )
 
         self._detect_kwargs = {
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
@@ -89,13 +87,6 @@ class _FusedModelActor:
             "has_embedding_column": str(kwargs.get("has_embedding_column", "text_embeddings_1b_v2_has_embedding")),
         }
 
-        device = kwargs.get("device")
-        hf_cache_dir = kwargs.get("hf_cache_dir")
-        normalize = bool(kwargs.get("normalize", True))
-        max_length = int(kwargs.get("max_length", 8192))
-        model_name_raw = kwargs.get("model_name")
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
-
         self._page_elements_model = NemotronPageElementsV3()
         self._ocr_model = NemotronOCRV1()
         self._table_structure_model = None
@@ -103,12 +94,12 @@ class _FusedModelActor:
             from nemo_retriever.model.local import NemotronTableStructureV1
 
             self._table_structure_model = NemotronTableStructureV1()
-        self._embed_model = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
+        self._embed_model = create_local_embedder(
+            kwargs.get("model_name"),
+            device=str(kwargs["device"]) if kwargs.get("device") else None,
+            hf_cache_dir=str(kwargs["hf_cache_dir"]) if kwargs.get("hf_cache_dir") else None,
+            normalize=bool(kwargs.get("normalize", True)),
+            max_length=int(kwargs.get("max_length", 8192)),
         )
 
     def __call__(self, batch_df: Any) -> Any:
