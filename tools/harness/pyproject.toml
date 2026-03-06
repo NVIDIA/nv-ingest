@@ -18,7 +18,7 @@ dependencies = [
     "nemotron-page-elements-v3>=0.dev0",
     "nemotron-graphic-elements-v1>=0.dev0",
     "nemotron-table-structure-v1>=0.dev0",
-    "nemoretriever-ocr>=0.dev0",
+    "nemotron-ocr>=0.dev0",
 ]
 
 [project.scripts]
@@ -39,7 +39,7 @@ nv-ingest-client = { path = "../../client/", editable = true }
 nemotron-page-elements-v3 = { index = "test-pypi" }
 nemotron-graphic-elements-v1 = { index = "test-pypi" }
 nemotron-table-structure-v1 = { index = "test-pypi" }
-nemoretriever-ocr = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
 
 [[tool.uv.index]]
 name = "test-pypi"

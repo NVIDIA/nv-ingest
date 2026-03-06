@@ -106,7 +106,7 @@ Instead of running NeMo Retriever locally, you can use NVCF to perform inference
 
 ## Run the Ray batch pipeline with `nemotron-parse`
 
-When the `nemotron-parse` model is used in the retriever batch pipeline, the `page-elements` and `nemoretriever-ocr` stages are skipped in the Ray pipeline, because their functionality is handled by the `nemotron-parse` actor. This behavior applies when you run the pipeline from the command line (for instance, by using `batch_pipeline.py` in library mode).
+When the `nemotron-parse` model is used in the retriever batch pipeline, the `page-elements` and `nemotron-ocr` stages are skipped in the Ray pipeline, because their functionality is handled by the `nemotron-parse` actor. This behavior applies when you run the pipeline from the command line (for instance, by using `batch_pipeline.py` in library mode).
 
 To enable `nemotron-parse` in the batch pipeline, set each of the following options to a value greater than zero:
 ​
