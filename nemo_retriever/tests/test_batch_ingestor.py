@@ -1,5 +1,9 @@
 from types import SimpleNamespace
 
+import pytest
+
+pytest.importorskip("ray")
+
 from nemo_retriever.ingest_modes.batch import BatchIngestor
 
 

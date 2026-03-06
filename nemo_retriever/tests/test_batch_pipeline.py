@@ -1,3 +1,7 @@
+import pytest
+
+pytest.importorskip("ray")
+
 from nemo_retriever.examples.batch_pipeline import _count_materialized_rows
 
 
