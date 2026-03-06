@@ -80,15 +80,15 @@ def main(
             "Only the missed-gold summary and recall metrics are printed."
         ),
     ),
-    pdf_extract_workers: int = typer.Option(
+    pdf_extract_tasks: int = typer.Option(
         12,
-        "--pdf-extract-workers",
+        "--pdf-extract-tasks",
         min=1,
-        help="Number of CPU workers for PDF extraction stage.",
+        help="Number of CPU tasks for PDF extraction stage.",
     ),
-    pdf_extract_num_cpus: float = typer.Option(
+    pdf_extract_cpus_per_task: float = typer.Option(
         2.0,
-        "--pdf-extract-num-cpus",
+        "--pdf-extract-cpus-per-task",
         min=0.1,
         help="CPUs reserved per PDF extraction task.",
     ),
@@ -202,8 +202,8 @@ def main(
                     extract_charts=True,
                     extract_infographics=False,
                     batch_tuning={
-                        "pdf_extract_workers": int(pdf_extract_workers),
-                        "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                        "pdf_extract_workers": int(pdf_extract_tasks),
+                        "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                         "pdf_split_batch_size": int(pdf_split_batch_size),
                         "pdf_extract_batch_size": int(pdf_extract_batch_size),
                     },
