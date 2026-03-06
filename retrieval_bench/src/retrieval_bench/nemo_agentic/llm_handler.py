@@ -133,7 +133,8 @@ class LLM:
     ) -> None:
         if info is None or self.config.raw_log_pardir is None or subdir is None:
             return
-        assert filename.endswith(".json")
+        if not filename.endswith(".json"):
+            raise ValueError(f"filename must end with '.json', got {filename!r}")
         json_log_dir = Path(self.config.raw_log_pardir, subdir)
         await awrite_json(obj=info, log_dir=json_log_dir, filename=filename)
 

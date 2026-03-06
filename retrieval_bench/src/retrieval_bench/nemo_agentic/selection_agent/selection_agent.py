@@ -134,7 +134,8 @@ class SelectionAgent:
             response = response["response"]
 
             steps += 1
-            assert len(response.choices) == 1
+            if len(response.choices) != 1:
+                raise RuntimeError(f"Expected exactly 1 choice from LLM, got {len(response.choices)}")
 
             if response.choices[0].finish_reason == "tool_calls":
                 conv_msg = {"content": [], "role": "assistant", "tool_calls": []}

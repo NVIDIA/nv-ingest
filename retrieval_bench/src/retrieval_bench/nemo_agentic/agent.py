@@ -51,7 +51,8 @@ class Agent:
         self._curr_time = datetime.now()
         self._uuid = uuid4().hex
 
-        assert self.config.user_msg_type in ["simple", "with_results"], "user_msg_type is not supported"
+        if self.config.user_msg_type not in ["simple", "with_results"]:
+            raise ValueError(f"user_msg_type must be 'simple' or 'with_results', got {self.config.user_msg_type!r}")
 
         # Load system prompt template
         if Path(config.system_prompt).exists():
@@ -144,13 +145,15 @@ class Agent:
         log_str = " ".join([f"{k}: {v}" for k, v in metadata_kv.items()])
         logger.info(f"[{self.session_id}] " + log_str)
 
-        assert len(response.choices) == 1
+        if len(response.choices) != 1:
+            raise RuntimeError(f"Expected exactly 1 choice from LLM, got {len(response.choices)}")
         if response.choices[0].finish_reason == "tool_calls":
             conv_msg = {"content": [], "role": "assistant", "tool_calls": []}
             for call_info in response.choices[0].message.tool_calls:
                 conv_msg["tool_calls"].append(call_info.model_dump())
             if response.choices[0].message.content is not None:
-                assert isinstance(response.choices[0].message.content, str), "non-text content from LLM"
+                if not isinstance(response.choices[0].message.content, str):
+                    raise TypeError("Expected string content from LLM, got non-text content")
                 conv_msg["content"].append({"type": "text", "text": response.choices[0].message.content})
             self.message_history.append(conv_msg)
         elif response.choices[0].finish_reason == "stop":
@@ -209,7 +212,8 @@ class Agent:
 
             if self.doc_transform_fn is not None:
                 if isinstance(fn_res, str):
-                    assert "Error" in fn_res
+                    if "Error" not in fn_res:
+                        raise RuntimeError(f"Unexpected non-list, non-error retrieve result: {fn_res!r}")
                 else:
                     fn_res = await asyncio.gather(*(self.doc_transform_fn(d) for d in fn_res))
             if isinstance(fn_res, list):
@@ -309,7 +313,8 @@ class Agent:
     ) -> Dict[str, Any]:
         """Run the agent for a given user message."""
         self.reset()
-        assert self.tool_map is not None, "Agent requires tool_map to be provided by the caller."
+        if self.tool_map is None:
+            raise RuntimeError("Agent requires tool_map to be provided by the caller.")
 
         await self.llm.log_extra_data_log_dir(subdir=self.get_llm_raw_io_subdir(), info=task_info)
         self.current_user_msg = query
