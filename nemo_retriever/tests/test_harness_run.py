@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 from nemo_retriever.harness.artifacts import create_run_artifact_dir
@@ -158,3 +159,131 @@ def test_execute_runs_does_not_write_sweep_results_file(monkeypatch, tmp_path: P
     )
 
     assert not (session_dir / "sweep_results.json").exists()
+
+
+def test_collect_run_metadata_falls_back_without_gpu_or_ray(monkeypatch) -> None:
+    def _raise_package_not_found(_name: str) -> str:
+        raise harness_run.metadata.PackageNotFoundError()
+
+    monkeypatch.setattr(harness_run.socket, "gethostname", lambda: "")
+    monkeypatch.setattr(harness_run.metadata, "version", _raise_package_not_found)
+    monkeypatch.setattr(harness_run, "_collect_gpu_metadata", lambda: (None, None))
+    monkeypatch.setattr(harness_run.sys, "version_info", None)
+
+    assert harness_run._collect_run_metadata() == {
+        "host": "unknown",
+        "gpu_count": None,
+        "cuda_driver": None,
+        "ray_version": "unknown",
+        "python_version": "unknown",
+    }
+
+
+def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "run_artifacts"
+    artifact_dir.mkdir()
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("q,s,p\nx,y,1\n", encoding="utf-8")
+
+    runtime_dir = artifact_dir / "runtime_metrics"
+    runtime_dir.mkdir()
+    detection_file = artifact_dir / "detection_summary.json"
+    detection_file.write_text(json.dumps({"total_detections": 7}), encoding="utf-8")
+    runtime_summary_file = runtime_dir / "jp20_single.runtime.summary.json"
+    runtime_summary_file.write_text(json.dumps({"elapsed_secs": 12.5}), encoding="utf-8")
+
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="jp20",
+        preset="single_gpu",
+        query_csv=str(query_csv),
+        write_detection_file=True,
+    )
+
+    monkeypatch.setattr(
+        harness_run,
+        "_build_command",
+        lambda _cfg, _artifact_dir, _run_id: (
+            ["python", "-m", "nemo_retriever.examples.batch_pipeline", str(dataset_dir)],
+            runtime_dir,
+            detection_file,
+            query_csv,
+        ),
+    )
+
+    def _fake_run_subprocess(_cmd: list[str], metrics) -> int:
+        metrics.files = 20
+        metrics.pages = 3181
+        metrics.ingest_secs = 12.5
+        metrics.pages_per_sec_ingest = 254.48
+        metrics.recall_metrics = {"recall@5": 0.9}
+        return 0
+
+    monkeypatch.setattr(harness_run, "_run_subprocess_with_tty", _fake_run_subprocess)
+    monkeypatch.setattr(harness_run, "now_timestr", lambda: "20260305_120000_UTC")
+    monkeypatch.setattr(harness_run, "last_commit", lambda: "abc1234")
+    monkeypatch.setattr(
+        harness_run,
+        "_collect_run_metadata",
+        lambda: {
+            "host": "builder-01",
+            "gpu_count": 2,
+            "cuda_driver": "550.54.15",
+            "ray_version": "2.49.0",
+            "python_version": "3.12.4",
+        },
+    )
+
+    result = harness_run._run_single(cfg, artifact_dir, run_id="jp20_single")
+    payload = json.loads((artifact_dir / "results.json").read_text(encoding="utf-8"))
+
+    expected = {
+        "timestamp": "20260305_120000_UTC",
+        "latest_commit": "abc1234",
+        "success": True,
+        "return_code": 0,
+        "failure_reason": None,
+        "test_config": {
+            "dataset_label": "jp20",
+            "dataset_dir": str(dataset_dir),
+            "preset": "single_gpu",
+            "query_csv": str(query_csv),
+            "effective_query_csv": str(query_csv),
+            "input_type": cfg.input_type,
+            "recall_required": cfg.recall_required,
+            "recall_match_mode": cfg.recall_match_mode,
+            "recall_adapter": cfg.recall_adapter,
+            "ray_address": cfg.ray_address,
+            "hybrid": cfg.hybrid,
+            "embed_model_name": cfg.embed_model_name,
+            "write_detection_file": True,
+            "lancedb_uri": str((artifact_dir / "lancedb").resolve()),
+            "tuning": {field: getattr(cfg, field) for field in sorted(harness_run.TUNING_FIELDS)},
+        },
+        "metrics": {
+            "files": 20,
+            "pages": 3181,
+            "ingest_secs": 12.5,
+            "pages_per_sec_ingest": 254.48,
+            "recall_recall_5": 0.9,
+        },
+        "run_metadata": {
+            "host": "builder-01",
+            "gpu_count": 2,
+            "cuda_driver": "550.54.15",
+            "ray_version": "2.49.0",
+            "python_version": "3.12.4",
+        },
+        "runtime_summary": {"elapsed_secs": 12.5},
+        "detection_summary": {"total_detections": 7},
+        "artifacts": {
+            "command_file": str((artifact_dir / "command.txt").resolve()),
+            "runtime_metrics_dir": str(runtime_dir.resolve()),
+            "detection_summary_file": str(detection_file.resolve()),
+        },
+    }
+
+    assert result == expected
+    assert payload == expected
