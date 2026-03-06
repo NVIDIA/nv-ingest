@@ -142,7 +142,7 @@ retriever local stage6 run --input-dir <dir>
 
 ## 8. Quick end‑to‑end test
 
-Once you’ve finished installing and configuring NeMo Retriever Library, it's a good idea to validate the entire pipeline with a small, known dataset. In this step, you run the batch pipeline module against the sample `bo20` dataset to confirm that ingestion, OCR under CUDA 13, embedding, and any configured recall evaluation all run end‑to‑end without errors.
+After you’ve finished installing and configuring NeMo Retriever Library, it's a good idea to validate the entire pipeline with a small, known dataset. In this step, you run the batch pipeline module against the sample `bo20` dataset to confirm that ingestion, OCR under CUDA 13, embedding, and any configured recall evaluation all run end‑to‑end without errors.
 
 ```bash
 uv run python -m nemo_retriever.examples.batch_pipeline /datasets/nemo-retriever/bo20
