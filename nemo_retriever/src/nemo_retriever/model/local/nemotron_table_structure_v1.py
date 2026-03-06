@@ -5,6 +5,7 @@
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 from nemotron_table_structure_v1.model import define_model as define_model_table_structure
@@ -26,6 +27,7 @@ class NemotronTableStructureV1(BaseModel):
 
     def __init__(self) -> None:
         super().__init__()
+        configure_global_hf_cache_base()
         # table_structure_model = define_model_table_structure("table_structure_v1")
         self._model = define_model_table_structure(self.model_name)
         self._table_structure_input_shape = (1024, 1024)

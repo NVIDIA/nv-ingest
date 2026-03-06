@@ -15,10 +15,9 @@ import glob
 import json
 import logging
 import os
-import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 from datetime import timedelta
+from functools import partial
 
 from typing import Union
 
@@ -30,6 +29,11 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
+from nemo_retriever.utils.ray_resource_hueristics import (
+    gather_cluster_resources,
+    resolve_requested_plan,
+)
+from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -42,7 +46,27 @@ from ..params import PdfSplitParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
 
-DEBUG_LOG_PATH = "/home/jeremy/Development/nv-ingest/.cursor/debug-250ae2.log"
+logger = logging.getLogger(__name__)
+
+
+def _setup_batch_debug_logger(enabled: bool) -> logging.Logger:
+    """Return a batch logger configured for optional DEBUG verbosity."""
+    logger = logging.getLogger("nemo_retriever.ingest_modes.batch")
+    logger.propagate = True
+    if enabled:
+        logger.setLevel(logging.DEBUG)
+        logger.debug("Batch debug logging enabled.")
+    return logger
+
+
+def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dict[str, Any]) -> None:
+    """Emit structured debug payloads without interrupting pipeline execution."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        logger.debug("%s | %s | %s", location, message, json.dumps(data, default=str))
+    except Exception:
+        logger.debug("%s | %s | %r", location, message, data)
 
 
 def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
@@ -51,27 +75,6 @@ def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, An
     if kwargs:
         return params.model_copy(update=kwargs)  # type: ignore[return-value]
     return params
-
-
-# region agent log
-def _debug_log(*, run_id: str, hypothesis_id: str, location: str, message: str, data: dict[str, Any]) -> None:
-    payload = {
-        "sessionId": "250ae2",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-
-
-# endregion
 
 
 class _LanceDBWriteActor:
@@ -241,6 +244,14 @@ class _BatchEmbedActor:
     """
 
     def __init__(self, params: EmbedParams) -> None:
+        import warnings
+
+        warnings.filterwarnings(
+            "ignore",
+            message=r".*`input_embeds` is deprecated.*create_bidirectional_mask.*",
+            category=FutureWarning,
+        )
+
         self._params = params
         self._kwargs = {
             **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True),
@@ -302,23 +313,55 @@ class BatchIngestor(Ingestor):
         documents: Optional[List[str]] = None,
         ray_address: Optional[str] = None,
         ray_log_to_driver: bool = True,
+        debug: bool = False,
     ) -> None:
         super().__init__(documents=documents)
 
-        logging.basicConfig(level=logging.INFO)
+        self._logger = _setup_batch_debug_logger(bool(debug))
+        self._debug = bool(debug)
+        if self._debug:
+            logging.getLogger().setLevel(logging.DEBUG)
 
         # Initialize Ray for distributed execution.
-        ray.init(address=ray_address or "local", ignore_reinit_error=True, log_to_driver=bool(ray_log_to_driver))
+        ray.init(
+            address=ray_address or "local",
+            ignore_reinit_error=True,
+            log_to_driver=bool(ray_log_to_driver),
+            runtime_env={
+                "env_vars": {
+                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
+                    "LOG_LEVEL": "INFO",
+                }
+            },
+        )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
         ctx = rd.DataContext.get_current()
         ctx.enable_rich_progress_bars = True
         ctx.use_ray_tqdm = False
 
-        # Query available resources so extract() can auto-size worker pools.
-        resources = ray.available_resources()
-        self._num_gpus = int(resources.get("GPU", 0))
-        self._num_cpus = int(resources.get("CPU", os.cpu_count() or 4))
+        # Scheduling flow:
+        # 1. Gather local/cluster resources (batch mode always runs on Ray).
+        # 1a. available_resources(ray) -> ClusterResources(BaseModel).
+        # 2. Resolve requested resources from user overrides or heuristics defaults.
+        # 2a. -> requested_resources = resolve_requested_resources() -> RequestedResources(BaseModel)
+        # 3. Compute final values from available + requested resources.
+        # 3a. -> final_resources = compute_final_resources(
+        #         available_resources, requested_resources
+        #       ) -> FinalResources(BaseModel)
+        # 4. Probe per-node GPU details (e.g. memory) via remote calls when needed.
+
+        # 1. Gather available resources
+        self._cluster_resources = gather_cluster_resources(ray)  # Contains both total and available resources
+        self._total_cpu_count = self._cluster_resources.total_cpu_count()
+        self._total_gpu_count = self._cluster_resources.total_gpu_count()
+        self._available_cpu_count = self._cluster_resources.available_cpu_count()
+        self._available_gpu_count = self._cluster_resources.available_gpu_count()
+        logger.info(self._cluster_resources)
+
+        # 2. Resolve requested plan for the Ray DAG that will be built
+        self._requested_plan = resolve_requested_plan(cluster_resources=self._cluster_resources)
+        logger.info(self._requested_plan)
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -330,6 +373,7 @@ class BatchIngestor(Ingestor):
         self._pipeline_type: str = "pdf"  # "pdf" | "txt" | "html"
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
+        self._use_nemotron_parse_only: bool = False
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -399,156 +443,6 @@ class BatchIngestor(Ingestor):
                 return 0
             return len([p for p in s.split(",") if p.strip()])
 
-        debug_run_id = str(kwargs.pop("debug_run_id", "unknown"))
-        pdf_split_batch_size = kwargs.pop("pdf_split_batch_size", 1)
-        pdf_extract_batch_size = kwargs.pop("pdf_extract_batch_size", 4)
-        pdf_extract_num_cpus = float(kwargs.pop("pdf_extract_num_cpus", 2))
-        page_elements_batch_size = kwargs.pop("page_elements_batch_size", 24)
-        detect_batch_size = kwargs.pop("detect_batch_size", 24)
-        nemotron_parse_workers = float(kwargs.pop("nemotron_parse_workers", 0.0))
-        gpu_nemotron_parse = float(kwargs.pop("gpu_nemotron_parse", 0.0))
-        nemotron_parse_batch_size = float(kwargs.pop("nemotron_parse_batch_size", 0.0))
-        use_nemotron_parse_only = (
-            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
-        )
-
-        # Count GPU stages that will be created.
-        # +1 reserves headroom for a downstream embed() stage.
-        detect_stage_count = (
-            1 if any(kwargs.get(k) is True for k in ("extract_tables", "extract_charts", "extract_infographics")) else 0
-        )
-        if use_nemotron_parse_only:
-            gpu_stage_count = detect_stage_count + 1  # nemotron-parse + embed
-        else:
-            gpu_stage_count = 1 + detect_stage_count + 1  # page_elements + detection + embed
-
-        # Per-stage GPU allocation: give OCR (the bottleneck) a full GPU;
-        # page-elements (lightweight YOLOX) and embedding share 0.5 each.
-        # Total = 0.5 + 1.0 + 0.5 = 2.0, so all 3 stages run concurrently.
-        num_gpus = self._num_gpus
-        if num_gpus >= 2 and gpu_stage_count == 3:
-            gpu_page_elements = 0.5
-            gpu_ocr = 1.0
-            gpu_embed = 0.5
-        else:
-            gpu_per_stage = min(1.0, num_gpus / max(1, gpu_stage_count))
-            gpu_page_elements = gpu_per_stage
-            gpu_ocr = gpu_per_stage
-            gpu_embed = gpu_per_stage
-
-        # Allow explicit per-stage GPU overrides for controlled experiments.
-        gpu_page_elements = float(kwargs.pop("gpu_page_elements", gpu_page_elements))
-        gpu_ocr = float(kwargs.pop("gpu_ocr", gpu_ocr))
-        gpu_embed = float(kwargs.pop("gpu_embed", gpu_embed))
-
-        # Each GPU stage gets 1 worker by default (each worker holds 1 model).
-        page_elements_workers = kwargs.pop("page_elements_workers", 1)
-        ocr_workers = kwargs.pop("ocr_workers", 1)
-        detect_workers = kwargs.pop("detect_workers", ocr_workers)
-        page_elements_cpus_per_actor = float(kwargs.pop("page_elements_cpus_per_actor", 1))
-        ocr_cpus_per_actor = float(kwargs.pop("ocr_cpus_per_actor", 1))
-
-        # When remote endpoints are provided as a comma-separated list, scale
-        # actor count to match endpoint count so load can be distributed.
-        pe_endpoints = _endpoint_count(kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url")))
-        if pe_endpoints > 0 and int(page_elements_workers) != int(pe_endpoints):
-            logging.warning(
-                "page_elements invoke URL list has %d endpoint(s); overriding page_elements_workers from %d to %d",
-                pe_endpoints,
-                int(page_elements_workers),
-                int(pe_endpoints),
-            )
-            page_elements_workers = int(pe_endpoints)
-
-        ocr_endpoints = _endpoint_count(kwargs.get("ocr_invoke_url", kwargs.get("invoke_url")))
-        if ocr_endpoints > 0 and int(detect_workers) != int(ocr_endpoints):
-            logging.warning(
-                "ocr invoke URL list has %d endpoint(s); overriding detect_workers from %d to %d",
-                ocr_endpoints,
-                int(detect_workers),
-                int(ocr_endpoints),
-            )
-            detect_workers = int(ocr_endpoints)
-
-        # Reserve CPUs for GPU actors, then divide the rest among extract workers.
-        if use_nemotron_parse_only:
-            total_gpu_cpus = int(nemotron_parse_workers) * ocr_cpus_per_actor
-        else:
-            total_gpu_cpus = (
-                page_elements_workers * page_elements_cpus_per_actor
-                + detect_workers * detect_stage_count * ocr_cpus_per_actor
-            )
-        cpus_for_extract = max(1, self._num_cpus - total_gpu_cpus)
-        pdf_extract_workers = kwargs.pop("pdf_extract_workers", max(1, cpus_for_extract // 2))
-
-        # region agent log
-        if use_nemotron_parse_only:
-            total_gpu_requested = float(gpu_nemotron_parse) * float(nemotron_parse_workers) + float(gpu_embed) * 1.0
-        else:
-            total_gpu_requested = (
-                float(gpu_page_elements) * float(page_elements_workers)
-                + float(gpu_ocr) * float(detect_workers * detect_stage_count)
-                + float(gpu_embed) * 1.0
-            )
-        _debug_log(
-            run_id=debug_run_id,
-            hypothesis_id="H1",
-            location="ingest_modes/batch.py:extract",
-            message="Resource envelope computed for Ray stages",
-            data={
-                "num_gpus_available": self._num_gpus,
-                "num_cpus_available": self._num_cpus,
-                "gpu_page_elements": gpu_page_elements,
-                "gpu_ocr": gpu_ocr,
-                "gpu_nemotron_parse": gpu_nemotron_parse,
-                "gpu_embed": gpu_embed,
-                "page_elements_workers": page_elements_workers,
-                "detect_workers": detect_workers,
-                "nemotron_parse_workers": nemotron_parse_workers,
-                "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                "use_nemotron_parse_only": use_nemotron_parse_only,
-                "detect_stage_count": detect_stage_count,
-                "pdf_extract_workers": pdf_extract_workers,
-                "pdf_extract_num_cpus": pdf_extract_num_cpus,
-                "total_gpu_requested_across_stages": total_gpu_requested,
-                "can_fully_overlap_gpu_stages": bool(total_gpu_requested <= float(self._num_gpus)),
-            },
-        )
-        _debug_log(
-            run_id=debug_run_id,
-            hypothesis_id="H2",
-            location="ingest_modes/batch.py:extract",
-            message="CPU reservation breakdown for actors and extraction pool",
-            data={
-                "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                "total_gpu_actor_cpus_reserved": total_gpu_cpus,
-                "cpus_for_extract": cpus_for_extract,
-            },
-        )
-        # endregion
-
-        # Store per-stage GPU allocations for downstream stages (e.g. embed).
-        self._gpu_page_elements = gpu_page_elements
-        self._gpu_ocr = gpu_ocr
-        self._gpu_embed = gpu_embed
-
-        logging.info(
-            "Batch extract resources: %d GPUs, %d CPUs | "
-            "pdf_extract_workers=%d, page_elements_workers=%d, ocr_workers=%d, "
-            "gpu_page_elements=%.2f, gpu_ocr=%.2f, gpu_nemotron_parse=%.2f, gpu_embed=%.2f, parse_only=%s",
-            self._num_gpus,
-            self._num_cpus,
-            pdf_extract_workers,
-            page_elements_workers,
-            detect_workers,
-            gpu_page_elements,
-            gpu_ocr,
-            gpu_nemotron_parse,
-            gpu_embed,
-            use_nemotron_parse_only,
-        )
-
         # Downstream batch stages assume `page_image.image_b64` exists for every page.
         # Ensure PDF extraction emits a page image unless the caller explicitly disables it.
         kwargs.setdefault("extract_page_as_image", True)
@@ -586,44 +480,52 @@ class BatchIngestor(Ingestor):
         if "page_elements_api_key" in kwargs:
             detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
 
+        detect_kwargs["inference_batch_size"] = self._requested_plan.get_page_elements_batch_size()
+
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
         self._rd_dataset = self._rd_dataset.map_batches(
             DocToPdfConversionActor,
             batch_size=1,
             num_cpus=1,
-            num_gpus=0,
             batch_format="pandas",
         )
 
-        # Splitting pdfs is broken into a separate stage to help amortize downstream
-        # processing if PDFs have vastly different numbers of pages.
-        pdf_split_actor = PDFSplitActor(
-            split_params=PdfSplitParams(
-                start_page=kwargs.get("start_page"),
-                end_page=kwargs.get("end_page"),
-            )
-        )
+        # PDF SPLIT - Splits each PDF document into individual pages.
+        # To help amortize downstream processing if PDFs have vastly different numbers of pages.
+        # This is a CPU-only stage. This "Actor" is technically scheduled as a Task
         self._rd_dataset = self._rd_dataset.map_batches(
-            pdf_split_actor,
-            batch_size=pdf_split_batch_size,
+            PDFSplitActor(
+                split_params=PdfSplitParams(
+                    start_page=kwargs.get("start_page"),
+                    end_page=kwargs.get("end_page"),
+                )
+            ),
+            batch_size=1,
             num_cpus=1,
-            num_gpus=0,
             batch_format="pandas",
         )
 
-        # Pre-split pdfs are now ready for extraction — the main CPU bottleneck.
-        extraction_actor = PDFExtractionActor(**kwargs)
+        # PDF EXTRACTION - Extracts text, tables, charts, infographics, etc. from the PDF pages.
+        # This is a CPU-only stage and is the main CPU bottleneck of the entire DAG
         self._rd_dataset = self._rd_dataset.map_batches(
-            extraction_actor,
-            batch_size=pdf_extract_batch_size,
+            PDFExtractionActor(**kwargs),
+            batch_size=self._requested_plan.get_pdf_extract_batch_size(),
             batch_format="pandas",
-            num_cpus=pdf_extract_num_cpus,
-            num_gpus=0,
-            compute=rd.TaskPoolStrategy(size=pdf_extract_workers),
+            num_cpus=self._requested_plan.get_pdf_extract_cpus_per_task(),
+            compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=24)
-        if use_nemotron_parse_only:
+
+        # In further stages we don't prefer individual rows as batching is more performant.
+        # Here we set the target number of rows per block to either
+        # nemotron-parse batch size or the page-elements batch size, depending on which is used.
+        if self._use_nemotron_parse_only:
+
+            # Set the target number of rows per block to the nemotron-parse batch size
+            self._rd_dataset = self._rd_dataset.repartition(
+                target_num_rows_per_block=self._requested_plan.get_nemotron_parse_batch_size()
+            )
+
             parse_flags: dict[str, Any] = {}
             if kwargs.get("extract_tables") is True:
                 parse_flags["extract_tables"] = True
@@ -647,22 +549,33 @@ class BatchIngestor(Ingestor):
                 parse_flags["invoke_url"] = parse_invoke_url
             self._rd_dataset = self._rd_dataset.map_batches(
                 NemotronParseActor,
-                batch_size=int(nemotron_parse_batch_size),
+                batch_size=self._requested_plan.get_nemotron_parse_batch_size(),
                 batch_format="pandas",
-                num_cpus=ocr_cpus_per_actor,
-                num_gpus=float(gpu_nemotron_parse),
-                compute=rd.ActorPoolStrategy(size=int(nemotron_parse_workers)),
+                num_gpus=self._requested_plan.get_nemotron_parse_gpus_per_actor(),
+                compute=rd.ActorPoolStrategy(
+                    initial_size=self._requested_plan.get_nemotron_parse_initial_actors(),
+                    min_size=self._requested_plan.get_nemotron_parse_min_actors(),
+                    max_size=self._requested_plan.get_nemotron_parse_max_actors(),
+                ),
                 fn_constructor_kwargs=parse_flags,
             )
         else:
+            # Set the target number of rows per block to the page-elements batch size
+            self._rd_dataset = self._rd_dataset.repartition(
+                target_num_rows_per_block=self._requested_plan.get_page_elements_batch_size()
+            )
+
             # Page-element detection with a GPU actor pool.
             self._rd_dataset = self._rd_dataset.map_batches(
                 PageElementDetectionActor,
-                batch_size=page_elements_batch_size,
+                batch_size=self._requested_plan.get_page_elements_batch_size(),
                 batch_format="pandas",
-                num_cpus=page_elements_cpus_per_actor,
-                num_gpus=gpu_page_elements,
-                compute=rd.ActorPoolStrategy(size=page_elements_workers),
+                num_gpus=self._requested_plan.get_page_elements_gpus_per_actor(),
+                compute=rd.ActorPoolStrategy(
+                    initial_size=self._requested_plan.get_page_elements_initial_actors(),
+                    min_size=self._requested_plan.get_page_elements_min_actors(),
+                    max_size=self._requested_plan.get_page_elements_max_actors(),
+                ),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
@@ -699,11 +612,14 @@ class BatchIngestor(Ingestor):
 
                 self._rd_dataset = self._rd_dataset.map_batches(
                     TableStructureActor,
-                    batch_size=detect_batch_size,
+                    batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
-                    num_cpus=ocr_cpus_per_actor,
-                    num_gpus=gpu_ocr,
-                    compute=rd.ActorPoolStrategy(size=detect_workers),
+                    num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_ocr_initial_actors(),
+                        min_size=self._requested_plan.get_ocr_min_actors(),
+                        max_size=self._requested_plan.get_ocr_max_actors(),
+                    ),
                     fn_constructor_kwargs=ts_ocr_flags,
                 )
 
@@ -734,14 +650,19 @@ class BatchIngestor(Ingestor):
             if "ocr_api_key" in kwargs:
                 ocr_flags["api_key"] = kwargs["ocr_api_key"]
 
+            ocr_flags["inference_batch_size"] = self._requested_plan.get_ocr_batch_size()
+
             if ocr_flags:
                 self._rd_dataset = self._rd_dataset.map_batches(
                     OCRActor,
-                    batch_size=detect_batch_size,
+                    batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
-                    num_cpus=ocr_cpus_per_actor,
-                    num_gpus=gpu_ocr,
-                    compute=rd.ActorPoolStrategy(size=detect_workers),
+                    num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_ocr_initial_actors(),
+                        min_size=self._requested_plan.get_ocr_min_actors(),
+                        max_size=self._requested_plan.get_ocr_max_actors(),
+                    ),
                     fn_constructor_kwargs=ocr_flags,
                 )
 
@@ -766,7 +687,6 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
             fn_constructor_kwargs={"params": TextChunkParams(**self._extract_txt_kwargs)},
         )
         return self
@@ -790,7 +710,6 @@ class BatchIngestor(Ingestor):
             batch_size=4,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
             fn_constructor_kwargs={"params": HtmlChunkParams(**self._extract_html_kwargs)},
         )
         return self
@@ -828,7 +747,6 @@ class BatchIngestor(Ingestor):
             batch_size=audio_chunk_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
             fn_constructor_kwargs={"params": AudioChunkParams(**self._extract_audio_chunk_kwargs)},
         )
         self._rd_dataset = self._rd_dataset.map_batches(
@@ -836,12 +754,16 @@ class BatchIngestor(Ingestor):
             batch_size=asr_batch_size,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
             fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
 
-    def embed(self, params: EmbedParams | None = None, **kwargs: Any) -> "BatchIngestor":
+    def embed(
+        self,
+        params: EmbedParams | None = None,
+        input_dataset: rd.Dataset | None = None,
+        **kwargs: Any,
+    ) -> "BatchIngestor":
         """
         Add a text-embedding stage to the batch pipeline.
 
@@ -857,7 +779,15 @@ class BatchIngestor(Ingestor):
           (e.g. ``"http://embedding:8000/v1"``).  When set, the actor
           delegates to the remote NIM instead of loading a local model,
           and no GPU is requested for this stage.
+        - ``input_dataset``: optional Ray Dataset to embed instead of the
+          currently configured internal dataset.
         """
+        if input_dataset is not None:
+            self._rd_dataset = input_dataset
+        if self._rd_dataset is None:
+            raise RuntimeError(
+                "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
+            )
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
         kwargs = {
@@ -868,39 +798,18 @@ class BatchIngestor(Ingestor):
             **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
 
-        def _endpoint_count(raw: Any) -> int:
-            s = str(raw or "").strip()
-            if not s:
-                return 0
-            return len([p for p in s.split(",") if p.strip()])
-
-        embed_workers = kwargs.pop("embed_workers", 1)
-        embed_batch_size = kwargs.pop("embed_batch_size", 256)
-        embed_cpus_per_actor = float(kwargs.pop("embed_cpus_per_actor", 1))
-
         if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
             kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
-
-        endpoint_count = _endpoint_count(kwargs.get("embedding_endpoint"))
-        if endpoint_count > 0 and int(embed_workers) != int(endpoint_count):
-            logging.warning(
-                "embed endpoint list has %d endpoint(s); overriding embed_workers from %d to %d",
-                endpoint_count,
-                int(embed_workers),
-                int(endpoint_count),
-            )
-            embed_workers = int(endpoint_count)
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
         embed_granularity = resolved.embed_granularity
         self._tasks.append(("embed", dict(kwargs)))
 
-        # Prepare content rows before embedding.
-        self._rd_dataset = self._rd_dataset.repartition(target_num_rows_per_block=256)
-
-        from functools import partial
-        from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
+        # We want to create Ray batches that are of the same size as the embed_batch_size.
+        self._rd_dataset = self._rd_dataset.repartition(
+            target_num_rows_per_block=self._requested_plan.get_embed_batch_size()
+        )
 
         if embed_granularity == "page":
             _row_fn = partial(
@@ -918,29 +827,28 @@ class BatchIngestor(Ingestor):
             )
         self._rd_dataset = self._rd_dataset.map_batches(
             _row_fn,
-            batch_size=embed_batch_size,
+            batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
         )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
-            gpu_per_stage = 0
+            embed_actor_num_gpus = 0  # We do not need GPU resources if invoking a remote NIM endpoint
         else:
-            # Embedding is GPU-bound; only needs modest CPU for tokenisation.
-            # Requesting all CPUs would prevent this stage from overlapping with
-            # upstream extraction/detection in Ray Data's streaming pipeline.
-            gpu_per_stage = getattr(self, "_gpu_embed", 1.0)
+            embed_actor_num_gpus = self._requested_plan.get_embed_gpus_per_actor()
 
         self._rd_dataset = self._rd_dataset.map_batches(
             _BatchEmbedActor,
-            batch_size=embed_batch_size,
+            batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
-            num_cpus=embed_cpus_per_actor,
-            num_gpus=gpu_per_stage,
-            compute=rd.ActorPoolStrategy(size=embed_workers),
+            num_gpus=embed_actor_num_gpus,  # pulled from if statement above
+            compute=rd.ActorPoolStrategy(
+                initial_size=self._requested_plan.get_embed_initial_actors(),
+                min_size=self._requested_plan.get_embed_min_actors(),
+                max_size=self._requested_plan.get_embed_max_actors(),
+            ),
             fn_constructor_kwargs={"params": resolved},
         )
 
@@ -975,7 +883,6 @@ class BatchIngestor(Ingestor):
             _LanceDBWriteActor,
             batch_format="pandas",
             num_cpus=1,
-            num_gpus=0,
             compute=rd.ActorPoolStrategy(size=1),
             fn_constructor_kwargs={"params": p},
         )
@@ -1019,6 +926,94 @@ class BatchIngestor(Ingestor):
     def write_to_disk(self, output_dir: str) -> "BatchIngestor":
         return self.save_intermediate_results(output_dir=output_dir)
 
+    @staticmethod
+    def _has_error(v: Any) -> bool:
+        """Recursively detect whether a value contains error-like payloads."""
+
+        def _is_populated_error_field(key: str, value: Any) -> bool:
+            if value is None:
+                return False
+            if key == "failed" and isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                return bool(value.strip())
+            if isinstance(value, (list, tuple, set, dict)):
+                return len(value) > 0
+            return bool(value)
+
+        if v is None:
+            return False
+        if isinstance(v, dict):
+            for k in ("error", "errors", "exception", "traceback", "failed"):
+                if k in v and _is_populated_error_field(k, v.get(k)):
+                    return True
+            return any(BatchIngestor._has_error(x) for x in v.values())
+        if isinstance(v, list):
+            return any(BatchIngestor._has_error(x) for x in v)
+        if isinstance(v, str):
+            s = v.strip()
+            if not s:
+                return False
+            # Parse JSON-like strings first, then fall back to keyword matching.
+            if (s.startswith("{") and s.endswith("}")) or (s.startswith("[") and s.endswith("]")):
+                try:
+                    return BatchIngestor._has_error(json.loads(s))
+                except Exception:
+                    pass
+            low = s.lower()
+            return any(tok in low for tok in ("error", "exception", "traceback", "failed"))
+        return False
+
+    @staticmethod
+    def has_error(v: Any) -> bool:
+        """Public helper for checking if a scalar value carries an error."""
+        return BatchIngestor._has_error(v)
+
+    @staticmethod
+    def extract_error_rows(batch: Any) -> Any:
+        """
+        Return only rows that contain error-like payloads in known columns.
+
+        Expected to run with ``batch_format="pandas"`` from Ray Data.
+        """
+        if batch is None:
+            return batch
+        columns = getattr(batch, "columns", None)
+        if columns is None:
+            return batch
+        error_candidate_columns = (
+            "error",
+            "errors",
+            "exception",
+            "traceback",
+            "metadata",
+            "source",
+            "embedding",
+        )
+        cols = [c for c in error_candidate_columns if c in columns]
+        if not cols:
+            return batch.iloc[0:0]
+
+        mask = batch[cols[0]].apply(BatchIngestor._has_error).astype(bool)
+        for c in cols[1:]:
+            mask = mask | batch[c].apply(BatchIngestor._has_error).astype(bool)
+        return batch[mask]
+
+    def get_error_rows(self, dataset: rd.Dataset | None = None) -> rd.Dataset:
+        """
+        Build a dataset containing only error rows from this pipeline.
+
+        If ``dataset`` is omitted, uses the ingestor's current internal dataset.
+        """
+        target = dataset if dataset is not None else self._rd_dataset
+        if target is None:
+            raise RuntimeError("No Ray Dataset available to inspect for errors.")
+        return target.map_batches(self.extract_error_rows, batch_format="pandas")
+
+    def get_dataset(self) -> rd.Dataset | None:
+        """Return the current in-memory Ray Dataset for this ingestor."""
+        return self._rd_dataset
+
     def ingest(self, params: IngestExecuteParams | None = None, **kwargs: Any) -> int:
         """
         Execute the Ray Data pipeline and return the total number of pages.
@@ -1035,68 +1030,8 @@ class BatchIngestor(Ingestor):
             run_params.save_to_disk,
             run_params.return_traces,
         )
-        runtime_metrics_dir = run_params.runtime_metrics_dir
-        runtime_metrics_prefix = run_params.runtime_metrics_prefix
-        t0 = time.monotonic()
-        num_pages = self._rd_dataset.count()
-        elapsed = time.monotonic() - t0
 
-        print(f"[done] {len(self._input_documents)} files, {num_pages} pages in {elapsed:.1f}s")
-        # region agent log
-        _debug_log(
-            run_id=str(runtime_metrics_prefix or "unknown"),
-            hypothesis_id="H3",
-            location="ingest_modes/batch.py:ingest",
-            message="Pipeline completed with aggregate throughput",
-            data={
-                "input_files": len(self._input_documents),
-                "num_pages": int(num_pages),
-                "elapsed_seconds": float(elapsed),
-                "pages_per_second_total": float(num_pages / elapsed) if elapsed > 0 else None,
-                "runtime_metrics_dir": runtime_metrics_dir,
-            },
-        )
-        # endregion
-
-        # Best-effort runtime metrics capture for per-run stage-level debugging.
-        if runtime_metrics_dir:
-            metrics_dir = Path(runtime_metrics_dir)
-            metrics_dir.mkdir(parents=True, exist_ok=True)
-            prefix = (runtime_metrics_prefix or "run").strip() or "run"
-
-            stats_path = metrics_dir / f"{prefix}.rd_dataset.stats.txt"
-            timeline_path = metrics_dir / f"{prefix}.ray.timeline.json"
-            summary_path = metrics_dir / f"{prefix}.runtime.summary.json"
-
-            stats_text = ""
-            try:
-                stats_text = str(self._rd_dataset.stats())
-                stats_path.write_text(stats_text, encoding="utf-8")
-            except Exception as e:
-                print(f"Warning: failed writing dataset stats: {e}")
-
-            try:
-                ray.timeline(filename=str(timeline_path))
-            except Exception as e:
-                print(f"Warning: failed writing ray timeline: {e}")
-
-            try:
-                summary = {
-                    "input_files": int(len(self._input_documents)),
-                    "num_pages": int(num_pages),
-                    "elapsed_seconds": float(elapsed),
-                    "stats_path": str(stats_path),
-                    "timeline_path": str(timeline_path),
-                }
-                summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
-            except Exception as e:
-                print(f"Warning: failed writing runtime summary: {e}")
-
-        # Create LanceDB vector index after all streaming writes are complete.
-        if hasattr(self, "_vdb_upload_kwargs") and self._vdb_upload_kwargs:
-            self._create_lancedb_index()
-
-        return num_pages
+        return self
 
     def _create_lancedb_index(self) -> None:
         """Create the LanceDB vector index after streaming writes finish."""
