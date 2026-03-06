@@ -90,6 +90,27 @@ def _collect_run_metadata() -> dict[str, Any]:
     }
 
 
+def _normalize_tags(tags: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw in tags or []:
+        tag = str(raw).strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        normalized.append(tag)
+
+    return normalized
+
+
+def _normalize_recall_metric_key(key: str) -> str:
+    metric = str(key).strip().lower()
+    if metric.startswith("recall@"):
+        return "recall_" + metric.split("@", 1)[1]
+    return metric.replace("@", "_").replace("-", "_")
+
+
 def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     raw = str(cfg.lancedb_uri or "lancedb")
     if raw == "lancedb":
@@ -126,9 +147,9 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         "--recall-match-mode",
         cfg.recall_match_mode,
         "--no-recall-details",
-        "--pdf-extract-workers",
+        "--pdf-extract-tasks",
         str(cfg.pdf_extract_workers),
-        "--pdf-extract-num-cpus",
+        "--pdf-extract-cpus-per-task",
         str(cfg.pdf_extract_num_cpus),
         "--pdf-extract-batch-size",
         str(cfg.pdf_extract_batch_size),
@@ -136,13 +157,13 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(cfg.pdf_split_batch_size),
         "--page-elements-batch-size",
         str(cfg.page_elements_batch_size),
-        "--page-elements-workers",
+        "--page-elements-actors",
         str(cfg.page_elements_workers),
-        "--ocr-workers",
+        "--ocr-actors",
         str(cfg.ocr_workers),
         "--ocr-batch-size",
         str(cfg.ocr_batch_size),
-        "--embed-workers",
+        "--embed-actors",
         str(cfg.embed_workers),
         "--embed-batch-size",
         str(cfg.embed_batch_size),
@@ -152,11 +173,11 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(cfg.ocr_cpus_per_actor),
         "--embed-cpus-per-actor",
         str(cfg.embed_cpus_per_actor),
-        "--gpu-page-elements",
+        "--page-elements-gpus-per-actor",
         str(cfg.gpu_page_elements),
-        "--gpu-ocr",
+        "--ocr-gpus-per-actor",
         str(cfg.gpu_ocr),
-        "--gpu-embed",
+        "--embed-gpus-per-actor",
         str(cfg.gpu_embed),
         "--embed-model-name",
         cfg.embed_model_name,
@@ -263,7 +284,7 @@ def _run_subprocess_with_tty(cmd: list[str], metrics: StreamMetrics) -> int:
         os.close(master_fd)
 
 
-def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str, Any]:
+def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[str] | None = None) -> dict[str, Any]:
     cmd, runtime_dir, detection_summary_file, effective_query_csv = _build_command(cfg, artifact_dir, run_id)
     command_text = " ".join(shlex.quote(token) for token in cmd)
     (artifact_dir / "command.txt").write_text(command_text + "\n", encoding="utf-8")
@@ -282,8 +303,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
 
     recall_metrics_normalized: dict[str, float] = {}
     for key, val in metrics.recall_metrics.items():
-        normalized = key.replace("@", "_").replace("-", "_")
-        recall_metrics_normalized[f"recall_{normalized}"] = val
+        recall_metrics_normalized[_normalize_recall_metric_key(key)] = val
 
     effective_rc, failure_reason, success = _evaluate_run_outcome(
         process_rc=process_rc,
@@ -319,6 +339,8 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
             "pages": metrics.pages,
             "ingest_secs": metrics.ingest_secs,
             "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
+            "rows_processed": metrics.rows_processed,
+            "rows_per_sec_ingest": metrics.rows_per_sec_ingest,
             **recall_metrics_normalized,
         },
         "run_metadata": run_metadata,
@@ -331,6 +353,8 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
     }
     if cfg.write_detection_file:
         result_payload["artifacts"]["detection_summary_file"] = str(detection_summary_file.resolve())
+    if tags:
+        result_payload["tags"] = list(tags)
 
     write_json(artifact_dir / "results.json", result_payload)
     return result_payload
@@ -346,6 +370,7 @@ def _run_entry(
     sweep_overrides: dict[str, Any] | None = None,
     cli_overrides: list[str] | None = None,
     recall_required: bool | None = None,
+    tags: list[str] | None = None,
 ) -> dict[str, Any]:
     cfg = load_harness_config(
         config_file=config_file,
@@ -364,8 +389,9 @@ def _run_entry(
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
     resolved_run_name = run_name or cfg.dataset_label
-    result = _run_single(cfg, artifact_dir, run_id=resolved_run_name)
-    return {
+    normalized_tags = _normalize_tags(tags)
+    result = _run_single(cfg, artifact_dir, run_id=resolved_run_name, tags=normalized_tags)
+    run_result = {
         "run_name": resolved_run_name,
         "dataset": cfg.dataset_label,
         "preset": cfg.preset,
@@ -375,6 +401,9 @@ def _run_entry(
         "failure_reason": result.get("failure_reason"),
         "metrics": dict(result.get("metrics", {})),
     }
+    if normalized_tags:
+        run_result["tags"] = normalized_tags
+    return run_result
 
 
 def execute_runs(
@@ -384,6 +413,7 @@ def execute_runs(
     session_prefix: str,
     preset_override: str | None,
     base_artifacts_dir: str | None = None,
+    tags: list[str] | None = None,
 ) -> tuple[Path, list[dict[str, Any]]]:
     session_dir = create_session_dir(session_prefix, base_dir=base_artifacts_dir)
     run_results: list[dict[str, Any]] = []
@@ -398,6 +428,7 @@ def execute_runs(
             preset=run.get("preset") if preset_override is None else preset_override,
             sweep_overrides=run.get("overrides") if isinstance(run.get("overrides"), dict) else run,
             recall_required=run.get("recall_required"),
+            tags=tags,
         )
         run_results.append(run_result)
 
@@ -410,6 +441,7 @@ def run_command(
     config: str | None = typer.Option(None, "--config", help="Path to harness test config YAML."),
     run_name: str | None = typer.Option(None, "--run-name", help="Optional run name label."),
     override: list[str] = typer.Option([], "--override", help="Override values with KEY=VALUE."),
+    tag: list[str] = typer.Option([], "--tag", help="Run tag to persist in harness artifacts. Repeatable."),
     recall_required: bool | None = typer.Option(
         None, "--recall-required/--no-recall-required", help="Override recall-required gate for this run."
     ),
@@ -422,6 +454,7 @@ def run_command(
         preset=preset,
         cli_overrides=override,
         recall_required=recall_required,
+        tags=tag,
     )
     typer.echo(
         f"\nResult: {'PASS' if result['success'] else 'FAIL'} | "
@@ -435,15 +468,20 @@ def sweep_command(
     runs_config: str = typer.Option(str(DEFAULT_NIGHTLY_CONFIG_PATH), "--runs-config", help="Path to sweep runs YAML."),
     preset: str | None = typer.Option(None, "--preset", help="Force preset for all sweep runs."),
     session_prefix: str = typer.Option("sweep", "--session-prefix", help="Session directory prefix."),
+    tag: list[str] = typer.Option([], "--tag", help="Session tag to persist on each run. Repeatable."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print run plan without executing."),
 ) -> None:
+    normalized_tags = _normalize_tags(tag)
     runs = load_runs_config(runs_config)
     if dry_run:
         typer.echo("Sweep dry run:")
         for idx, run in enumerate(runs):
-            typer.echo(
-                f"  {idx + 1:03d}: name={run.get('name')} dataset={run.get('dataset')} preset={run.get('preset')}"
+            tag_text = f" tags={normalized_tags}" if normalized_tags else ""
+            plan_line = (
+                f"  {idx + 1:03d}: name={run.get('name')} "
+                f"dataset={run.get('dataset')} preset={run.get('preset')}{tag_text}"
             )
+            typer.echo(plan_line)
         raise typer.Exit(code=0)
 
     session_dir, run_results = execute_runs(
@@ -451,6 +489,7 @@ def sweep_command(
         config_file=config,
         session_prefix=session_prefix,
         preset_override=preset,
+        tags=normalized_tags,
     )
     summary_path = write_session_summary(
         session_dir,

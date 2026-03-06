@@ -270,6 +270,14 @@ def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: fl
     print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
 
 
+def _count_materialized_rows(dataset: object) -> int:
+    """Count rows from a materialized Ray Dataset without relying on ``len()``."""
+    count = getattr(dataset, "count", None)
+    if callable(count):
+        return int(count())
+    return len(dataset)  # type: ignore[arg-type]
+
+
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """
     Ensure the local LanceDB URI exists and table can be opened.
@@ -855,11 +863,11 @@ def main(
         )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
+        rows_processed = _count_materialized_rows(ingest_results)
         logger.info(
-            f"Ingestion complete. {len(ingest_results)} rows procesed in "
-            f"{ingest_elapsed_s:.2f} seconds. {len(ingest_results)/ingest_elapsed_s:.2f} PPS"
+            f"Ingestion complete. {rows_processed} rows procesed in "
+            f"{ingest_elapsed_s:.2f} seconds. {rows_processed/ingest_elapsed_s:.2f} PPS"
         )
-        logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()

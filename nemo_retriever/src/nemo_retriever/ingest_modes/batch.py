@@ -77,6 +77,14 @@ def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, An
     return params
 
 
+def _runtime_env_vars() -> dict[str, str]:
+    env_vars = {
+        "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
+        "LOG_LEVEL": "INFO",
+    }
+    return {key: value for key, value in env_vars.items() if isinstance(value, str)}
+
+
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
@@ -328,10 +336,7 @@ class BatchIngestor(Ingestor):
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
             runtime_env={
-                "env_vars": {
-                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
-                    "LOG_LEVEL": "INFO",
-                }
+                "env_vars": _runtime_env_vars()
             },
         )
 
