@@ -245,11 +245,14 @@ def test_load_harness_config_rejects_invalid_recall_adapter(tmp_path: Path) -> N
 
 def test_load_harness_config_uses_financebench_repo_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     real_exists = Path.exists
+    expected_query_csv = (harness_config.REPO_ROOT / "data" / "financebench_train.json").resolve()
 
     def _fake_exists(path_self: Path) -> bool:
         if path_self == Path("/datasets/nv-ingest/financebench"):
             return False
         if path_self == Path("/raid/tester/financebench"):
+            return True
+        if path_self == expected_query_csv:
             return True
         return real_exists(path_self)
 
@@ -258,5 +261,5 @@ def test_load_harness_config_uses_financebench_repo_fixture(monkeypatch: pytest.
 
     cfg = load_harness_config(dataset="financebench", preset="single_gpu")
     assert cfg.dataset_dir == str(Path("/raid/tester/financebench").resolve())
-    assert cfg.query_csv == str((harness_config.REPO_ROOT / "data" / "financebench_train.json").resolve())
+    assert cfg.query_csv == str(expected_query_csv)
     assert cfg.recall_required is True
