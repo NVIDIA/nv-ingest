@@ -1,8 +1,8 @@
 # Example config for chart extraction.
 #
 # Intended usage (once the chart stage CLI is wired up similarly to table stage):
-#   - `retriever chart stage run --config <this.yaml> --input <primitives.parquet>`
-#   - `retriever local stage4 run --config <this.yaml> --input <primitives.parquet>`
+#   - `nr chart stage run --config <this.yaml> --input <primitives.parquet>`
+#   - `nr local stage4 run --config <this.yaml> --input <primitives.parquet>`
 #
 # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema`
 # via `nemo_retriever.chart.config.load_chart_extractor_schema_from_dict`.

@@ -8,7 +8,7 @@ Audio extraction CLI (chunk + ASR, write *.audio_extraction.json sidecars).
 This module intentionally contains **no configuration logic**. It simply re-exports the
 `nemo_retriever.audio.stage` Typer application so any arguments provided to:
 
-  `retriever audio ...`
+  `nr audio ...`
 
 are handled exactly the same as the stage commands (e.g. `extract`, `discover`).
 """

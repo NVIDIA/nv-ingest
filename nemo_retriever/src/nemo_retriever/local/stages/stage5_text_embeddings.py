@@ -10,7 +10,7 @@ Local pipeline stage5: thin proxy for text embedding CLI.
 This module intentionally contains no configuration logic. It re-exports the
 `nemo_retriever.text_embed.stage` Typer application so arguments provided to:
 
-  `retriever local stage5 ...`
+  `nr local stage5 ...`
 
 are handled by `nemo_retriever.text_embed.stage`, including local-HF fallback options
 when an embedding endpoint is not configured.

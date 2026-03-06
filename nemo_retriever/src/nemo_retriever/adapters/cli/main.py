@@ -7,12 +7,14 @@ from __future__ import annotations
 import typer
 
 from nemo_retriever.audio import app as audio_app
+from nemo_retriever.examples.batch_pipeline import app as batch_app
 from nemo_retriever.utils.benchmark import app as benchmark_app
 from nemo_retriever.chart import app as chart_app
 from nemo_retriever.utils.compare import app as compare_app
 from nemo_retriever.harness import app as harness_app
 from nemo_retriever.html import __main__ as html_main
 from nemo_retriever.utils.image import app as image_app
+from nemo_retriever.ingest_modes.inprocess_cli import app as inprocess_app
 from nemo_retriever.local import app as local_app
 from nemo_retriever.online import __main__ as online_main
 from nemo_retriever.pdf import app as pdf_app
@@ -21,7 +23,13 @@ from nemo_retriever.txt import __main__ as txt_main
 from nemo_retriever.vector_store import app as vector_store_app
 from nemo_retriever.version import get_version_info
 
-app = typer.Typer(help="Retriever")
+app = typer.Typer(help="NeMo Retriever – RAG ingestion pipeline CLI.")
+
+ingest_app = typer.Typer(help="Run ingestion pipelines (batch or in-process).")
+ingest_app.add_typer(batch_app, name="batch")
+ingest_app.add_typer(inprocess_app, name="inprocess")
+app.add_typer(ingest_app, name="ingest")
+
 app.add_typer(audio_app, name="audio")
 app.add_typer(image_app, name="image")
 app.add_typer(pdf_app, name="pdf")
@@ -54,7 +62,7 @@ def _callback(
     version: bool = typer.Option(
         False,
         "--version",
-        help="Show retriever version metadata and exit.",
+        help="Show nr version metadata and exit.",
         callback=_version_callback,
         is_eager=True,
     )

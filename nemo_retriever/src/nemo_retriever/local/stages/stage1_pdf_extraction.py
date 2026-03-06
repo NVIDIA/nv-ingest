@@ -10,11 +10,11 @@ Local pipeline stage1: pass-through PDF extraction CLI.
 This module intentionally contains **no configuration logic**. It simply re-exports the
 `nemo_retriever.pdf.stage` Typer application so any arguments provided to:
 
-  `retriever local stage1 ...`
+  `nr local stage1 ...`
 
 are handled exactly the same as:
 
-  `retriever pdf ...`
+  `nr pdf ...`
 """
 
 from nemo_retriever.pdf.stage import app as app

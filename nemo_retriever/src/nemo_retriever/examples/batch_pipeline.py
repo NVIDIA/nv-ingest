@@ -4,7 +4,7 @@
 
 """
 Batch ingestion pipeline with optional recall evaluation.
-Run with: uv run python -m nemo_retriever.examples.batch_pipeline <input-dir>
+Run with: nr batch <input-dir>
 """
 
 import json

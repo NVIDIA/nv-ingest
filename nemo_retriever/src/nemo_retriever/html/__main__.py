@@ -5,7 +5,7 @@
 """
 CLI for .html extraction: markitdown -> markdown -> tokenizer split, write *.html_extraction.json.
 
-Use with: retriever local stage5 run --pattern "*.html_extraction.json" then stage6.
+Use with: nr local stage5 run --pattern "*.html_extraction.json" then stage6.
 """
 
 from __future__ import annotations
@@ -63,8 +63,8 @@ def run(
     Scan input_dir for *.html, convert to markdown and chunk each, write <stem>.html_extraction.json.
 
     Output JSON has the same primitives-like shape as stage5 input (text, path, page_number, metadata).
-    Then run: retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"
-    and retriever local stage6 run --input-dir <dir>.
+    Then run: nr local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"
+    and nr local stage6 run --input-dir <dir>.
     """
     input_dir = Path(input_dir)
     html_files = sorted(input_dir.glob("*.html"))
