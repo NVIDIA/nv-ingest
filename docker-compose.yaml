@@ -124,6 +124,10 @@ services:
     # NIM ON
     image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-nemotron-embed-1b-v2}:${EMBEDDING_TAG:-1.13.0}
     shm_size: 16gb
+    ports:
+      - "${EMBEDDING_HTTP_PORT:-8012}:8000"
+      - "${EMBEDDING_GRPC_PORT:-8013}:8001"
+      - "${EMBEDDING_METRICS_PORT:-8014}:8002"
     expose:
       - "8000"
       - "8001"
