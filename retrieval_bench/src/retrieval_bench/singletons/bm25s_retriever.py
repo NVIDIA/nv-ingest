@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
+from retrieval_bench.singletons._shared import hash_corpus_ids10 as _hash_corpus_ids10
 from retrieval_bench.utils.corpus_language import corpus_language
 
 
@@ -36,14 +37,6 @@ def _stemmer_language(dataset_name: str) -> str:
 def _stopwords_language(stemmer_language: str) -> str:
     # bm25s uses short language codes for built-in stopwords.
     return "fr" if stemmer_language == "french" else "en"
-
-
-def _hash_corpus_ids10(corpus_ids: Sequence[str]) -> str:
-    h = hashlib.sha256()
-    for cid in corpus_ids:
-        h.update(str(cid).encode("utf-8"))
-        h.update(b"\n")
-    return h.hexdigest()[:10]
 
 
 @dataclass(frozen=True, slots=True)
