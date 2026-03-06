@@ -856,8 +856,8 @@ def main(
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         num_rows = ingest_results.groupby("source_id").count().count()
-        print(
-            f"Ingestion complete. {num_rows} rows processed in "
+        logger.info(
+            f"Ingestion complete. {num_rows} rows procesed in "
             f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
         )
 
