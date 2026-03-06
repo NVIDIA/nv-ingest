@@ -250,10 +250,3 @@ outputs/
 models/
 
 nemo_retriever/run_results/
-
-# retrieval_bench runtime outputs
-retrieval_bench/results/
-retrieval_bench/traces/
-retrieval_bench/cache/
-retrieval_bench/nemo_agentic_logs/
-retrieval_bench/shards/
