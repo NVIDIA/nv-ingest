@@ -851,7 +851,7 @@ def main(
                 )
             )
             .get_dataset()
-            .group_by("source_id")
+            .groupby("source_id")
             .materialize()
         )
 
