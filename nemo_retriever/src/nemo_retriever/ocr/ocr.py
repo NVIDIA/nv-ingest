@@ -12,7 +12,7 @@ PageElements v3. Text extraction for the full page is handled upstream
 by PDFium in the PDF extraction stage.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import base64
 import io
@@ -45,68 +45,6 @@ def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
             "traceback": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
         },
     }
-
-
-def _crop_b64_image_by_norm_bbox(
-    page_image_b64: str,
-    *,
-    bbox_xyxy_norm: Sequence[float],
-    image_format: str = "png",
-) -> Tuple[Optional[str], Optional[Tuple[int, int]]]:
-    """
-    Crop a base64-encoded RGB image by a normalized xyxy bbox.
-
-    Returns
-    -------
-    cropped_image_b64 : str | None
-        Base64-encoded cropped image (PNG), or *None* on failure.
-    cropped_shape_hw : tuple[int, int] | None
-        (H, W) of the crop, or *None* on failure.
-    """
-    if Image is None:  # pragma: no cover
-        raise ImportError("Cropping requires pillow.")
-
-    if not isinstance(page_image_b64, str) or not page_image_b64:
-        return None, None
-    try:
-        x1n, y1n, x2n, y2n = [float(x) for x in bbox_xyxy_norm]
-    except Exception:
-        return None, None
-
-    try:
-        raw = base64.b64decode(page_image_b64)
-        with Image.open(io.BytesIO(raw)) as im0:
-            im = im0.convert("RGB")
-            w, h = im.size
-            if w <= 1 or h <= 1:
-                return None, None
-
-            def _clamp_int(v: float, lo: int, hi: int) -> int:
-                if v != v:  # NaN
-                    return lo
-                return int(min(max(v, float(lo)), float(hi)))
-
-            x1 = _clamp_int(x1n * w, 0, w)
-            x2 = _clamp_int(x2n * w, 0, w)
-            y1 = _clamp_int(y1n * h, 0, h)
-            y2 = _clamp_int(y2n * h, 0, h)
-
-            if x2 <= x1 or y2 <= y1:
-                return None, None
-
-            crop = im.crop((x1, y1, x2, y2))
-            cw, ch = crop.size
-            if cw <= 1 or ch <= 1:
-                return None, None
-
-            buf = io.BytesIO()
-            fmt = str(image_format or "png").lower()
-            if fmt not in {"png"}:
-                fmt = "png"
-            crop.save(buf, format=fmt.upper())
-            return base64.b64encode(buf.getvalue()).decode("ascii"), (int(ch), int(cw))
-    except Exception:
-        return None, None
 
 
 def _crop_all_from_page(

@@ -856,7 +856,7 @@ def main(
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         logger.info(f"Ingestion complete in {ingest_elapsed_s:.2f} seconds")
-        print(ingestor)
+        print(ingestor.get_dataset())
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
