@@ -855,12 +855,17 @@ def main(
         )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        logger.info(f"Ingestion complete in {ingest_elapsed_s:.2f} seconds")
-        print(ingestor.get_dataset())
+        logger.info(
+            f"Ingestion complete. {len(ingest_results)} rows procesed in "
+            f"{ingest_elapsed_s:.2f} seconds. {len(ingest_results)/ingest_elapsed_s:.2f} PPS"
+        )
+        logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
             error_count = int(error_rows.count())
+
+            # Error out, stop processing, and write top 5 errors rows to a local file for analysis.
             if error_count > 0:
                 error_file = Path("ingest_errors.json").resolve()
                 max_error_rows_to_write = 5
@@ -870,19 +875,15 @@ def main(
                     fh.write("\n")
                 logger.error(
                     "Detected %d error row(s) in ingest results. Wrote first %d row(s) "
-                    "to %s. Showing top 5 extracted errors and exiting before recall.",
+                    "to %s. Showing top 5 extracted errors and exiting before recall."
+                    " Writing top(%d) error rows to %s",
                     error_count,
                     len(error_rows_to_write),
                     str(error_file),
+                    int(max_error_rows_to_write),
+                    str(error_file),
                 )
-                for idx, row in enumerate(error_rows.take(min(5, error_count)), start=1):
-                    extracted: list[object] = []
-                    for value in row.values():
-                        extracted.extend(_extract_error_payloads(value))
-                    if extracted:
-                        logger.error("Error row %d payloads: %s", idx, json.dumps(extracted, default=str))
-                    else:
-                        logger.error("Error row %d payloads: (no structured payload extracted)", idx)
+
                 ray.shutdown()
                 logger.error(f"Exiting with code 1 due to {error_count} error rows in ingest results.")
                 raise typer.Exit(code=1)
