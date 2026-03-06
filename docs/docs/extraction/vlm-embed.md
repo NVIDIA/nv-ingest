@@ -9,7 +9,7 @@ The model supports three embedding modalities: `text`, `image`, and `text_image`
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 ## Configure and Run the Multimodal NIM
@@ -189,5 +189,5 @@ results = ingestor.ingest()
 
 - [Support Matrix](support-matrix.md)
 - [Troubleshoot NeMo Retriever Library](troubleshoot.md)
-- [Use the NeMo Retriever Python API](python-api-reference.md)
+- [Use the NeMo Retriever Library Python API](python-api-reference.md)
 - [Extract Captions from Images](python-api-reference.md#extract-captions-from-images)

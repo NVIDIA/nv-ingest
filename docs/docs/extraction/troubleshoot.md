@@ -4,7 +4,7 @@ Use this documentation to troubleshoot issues that arise when you use [NeMo Retr
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 ## Can't process long, non-language text strings
