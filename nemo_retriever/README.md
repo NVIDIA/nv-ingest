@@ -204,13 +204,23 @@ The `--dry-run` option lets you verify the planned runs without executing them. 
 
 Each harness run writes a compact artifact set (no full stdout/stderr log persistence):
 
-- **results.json** – normalized metrics, pass/fail, and a config snapshot  
-- **command.txt** – the exact command that was invoked  
-- **runtime_metrics/** – Ray runtime summary and timeline files  
+- `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
+- `command.txt` (exact invoked command)
+- `runtime_metrics/` (Ray runtime summary + timeline files)
 
 By default, detection totals are embedded into `results.json` under `detection_summary`. To obtain a separate detection file set, set `write_detection_file: true` in `nemo_retriever/harness/test_configs.yaml`. Sweep and nightly sessions additionally write `session_summary.json`, which contains an overall pass/fail rollup. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
-6. Runtime metrics
+`results.json` also includes a nested `run_metadata` block for lightweight environment context:
+
+- `host`
+- `gpu_count`
+- `cuda_driver`
+- `ray_version`
+- `python_version`
+
+These fields use best-effort discovery and fall back to `null` or `"unknown"` rather than failing a run.
+
+Sweep/nightly sessions additionally write:
 
 The `runtime_metrics/` directory contains:
 
@@ -220,7 +230,7 @@ The `runtime_metrics/` directory contains:
 
 Use `results.json` for routine benchmark comparison, and use the files under `runtime_metrics/` when investigating throughput regressions or stage‑level behavior. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
-7. Artifact size profile
+6. Artifact size profile
 
 Current benchmark runs show that the LanceDB data dominates the artifact footprint:
 
@@ -271,7 +281,57 @@ Then run your pipeline as before with `--ray-address auto` so it connects to thi
 
 ## Running multiple NIM instances on multi‑GPU hosts
 
-If you want to scale page‑elements and OCR services across multiple GPUs on the same host, you can run separate Docker Compose projects and pin each to a different GPU. [How Cohesity uses NVIDIA NeMo Retriever Library microservices to improve RAG AI retrieval recall (Cohesity blog)](https://www.cohesity.com/blogs/how-cohesity-uses-nvidia-nemo-retriever-microservices-to-improve-rag-ai-retrieval-recall/)
+### Resource heuristics (batch mode)
+
+By default, batch mode computes resources using this order:
+
+1. Auto-detected resources (Ray cluster if connected, otherwise local machine)
+2. Environment variables
+3. Explicit function arguments (highest precedence)
+
+This means defaults are deterministic but easy to override when you need fixed behavior.
+
+### Default behavior
+
+- `cpu_count` / `gpu_count` are detected from Ray (`cluster_resources`) or local host.
+- Worker heuristics:
+  - `page_elements_workers = gpu_count * page_elements_per_gpu`
+  - `detect_workers = gpu_count * ocr_per_gpu`
+  - `embed_workers = gpu_count * embed_per_gpu`
+  - minimum of `1` per stage
+- Stage GPU defaults:
+  - If `gpu_count >= 2` and `concurrent_gpu_stage_count == 3`, uses high-overlap values for page-elements/OCR/embed.
+  - Otherwise uses `min(max_gpu_per_stage, gpu_count / concurrent_gpu_stage_count)`.
+
+### Override variables
+
+| Variable | Where to set | Meaning |
+|---|---|---|
+| `NEMO_RETRIEVER_BATCH_NUM_CPUS` | env | Override resolved CPU count |
+| `NEMO_RETRIEVER_BATCH_NUM_GPUS` | env | Override resolved GPU count |
+| `override_cpu_count`, `override_gpu_count` | function args | Highest-priority CPU/GPU override |
+| `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU` | env | Page-elements workers per GPU |
+| `NEMO_RETRIEVER_BATCH_OCR_PER_GPU` | env | OCR workers per GPU |
+| `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU` | env | Embed workers per GPU |
+| `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS` | env | GPU request for CPU-only stages (usually `0.0`) |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS` | env | Page-elements GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS` | env | OCR GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS` | env | Embed GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE` | env | Cap for per-stage GPU share in non-overlap mode |
+
+Environment variable names for heuristic knobs:
+- `NEMO_RETRIEVER_BATCH_NUM_CPUS`
+- `NEMO_RETRIEVER_BATCH_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_OCR_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE`
+
+### Running multiple NIM service instances on multi-GPU hosts
 
 ### Start two stacks on separate GPUs
 

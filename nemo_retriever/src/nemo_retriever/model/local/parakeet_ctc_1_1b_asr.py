@@ -19,6 +19,8 @@ from typing import List, Optional
 
 import numpy as np
 
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
+
 logger = logging.getLogger(__name__)
 
 MODEL_ID = "nvidia/parakeet-ctc-1.1b"
@@ -91,6 +93,7 @@ def _load_model_and_processor(model_id: str, hf_cache_dir: Optional[str] = None)
     from transformers import AutoModelForCTC, AutoProcessor
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    hf_cache_dir = configure_global_hf_cache_base(hf_cache_dir)
     kwargs = {}
     if hf_cache_dir:
         kwargs["cache_dir"] = hf_cache_dir

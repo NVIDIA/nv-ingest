@@ -124,7 +124,7 @@ pytest -q nemo_retriever/tests/test_harness_parsers.py \
 
 ### P0 (next)
 
-- Add run-level metadata fields useful for long-term tracking:
+- Completed in PR 1: add run-level metadata fields useful for long-term tracking:
   - `host`, `gpu_count`, `cuda_driver`, `ray_version`, `python_version`.
 - Add optional run tag support (for example `--tag nightly`, `--tag candidate`) into `results.json`.
 - Add one command to print a compact table from a session (`session_summary.json`) for quick review.
