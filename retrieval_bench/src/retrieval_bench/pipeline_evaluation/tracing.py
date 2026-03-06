@@ -11,9 +11,12 @@ Traces are written as one JSON file per query:
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
+
+logger = logging.getLogger(__name__)
 
 
 def _slugify(value: str) -> str:
@@ -96,6 +99,7 @@ def load_trace_file(path: Path) -> Optional[Dict[str, Any]]:
             return None
         return obj
     except Exception:
+        logger.debug("Failed to load trace file %s", path, exc_info=True)
         return None
 
 
