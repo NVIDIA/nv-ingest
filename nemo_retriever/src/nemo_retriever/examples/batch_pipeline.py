@@ -861,6 +861,10 @@ def main(
         )
         logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
 
+        # TODO: Remove this temp write to file
+        print(ingestor.get_dataset().schema())
+        ingestor.get_dataset().write_parquet("ingest_results.parquet")
+
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
             error_count = int(error_rows.count())
