@@ -1,4 +1,4 @@
-# NeMo Retriever Library — Library Mode Quick Start
+# Quick Start for NeMo Retriever Library (Library Mode)
 
 NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for PDFs that parses document structure—including text, tables, charts, and infographics—creates embeddings, optionally stores them in LanceDB, and performs recall evaluation.
 
