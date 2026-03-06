@@ -85,7 +85,7 @@ This creates a project-local environment and installs the `nemo_retriever` Pytho
 
 5. Run the batch pipeline on PDFs
 
-In this step, you run the end‑to‑end NeMo Retriever Library batch pipeline to ingest a collection of PDFs and generate embeddings for them. Pointing the script at a directory of PDF files lets the pipeline handle parsing, OCR, embedding, optional LanceDB upload, and (if configured) recall evaluation in a single command.
+In this procedure, you run the end‑to‑end NeMo Retriever Library batch pipeline to ingest a collection of PDFs and generate embeddings for them. Pointing the script at a directory of PDF files lets the pipeline handle parsing, OCR, embedding, optional LanceDB upload, and (if configured) recall evaluation in a single command.
 
 Run the batch pipeline script and point it at the directory that contains your PDFs using the following command.
 
