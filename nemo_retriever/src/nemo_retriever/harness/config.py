@@ -144,6 +144,47 @@ def _resolve_path_like(value: str | None, base_path: Path = REPO_ROOT) -> str | 
     return str(p)
 
 
+def _resolve_dataset_dir_path(value: str) -> str:
+    p = Path(value).expanduser()
+    if not p.is_absolute():
+        return str((REPO_ROOT / p).resolve())
+
+    resolved = p.resolve()
+    if resolved.exists():
+        return str(resolved)
+
+    try:
+        relative = resolved.relative_to(Path("/datasets/nv-ingest"))
+    except ValueError:
+        return str(resolved)
+
+    user = os.environ.get("USER")
+    if not user:
+        return str(resolved)
+
+    alternate = (Path("/raid") / user / relative).resolve()
+    if alternate.exists():
+        return str(alternate)
+
+    return str(resolved)
+
+
+def _resolve_query_csv_path(value: str | None, *, config_path: Path) -> str | None:
+    if value is None:
+        return None
+
+    p = Path(value).expanduser()
+    if p.is_absolute():
+        return str(p.resolve())
+
+    resolved_candidates = [(base / p).resolve() for base in (config_path.parent, REPO_ROOT)]
+    for candidate in resolved_candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return str(resolved_candidates[0])
+
+
 def _apply_env_overrides(config_dict: dict[str, Any]) -> None:
     env_map: dict[str, tuple[str, Any]] = {
         "HARNESS_DATASET": ("dataset", str),
@@ -256,8 +297,8 @@ def load_harness_config(
     dataset_dir = merged.get("dataset_dir")
     if dataset_dir is None:
         raise ValueError("dataset is required via active.dataset, --dataset, or sweep run")
-    merged["dataset_dir"] = _resolve_path_like(str(dataset_dir), REPO_ROOT)
-    merged["query_csv"] = _resolve_path_like(merged.get("query_csv"), REPO_ROOT)
+    merged["dataset_dir"] = _resolve_dataset_dir_path(str(dataset_dir))
+    merged["query_csv"] = _resolve_query_csv_path(merged.get("query_csv"), config_path=config_path)
 
     if merged.get("artifacts_dir") is not None:
         merged["artifacts_dir"] = _resolve_path_like(str(merged["artifacts_dir"]), REPO_ROOT)
