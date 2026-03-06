@@ -214,6 +214,7 @@ def pdf_extraction(
             pdf_bytes = row["bytes"] if "bytes" in pdf_binary.columns else None
             pdf_path = row["path"] if "path" in pdf_binary.columns else None
             page_number = int(row["page_number"]) if "page_number" in pdf_binary.columns else 1
+            source_id = row["source_id"] if "source_id" in pdf_binary.columns else None
 
             try:
                 if not isinstance(pdf_bytes, (bytes, bytearray, memoryview)):
@@ -273,6 +274,7 @@ def pdf_extraction(
                     page_record: Dict[str, Any] = {
                         "path": pdf_path,
                         "page_number": page_number,
+                        "source_id": source_id,
                         "text": text if extract_text else "",
                         "page_image": None,
                         "images": [],
