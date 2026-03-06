@@ -16,7 +16,9 @@ To bump a model version, update the corresponding SHA in
 
 from __future__ import annotations
 
-from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 HF_MODEL_REVISIONS: dict[str, str] = {
     "nvidia/llama-3.2-nv-embedqa-1b-v2": "cefc2394cc541737b7867df197984cf23f05367f",
@@ -28,6 +30,28 @@ HF_MODEL_REVISIONS: dict[str, str] = {
 }
 
 
-def get_hf_revision(model_id: str) -> Optional[str]:
-    """Return the pinned commit SHA for *model_id*, or ``None`` if not registered."""
-    return HF_MODEL_REVISIONS.get(model_id)
+def get_hf_revision(model_id: str, *, strict: bool = True) -> str:
+    """Return the pinned commit SHA for *model_id*.
+
+    Parameters
+    ----------
+    model_id:
+        HuggingFace model identifier (e.g. ``"nvidia/parakeet-ctc-1.1b"``).
+    strict:
+        When ``True`` (the default), raise ``ValueError`` if *model_id* has
+        no pinned revision.  When ``False``, log a warning and return
+        ``None`` so that ``from_pretrained`` falls back to the ``main``
+        branch.
+    """
+    revision = HF_MODEL_REVISIONS.get(model_id)
+    if revision is not None:
+        return revision
+
+    msg = (
+        f"No pinned HuggingFace revision for model '{model_id}'. "
+        "Add an entry to HF_MODEL_REVISIONS in hf_model_registry.py to pin it."
+    )
+    if strict:
+        raise ValueError(msg)
+    logger.warning(msg + " Falling back to the default (main) branch.")
+    return None  # type: ignore[return-value]
