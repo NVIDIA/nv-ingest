@@ -16,8 +16,8 @@ From the repo root:
 
 ```bash
 cd /path/to/nv-ingest
-uv venv .retriever
-source .retriever/bin/activate
+uv venv .nr
+source .nr/bin/activate
 uv pip install -e ./nemo_retriever
 ```
 
@@ -52,7 +52,7 @@ uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path
 
 Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. For document-level recall, use `--recall-match-mode pdf_only` with `query,expected_pdf` data. Recall is skipped if the query file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, install the CUDA 13 runtime and set `LD_LIBRARY_PATH` as shown above.
 
-For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
+For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `nr html run --input-dir <dir>` writes `*.html_extraction.json`; then `nr local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `nr local stage6 run --input-dir <dir>`.
 
 ## Harness (run, sweep, nightly)
 
@@ -61,7 +61,7 @@ For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt
 - Config files:
   - `nemo_retriever/harness/test_configs.yaml`
   - `nemo_retriever/harness/nightly_config.yaml`
-- CLI entrypoint is nested under `retriever harness`.
+- CLI entrypoint is nested under `nr harness`.
 - First pass is LanceDB-only and enforces recall-required pass/fail by default.
 - Single-run artifact directories default to `<dataset>_<timestamp>`.
 - Dataset-specific recall adapters are supported via config:
@@ -77,37 +77,37 @@ For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt
 
 ```bash
 # Dataset preset from test_configs.yaml (recall-required example)
-retriever harness run --dataset jp20 --preset single_gpu
+nr harness run --dataset jp20 --preset single_gpu
 
 # Direct dataset path
-retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
+nr harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
 
 # Add repeatable run or session tags for later review
-retriever harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
+nr harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
 ```
 
 ### Sweep runs (explicit runs list)
 
 ```bash
-retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
+nr harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
 ```
 
 ### Nightly session
 
 ```bash
-retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
-retriever harness nightly --dry-run
-retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+nr harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
+nr harness nightly --dry-run
+nr harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
 ```
 
 ### Session inspection
 
 ```bash
 # Print a compact table from a completed sweep/nightly session
-retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
+nr harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
 
 # Compare two session summaries by run name
-retriever harness compare \
+nr harness compare \
   nemo_retriever/artifacts/nightly_20260305_010203_UTC \
   nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```

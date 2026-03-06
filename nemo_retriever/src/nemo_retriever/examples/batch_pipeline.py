@@ -4,7 +4,7 @@
 
 """
 Batch ingestion pipeline with optional recall evaluation.
-Run with: uv run python -m nemo_retriever.examples.batch_pipeline <input-dir>
+Run with: nr batch <input-dir>
 """
 
 import json
@@ -345,7 +345,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     return key, dist
 
 
-@app.command()
+@app.command(name="pipeline")
 def main(
     ctx: typer.Context,
     debug: bool = typer.Option(

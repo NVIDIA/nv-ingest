@@ -24,7 +24,7 @@ def run(
         exists=True,
         file_okay=False,
         dir_okay=True,
-        help="Directory containing `*.text_embeddings.json` files (from `retriever local stage5`).",
+        help="Directory containing `*.text_embeddings.json` files (from `nr local stage5`).",
     ),
     recursive: bool = typer.Option(False, "--recursive/--no-recursive", help="Scan subdirectories too."),
     limit: Optional[int] = typer.Option(None, "--limit", min=1, help="Optionally limit number of input files."),

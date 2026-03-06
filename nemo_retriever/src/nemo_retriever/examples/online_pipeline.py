@@ -7,7 +7,7 @@ Unified ingestion pipeline: inprocess (local) or online (REST API) with optional
 
 - Inprocess: runs the full pipeline locally (no server).
 - Online: submits each document to the online ingest REST service (start with
-  `retriever online serve`). Uses the same LanceDB for recall evaluation.
+  `nr online serve`). Uses the same LanceDB for recall evaluation.
 
 Run with:
   uv run python -m nemo_retriever.examples.online_pipeline <input-dir>
