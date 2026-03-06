@@ -5,6 +5,12 @@ Pipeline evaluation framework for document retrieval.
 This package depends on `vidore-benchmark` for shared framework modules that are
 not vendored in this slim repository snapshot.
 
+## Security note
+
+All model backends load HuggingFace models with `trust_remote_code=True`, which
+executes Python code shipped with the model repository. Only use model IDs from
+sources you trust.
+
 ## Installation
 
 ```bash
