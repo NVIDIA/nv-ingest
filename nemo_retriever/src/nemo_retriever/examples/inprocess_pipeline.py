@@ -96,7 +96,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     return key, dist
 
 
-@app.command()
+@app.command(name="pipeline")
 def main(
     input_path: Path = typer.Argument(
         ...,

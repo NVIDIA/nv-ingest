@@ -86,14 +86,14 @@ def test_ingest_help_lists_batch_and_inprocess() -> None:
 
 
 def test_ingest_batch_help_succeeds() -> None:
-    result = RUNNER.invoke(app, ["ingest", "batch", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "batch", "pipeline", "--help"])
     assert result.exit_code == 0
 
 
 def test_ingest_batch_help_shows_key_options() -> None:
-    result = RUNNER.invoke(app, ["ingest", "batch", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "batch", "pipeline", "--help"])
     for flag in ("--embed-model-name", "--lancedb-uri", "--input-type", "--debug"):
-        assert flag in result.output, f"Expected {flag!r} in batch --help output"
+        assert flag in result.output, f"Expected {flag!r} in batch pipeline --help output"
 
 
 # ---------------------------------------------------------------------------
@@ -102,12 +102,12 @@ def test_ingest_batch_help_shows_key_options() -> None:
 
 
 def test_ingest_inprocess_help_succeeds() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline", "--help"])
     assert result.exit_code == 0
 
 
 def test_ingest_inprocess_help_shows_extract_options() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline", "--help"])
     for flag in (
         "--use-table-structure",
         "--table-output-format",
@@ -115,11 +115,11 @@ def test_ingest_inprocess_help_shows_extract_options() -> None:
         "--page-elements-invoke-url",
         "--ocr-invoke-url",
     ):
-        assert flag in result.output, f"Expected {flag!r} in inprocess --help"
+        assert flag in result.output, f"Expected {flag!r} in inprocess pipeline --help"
 
 
 def test_ingest_inprocess_help_shows_embed_options() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline", "--help"])
     for flag in (
         "--embed-model-name",
         "--embed-invoke-url",
@@ -128,26 +128,26 @@ def test_ingest_inprocess_help_shows_embed_options() -> None:
         "--text-elements-modality",
         "--structured-elements-modality",
     ):
-        assert flag in result.output, f"Expected {flag!r} in inprocess --help"
+        assert flag in result.output, f"Expected {flag!r} in inprocess pipeline --help"
 
 
 def test_ingest_inprocess_help_shows_execution_options() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline", "--help"])
     for flag in ("--max-workers", "--gpu-devices", "--num-gpus"):
-        assert flag in result.output, f"Expected {flag!r} in inprocess --help"
+        assert flag in result.output, f"Expected {flag!r} in inprocess pipeline --help"
 
 
 def test_ingest_inprocess_help_shows_recall_options() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess", "--help"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline", "--help"])
     for flag in ("--query-csv", "--no-recall-details"):
-        assert flag in result.output, f"Expected {flag!r} in inprocess --help"
+        assert flag in result.output, f"Expected {flag!r} in inprocess pipeline --help"
 
 
 # ---------------------------------------------------------------------------
-# ``nr ingest inprocess`` subcommand – argument validation
+# ``nr ingest inprocess pipeline`` – argument validation
 # ---------------------------------------------------------------------------
 
 
 def test_ingest_inprocess_rejects_missing_path() -> None:
-    result = RUNNER.invoke(app, ["ingest", "inprocess"])
+    result = RUNNER.invoke(app, ["ingest", "inprocess", "pipeline"])
     assert result.exit_code != 0
