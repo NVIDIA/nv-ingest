@@ -573,9 +573,10 @@ class BatchIngestor(Ingestor):
                 num_cpus=1,
                 num_gpus=self._requested_plan.get_page_elements_gpus_per_actor(),
                 compute=rd.ActorPoolStrategy(
-                    initial_size=self._requested_plan.get_page_elements_initial_actors(),
-                    min_size=self._requested_plan.get_page_elements_min_actors(),
-                    max_size=self._requested_plan.get_page_elements_max_actors(),
+                    # initial_size=self._requested_plan.get_page_elements_initial_actors(),
+                    # min_size=self._requested_plan.get_page_elements_min_actors(),
+                    # max_size=self._requested_plan.get_page_elements_max_actors(),
+                    size=6,
                 ),
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
