@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from nemo_retriever.params import TextChunkParams
 
-DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-nemotron-embed-1b-v2"
 DEFAULT_MAX_TOKENS = 512
 DEFAULT_OVERLAP_TOKENS = 0
 

@@ -341,7 +341,7 @@ class TestYoloxPageElementsV3Interface(unittest.TestCase):
 
     def test_postprocess_annotations_v2_fallback_path_is_taken(self):
         # A v2-configured interface should use the legacy expansion functions.
-        model_v2 = YoloxPageElementsModelInterface(version="nemoretriever-page-elements-v2")
+        model_v2 = YoloxPageElementsModelInterface(version="nemotron-page-elements-v3")
         model_v2.transform_normalized_coordinates_to_original = MagicMock(side_effect=lambda x, y: x)
         v2_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
 

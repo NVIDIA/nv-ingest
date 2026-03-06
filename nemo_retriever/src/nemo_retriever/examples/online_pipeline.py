@@ -219,7 +219,7 @@ def main(
     cfg = RecallConfig(
         lancedb_uri=str(LANCEDB_URI),
         lancedb_table=str(LANCEDB_TABLE),
-        embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model="nvidia/llama-nemotron-embed-1b-v2",
         top_k=10,
         ks=(1, 5, 10),
     )

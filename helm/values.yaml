@@ -121,17 +121,17 @@ tmpDirSize: 50Gi
 ## @param envVars.NEMOTRON_PARSE_HTTP_ENDPOINT [default: "http://nemotron-parse:8000/v1/chat/completions"] HTTP endpoint for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_INFER_PROTOCOL [default: "http"] Protocol for Nemotron Parse service
 ## @param envVars.NEMOTRON_PARSE_MODEL_NAME [default: "nvidia/nemotron-parse"] Model name for Nemotron Parse
-## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
-## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v3:8000/v1/infer"] HTTP endpoint for YOLOX page elements
+## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemotron-page-elements-v3:8001"] gRPC endpoint for YOLOX page elements
+## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemotron-page-elements-v3:8000/v1/infer"] HTTP endpoint for YOLOX page elements
 ## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"] gRPC endpoint for YOLOX graphic elements
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"] HTTP endpoint for YOLOX graphic elements
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemotron-graphic-elements-v1:8001"] gRPC endpoint for YOLOX graphic elements
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemotron-graphic-elements-v1:8000/v1/infer"] HTTP endpoint for YOLOX graphic elements
 ## @param envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX graphic elements
-## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"] gRPC endpoint for YOLOX table structure
-## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"] HTTP endpoint for YOLOX table structure
+## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemotron-table-structure-v1:8001"] gRPC endpoint for YOLOX table structure
+## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemotron-table-structure-v1:8000/v1/infer"] HTTP endpoint for YOLOX table structure
 ## @param envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX table structure
 ## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"] Endpoint for embedding service
-## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for embedding service
+## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-nemotron-embed-1b-v2"] Model name for embedding service
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://integrate.api.nvidia.com/v1/chat/completions"] Endpoint for VLM caption service
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/nemotron-nano-12b-v2-vl"] Model name for VLM caption service
@@ -171,27 +171,27 @@ envVars:
   AUDIO_INFER_PROTOCOL: "grpc"
 
   EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
-  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-nemotron-embed-1b-v2"
 
   NEMOTRON_PARSE_HTTP_ENDPOINT: http://nemotron-parse:8000/v1/chat/completions
   NEMOTRON_PARSE_INFER_PROTOCOL: http
   NEMOTRON_PARSE_MODEL_NAME: nvidia/nemotron-parse
 
   YOLOX_PAGE_IMAGE_FORMAT: JPEG
-  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v3:8001
-  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v3:8000/v1/infer
+  YOLOX_GRPC_ENDPOINT: nemotron-page-elements-v3:8001
+  YOLOX_HTTP_ENDPOINT: http://nemotron-page-elements-v3:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
 
-  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
-  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
+  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemotron-graphic-elements-v1:8001
+  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemotron-graphic-elements-v1:8000/v1/infer
   YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: grpc
 
-  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
-  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
+  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemotron-table-structure-v1:8001
+  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemotron-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
 
-  OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
-  OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
+  OCR_GRPC_ENDPOINT: nemotron-ocr-v1:8001
+  OCR_HTTP_ENDPOINT: http://nemotron-ocr-v1:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
   OCR_MODEL_NAME: scene_text_ensemble
 
@@ -641,7 +641,7 @@ nimOperator:
   page_elements:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v3
+      repository: nvcr.io/nim/nvidia/nemotron-page-elements-v3
       tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
@@ -706,7 +706,7 @@ nimOperator:
   graphic_elements:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
+      repository: nvcr.io/nim/nvidia/nemotron-graphic-elements-v1
       tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
@@ -752,7 +752,7 @@ nimOperator:
   table_structure:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
+      repository: nvcr.io/nim/nvidia/nemotron-table-structure-v1
       tag: 1.8.0
       pullPolicy: IfNotPresent
       pullSecrets:
@@ -840,7 +840,7 @@ nimOperator:
   nemoretriever_ocr_v1:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
+      repository: nvcr.io/nim/nvidia/nemotron-ocr-v1
       tag: 1.2.1
       pullPolicy: IfNotPresent
       pullSecrets:

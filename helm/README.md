@@ -299,7 +299,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://llama-32-nv-embedqa-1b-v2:8000/v1"` |  |
-| envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-nemotron-embed-1b-v2"` |  |
 | envVars.IMAGE_STORAGE_PUBLIC_BASE_URL | string | `""` |  |
 | envVars.IMAGE_STORAGE_URI | string | `"s3://nv-ingest/artifacts/store/images"` |  |
 | envVars.INGEST_DISABLE_DYNAMIC_SCALING | bool | `true` |  |
@@ -321,8 +321,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.NEMOTRON_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NEMOTRON_PARSE_MODEL_NAME | string | `"nvidia/nemotron-parse"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
-| envVars.OCR_GRPC_ENDPOINT | string | `"nemoretriever-ocr-v1:8001"` |  |
-| envVars.OCR_HTTP_ENDPOINT | string | `"http://nemoretriever-ocr-v1:8000/v1/infer"` |  |
+| envVars.OCR_GRPC_ENDPOINT | string | `"nemotron-ocr-v1:8001"` |  |
+| envVars.OCR_HTTP_ENDPOINT | string | `"http://nemotron-ocr-v1:8000/v1/infer"` |  |
 | envVars.OCR_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.OCR_MODEL_NAME | string | `"scene_text_ensemble"` |  |
 | envVars.OMP_NUM_THREADS | int | `1` |  |
@@ -330,15 +330,15 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/nemotron-nano-12b-v2-vl"` |  |
 | envVars.VLM_CAPTION_PROMPT | string | `"Caption the content of this image:"` |  |
 | envVars.VLM_CAPTION_SYSTEM_PROMPT | string | `"/no_think"` |  |
-| envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
-| envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
+| envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemotron-graphic-elements-v1:8001"` |  |
+| envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemotron-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |
-| envVars.YOLOX_GRPC_ENDPOINT | string | `"nemoretriever-page-elements-v3:8001"` |  |
-| envVars.YOLOX_HTTP_ENDPOINT | string | `"http://nemoretriever-page-elements-v3:8000/v1/infer"` |  |
+| envVars.YOLOX_GRPC_ENDPOINT | string | `"nemotron-page-elements-v3:8001"` |  |
+| envVars.YOLOX_HTTP_ENDPOINT | string | `"http://nemotron-page-elements-v3:8000/v1/infer"` |  |
 | envVars.YOLOX_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.YOLOX_PAGE_IMAGE_FORMAT | string | `"JPEG"` |  |
-| envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT | string | `"nemoretriever-table-structure-v1:8001"` |  |
-| envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT | string | `"http://nemoretriever-table-structure-v1:8000/v1/infer"` |  |
+| envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT | string | `"nemotron-table-structure-v1:8001"` |  |
+| envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT | string | `"http://nemotron-table-structure-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL | string | `"grpc"` |  |
 | extraEnvVarsCM | string | `""` |  |
 | extraEnvVarsSecret | string | `""` |  |
@@ -432,7 +432,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.embedqa.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.embedqa.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.embedqa.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.embedqa.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| nimOperator.embedqa.image.repository | string | `"nvcr.io/nim/nvidia/llama-nemotron-embed-1b-v2"` |  |
 | nimOperator.embedqa.image.tag | string | `"1.10.1"` |  |
 | nimOperator.embedqa.replicas | int | `1` |  |
 | nimOperator.embedqa.resources.limits."nvidia.com/gpu" | int | `1` |  |
@@ -458,7 +458,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.graphic_elements.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.graphic_elements.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.graphic_elements.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.graphic_elements.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1"` |  |
+| nimOperator.graphic_elements.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-graphic-elements-v1"` |  |
 | nimOperator.graphic_elements.image.tag | string | `"1.6.0"` |  |
 | nimOperator.graphic_elements.replicas | int | `1` |  |
 | nimOperator.graphic_elements.resources.limits."nvidia.com/gpu" | int | `1` |  |
@@ -473,7 +473,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2"` |  |
+| nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.tag | string | `"1.8.0"` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.replicas | int | `1` |  |
 | nimOperator.llama_3_2_nv_rerankqa_1b_v2.resources.limits."nvidia.com/gpu" | int | `1` |  |
@@ -501,7 +501,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemoretriever_ocr_v1.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.nemoretriever_ocr_v1.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1"` |  |
+| nimOperator.nemoretriever_ocr_v1.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemotron-ocr-v1"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.tag | string | `"1.1.0"` |  |
 | nimOperator.nemoretriever_ocr_v1.replicas | int | `1` |  |
 | nimOperator.nemoretriever_ocr_v1.resources.limits."nvidia.com/gpu" | int | `1` |  |
@@ -585,7 +585,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.page_elements.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.page_elements.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.page_elements.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.page_elements.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v3"` |  |
+| nimOperator.page_elements.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-page-elements-v3"` |  |
 | nimOperator.page_elements.image.tag | string | `"1.7.0"` |  |
 | nimOperator.page_elements.replicas | int | `1` |  |
 | nimOperator.page_elements.resources.limits."nvidia.com/gpu" | int | `1` |  |
@@ -611,7 +611,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.table_structure.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.table_structure.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.table_structure.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.table_structure.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-table-structure-v1"` |  |
+| nimOperator.table_structure.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-table-structure-v1"` |  |
 | nimOperator.table_structure.image.tag | string | `"1.6.0"` |  |
 | nimOperator.table_structure.replicas | int | `1` |  |
 | nimOperator.table_structure.resources.limits."nvidia.com/gpu" | int | `1` |  |
