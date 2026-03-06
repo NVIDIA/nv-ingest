@@ -562,7 +562,9 @@ def ocr_page_elements(
                     ml = "word" if label_name == "table" else "paragraph"
                     local_jobs[ml].append((label_name, bbox, crop_array))
 
-                def _append_local_result(label_name: str, bbox: List[float], preds: Any, crop_hw: Tuple[int, int] = (0, 0)) -> None:
+                def _append_local_result(
+                    label_name: str, bbox: List[float], preds: Any, crop_hw: Tuple[int, int] = (0, 0)
+                ) -> None:
                     if label_name == "chart" and use_graphic_elements:
                         ge_dets = _find_ge_detections_for_bbox(row, bbox)
                         if ge_dets:
@@ -601,11 +603,15 @@ def ocr_page_elements(
 
                         if isinstance(batch_preds, list) and len(batch_preds) == len(batch_jobs):
                             for (label_name, bbox, crop_array), preds in zip(batch_jobs, batch_preds):
-                                _append_local_result(label_name, bbox, preds, crop_hw=(crop_array.shape[0], crop_array.shape[1]))
+                                _append_local_result(
+                                    label_name, bbox, preds, crop_hw=(crop_array.shape[0], crop_array.shape[1])
+                                )
                         else:
                             for label_name, bbox, crop_array in batch_jobs:
                                 preds = model.invoke(crop_array, merge_level=ml)
-                                _append_local_result(label_name, bbox, preds, crop_hw=(crop_array.shape[0], crop_array.shape[1]))
+                                _append_local_result(
+                                    label_name, bbox, preds, crop_hw=(crop_array.shape[0], crop_array.shape[1])
+                                )
 
         except BaseException as e:
             print(f"Warning: OCR failed: {type(e).__name__}: {e}")
