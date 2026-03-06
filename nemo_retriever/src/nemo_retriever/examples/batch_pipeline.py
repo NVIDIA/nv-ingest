@@ -12,7 +12,6 @@ import logging
 import os
 import sys
 import time
-from collections import defaultdict
 from importlib import import_module
 from pathlib import Path
 from typing import Optional, TextIO
@@ -116,107 +115,16 @@ def _to_int(value: object, default: int = 0) -> int:
 
 
 def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
-    """
-    Collect per-model detection totals deduped by (source_id, page_number).
+    """Collect per-model detection totals deduped by (source_id, page_number)."""
+    from nemo_retriever.utils.detection_summary import collect_detection_summary_from_lancedb
 
-    Counts are read from LanceDB row `metadata`, which is populated during batch
-    ingestion by the Ray write stage.
-    """
-    try:
-        db = _lancedb().connect(uri)
-        table = db.open_table(table_name)
-        df = table.to_pandas()[["source_id", "page_number", "metadata"]]
-    except Exception:
-        return None
-
-    # Deduplicate exploded rows by page key; keep max per-page counts.
-    per_page: dict[tuple[str, int], dict] = {}
-    for row in df.itertuples(index=False):
-        source_id = str(getattr(row, "source_id", "") or "")
-        page_number = _to_int(getattr(row, "page_number", -1), default=-1)
-        key = (source_id, page_number)
-
-        raw_metadata = getattr(row, "metadata", None)
-        meta: dict = {}
-        if isinstance(raw_metadata, str) and raw_metadata.strip():
-            try:
-                parsed = json.loads(raw_metadata)
-                if isinstance(parsed, dict):
-                    meta = parsed
-            except Exception:
-                meta = {}
-
-        entry = per_page.setdefault(
-            key,
-            {
-                "page_elements_total": 0,
-                "ocr_table_total": 0,
-                "ocr_chart_total": 0,
-                "ocr_infographic_total": 0,
-                "page_elements_by_label": defaultdict(int),
-            },
-        )
-
-        pe_total = _to_int(meta.get("page_elements_v3_num_detections"), default=0)
-        entry["page_elements_total"] = max(entry["page_elements_total"], pe_total)
-
-        ocr_table = _to_int(meta.get("ocr_table_detections"), default=0)
-        ocr_chart = _to_int(meta.get("ocr_chart_detections"), default=0)
-        ocr_infographic = _to_int(meta.get("ocr_infographic_detections"), default=0)
-        entry["ocr_table_total"] = max(entry["ocr_table_total"], ocr_table)
-        entry["ocr_chart_total"] = max(entry["ocr_chart_total"], ocr_chart)
-        entry["ocr_infographic_total"] = max(entry["ocr_infographic_total"], ocr_infographic)
-
-        label_counts = meta.get("page_elements_v3_counts_by_label")
-        if isinstance(label_counts, dict):
-            for label, count in label_counts.items():
-                if not isinstance(label, str):
-                    continue
-                entry["page_elements_by_label"][label] = max(
-                    entry["page_elements_by_label"][label],
-                    _to_int(count, default=0),
-                )
-
-    pe_by_label_totals: dict[str, int] = defaultdict(int)
-    page_elements_total = 0
-    ocr_table_total = 0
-    ocr_chart_total = 0
-    ocr_infographic_total = 0
-    for page_entry in per_page.values():
-        page_elements_total += int(page_entry["page_elements_total"])
-        ocr_table_total += int(page_entry["ocr_table_total"])
-        ocr_chart_total += int(page_entry["ocr_chart_total"])
-        ocr_infographic_total += int(page_entry["ocr_infographic_total"])
-        for label, count in page_entry["page_elements_by_label"].items():
-            pe_by_label_totals[label] += int(count)
-
-    return {
-        "pages_seen": int(len(per_page)),
-        "page_elements_v3_total_detections": int(page_elements_total),
-        "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
-        "ocr_table_total_detections": int(ocr_table_total),
-        "ocr_chart_total_detections": int(ocr_chart_total),
-        "ocr_infographic_total_detections": int(ocr_infographic_total),
-    }
+    return collect_detection_summary_from_lancedb(uri, table_name)
 
 
 def _print_detection_summary(summary: Optional[dict]) -> None:
-    if summary is None:
-        print("Detection summary: unavailable (could not read LanceDB metadata).")
-        return
-    print("\nDetection summary (deduped by source_id/page_number):")
-    print(f"  Pages seen: {summary['pages_seen']}")
-    print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
-    print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
-    print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
-    print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
-    print("  PageElements v3 counts by label:")
-    by_label = summary.get("page_elements_v3_counts_by_label") or {}
-    if not by_label:
-        print("    (none)")
-    else:
-        for label, count in by_label.items():
-            print(f"    {label}: {count}")
+    from nemo_retriever.utils.detection_summary import print_detection_summary
+
+    print_detection_summary(summary)
 
 
 def _extract_error_payloads(v: object) -> list[object]:

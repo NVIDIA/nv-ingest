@@ -907,105 +907,16 @@ def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
 
 
 def _collect_summary_from_df(df: pd.DataFrame) -> dict:
-    """Compute detection summary from a result DataFrame.
+    """Compute detection summary from a result DataFrame."""
+    from nemo_retriever.utils.detection_summary import collect_detection_summary_from_df
 
-    Mirrors the batch pipeline's ``_collect_detection_summary`` but reads
-    directly from the in-memory DataFrame instead of LanceDB.  Rows are
-    deduplicated by ``(path, page_number)`` so exploded content rows don't
-    inflate counts.
-    """
-    per_page: dict[tuple, dict] = {}
-
-    for _, row in df.iterrows():
-        row_dict = row.to_dict()
-
-        path = str(row_dict.get("path") or row_dict.get("source_id") or "")
-        page_number = -1
-        try:
-            page_number = int(row_dict.get("page_number", -1))
-        except (TypeError, ValueError):
-            pass
-
-        key = (path, page_number)
-
-        meta = row_dict.get("metadata")
-        if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except Exception:
-                meta = {}
-        if not isinstance(meta, dict):
-            meta = {}
-
-        entry = per_page.setdefault(
-            key,
-            {
-                "pe": 0,
-                "ocr_table": 0,
-                "ocr_chart": 0,
-                "ocr_infographic": 0,
-                "pe_by_label": defaultdict(int),
-            },
-        )
-
-        # Check metadata first, then fall back to direct DataFrame columns.
-        # The batch pipeline stores these inside the metadata JSON, but the
-        # inprocess pipeline keeps them as top-level DataFrame columns.
-        try:
-            pe = int(
-                meta.get("page_elements_v3_num_detections") or row_dict.get("page_elements_v3_num_detections") or 0
-            )
-        except (TypeError, ValueError):
-            pe = 0
-        entry["pe"] = max(entry["pe"], pe)
-
-        for field, meta_key, col_key in [
-            ("ocr_table", "ocr_table_detections", "table"),
-            ("ocr_chart", "ocr_chart_detections", "chart"),
-            ("ocr_infographic", "ocr_infographic_detections", "infographic"),
-        ]:
-            try:
-                val = int(meta.get(meta_key, 0) or 0)
-            except (TypeError, ValueError):
-                val = 0
-            # Fall back to counting direct list columns (e.g. row["table"]).
-            if val == 0:
-                col_val = row_dict.get(col_key)
-                if isinstance(col_val, list):
-                    val = len(col_val)
-            entry[field] = max(entry[field], val)
-
-        label_counts = meta.get("page_elements_v3_counts_by_label") or row_dict.get("page_elements_v3_counts_by_label")
-        if isinstance(label_counts, dict):
-            for label, count in label_counts.items():
-                try:
-                    c = int(count or 0)
-                except (TypeError, ValueError):
-                    c = 0
-                entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
-
-    pe_by_label_totals: dict[str, int] = defaultdict(int)
-    pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
-    for e in per_page.values():
-        pe_total += e["pe"]
-        ocr_table_total += e["ocr_table"]
-        ocr_chart_total += e["ocr_chart"]
-        ocr_infographic_total += e["ocr_infographic"]
-        for label, count in e["pe_by_label"].items():
-            pe_by_label_totals[label] += count
-
-    return {
-        "pages_seen": len(per_page),
-        "page_elements_v3_total_detections": pe_total,
-        "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
-        "ocr_table_total_detections": ocr_table_total,
-        "ocr_chart_total_detections": ocr_chart_total,
-        "ocr_infographic_total_detections": ocr_infographic_total,
-    }
+    return collect_detection_summary_from_df(df)
 
 
 def _print_ingest_summary(results: list, elapsed_s: float) -> None:
     """Print end-of-ingest summary matching batch pipeline output format."""
+    from nemo_retriever.utils.detection_summary import print_detection_summary
+
     dfs = [r for r in results if isinstance(r, pd.DataFrame) and not r.empty]
     if not dfs:
         print(f"\nIngest time: {elapsed_s:.2f}s (no documents processed)")
@@ -1013,20 +924,7 @@ def _print_ingest_summary(results: list, elapsed_s: float) -> None:
 
     combined = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
     summary = _collect_summary_from_df(combined)
-
-    print("\nDetection summary (deduped by source/page_number):")
-    print(f"  Pages seen: {summary['pages_seen']}")
-    print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
-    print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
-    print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
-    print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
-    print("  PageElements v3 counts by label:")
-    by_label = summary.get("page_elements_v3_counts_by_label", {})
-    if not by_label:
-        print("    (none)")
-    else:
-        for label, count in by_label.items():
-            print(f"    {label}: {count}")
+    print_detection_summary(summary)
 
     pages = summary["pages_seen"]
     if elapsed_s > 0 and pages > 0:
