@@ -2,6 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .__main__ import app, main
+from .cli import app, main
 
 __all__ = ["app", "main"]
