@@ -153,7 +153,7 @@ def split_pdf_batch(pdf_batch: Any, params: PdfSplitParams | None = None) -> pd.
                         "bytes": pages[page_idx],
                         "path": pdf_path,
                         "page_number": page_idx + 1,
-                        "metadata": {"source_path": pdf_path},
+                        "metadata": {"source_path": pdf_path, "source_id": f"{pdf_path}_{page_idx + 1}"},
                     }
                 )
         except BaseException as e:
