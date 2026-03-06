@@ -20,6 +20,7 @@ from typing import List, Optional
 import numpy as np
 
 from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
+from nemo_retriever.utils.hf_model_registry import get_hf_revision
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +95,14 @@ def _load_model_and_processor(model_id: str, hf_cache_dir: Optional[str] = None)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     hf_cache_dir = configure_global_hf_cache_base(hf_cache_dir)
+    _revision = get_hf_revision(model_id)
     kwargs = {}
     if hf_cache_dir:
         kwargs["cache_dir"] = hf_cache_dir
-    processor = AutoProcessor.from_pretrained(model_id, **kwargs)
-    model = AutoModelForCTC.from_pretrained(model_id, torch_dtype="auto", device_map=device, **kwargs)
+    processor = AutoProcessor.from_pretrained(model_id, revision=_revision, **kwargs)
+    model = AutoModelForCTC.from_pretrained(
+        model_id, revision=_revision, torch_dtype="auto", device_map=device, **kwargs
+    )
     return model, processor
 
 
