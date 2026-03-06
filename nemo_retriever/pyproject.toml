@@ -58,7 +58,7 @@ dependencies = [
   "nemotron-page-elements-v3>=0.dev0",
   "nemotron-graphic-elements-v1>=0.dev0",
   "nemotron-table-structure-v1>=0.dev0",
-  "nemoretriever-ocr>=0.dev0",
+  "nemotron-ocr>=0.dev0",
   "markitdown",
   "timm==1.0.22",
   "accelerate==1.12.0",
@@ -89,7 +89,7 @@ nv-ingest-client = { path = "../client/", editable = true }
 nemotron-page-elements-v3 = { index = "test-pypi" }
 nemotron-graphic-elements-v1 = { index = "test-pypi" }
 nemotron-table-structure-v1 = { index = "test-pypi" }
-nemoretriever-ocr = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
 torch = { index = "torch-cuda"}
 torchvision = { index ="torch-cuda"}
 

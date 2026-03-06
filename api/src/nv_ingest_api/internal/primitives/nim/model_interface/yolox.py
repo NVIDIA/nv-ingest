@@ -2144,7 +2144,6 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
             "yolox-page-elements",
             "page-elements",
             "nemotron-page-elements-v3",
-            "nemotron-page-elements-v3",
             "nemoretriever-page-elements-v3",
             "nemoretriever-page-elements-v2",
         ):
