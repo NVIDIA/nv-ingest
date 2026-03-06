@@ -113,7 +113,7 @@ By doing this the pipeline connects to the running Ray deployment instead of sta
 
 ## 7. Ingest HTML or plain text instead of PDFs
 
-If your content isn’t stored as PDFs, you can point the same NeMo Retriever Library batch pipeline at directories of HTML or plain text files instead. 
+If your documents aren't stored as PDFs, you can point the same NeMo Retriever Library batch pipeline to directories of HTML or plain text files instead. 
 
 In this step, you either pass an input‑type flag to the batch example for a simple one‑shot run, or use a staged HTML CLI flow for more control over each phase of ingestion.
 
