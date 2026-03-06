@@ -4,7 +4,18 @@ import time
 
 from transformers import AutoTokenizer
 
-from nemo_retriever.utils.hf_model_registry import get_hf_revision
+try:
+    from nemo_retriever.utils.hf_model_registry import get_hf_revision
+except ModuleNotFoundError:
+    # Fallback for Docker build stages where nemo_retriever isn't installed yet.
+    _REVISIONS = {
+        "meta-llama/Llama-3.2-1B": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+        "intfloat/e5-large-unsupervised": "15af9288f69a6291f37bfb89b47e71abc747b206",
+    }
+
+    def get_hf_revision(model_id):  # type: ignore[misc]
+        return _REVISIONS.get(model_id)
+
 
 MAX_RETRIES = 5
 
