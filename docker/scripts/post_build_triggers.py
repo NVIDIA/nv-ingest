@@ -4,6 +4,8 @@ import time
 
 from transformers import AutoTokenizer
 
+from nemo_retriever.utils.hf_model_registry import get_hf_revision
+
 MAX_RETRIES = 5
 
 
@@ -12,7 +14,7 @@ def download_tokenizer(model_name, save_path, token=None):
 
     for attempt in range(MAX_RETRIES):
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, revision=get_hf_revision(model_name), token=token)
             tokenizer.save_pretrained(save_path)
             return
         except Exception as e:
