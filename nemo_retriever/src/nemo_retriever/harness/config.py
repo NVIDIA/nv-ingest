@@ -53,7 +53,7 @@ class HarnessConfig:
     ray_address: str | None = None
     lancedb_uri: str = "lancedb"
     hybrid: bool = False
-    embed_model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    embed_model_name: str = "nvidia/llama-nemotron-embed-1b-v2"
     write_detection_file: bool = False
 
     pdf_extract_workers: int = 8

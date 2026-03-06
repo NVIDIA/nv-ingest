@@ -150,7 +150,7 @@ def main(
         help="Optional remote endpoint URL for embedding model inference.",
     ),
     embed_model_name: str = typer.Option(
-        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "nvidia/llama-nemotron-embed-1b-v2",
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),

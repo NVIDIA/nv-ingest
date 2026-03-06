@@ -15,7 +15,7 @@ class Retriever:
 
     lancedb_uri: str = "lancedb"
     lancedb_table: str = "nv-ingest"
-    embedder: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    embedder: str = "nvidia/llama-nemotron-embed-1b-v2"
     embedding_http_endpoint: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embedding_api_key: str = ""

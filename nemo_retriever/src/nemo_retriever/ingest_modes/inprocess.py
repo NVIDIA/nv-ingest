@@ -333,7 +333,7 @@ def _embed_group(
         truncate="END",
         dimensions=None,
         embedding_nim_endpoint=endpoint or "http://localhost:8012/v1",
-        embedding_model=resolved_model_name or "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        embedding_model=resolved_model_name or "nvidia/llama-nemotron-embed-1b-v2",
         embed_modality=group_modality,
     )
 
