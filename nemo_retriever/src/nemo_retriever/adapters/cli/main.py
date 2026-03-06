@@ -14,7 +14,7 @@ from nemo_retriever.utils.compare import app as compare_app
 from nemo_retriever.harness import app as harness_app
 from nemo_retriever.html import __main__ as html_main
 from nemo_retriever.utils.image import app as image_app
-from nemo_retriever.ingest_modes.inprocess_cli import app as inprocess_app
+from nemo_retriever.examples.inprocess_pipeline import app as inprocess_app
 from nemo_retriever.local import app as local_app
 from nemo_retriever.online import __main__ as online_main
 from nemo_retriever.pdf import app as pdf_app

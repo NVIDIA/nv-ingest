@@ -69,6 +69,7 @@ dependencies = [
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
   "nvidia-ml-py",
+  "pytest"
 ]
 
 [project.optional-dependencies]

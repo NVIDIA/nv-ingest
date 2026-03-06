@@ -4,7 +4,7 @@
 
 """
 In-process ingestion pipeline (no Ray) with optional recall evaluation.
-Run with: uv run python -m nemo_retriever.examples.inprocess_pipeline <input-dir>
+Run with: nr ingest inprocess <input-dir>
 """
 
 import json
