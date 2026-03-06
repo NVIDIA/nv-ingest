@@ -37,7 +37,7 @@ uv pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.o
 ```
 This creates a dedicated Python environment and installs the `nemo-retriever` PyPI package, the canonical distribution for the NeMo Retriever Library.
 
-## 3. Install NeMo Retriever Library (nightly) and dependencies
+## 3. Install NeMo Retriever Library and Dependencies
 
 Install the latest nightly builds of the NeMo Retriever Library so you can test the most recent features and fixes before they are rolled into a stable release. 
 
