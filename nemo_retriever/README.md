@@ -2,7 +2,7 @@
 
 NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for documents that can parse text, tables, charts, and infographics. NeMo Retriever Library parses documents, creates embeddings, optionally stores embeddings in LanceDB, and performs recall evaluation.
 
-This quick start guide shows how to run NeMo Retriever in **library mode**, directly from your application, without Docker. In library mode, NeMo Retriever Library supports two deployment options:
+This quick start guide shows how to run NeMo Retriever in library mode, directly from your application, without Docker. In library mode, NeMo Retriever Library supports two deployment options:
 - Load Hugging Face models locally on your GPU.
 - Use locally deployed NeMo Retriever NIM endpoints for embedding and OCR.
 
