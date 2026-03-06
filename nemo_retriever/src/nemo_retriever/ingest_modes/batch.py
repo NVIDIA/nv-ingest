@@ -29,6 +29,7 @@ from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
+from nemo_retriever.utils.hf_cache import resolve_hf_cache_dir
 from nemo_retriever.utils.ray_resource_hueristics import (
     gather_cluster_resources,
     resolve_requested_plan,
@@ -299,17 +300,17 @@ class BatchIngestor(Ingestor):
         if self._debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
+        runtime_env_vars = {
+            "LOG_LEVEL": "INFO",
+            "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
+        }
+
         # Initialize Ray for distributed execution.
         ray.init(
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={
-                "env_vars": {
-                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
-                    "LOG_LEVEL": "INFO",
-                }
-            },
+            runtime_env={"env_vars": runtime_env_vars},
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
