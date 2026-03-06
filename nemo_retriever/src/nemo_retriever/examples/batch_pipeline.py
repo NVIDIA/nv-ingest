@@ -851,13 +851,14 @@ def main(
                 )
             )
             .get_dataset()
+            .group_by("source_id")
             .materialize()
         )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        num_rows = ingest_results.group_by("source_id").count()
+        num_rows = ingest_results.count()
         logger.info(
-            f"Ingestion complete. {num_rows} rows procesed in "
+            f"Ingestion complete. {num_rows} rows processed in "
             f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
         )
         logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")

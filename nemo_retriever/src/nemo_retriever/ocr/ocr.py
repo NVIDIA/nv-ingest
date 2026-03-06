@@ -500,8 +500,10 @@ def ocr_page_elements(
                         elif label_name == "infographic":
                             infographic_items.append(entry)
             else:
-                if inference_batch_size is not None or inference_batch_size < 1:
-                    raise ValueError("inference_batch_size must be set and greater than 0")
+                if inference_batch_size is None or inference_batch_size < 1:
+                    raise ValueError(
+                        f"inference_batch_size must be set and greater than 0. Value: {inference_batch_size}"
+                    )
 
                 local_batch_size = max(1, int(inference_batch_size))
 
