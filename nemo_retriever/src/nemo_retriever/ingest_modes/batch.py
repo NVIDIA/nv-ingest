@@ -609,7 +609,11 @@ class BatchIngestor(Ingestor):
                     ge_kwargs["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
                 if "ocr_api_key" in kwargs:
                     ge_kwargs["api_key"] = kwargs["ocr_api_key"]
-                ge_gpu = 0.0 if (ge_invoke_url and ocr_invoke_url_for_ge) else self._requested_plan.get_page_elements_gpus_per_actor()
+                ge_gpu = (
+                    0.0
+                    if (ge_invoke_url and ocr_invoke_url_for_ge)
+                    else self._requested_plan.get_page_elements_gpus_per_actor()
+                )
                 self._rd_dataset = self._rd_dataset.map_batches(
                     ChartGraphicElementsOCRActor,
                     batch_size=self._requested_plan.get_page_elements_batch_size(),
