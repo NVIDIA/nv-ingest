@@ -855,11 +855,11 @@ def main(
         )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
+        num_rows = ingest_results.groupby("source_id").count().count()
         logger.info(
-            f"Ingestion complete. {len(ingest_results)} rows procesed in "
-            f"{ingest_elapsed_s:.2f} seconds. {len(ingest_results)/ingest_elapsed_s:.2f} PPS"
+            f"Ingestion complete. {num_rows} rows procesed in "
+            f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
         )
-        logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
