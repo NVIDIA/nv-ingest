@@ -548,6 +548,7 @@ def ocr_page_elements(
     for meta in all_ocr_meta:
         meta["timing"] = {"seconds": float(elapsed)}
 
+    # TODO: Is this actually a necessary copy?
     out = batch_df.copy()
     # Only overwrite content columns that this call is responsible for.
     # When extract_tables=False, preserve any existing `table` column
