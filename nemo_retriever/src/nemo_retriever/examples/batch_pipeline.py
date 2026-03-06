@@ -257,26 +257,15 @@ def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
     target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
-    if ingest_elapsed_s <= 0:
-        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
-        return
-    if processed_pages is None:
-        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
-        return
-
-    pps = processed_pages / ingest_elapsed_s
-    print(f"Pages processed: {processed_pages}")
-    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
 
 
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
-    """
-    Ensure the local LanceDB URI exists and table can be opened.
+    """Ensure the local LanceDB URI exists and table can be opened.
 
     Creates an empty table with the expected schema if it does not exist yet.
     """
-    # Local path URI in this pipeline.
+    from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+
     Path(uri).mkdir(parents=True, exist_ok=True)
 
     db = _lancedb().connect(uri)
@@ -288,61 +277,9 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
 
     import pyarrow as pa  # type: ignore
 
-    schema = pa.schema(
-        [
-            pa.field("vector", pa.list_(pa.float32(), 2048)),
-            pa.field("pdf_page", pa.string()),
-            pa.field("filename", pa.string()),
-            pa.field("pdf_basename", pa.string()),
-            pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
-            pa.field("path", pa.string()),
-            pa.field("text", pa.string()),
-            pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
-        ]
-    )
-    empty = pa.table(
-        {
-            "vector": [],
-            "pdf_page": [],
-            "filename": [],
-            "pdf_basename": [],
-            "page_number": [],
-            "source_id": [],
-            "path": [],
-            "text": [],
-            "metadata": [],
-            "source": [],
-        },
-        schema=schema,
-    )
+    schema = lancedb_schema(2048)
+    empty = pa.table({f.name: [] for f in schema}, schema=schema)
     db.create_table(table_name, data=empty, schema=schema, mode="create")
-
-
-def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
-    s = str(golden_key)
-    if "_" not in s:
-        return s, ""
-    doc, page = s.rsplit("_", 1)
-    return doc, page
-
-
-def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
-    try:
-        res = json.loads(hit.get("metadata", "{}"))
-        source = json.loads(hit.get("source", "{}"))
-    except Exception:
-        return None, None
-
-    source_id = source.get("source_id")
-    page_number = res.get("page_number")
-    if not source_id or page_number is None:
-        return None, float(hit.get("_distance")) if "_distance" in hit else None
-
-    key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
-    return key, dist
 
 
 @app.command()
