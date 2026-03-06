@@ -61,7 +61,7 @@ The following are the known issues that are fixed in this version:
 The following are the known issues for NeMo Retriever Library:
 
 - Advanced visual parsing is not supported on RTX Pro 6000, B200, or H200 NVL. For details, refer to [Advanced Visual Parsing](advanced-visual-parsing.md) and [Support Matrix](support-matrix.md).
-- The Page Elements NIM (`nemotron-page-elements-v3:1.7.0`) may intermittently fail during inference under high-concurrency workloads. This happens when Triton’s dynamic batching combines requests that exceed the model’s maximum batch size, a situation more commonly seen in multi-GPU setups or large ingestion runs. In these cases, extraction fails for the impacted documents. A correction is planned for `nemotron-page-elements-v3:1.7.1`.
+- The Page Elements NIM (`nemoretriever-page-elements-v3:1.7.0`) may intermittently fail during inference under high-concurrency workloads. This happens when Triton’s dynamic batching combines requests that exceed the model’s maximum batch size, a situation more commonly seen in multi-GPU setups or large ingestion runs. In these cases, extraction fails for the impacted documents. A correction is planned for `nemoretriever-page-elements-v3:1.7.1`.
 
 
 ## Release Notes for Previous Versions
