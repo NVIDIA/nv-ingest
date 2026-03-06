@@ -29,6 +29,7 @@ def _get_tokenizer(model_id: str, cache_dir: Optional[str] = None):  # noqa: ANN
     return AutoTokenizer.from_pretrained(
         model_id,
         cache_dir=cache_dir,
+        trust_remote_code=True,
     )
 
 

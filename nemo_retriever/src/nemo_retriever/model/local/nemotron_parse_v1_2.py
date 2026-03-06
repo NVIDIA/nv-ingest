@@ -11,6 +11,7 @@ import numpy as np
 import torch
 from PIL import Image
 
+from nemo_retriever.utils.hf_cache import configure_global_hf_cache_base
 from ..model import BaseModel, RunMode
 
 
@@ -37,6 +38,7 @@ class NemotronParseV12(BaseModel):
         self._task_prompt = task_prompt
         self._device = torch.device(device or ("cuda:0" if torch.cuda.is_available() else "cpu"))
         self._dtype = torch.bfloat16 if self._device.type == "cuda" else torch.float32
+        hf_cache_dir = configure_global_hf_cache_base(hf_cache_dir)
 
         self._model = AutoModel.from_pretrained(
             self._model_path,
@@ -46,7 +48,9 @@ class NemotronParseV12(BaseModel):
         ).to(self._device)
         self._model.eval()
 
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_path, cache_dir=hf_cache_dir)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._model_path, cache_dir=hf_cache_dir, trust_remote_code=True
+        )
         self._processor = AutoProcessor.from_pretrained(
             self._model_path, trust_remote_code=True, cache_dir=hf_cache_dir
         )

@@ -97,13 +97,23 @@ retriever harness nightly --dry-run
 
 Each run writes a compact artifact set (no full stdout/stderr log persistence):
 
-- `results.json` (normalized metrics + pass/fail + config snapshot)
+- `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
 - `command.txt` (exact invoked command)
 - `runtime_metrics/` (Ray runtime summary + timeline files)
 
 By default, detection totals are embedded into `results.json` under `detection_summary`.
 If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
 `nemo_retriever/harness/test_configs.yaml`.
+
+`results.json` also includes a nested `run_metadata` block for lightweight environment context:
+
+- `host`
+- `gpu_count`
+- `cuda_driver`
+- `ray_version`
+- `python_version`
+
+These fields use best-effort discovery and fall back to `null` or `"unknown"` rather than failing a run.
 
 Sweep/nightly sessions additionally write:
 
@@ -161,6 +171,56 @@ CUDA_VISIBLE_DEVICES=0 ray start --head --num-gpus=1
 ```
 
 Then run your pipeline as above (e.g. `--ray-address auto` for the CLI, or `ray_address="auto"` in Python).
+
+## Resource heuristics (batch mode)
+
+By default, batch mode computes resources using this order:
+
+1. Auto-detected resources (Ray cluster if connected, otherwise local machine)
+2. Environment variables
+3. Explicit function arguments (highest precedence)
+
+This means defaults are deterministic but easy to override when you need fixed behavior.
+
+### Default behavior
+
+- `cpu_count` / `gpu_count` are detected from Ray (`cluster_resources`) or local host.
+- Worker heuristics:
+  - `page_elements_workers = gpu_count * page_elements_per_gpu`
+  - `detect_workers = gpu_count * ocr_per_gpu`
+  - `embed_workers = gpu_count * embed_per_gpu`
+  - minimum of `1` per stage
+- Stage GPU defaults:
+  - If `gpu_count >= 2` and `concurrent_gpu_stage_count == 3`, uses high-overlap values for page-elements/OCR/embed.
+  - Otherwise uses `min(max_gpu_per_stage, gpu_count / concurrent_gpu_stage_count)`.
+
+### Override variables
+
+| Variable | Where to set | Meaning |
+|---|---|---|
+| `NEMO_RETRIEVER_BATCH_NUM_CPUS` | env | Override resolved CPU count |
+| `NEMO_RETRIEVER_BATCH_NUM_GPUS` | env | Override resolved GPU count |
+| `override_cpu_count`, `override_gpu_count` | function args | Highest-priority CPU/GPU override |
+| `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU` | env | Page-elements workers per GPU |
+| `NEMO_RETRIEVER_BATCH_OCR_PER_GPU` | env | OCR workers per GPU |
+| `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU` | env | Embed workers per GPU |
+| `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS` | env | GPU request for CPU-only stages (usually `0.0`) |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS` | env | Page-elements GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS` | env | OCR GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS` | env | Embed GPU share in 3-stage overlap mode |
+| `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE` | env | Cap for per-stage GPU share in non-overlap mode |
+
+Environment variable names for heuristic knobs:
+- `NEMO_RETRIEVER_BATCH_NUM_CPUS`
+- `NEMO_RETRIEVER_BATCH_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_OCR_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU`
+- `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS`
+- `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE`
 
 ### Running multiple NIM service instances on multi-GPU hosts
 
