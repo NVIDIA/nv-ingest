@@ -214,9 +214,9 @@ By default, detection totals are embedded into `results.json` under `detection_s
 
 The `runtime_metrics/` directory contains:
 
-- `run.runtime.summary.json`: run totals (input files, pages, elapsed seconds)  
-- `run.ray.timeline.json`: detailed Ray execution timeline  
-- `run.rd_dataset.stats.txt`: Ray dataset stats dump  
+- **`run.runtime.summary.json`** - run totals (input files, pages, elapsed seconds)  
+- **`run.ray.timeline.json`** - detailed Ray execution timeline  
+- **`run.rd_dataset.stats.txt`** - Ray dataset stats dump  
 
 Use `results.json` for routine benchmark comparison, and use the files under `runtime_metrics/` when investigating throughput regressions or stage‑level behavior. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
@@ -224,8 +224,8 @@ Use `results.json` for routine benchmark comparison, and use the files under `ru
 
 Current benchmark runs show that the LanceDB data dominates the artifact footprint:
 
-- `bo20: ~9.0 MiB total, ~8.6 MiB LanceDB`  
-- `jp20: ~36.8 MiB total, ~36.2 MiB LanceDB` 
+- **`bo20`** - ~9.0 MiB total, ~8.6 MiB LanceDB  
+- **`jp20`** - ~36.8 MiB total, ~36.2 MiB LanceDB 
 
 ## Audio ingestion pipeline
 
