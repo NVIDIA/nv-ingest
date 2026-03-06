@@ -12,7 +12,7 @@ active:
   ray_address: null
   lancedb_uri: lancedb
   hybrid: false
-  embed_model_name: nvidia/llama-3.2-nv-embedqa-1b-v2
+  embed_model_name: nvidia/llama-nemotron-embed-1b-v2
   write_detection_file: false
 
 presets:
