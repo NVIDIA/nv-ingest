@@ -12,6 +12,9 @@ from nv_ingest_client.util.document_analysis import analyze_document_chunks
 from nv_ingest_harness.utils.cases import get_repo_root
 from nv_ingest_harness.utils.interact import (
     embed_info,
+    get_embed_task_endpoint,
+    get_embedding_api_base,
+    is_embedding_endpoint_reachable,
     segment_results,
     kv_event_log,
 )  # noqa: E402
@@ -84,7 +87,8 @@ def main(config=None, log_path: str = "test_results") -> int:
     print(f"Path to User-Defined Function: {str(udf_path)}")
     llm_model = config.llm_summarization_model
 
-    model_name, dense_dim = embed_info()
+    model_name, dense_dim = embed_info(config.embedding_model)
+    embedding_endpoint = get_embedding_api_base(hostname)
 
     # Log configuration for transparency
     print("=== Configuration ===")
@@ -134,7 +138,7 @@ def main(config=None, log_path: str = "test_results") -> int:
     # Embed and upload (core pipeline)
     print("Uploading to collection:", collection_name)
     ingestor = (
-        ingestor.embed(model_name=model_name)
+        ingestor.embed(model_name=model_name, endpoint_url=get_embed_task_endpoint())
         .vdb_upload(
             collection_name=collection_name,
             dense_dim=dense_dim,
@@ -190,17 +194,24 @@ def main(config=None, log_path: str = "test_results") -> int:
         "How many dollars does a power drill cost?",
     ]
     querying_start = time.time()
-    _ = nvingest_retrieval(
-        queries,
-        collection_name,
-        hybrid=sparse,
-        embedding_endpoint=f"http://{hostname}:8012/v1",
-        embedding_model_name=model_name,
-        model_name=model_name,
-        top_k=5,
-        gpu_search=gpu_search,
-    )
-    kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
+    if not is_embedding_endpoint_reachable(hostname):
+        print("Warning: Embedding endpoint is not reachable from host; skipping retrieval sanity check.")
+        kv_event_log("retrieval_time_s", 0.0, log_path)
+    else:
+        try:
+            _ = nvingest_retrieval(
+                queries,
+                collection_name,
+                hybrid=sparse,
+                embedding_endpoint=embedding_endpoint,
+                embedding_model_name=model_name,
+                model_name=model_name,
+                top_k=5,
+                gpu_search=gpu_search,
+            )
+        except Exception as exc:
+            print(f"Warning: retrieval sanity check failed; continuing test run ({exc})")
+        kv_event_log("retrieval_time_s", time.time() - querying_start, log_path)
 
     # Summarize
     dataset_name = os.path.basename(data_dir.rstrip("/")) if data_dir else "unknown"

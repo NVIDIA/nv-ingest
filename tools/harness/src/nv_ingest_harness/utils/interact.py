@@ -3,6 +3,7 @@ import inspect
 import json
 import os
 import shutil
+from urllib.parse import urlparse
 import time
 import zipfile
 import urllib.request
@@ -20,7 +21,67 @@ def run_cmd(cmd: list[str], cwd: Path | None = None) -> int:
     return subprocess.call(cmd, cwd=cwd)
 
 
+MODEL_DIMENSIONS = {
+    "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1": 2048,
+    "nvidia/llama-3.2-nv-embedqa-1b-v2": 2048,
+    "nvidia/llama-3.2-nemoretriever-300m-embed-v1": 2048,
+    "nvidia/nv-embedqa-e5-v5": 1024,
+}
+DEFAULT_MODEL = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+DEFAULT_DIMENSION = 2048
+
+
+def _ensure_v1_base(url: str) -> str:
+    base = url.rstrip("/")
+    parsed = urlparse(base)
+    if parsed.path.endswith("/v1"):
+        return base
+    if parsed.path in ("", "/"):
+        return f"{base}/v1"
+    return base
+
+
+def get_embedding_api_base(hostname: str = "localhost") -> str:
+    explicit = os.getenv("HARNESS_EMBEDDING_ENDPOINT")
+    if explicit:
+        return _ensure_v1_base(explicit)
+
+    env_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT")
+    if env_endpoint:
+        parsed = urlparse(env_endpoint)
+        endpoint_host = (parsed.hostname or "").lower()
+        host_mode = hostname in {"localhost", "127.0.0.1"}
+        if not (host_mode and endpoint_host in {"embedding"}):
+            return _ensure_v1_base(env_endpoint)
+
+    return f"http://{hostname}:8012/v1"
+
+
+def get_embedding_models_url(hostname: str = "localhost") -> str:
+    return f"{get_embedding_api_base(hostname).rstrip('/')}/models"
+
+
+def get_embedding_health_url(hostname: str = "localhost") -> str:
+    return f"{get_embedding_api_base(hostname).rstrip('/')}/health/ready"
+
+
+def is_embedding_endpoint_reachable(hostname: str = "localhost", timeout_s: float = 1.5) -> bool:
+    try:
+        with urllib.request.urlopen(get_embedding_health_url(hostname), timeout=timeout_s) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
+def get_embed_task_endpoint() -> str:
+    env_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT")
+    if env_endpoint and env_endpoint.strip():
+        return _ensure_v1_base(env_endpoint.strip())
+    return "http://embedding:8000/v1"
+
+
 def embed_info(
+    preferred_model: str | None = None,
     max_retries: int = 5,
     initial_backoff: float = 1.0,
     backoff_multiplier: float = 2.0,
@@ -41,19 +102,14 @@ def embed_info(
         tuple: A tuple containing (model_name: str, embedding_dimension: int).
                Returns a default model if the embedding service is not available after retries.
     """
-    # Model name to embedding dimension mapping
-    MODEL_DIMENSIONS = {
-        "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1": 2048,
-        "nvidia/llama-3.2-nv-embedqa-1b-v2": 2048,
-        "nvidia/llama-3.2-nemoretriever-300m-embed-v1": 2048,
-        "nvidia/nv-embedqa-e5-v5": 1024,
-    }
+    if preferred_model and preferred_model.lower() != "auto":
+        return preferred_model, MODEL_DIMENSIONS.get(preferred_model, DEFAULT_DIMENSION)
 
-    # Default model
-    DEFAULT_MODEL = "nvidia/nv-embedqa-e5-v5"
-    DEFAULT_DIMENSION = 1024
+    env_model = os.getenv("EMBEDDING_NIM_MODEL_NAME")
+    if env_model:
+        return env_model, MODEL_DIMENSIONS.get(env_model, DEFAULT_DIMENSION)
 
-    url = "http://localhost:8012/v1/models"
+    url = get_embedding_models_url("localhost")
 
     # Try to fetch model info from embedding service API with retry/backoff
     for attempt in range(max_retries):

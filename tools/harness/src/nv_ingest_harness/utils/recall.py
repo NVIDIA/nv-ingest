@@ -15,6 +15,7 @@ from typing import Dict, Optional, Callable
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 from nv_ingest_harness.utils.cases import get_repo_root
+from nv_ingest_harness.utils.interact import get_embedding_api_base
 
 
 def _get_retrieval_func(
@@ -123,7 +124,7 @@ def get_recall_scores(
         if vdb_backend == "lancedb":
             batch_answers = retrieval_func(
                 batch_queries,
-                embedding_endpoint=f"http://{hostname}:8012/v1",
+                embedding_endpoint=get_embedding_api_base(hostname),
                 model_name=model_name,
                 top_k=top_k,
                 nv_ranker=nv_ranker,
@@ -135,7 +136,7 @@ def get_recall_scores(
                 batch_queries,
                 collection_name,
                 hybrid=sparse,
-                embedding_endpoint=f"http://{hostname}:8012/v1",
+                embedding_endpoint=get_embedding_api_base(hostname),
                 model_name=model_name,
                 top_k=top_k,
                 gpu_search=gpu_search,
@@ -242,7 +243,7 @@ def get_recall_scores_pdf_only(
         if vdb_backend == "lancedb":
             batch_answers = retrieval_func(
                 batch_queries,
-                embedding_endpoint=f"http://{hostname}:8012/v1",
+                embedding_endpoint=get_embedding_api_base(hostname),
                 model_name=model_name,
                 top_k=top_k,
                 nv_ranker=nv_ranker,
@@ -254,7 +255,7 @@ def get_recall_scores_pdf_only(
                 batch_queries,
                 collection_name,
                 hybrid=sparse,
-                embedding_endpoint=f"http://{hostname}:8012/v1",
+                embedding_endpoint=get_embedding_api_base(hostname),
                 model_name=model_name,
                 top_k=top_k,
                 gpu_search=gpu_search,
