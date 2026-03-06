@@ -202,9 +202,9 @@ The `--dry-run` option lets you verify the planned runs without executing them. 
 
 Each harness run writes a compact artifact set (no full stdout/stderr log persistence):
 
-- `results.json`: normalized metrics, pass/fail, and a config snapshot  
-- `command.txt`: the exact command that was invoked  
-- `runtime_metrics/`: Ray runtime summary and timeline files  
+- **results.json** – normalized metrics, pass/fail, and a config snapshot  
+- **command.txt** – the exact command that was invoked  
+- **runtime_metrics/** – Ray runtime summary and timeline files  
 
 By default, detection totals are embedded into `results.json` under `detection_summary`. To obtain a separate detection file set, set `write_detection_file: true` in `nemo_retriever/harness/test_configs.yaml`. Sweep and nightly sessions additionally write `session_summary.json`, which contains an overall pass/fail rollup. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
