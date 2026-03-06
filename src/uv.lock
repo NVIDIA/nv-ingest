@@ -2438,7 +2438,7 @@ requires-dist = [
     { name = "llama-index-embeddings-nvidia" },
     { name = "markitdown" },
     { name = "minio", specifier = ">=7.2.12" },
-    { name = "nvidia-riva-client", specifier = "==2.20.0" },
+    { name = "nvidia-riva-client", specifier = "==2.25.0" },
     { name = "opencv-python" },
     { name = "opentelemetry-api", specifier = ">=1.27.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.27.0" },

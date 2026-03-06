@@ -70,11 +70,10 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
 
 @app.command()
 def main(
-    input_dir: Path = typer.Argument(
+    input_path: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs or .txt files to ingest.",
+        help="File or directory containing PDFs or .txt files to ingest.",
         path_type=Path,
-        exists=True,
     ),
     run_mode: str = typer.Option(
         "inprocess",
@@ -112,15 +111,23 @@ def main(
         typer.echo("Online mode currently supports PDF only; use --input-type pdf.", err=True)
         raise typer.Exit(1)
 
-    _ = input_type
-
-    input_dir = Path(input_dir)
+    input_path = Path(input_path)
+    if input_path.is_file():
+        file_patterns = [str(input_path)]
+    elif input_path.is_dir():
+        ext_map = {
+            "txt": ["*.txt"],
+            "doc": ["*.docx", "*.pptx"],
+        }
+        exts = ext_map.get(input_type, ["*.pdf"])
+        file_patterns = [str(input_path / e) for e in exts]
+    else:
+        raise typer.BadParameter(f"Path does not exist: {input_path}")
 
     if run_mode == "online":
         ingestor = create_ingestor(run_mode="online", params=IngestorCreateParams(base_url=base_url))
-        glob_pattern = str(input_dir / "*.pdf")
         ingestor = (
-            ingestor.files(glob_pattern)
+            ingestor.files(file_patterns)
             .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
             .embed(EmbedParams(model_name="nemo_retriever_v1"))
             .vdb_upload(
@@ -145,11 +152,10 @@ def main(
                 typer.echo(f"  FAIL {r.get('source_path', '?')}: {r.get('error', 'unknown')}", err=True)
     else:
         # Inprocess: same as inprocess_pipeline
+        ingestor = create_ingestor(run_mode="inprocess")
         if input_type == "txt":
-            glob_pattern = str(input_dir / "*.txt")
-            ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(EmbedParams(model_name="nemo_retriever_v1"))
                 .vdb_upload(
@@ -164,10 +170,8 @@ def main(
                 )
             )
         elif input_type == "doc":
-            doc_globs = [str(input_dir / "*.docx"), str(input_dir / "*.pptx")]
-            ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
-                ingestor.files(doc_globs)
+                ingestor.files(file_patterns)
                 .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
                 .embed(EmbedParams(model_name="nemo_retriever_v1"))
                 .vdb_upload(
@@ -182,10 +186,8 @@ def main(
                 )
             )
         else:
-            glob_pattern = str(input_dir / "*.pdf")
-            ingestor = create_ingestor(run_mode="inprocess")
             ingestor = (
-                ingestor.files(glob_pattern)
+                ingestor.files(file_patterns)
                 .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
                 .embed(EmbedParams(model_name="nemo_retriever_v1"))
                 .vdb_upload(

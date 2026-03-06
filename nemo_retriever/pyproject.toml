@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel>=0.46.2"]
+requires = ["setuptools>=78.1.1", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -36,7 +36,7 @@ dependencies = [
   "fastapi>=0.114.0",
   "uvicorn[standard]>=0.30.0",
   "httpx>=0.27.0",
-  "requests>=2.31.0",
+  "requests>=2.32.5",
   "pydantic>=2.8.0",
   "typer>=0.12.0",
   "rich>=13.7.0",
@@ -63,10 +63,12 @@ dependencies = [
   "timm==1.0.22",
   "accelerate==1.12.0",
   "albumentations==2.0.8",
+  "scikit-learn>=1.6.0",
   "open-clip-torch==3.2.0",
   # Local ASR (Parakeet): read chunk files and resample to 16 kHz mono
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
+  "nvidia-ml-py",
 ]
 
 [project.optional-dependencies]

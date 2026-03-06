@@ -5,12 +5,14 @@
 from __future__ import annotations
 
 import errno
+from importlib import metadata
 import json
 import os
 import pty
 import re
 import select
 import shlex
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -34,8 +36,79 @@ from nemo_retriever.harness.config import (
     load_runs_config,
 )
 from nemo_retriever.harness.parsers import StreamMetrics
+from nemo_retriever.harness.recall_adapters import prepare_recall_query_file
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+
+
+def _collect_gpu_metadata() -> tuple[int | None, str | None]:
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None, None
+
+    output_lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    combined_output = f"{result.stdout}\n{result.stderr}"
+    if "No devices were found" in combined_output:
+        return 0, None
+    if result.returncode != 0:
+        return None, None
+    if not output_lines:
+        return 0, None
+    return len(output_lines), output_lines[0]
+
+
+def _collect_run_metadata() -> dict[str, Any]:
+    try:
+        host = socket.gethostname().strip() or "unknown"
+    except OSError:
+        host = "unknown"
+
+    version_info = getattr(sys, "version_info", None)
+    if version_info is None:
+        python_version = "unknown"
+    else:
+        python_version = f"{version_info.major}.{version_info.minor}.{version_info.micro}"
+
+    try:
+        ray_version = metadata.version("ray")
+    except metadata.PackageNotFoundError:
+        ray_version = "unknown"
+
+    gpu_count, cuda_driver = _collect_gpu_metadata()
+    return {
+        "host": host,
+        "gpu_count": gpu_count,
+        "cuda_driver": cuda_driver,
+        "ray_version": ray_version,
+        "python_version": python_version,
+    }
+
+
+def _normalize_tags(tags: list[str] | None) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+
+    for raw in tags or []:
+        tag = str(raw).strip()
+        if not tag or tag in seen:
+            continue
+        seen.add(tag)
+        normalized.append(tag)
+
+    return normalized
+
+
+def _normalize_recall_metric_key(key: str) -> str:
+    metric = str(key).strip().lower()
+    if metric.startswith("recall@"):
+        return "recall_" + metric.split("@", 1)[1]
+    return metric.replace("@", "_").replace("-", "_")
 
 
 def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
@@ -48,7 +121,7 @@ def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     return str(p)
 
 
-def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path]:
+def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path]:
     runtime_dir = artifact_dir / "runtime_metrics"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     if cfg.write_detection_file:
@@ -56,7 +129,11 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
     else:
         # Keep detection summary out of top-level artifacts unless explicitly requested.
         detection_summary_file = runtime_dir / ".detection_summary.json"
-    query_csv = Path(cfg.query_csv) if cfg.query_csv else (artifact_dir / "__query_csv_missing__.csv")
+    query_csv = prepare_recall_query_file(
+        query_csv=Path(cfg.query_csv) if cfg.query_csv else None,
+        recall_adapter=cfg.recall_adapter,
+        output_dir=runtime_dir,
+    )
 
     cmd = [
         sys.executable,
@@ -67,6 +144,8 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         cfg.input_type,
         "--query-csv",
         str(query_csv),
+        "--recall-match-mode",
+        cfg.recall_match_mode,
         "--no-recall-details",
         "--pdf-extract-workers",
         str(cfg.pdf_extract_workers),
@@ -117,7 +196,7 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
     if cfg.hybrid:
         cmd += ["--hybrid"]
 
-    return cmd, runtime_dir, detection_summary_file
+    return cmd, runtime_dir, detection_summary_file, query_csv
 
 
 def _evaluate_run_outcome(
@@ -205,8 +284,8 @@ def _run_subprocess_with_tty(cmd: list[str], metrics: StreamMetrics) -> int:
         os.close(master_fd)
 
 
-def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str, Any]:
-    cmd, runtime_dir, detection_summary_file = _build_command(cfg, artifact_dir, run_id)
+def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[str] | None = None) -> dict[str, Any]:
+    cmd, runtime_dir, detection_summary_file, effective_query_csv = _build_command(cfg, artifact_dir, run_id)
     command_text = " ".join(shlex.quote(token) for token in cmd)
     (artifact_dir / "command.txt").write_text(command_text + "\n", encoding="utf-8")
 
@@ -215,6 +294,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
 
     metrics = StreamMetrics()
     process_rc = _run_subprocess_with_tty(cmd, metrics)
+    run_metadata = _collect_run_metadata()
     runtime_summary_path = runtime_dir / f"{run_id}.runtime.summary.json"
     runtime_summary = _read_json_if_exists(runtime_summary_path)
     detection_summary = _read_json_if_exists(detection_summary_file)
@@ -223,8 +303,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
 
     recall_metrics_normalized: dict[str, float] = {}
     for key, val in metrics.recall_metrics.items():
-        normalized = key.replace("@", "_").replace("-", "_")
-        recall_metrics_normalized[f"recall_{normalized}"] = val
+        recall_metrics_normalized[_normalize_recall_metric_key(key)] = val
 
     effective_rc, failure_reason, success = _evaluate_run_outcome(
         process_rc=process_rc,
@@ -243,8 +322,11 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
             "dataset_dir": cfg.dataset_dir,
             "preset": cfg.preset,
             "query_csv": cfg.query_csv,
+            "effective_query_csv": str(effective_query_csv),
             "input_type": cfg.input_type,
             "recall_required": cfg.recall_required,
+            "recall_match_mode": cfg.recall_match_mode,
+            "recall_adapter": cfg.recall_adapter,
             "ray_address": cfg.ray_address,
             "hybrid": cfg.hybrid,
             "embed_model_name": cfg.embed_model_name,
@@ -259,6 +341,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
             "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
             **recall_metrics_normalized,
         },
+        "run_metadata": run_metadata,
         "runtime_summary": runtime_summary,
         "detection_summary": detection_summary,
         "artifacts": {
@@ -268,6 +351,8 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> dict[str
     }
     if cfg.write_detection_file:
         result_payload["artifacts"]["detection_summary_file"] = str(detection_summary_file.resolve())
+    if tags:
+        result_payload["tags"] = list(tags)
 
     write_json(artifact_dir / "results.json", result_payload)
     return result_payload
@@ -283,6 +368,7 @@ def _run_entry(
     sweep_overrides: dict[str, Any] | None = None,
     cli_overrides: list[str] | None = None,
     recall_required: bool | None = None,
+    tags: list[str] | None = None,
 ) -> dict[str, Any]:
     cfg = load_harness_config(
         config_file=config_file,
@@ -301,8 +387,9 @@ def _run_entry(
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
     resolved_run_name = run_name or cfg.dataset_label
-    result = _run_single(cfg, artifact_dir, run_id=resolved_run_name)
-    return {
+    normalized_tags = _normalize_tags(tags)
+    result = _run_single(cfg, artifact_dir, run_id=resolved_run_name, tags=normalized_tags)
+    run_result = {
         "run_name": resolved_run_name,
         "dataset": cfg.dataset_label,
         "preset": cfg.preset,
@@ -312,6 +399,9 @@ def _run_entry(
         "failure_reason": result.get("failure_reason"),
         "metrics": dict(result.get("metrics", {})),
     }
+    if normalized_tags:
+        run_result["tags"] = normalized_tags
+    return run_result
 
 
 def execute_runs(
@@ -321,6 +411,7 @@ def execute_runs(
     session_prefix: str,
     preset_override: str | None,
     base_artifacts_dir: str | None = None,
+    tags: list[str] | None = None,
 ) -> tuple[Path, list[dict[str, Any]]]:
     session_dir = create_session_dir(session_prefix, base_dir=base_artifacts_dir)
     run_results: list[dict[str, Any]] = []
@@ -335,6 +426,7 @@ def execute_runs(
             preset=run.get("preset") if preset_override is None else preset_override,
             sweep_overrides=run.get("overrides") if isinstance(run.get("overrides"), dict) else run,
             recall_required=run.get("recall_required"),
+            tags=tags,
         )
         run_results.append(run_result)
 
@@ -347,6 +439,7 @@ def run_command(
     config: str | None = typer.Option(None, "--config", help="Path to harness test config YAML."),
     run_name: str | None = typer.Option(None, "--run-name", help="Optional run name label."),
     override: list[str] = typer.Option([], "--override", help="Override values with KEY=VALUE."),
+    tag: list[str] = typer.Option([], "--tag", help="Run tag to persist in harness artifacts. Repeatable."),
     recall_required: bool | None = typer.Option(
         None, "--recall-required/--no-recall-required", help="Override recall-required gate for this run."
     ),
@@ -359,6 +452,7 @@ def run_command(
         preset=preset,
         cli_overrides=override,
         recall_required=recall_required,
+        tags=tag,
     )
     typer.echo(
         f"\nResult: {'PASS' if result['success'] else 'FAIL'} | "
@@ -372,15 +466,20 @@ def sweep_command(
     runs_config: str = typer.Option(str(DEFAULT_NIGHTLY_CONFIG_PATH), "--runs-config", help="Path to sweep runs YAML."),
     preset: str | None = typer.Option(None, "--preset", help="Force preset for all sweep runs."),
     session_prefix: str = typer.Option("sweep", "--session-prefix", help="Session directory prefix."),
+    tag: list[str] = typer.Option([], "--tag", help="Session tag to persist on each run. Repeatable."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print run plan without executing."),
 ) -> None:
+    normalized_tags = _normalize_tags(tag)
     runs = load_runs_config(runs_config)
     if dry_run:
         typer.echo("Sweep dry run:")
         for idx, run in enumerate(runs):
-            typer.echo(
-                f"  {idx + 1:03d}: name={run.get('name')} dataset={run.get('dataset')} preset={run.get('preset')}"
+            tag_text = f" tags={normalized_tags}" if normalized_tags else ""
+            plan_line = (
+                f"  {idx + 1:03d}: name={run.get('name')} "
+                f"dataset={run.get('dataset')} preset={run.get('preset')}{tag_text}"
             )
+            typer.echo(plan_line)
         raise typer.Exit(code=0)
 
     session_dir, run_results = execute_runs(
@@ -388,6 +487,7 @@ def sweep_command(
         config_file=config,
         session_prefix=session_prefix,
         preset_override=preset,
+        tags=normalized_tags,
     )
     summary_path = write_session_summary(
         session_dir,
