@@ -856,15 +856,10 @@ def main(
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         num_rows = ingest_results.groupby("source_id").count().count()
-        logger.info(
+        print(
             f"Ingestion complete. {num_rows} rows processed in "
             f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
         )
-        logger.info(f"Ingestion Dataset: {ingestor.get_dataset()}")
-
-        # TODO: Remove this temp write to file
-        print(ingestor.get_dataset().schema())
-        ingestor.get_dataset().write_parquet("ingest_results.parquet")
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
