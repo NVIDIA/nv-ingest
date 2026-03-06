@@ -851,12 +851,11 @@ def main(
                 )
             )
             .get_dataset()
-            .groupby("source_id")
             .materialize()
         )
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        num_rows = ingest_results.count()
+        num_rows = ingest_results.groupby("source_id").count()
         logger.info(
             f"Ingestion complete. {num_rows} rows processed in "
             f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
