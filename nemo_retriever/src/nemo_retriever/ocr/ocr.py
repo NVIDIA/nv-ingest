@@ -503,6 +503,8 @@ def ocr_page_elements(
                     # Use word-level merging for tables to preserve cell boundaries;
                     # paragraph-level for charts/infographics where structure matters less.
                     ml = "word" if label_name == "table" else "paragraph"
+
+                    # TODO: We aren't even doing batching here .... just ignoring the setting completely
                     preds = model.invoke(crop_array, merge_level=ml)
 
                     # Parse and assemble text.

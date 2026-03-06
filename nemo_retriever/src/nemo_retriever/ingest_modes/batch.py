@@ -614,6 +614,7 @@ class BatchIngestor(Ingestor):
                     TableStructureActor,
                     batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
+                    num_cpus=1,
                     num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
                     compute=rd.ActorPoolStrategy(
                         initial_size=self._requested_plan.get_ocr_initial_actors(),
@@ -657,6 +658,7 @@ class BatchIngestor(Ingestor):
                     OCRActor,
                     batch_size=self._requested_plan.get_ocr_batch_size(),
                     batch_format="pandas",
+                    num_cpus=1,
                     num_gpus=self._requested_plan.get_ocr_gpus_per_actor(),
                     compute=rd.ActorPoolStrategy(
                         initial_size=self._requested_plan.get_ocr_initial_actors(),
@@ -843,6 +845,7 @@ class BatchIngestor(Ingestor):
             _BatchEmbedActor,
             batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
+            num_cpus=1,
             num_gpus=embed_actor_num_gpus,  # pulled from if statement above
             compute=rd.ActorPoolStrategy(
                 initial_size=self._requested_plan.get_embed_initial_actors(),
