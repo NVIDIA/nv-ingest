@@ -38,6 +38,11 @@ _HEAVY_INTERNAL = [
     "nemo_retriever.pdf.stage",
     "nemo_retriever.pdf.extract",
     "nemo_retriever.pdf.split",
+    "nemo_retriever.chart",
+    "nemo_retriever.chart.chart_detection",
+    "nemo_retriever.chart.commands",
+    "nemo_retriever.chart.config",
+    "nemo_retriever.chart.processor",
 ]
 for _mod_name in _HEAVY_INTERNAL:
     sys.modules.setdefault(_mod_name, MagicMock())
