@@ -215,6 +215,16 @@ def main(
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
+    use_graphic_elements: bool = typer.Option(
+        False,
+        "--use-graphic-elements",
+        help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
+    ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
+    ),
 ) -> None:
     if gpu_devices is not None and num_gpus is not None:
         raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")
@@ -300,6 +310,8 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
                     use_table_structure=use_table_structure,
                     table_output_format=table_output_format,
                     table_structure_invoke_url=table_structure_invoke_url,
@@ -343,6 +355,8 @@ def main(
                     extract_tables=True,
                     extract_charts=True,
                     extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
                     use_table_structure=use_table_structure,
                     table_output_format=table_output_format,
                     table_structure_invoke_url=table_structure_invoke_url,

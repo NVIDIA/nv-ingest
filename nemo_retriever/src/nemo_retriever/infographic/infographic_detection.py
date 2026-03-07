@@ -7,9 +7,8 @@ from __future__ import annotations
 """
 Infographic detection (Nemotron Graphic Elements v1).
 
-This mirrors `nemo_retriever.chart.chart_detection.detect_graphic_elements_v1`, but:
-- prioritizes `infographics` crops when present
-- uses infographic-specific output column defaults
+This prioritizes `infographics` crops when present and uses
+infographic-specific output column defaults.
 """
 
 from dataclasses import dataclass

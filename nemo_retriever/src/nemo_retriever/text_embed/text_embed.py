@@ -12,7 +12,7 @@ environments that don't have the full schema/transform stack installed.
 
 It mirrors the "pure pandas batch fn + Ray-friendly actor" pattern used by:
 - `nemo_retriever.page_elements.detect_page_elements_v3`
-- `nemo_retriever.chart.chart_detection.detect_graphic_elements_v1`
+- `nemo_retriever.chart.chart_detection.graphic_elements_ocr_page_elements`
 """
 
 from dataclasses import dataclass
