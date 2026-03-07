@@ -78,7 +78,7 @@ dev = [
 ]
 
 [project.scripts]
-retriever = "nemo_retriever.__main__:main"
+retriever = "nemo_retriever.adapters.cli.main:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "nemo_retriever.version.get_build_version"}
