@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   page-elements:
-    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v3}:${YOLOX_TAG:-1.7.0}
+    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemotron-page-elements-v3}:${YOLOX_TAG:-1.8.0}
     shm_size: 16gb
     ports:
       - "${PAGE_ELEMENTS_HTTP_PORT:-8000}:8000"
@@ -47,7 +47,7 @@ services:
     runtime: nvidia
 
   graphic-elements:
-    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.6.0}
+    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemotron-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.8.0}
     shm_size: 16gb
     expose:
       - "8000"
@@ -71,7 +71,7 @@ services:
     runtime: nvidia
 
   table-structure:
-    image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.6.0}
+    image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemotron-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.8.0}
     shm_size: 16gb
     expose:
       - "8000"
@@ -122,8 +122,12 @@ services:
 
   embedding:
     # NIM ON
-    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-1.10.1}
+    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-nemotron-embed-1b-v2}:${EMBEDDING_TAG:-1.13.0}
     shm_size: 16gb
+    ports:
+      - "${EMBEDDING_HTTP_PORT:-8012}:8000"
+      - "${EMBEDDING_GRPC_PORT:-8013}:8001"
+      - "${EMBEDDING_METRICS_PORT:-8014}:8002"
     expose:
       - "8000"
       - "8001"
@@ -146,7 +150,7 @@ services:
 
   reranker:
     # NIM ON
-    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-1.8.0}
+    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2}:${RERANKER_TAG:-1.10.0}
     shm_size: 16gb
     expose:
       - "8000"
@@ -188,7 +192,7 @@ services:
       - nemotron-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.5.0}
+    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.6.0}
     shm_size: 16gb
     expose:
       - "8000"
@@ -212,7 +216,7 @@ services:
       - vlm
 
   audio:
-    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-1.4.0}
+    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-1.5.0}
     shm_size: 2gb
     expose:
       - "50051" # grpc
@@ -268,7 +272,7 @@ services:
       #- INGEST_CONFIG_PATH=/workspace/config/custom_summarization_pipeline.yaml
       - MAX_INGEST_PROCESS_WORKERS=${MAX_INGEST_PROCESS_WORKERS:-32}
       - EMBEDDING_NIM_ENDPOINT=${EMBEDDING_NIM_ENDPOINT:-http://embedding:8000/v1}
-      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
+      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-nemotron-embed-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_RAY_LOG_LEVEL=DEVELOPMENT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
