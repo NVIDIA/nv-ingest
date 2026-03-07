@@ -167,25 +167,14 @@ def _embed_queries_local_hf(
     batch_size: int,
     model_name: Optional[str] = None,
 ) -> List[List[float]]:
-    # Lazy import: only load torch/HF when needed.
-    from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+    from nemo_retriever.model import create_local_embedder, is_vl_embed_model
 
-    model_id = resolve_embed_model(model_name)
+    embedder = create_local_embedder(model_name, device=device, hf_cache_dir=cache_dir)
 
     if is_vl_embed_model(model_name):
-        from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
-
-        embedder = LlamaNemotronEmbedVL1BV2Embedder(device=device, hf_cache_dir=cache_dir, model_id=model_id)
-        # VL model handles query formatting internally via encode_queries().
         vecs = embedder.embed_queries(queries, batch_size=int(batch_size))
     else:
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-
-        embedder = LlamaNemotronEmbed1BV2Embedder(
-            device=device, hf_cache_dir=cache_dir, normalize=True, model_id=model_id
-        )
         vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
-    # Ensure list-of-list floats.
     return vecs.detach().to("cpu").tolist()
 
 

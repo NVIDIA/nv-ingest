@@ -89,14 +89,17 @@ def maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_config
     if has_endpoint or not use_local:
         return
 
-    # Lazy import: only load torch/HF when we truly need local embeddings.
-    from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+    from nemo_retriever.model import create_local_embedder
 
     local_device = task_config.get("local_hf_device")
     local_cache_dir = task_config.get("local_hf_cache_dir")
     local_batch_size = int(task_config.get("local_hf_batch_size") or 64)
 
-    embedder = LlamaNemotronEmbed1BV2Embedder(device=local_device, hf_cache_dir=local_cache_dir, normalize=True)
+    embedder = create_local_embedder(
+        task_config.get("model_name"),
+        device=local_device,
+        hf_cache_dir=local_cache_dir,
+    )
 
     def _embed(texts):
         prefix = f"{transform_config.input_type}: " if getattr(transform_config, "input_type", None) else ""

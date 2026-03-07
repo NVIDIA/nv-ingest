@@ -45,7 +45,7 @@ class LlamaNemotronEmbed1BV2Embedder:
 
         from transformers import AutoModel, AutoTokenizer
 
-        MODEL_ID = self.model_id or "nvidia/llama-3.2-nv-embedqa-1b-v2"
+        MODEL_ID = self.model_id or "nvidia/llama-nemotron-embed-1b-v2"
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = configure_global_hf_cache_base(self.hf_cache_dir)
         _revision = get_hf_revision(MODEL_ID)
