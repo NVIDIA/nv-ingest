@@ -271,38 +271,15 @@ class _BatchEmbedActor:
             self._model = None
             return
 
-        device = self._kwargs.get("device")
-        hf_cache_dir = self._kwargs.get("hf_cache_dir")
-        normalize = bool(self._kwargs.get("normalize", True))
-        max_length = int(self._kwargs.get("max_length", 8192))
-        model_name_raw = self._kwargs.get("model_name")
+        from nemo_retriever.model import create_local_embedder
 
-        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
-
-        model_id = resolve_embed_model(model_name_raw)
-
-        if is_vl_embed_model(model_name_raw):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            self._model = LlamaNemotronEmbedVL1BV2Embedder(
-                device=str(device) if device else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-                model_id=model_id,
-            )
-        else:
-            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-                LlamaNemotronEmbed1BV2Embedder,
-            )
-
-            self._model = LlamaNemotronEmbed1BV2Embedder(
-                device=str(device) if device else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-                normalize=normalize,
-                max_length=max_length,
-                model_id=model_id,
-            )
+        self._model = create_local_embedder(
+            self._kwargs.get("model_name"),
+            device=str(self._kwargs["device"]) if self._kwargs.get("device") else None,
+            hf_cache_dir=str(self._kwargs["hf_cache_dir"]) if self._kwargs.get("hf_cache_dir") else None,
+            normalize=bool(self._kwargs.get("normalize", True)),
+            max_length=int(self._kwargs.get("max_length", 8192)),
+        )
 
     def __call__(self, batch_df: Any) -> Any:
         from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed

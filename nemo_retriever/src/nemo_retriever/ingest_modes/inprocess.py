@@ -29,7 +29,6 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
-from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 from nemo_retriever.chart.chart_detection import graphic_elements_ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
@@ -1568,38 +1567,22 @@ class InProcessIngestor(Ingestor):
             return self
 
         # Local HF embedder path.
-        # Allow callers to control device / max_length to avoid OOMs.
         device = embed_kwargs.pop("device", None)
         hf_cache_dir = embed_kwargs.pop("hf_cache_dir", None)
         normalize = bool(embed_kwargs.pop("normalize", True))
         max_length = int(embed_kwargs.pop("max_length", 8192))
-
         model_name_raw = embed_kwargs.pop("model_name", None)
 
-        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
-
-        model_id = resolve_embed_model(model_name_raw)
+        from nemo_retriever.model import create_local_embedder
 
         embed_kwargs.setdefault("input_type", "passage")
-
-        if is_vl_embed_model(model_name_raw):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            embed_kwargs["model"] = LlamaNemotronEmbedVL1BV2Embedder(
-                device=str(device) if device is not None else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-                model_id=model_id,
-            )
-        else:
-            embed_kwargs["model"] = LlamaNemotronEmbed1BV2Embedder(
-                device=str(device) if device is not None else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-                normalize=normalize,
-                max_length=max_length,
-                model_id=model_id,
-            )
+        embed_kwargs["model"] = create_local_embedder(
+            model_name_raw,
+            device=str(device) if device is not None else None,
+            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+            normalize=normalize,
+            max_length=max_length,
+        )
         self._tasks.append((embed_text_main_text_embed, embed_kwargs))
         return self
 
