@@ -24,7 +24,7 @@ from typing import Union
 import ray
 import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
-from nemo_retriever.chart.chart_detection import ChartGraphicElementsOCRActor
+from nemo_retriever.chart.chart_detection import GraphicElementsActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.table.table_detection import TableStructureActor
@@ -490,7 +490,7 @@ class BatchIngestor(Ingestor):
                     else self._requested_plan.get_page_elements_gpus_per_actor()
                 )
                 self._rd_dataset = self._rd_dataset.map_batches(
-                    ChartGraphicElementsOCRActor,
+                    GraphicElementsActor,
                     batch_size=self._requested_plan.get_page_elements_batch_size(),
                     batch_format="pandas",
                     num_gpus=ge_gpu,

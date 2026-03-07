@@ -268,20 +268,20 @@ class TestGraphicElementsOCRPageElements:
 
 
 # ---------------------------------------------------------------------------
-# ChartGraphicElementsOCRActor tests
+# GraphicElementsActor tests
 # ---------------------------------------------------------------------------
 
 
 @_needs_pil
-class TestChartGraphicElementsOCRActor:
+class TestGraphicElementsActor:
     """Test the Ray actor wrapper."""
 
     def test_actor_error_returns_dataframe_with_error(self) -> None:
         """Actor should never raise; errors go into metadata columns."""
-        from nemo_retriever.chart.chart_detection import ChartGraphicElementsOCRActor
+        from nemo_retriever.chart.chart_detection import GraphicElementsActor
 
-        with patch("nemo_retriever.chart.chart_detection.ChartGraphicElementsOCRActor.__init__", return_value=None):
-            actor = ChartGraphicElementsOCRActor.__new__(ChartGraphicElementsOCRActor)
+        with patch("nemo_retriever.chart.chart_detection.GraphicElementsActor.__init__", return_value=None):
+            actor = GraphicElementsActor.__new__(GraphicElementsActor)
             actor._graphic_elements_model = None
             actor._ocr_model = None
             actor._graphic_elements_invoke_url = ""

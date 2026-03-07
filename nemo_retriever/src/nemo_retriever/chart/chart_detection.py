@@ -524,7 +524,7 @@ def graphic_elements_ocr_page_elements(
 # ---------------------------------------------------------------------------
 
 
-class ChartGraphicElementsOCRActor:
+class GraphicElementsActor:
     """
     Ray-friendly callable that initializes both graphic-elements and OCR
     models once per actor and runs the combined stage.
