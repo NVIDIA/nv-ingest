@@ -57,7 +57,7 @@ def test_alias_resolved_to_text_embedder(_patch_embedders):
     fake_text, _ = _patch_embedders
     result = create_local_embedder("nemo_retriever_v1")
     call_kwargs = fake_text.call_args
-    assert call_kwargs.kwargs["model_id"] == "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    assert call_kwargs.kwargs["model_id"] == "nvidia/llama-nemotron-embed-1b-v2"
     assert result is fake_text.return_value
 
 
