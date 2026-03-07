@@ -69,7 +69,7 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
         logger.debug("%s | %s | %r", location, message, data)
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]):
     if params is None:
         return model_cls(**kwargs)
     if kwargs:
@@ -329,7 +329,7 @@ class BatchIngestor(Ingestor):
             log_to_driver=bool(ray_log_to_driver),
             runtime_env={
                 "env_vars": {
-                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR"),
+                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR", ""),
                     "LOG_LEVEL": "INFO",
                 }
             },
