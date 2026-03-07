@@ -26,7 +26,6 @@ from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
-from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 
 logger = logging.getLogger(__name__)
@@ -125,14 +124,14 @@ def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
     try:
         db = _lancedb().connect(uri)
         table = db.open_table(table_name)
-        df = table.to_pandas()[["source_id", "page_number", "metadata"]]
+        df = table.to_pandas()[["source", "page_number", "metadata"]]
     except Exception:
         return None
 
     # Deduplicate exploded rows by page key; keep max per-page counts.
     per_page: dict[tuple[str, int], dict] = {}
     for row in df.itertuples(index=False):
-        source_id = str(getattr(row, "source_id", "") or "")
+        source_id = str(getattr(row, "source", "") or "")
         page_number = _to_int(getattr(row, "page_number", -1), default=-1)
         key = (source_id, page_number)
 
@@ -295,11 +294,10 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
             pa.field("filename", pa.string()),
             pa.field("pdf_basename", pa.string()),
             pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
+            pa.field("source", pa.string()),
             pa.field("path", pa.string()),
             pa.field("text", pa.string()),
             pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
         ]
     )
     empty = pa.table(
@@ -309,11 +307,10 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
             "filename": [],
             "pdf_basename": [],
             "page_number": [],
-            "source_id": [],
+            "source": [],
             "path": [],
             "text": [],
             "metadata": [],
-            "source": [],
         },
         schema=schema,
     )
@@ -329,14 +326,9 @@ def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
 
 
 def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
-    try:
-        res = json.loads(hit.get("metadata", "{}"))
-        source = json.loads(hit.get("source", "{}"))
-    except Exception:
-        return None, None
 
-    source_id = source.get("source_id")
-    page_number = res.get("page_number")
+    source_id = hit.get("source_id")
+    page_number = hit.get("page_number")
     if not source_id or page_number is None:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
@@ -674,17 +666,6 @@ def main(
                         embed_granularity=embed_granularity,
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
         elif input_type == "html":
             ingestor = (
@@ -698,17 +679,6 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -761,17 +731,6 @@ def main(
                             "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -827,17 +786,6 @@ def main(
                         },
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
 
         logger.info("Running extraction...")
@@ -853,7 +801,6 @@ def main(
             .get_dataset()
             .materialize()
         )
-
         ingest_elapsed_s = time.perf_counter() - ingest_start
         num_rows = ingest_results.groupby("source_id").count().count()
         logger.info(
@@ -887,8 +834,11 @@ def main(
                 ray.shutdown()
                 logger.error(f"Exiting with code 1 due to {error_count} error rows in ingest results.")
                 raise typer.Exit(code=1)
-
+        rows = ingest_results.take_all()
         ray.shutdown()
+        from nemo_retriever.vector_store.lancedb_store import handle_lancedb
+
+        handle_lancedb(rows, lancedb_uri, LANCEDB_TABLE, mode="overwrite")
 
         # ---------------------------------------------------------------------------
         # Recall calculation

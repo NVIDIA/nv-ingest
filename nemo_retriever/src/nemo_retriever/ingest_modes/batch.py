@@ -70,7 +70,7 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
         logger.debug("%s | %s | %r", location, message, data)
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
+def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]):
     if params is None:
         return model_cls(**kwargs)
     if kwargs:
