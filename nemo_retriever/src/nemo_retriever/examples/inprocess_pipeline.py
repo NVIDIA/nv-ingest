@@ -7,7 +7,6 @@ In-process ingestion pipeline (no Ray) with optional recall evaluation.
 Run with: uv run python -m nemo_retriever.examples.inprocess_pipeline <input-dir>
 """
 
-import json
 import time
 from pathlib import Path
 from typing import Optional
@@ -15,85 +14,24 @@ from typing import Optional
 import lancedb
 import typer
 from nemo_retriever import create_ingestor
+from nemo_retriever.examples.common import estimate_processed_pages, print_pages_per_second
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
-from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.recall.core import (
+    RecallConfig,
+    gold_to_doc_page,
+    hit_key_and_distance,
+    is_hit_at_k,
+    retrieve_and_score,
+)
 
 app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
-
-
-def _estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
-    """
-    Estimate pages processed by counting unique (source_id, page_number) pairs.
-
-    Falls back to table row count if page-level fields are unavailable.
-    """
-    try:
-        db = lancedb.connect(uri)
-        table = db.open_table(table_name)
-    except Exception:
-        return None
-
-    try:
-        df = table.to_pandas()[["source_id", "page_number"]]
-        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
-    except Exception:
-        try:
-            return int(table.count_rows())
-        except Exception:
-            return None
-
-
-def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
-    if ingest_elapsed_s <= 0:
-        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
-        return
-    if processed_pages is None:
-        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
-        return
-
-    pps = processed_pages / ingest_elapsed_s
-    print(f"Pages processed: {processed_pages}")
-    print(f"Pages/sec (ingest only): {pps:.2f}")
-
-
-def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
-    s = str(golden_key)
-    if "_" not in s:
-        return s, ""
-    doc, page = s.rsplit("_", 1)
-    return doc, page
-
-
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int) -> bool:
-    doc, page = _gold_to_doc_page(golden_key)
-    specific_page = f"{doc}_{page}"
-    entire_document = f"{doc}_-1"
-    top = (retrieved_keys or [])[: int(k)]
-    return (specific_page in top) or (entire_document in top)
-
-
-def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
-    try:
-        res = json.loads(hit.get("metadata", "{}"))
-        source = json.loads(hit.get("source", "{}"))
-    except Exception:
-        return None, None
-
-    source_id = source.get("source_id")
-    page_number = res.get("page_number")
-    if not source_id or page_number is None:
-        return None, float(hit.get("_distance")) if "_distance" in hit else None
-
-    key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
-    return key, dist
 
 
 @app.command()
@@ -388,7 +326,7 @@ def main(
         )
     )
     ingest_elapsed_s = time.perf_counter() - ingest_start
-    processed_pages = _estimate_processed_pages(LANCEDB_URI, LANCEDB_TABLE)
+    processed_pages = estimate_processed_pages(LANCEDB_URI, LANCEDB_TABLE)
     print("Extraction complete.")
 
     # ---------------------------------------------------------------------------
@@ -397,7 +335,7 @@ def main(
     query_csv = Path(query_csv)
     if not query_csv.exists():
         print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
-        _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        print_pages_per_second(processed_pages, ingest_elapsed_s)
         return
 
     db = lancedb.connect(f"./{LANCEDB_URI}")
@@ -432,16 +370,16 @@ def main(
             _raw_hits,
         )
     ):
-        doc, page = _gold_to_doc_page(g)
+        doc, page = gold_to_doc_page(g)
 
         scored_hits: list[tuple[str, float | None]] = []
         for h in hits:
-            key, dist = _hit_key_and_distance(h)
+            key, dist = hit_key_and_distance(h)
             if key:
                 scored_hits.append((key, dist))
 
         top_keys = [k for (k, _d) in scored_hits]
-        hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+        hit = is_hit_at_k(g, top_keys, cfg.top_k, match_mode="pdf_page")
 
         if not no_recall_details:
             ext = (
@@ -482,7 +420,7 @@ def main(
     print("\nRecall metrics (matching nemo_retriever.recall.core):")
     for k, v in metrics.items():
         print(f"  {k}: {v:.4f}")
-    _print_pages_per_second(processed_pages, ingest_elapsed_s)
+    print_pages_per_second(processed_pages, ingest_elapsed_s)
 
 
 if __name__ == "__main__":
