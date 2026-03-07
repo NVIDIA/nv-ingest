@@ -70,7 +70,7 @@ class TextEmbeddingConfig:
     # Remote / NIM-like settings
     api_key: Optional[str] = None
     embedding_nim_endpoint: Optional[str] = None  # e.g. "http://host:8000/v1"
-    embedding_model: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    embedding_model: str = "nvidia/llama-nemotron-embed-1b-v2"
     encoding_format: str = "float"  # OpenAI-compatible embeddings often accept "float"
     input_type: str = "passage"
     truncate: str = "END"

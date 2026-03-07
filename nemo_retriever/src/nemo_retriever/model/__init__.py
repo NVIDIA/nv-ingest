@@ -13,11 +13,11 @@ _VL_EMBED_MODEL_IDS = frozenset(
 
 # Short name → full HF repo ID.
 _EMBED_MODEL_ALIASES: dict[str, str] = {
-    "nemo_retriever_v1": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+    "nemo_retriever_v1": "nvidia/llama-nemotron-embed-1b-v2",
     "llama-nemotron-embed-vl-1b-v2": "nvidia/llama-nemotron-embed-vl-1b-v2",
 }
 
-_DEFAULT_EMBED_MODEL = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+_DEFAULT_EMBED_MODEL = "nvidia/llama-nemotron-embed-1b-v2"
 
 
 def resolve_embed_model(model_name: str | None) -> str:

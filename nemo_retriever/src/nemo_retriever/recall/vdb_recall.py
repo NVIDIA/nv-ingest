@@ -105,7 +105,7 @@ def recall_with_main(
         help="gRPC embedding endpoint (e.g. 'localhost:8013').",
     ),
     embedding_model: str = typer.Option(
-        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "nvidia/llama-nemotron-embed-1b-v2",
         "--embedding-model",
         help="Embedding model name.",
     ),
@@ -228,7 +228,7 @@ def run(
         help="gRPC embedding endpoint (e.g. 'localhost:8013').",
     ),
     embedding_model: str = typer.Option(
-        "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "nvidia/llama-nemotron-embed-1b-v2",
         "--embedding-model",
         help="Embedding model name.",
     ),

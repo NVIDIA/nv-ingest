@@ -27,7 +27,7 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
-YOLOX_PAGE_DEFAULT_VERSION = "nemoretriever-page-elements-v3"
+YOLOX_PAGE_DEFAULT_VERSION = "nemotron-page-elements-v3"
 
 # Note: local-vs-remote selection is driven by `infer_protocol` ("local" vs "grpc"/"http")
 # at the `create_inference_client(...)` layer, not by environment variables.
@@ -2143,6 +2143,7 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
             "yolox",
             "yolox-page-elements",
             "page-elements",
+            "nemotron-page-elements-v3",
             "nemoretriever-page-elements-v3",
             "nemoretriever-page-elements-v2",
         ):
