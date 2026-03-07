@@ -23,7 +23,6 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import BytesIO
 from collections.abc import Callable, Iterator
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
@@ -637,8 +636,6 @@ def save_dataframe_to_disk_json(df: Any, *, output_directory: str) -> Any:
 from nemo_retriever.ingest_modes.lancedb_utils import (
     build_lancedb_rows,
     create_or_append_lancedb_table,
-    extract_embedding_from_row as _extract_embedding_from_row,
-    extract_source_path_and_page as _extract_source_path_and_page,
     infer_vector_dim,
     lancedb_schema,
 )

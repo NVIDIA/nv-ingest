@@ -7,8 +7,6 @@
 import json
 from types import SimpleNamespace
 
-import pytest
-
 from nemo_retriever.ingest_modes.lancedb_utils import (
     build_lancedb_row,
     build_lancedb_rows,
@@ -83,8 +81,16 @@ class TestBuildLancedbRow:
         result = build_lancedb_row(self._row())
         assert result is not None
         assert set(result.keys()) == {
-            "vector", "pdf_page", "filename", "pdf_basename",
-            "page_number", "source_id", "path", "metadata", "source", "text",
+            "vector",
+            "pdf_page",
+            "filename",
+            "pdf_basename",
+            "page_number",
+            "source_id",
+            "path",
+            "metadata",
+            "source",
+            "text",
         }
 
     def test_vector_extracted(self):
@@ -132,10 +138,12 @@ class TestBuildLancedbRows:
     def test_filters_rows_without_embeddings(self):
         import pandas as pd
 
-        df = pd.DataFrame([
-            {"metadata": {"embedding": [1.0]}, "path": "/a.pdf", "page_number": 1, "text": "a"},
-            {"metadata": {}, "path": "/b.pdf", "page_number": 1, "text": "b"},
-        ])
+        df = pd.DataFrame(
+            [
+                {"metadata": {"embedding": [1.0]}, "path": "/a.pdf", "page_number": 1, "text": "a"},
+                {"metadata": {}, "path": "/b.pdf", "page_number": 1, "text": "b"},
+            ]
+        )
         rows = build_lancedb_rows(df)
         assert len(rows) == 1
         assert rows[0]["vector"] == [1.0]
