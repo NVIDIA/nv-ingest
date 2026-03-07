@@ -88,11 +88,8 @@ class _LanceDBWriteActor:
     """
 
     def __init__(self, params: VdbUploadParams | None = None) -> None:
-        import json
-        from pathlib import Path
+        from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 
-        self._json = json
-        self._Path = Path
         lancedb_params = (params or VdbUploadParams()).lancedb
 
         self._lancedb_uri = lancedb_params.lancedb_uri
@@ -104,30 +101,13 @@ class _LanceDBWriteActor:
         self._text_column = lancedb_params.text_column
 
         import lancedb  # type: ignore
-        import pyarrow as pa  # type: ignore
 
-        self._pa = pa
         self._db = lancedb.connect(uri=self._lancedb_uri)
-        self._table = None
-        self._schema = None
-        self._first_batch = True
         self._total_rows = 0
-        self._table = None
-        mode = "overwrite" if self._overwrite else "create"
-        fields = [
-            pa.field("vector", pa.list_(pa.float32(), 2048)),
-            pa.field("pdf_page", pa.string()),
-            pa.field("filename", pa.string()),
-            pa.field("pdf_basename", pa.string()),
-            pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
-            pa.field("path", pa.string()),
-            pa.field("text", pa.string()),
-            pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
-        ]
-        self._schema = pa.schema(fields)
 
+        # Use a default dim for the initial empty table; rows are appended via add().
+        self._schema = lancedb_schema(2048)
+        mode = "overwrite" if self._overwrite else "create"
         self._table = self._db.create_table(
             self._table_name,
             schema=self._schema,
@@ -135,98 +115,16 @@ class _LanceDBWriteActor:
         )
 
     def _build_rows(self, df: Any) -> list:
-        """Build LanceDB rows from a pandas DataFrame batch.
+        """Build LanceDB rows from a pandas DataFrame batch."""
+        from nemo_retriever.ingest_modes.lancedb_utils import build_lancedb_rows
 
-        Mirrors the row-building logic from
-        ``upload_embeddings_to_lancedb_inprocess`` in inprocess.py.
-        """
-        rows: list = []
-        for row in df.itertuples(index=False):
-            # Extract embedding
-            emb = None
-            meta = getattr(row, "metadata", None)
-            if isinstance(meta, dict):
-                emb = meta.get("embedding")
-                if not (isinstance(emb, list) and emb):
-                    emb = None
-            if emb is None:
-                payload = getattr(row, self._embedding_column, None)
-                if isinstance(payload, dict):
-                    emb = payload.get(self._embedding_key)
-                    if not (isinstance(emb, list) and emb):
-                        emb = None
-            if emb is None:
-                continue
-
-            # Extract source path and page number
-            path = ""
-            page = -1
-            v = getattr(row, "path", None)
-            if isinstance(v, str) and v.strip():
-                path = v.strip()
-            v = getattr(row, "page_number", None)
-            try:
-                if v is not None:
-                    page = int(v)
-            except Exception:
-                pass
-            if isinstance(meta, dict):
-                sp = meta.get("source_path")
-                if isinstance(sp, str) and sp.strip():
-                    path = sp.strip()
-
-            p = self._Path(path) if path else None
-            filename = p.name if p is not None else ""
-            pdf_basename = p.stem if p is not None else ""
-            pdf_page = f"{pdf_basename}_{page}" if (pdf_basename and page >= 0) else ""
-            source_id = path or filename or pdf_basename
-
-            metadata_obj = {"page_number": int(page) if page is not None else -1}
-            if pdf_page:
-                metadata_obj["pdf_page"] = pdf_page
-            # Persist per-page detection counters for end-of-run summaries.
-            # These may be duplicated across exploded content rows; downstream
-            # summary logic should dedupe by (source_id, page_number).
-            pe_num = getattr(row, "page_elements_v3_num_detections", None)
-            if pe_num is not None:
-                try:
-                    metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
-                except Exception:
-                    pass
-            pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
-            if isinstance(pe_counts, dict):
-                metadata_obj["page_elements_v3_counts_by_label"] = {
-                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
-                }
-            for ocr_col in ("table", "chart", "infographic"):
-                entries = getattr(row, ocr_col, None)
-                if isinstance(entries, list):
-                    metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
-            ct = getattr(row, "_content_type", None)
-            if isinstance(ct, str) and ct:
-                metadata_obj["content_type"] = ct
-            source_obj = {"source_id": str(path)}
-
-            row_out = {
-                "vector": emb,
-                "pdf_page": pdf_page,
-                "filename": filename,
-                "pdf_basename": pdf_basename,
-                "page_number": int(page) if page is not None else -1,
-                "source_id": str(source_id),
-                "path": str(path),
-                "metadata": self._json.dumps(metadata_obj, ensure_ascii=False),
-                "source": self._json.dumps(source_obj, ensure_ascii=False),
-            }
-
-            if self._include_text:
-                t = getattr(row, self._text_column, None)
-                row_out["text"] = str(t) if isinstance(t, str) else ""
-            else:
-                row_out["text"] = ""
-
-            rows.append(row_out)
-        return rows
+        return build_lancedb_rows(
+            df,
+            embedding_column=self._embedding_column,
+            embedding_key=self._embedding_key,
+            text_column=self._text_column,
+            include_text=self._include_text,
+        )
 
     def __call__(self, batch_df: Any) -> Any:
         rows = self._build_rows(batch_df)
