@@ -168,6 +168,7 @@ class ExtractParams(_ParamsModel):
     page_elements_invoke_url: Optional[str] = None
     page_elements_api_key: Optional[str] = None
     page_elements_request_timeout_s: Optional[float] = None
+    graphic_elements_invoke_url: Optional[str] = None
     ocr_invoke_url: Optional[str] = None
     ocr_api_key: Optional[str] = None
     ocr_request_timeout_s: Optional[float] = None

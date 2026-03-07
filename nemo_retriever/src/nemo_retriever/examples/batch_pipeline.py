@@ -606,6 +606,11 @@ def main(
             "(used when --table-output-format=markdown)."
         ),
     ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
@@ -726,6 +731,7 @@ def main(
                         table_output_format=table_output_format,
                         table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
                             "debug_run_id": str(runtime_metrics_prefix or "unknown"),
@@ -789,6 +795,7 @@ def main(
                         table_output_format=table_output_format,
                         table_structure_invoke_url=table_structure_invoke_url,
                         page_elements_invoke_url=page_elements_invoke_url,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         ocr_invoke_url=ocr_invoke_url,
                         batch_tuning={
                             "debug_run_id": str(runtime_metrics_prefix or "unknown"),
