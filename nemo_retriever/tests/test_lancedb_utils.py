@@ -5,9 +5,22 @@
 """Unit tests for nemo_retriever.ingest_modes.lancedb_utils."""
 
 import json
+import sys
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
-from nemo_retriever.ingest_modes.lancedb_utils import (
+# The ingest_modes __init__.py eagerly imports batch/fused/inprocess/online,
+# which pull in ray, torch, etc.  Stub them so lancedb_utils can be imported
+# in lightweight CI (matching the pattern in test_multimodal_embed.py).
+for _mod_name in [
+    "nemo_retriever.ingest_modes.batch",
+    "nemo_retriever.ingest_modes.fused",
+    "nemo_retriever.ingest_modes.inprocess",
+    "nemo_retriever.ingest_modes.online",
+]:
+    sys.modules.setdefault(_mod_name, MagicMock())
+
+from nemo_retriever.ingest_modes.lancedb_utils import (  # noqa: E402
     build_lancedb_row,
     build_lancedb_rows,
     create_or_append_lancedb_table,
