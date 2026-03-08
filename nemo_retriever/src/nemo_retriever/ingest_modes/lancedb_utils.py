@@ -92,10 +92,21 @@ def _build_detection_metadata(row: Any) -> Dict[str, Any]:
             str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
         }
 
+    ge_num = getattr(row, "graphic_elements_v1_num_detections", None)
+    if ge_num is not None:
+        try:
+            out["graphic_elements_v1_num_detections"] = int(ge_num)
+        except Exception:
+            pass
+
     for ocr_col in ("table", "chart", "infographic"):
         entries = getattr(row, ocr_col, None)
         if isinstance(entries, list):
             out[f"ocr_{ocr_col}_detections"] = int(len(entries))
+
+    ct = getattr(row, "_content_type", None)
+    if isinstance(ct, str) and ct:
+        out["content_type"] = ct
 
     return out
 

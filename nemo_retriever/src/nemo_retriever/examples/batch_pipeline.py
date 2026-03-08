@@ -404,6 +404,11 @@ def main(
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
+    ),
     embed_invoke_url: Optional[str] = typer.Option(
         None,
         "--embed-invoke-url",
@@ -584,6 +589,11 @@ def main(
         "--text-elements-modality",
         help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
     ),
+    use_graphic_elements: bool = typer.Option(
+        False,
+        "--use-graphic-elements",
+        help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
+    ),
     use_table_structure: bool = typer.Option(
         False,
         "--use-table-structure",
@@ -721,6 +731,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         inference_batch_size=page_elements_batch_size,
                         use_table_structure=use_table_structure,
                         table_output_format=table_output_format,
@@ -784,6 +796,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         inference_batch_size=page_elements_batch_size,
                         use_table_structure=use_table_structure,
                         table_output_format=table_output_format,
