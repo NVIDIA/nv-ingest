@@ -18,4 +18,5 @@ def run_mode_ingest(
     ingest_params: IngestExecuteParams | None = None,
 ) -> object:
     ingestor = create_runmode_ingestor(run_mode=run_mode, params=create_params)
+    ingestor.ingest_strucutred(params=ingest_params)
     return ingestor.ingest(params=ingest_params)
