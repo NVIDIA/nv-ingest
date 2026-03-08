@@ -74,7 +74,10 @@ class NemotronGraphicElementsV1(BaseModel):
             raise RuntimeError("Local graphic_elements_v1 model was not initialized.")
 
         # Conditionally check and make sure the input data is on the correct device and shape
-        return self._model(input_data, orig_shape)[0]
+        results = self._model(input_data, orig_shape)
+        if len(results) == 1:
+            return results[0]
+        return results
 
     @property
     def model_name(self) -> str:
