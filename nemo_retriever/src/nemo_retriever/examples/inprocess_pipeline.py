@@ -4,7 +4,7 @@
 
 """
 In-process ingestion pipeline (no Ray) with optional recall evaluation.
-Run with: uv run python -m nemo_retriever.examples.inprocess_pipeline <input-dir>
+Run with: nr ingest inprocess <input-dir>
 """
 
 import json
@@ -96,7 +96,7 @@ def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     return key, dist
 
 
-@app.command()
+@app.command(name="pipeline")
 def main(
     input_path: Path = typer.Argument(
         ...,

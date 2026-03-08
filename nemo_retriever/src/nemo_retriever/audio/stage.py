@@ -5,8 +5,8 @@
 """
 Audio extraction stage: chunk + ASR only, write *.audio_extraction.json sidecars.
 
-Invoked as `retriever audio extract` / `retriever audio discover` (or
-`python -m nemo_retriever.audio extract` / `discover`). Analogous to `retriever pdf stage page-elements`.
+Invoked as `nr audio extract` / `nr audio discover` (or
+`python -m nemo_retriever.audio extract` / `discover`). Analogous to `nr pdf stage page-elements`.
 """
 
 from __future__ import annotations

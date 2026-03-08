@@ -49,36 +49,36 @@ From repo root:
 
 ```bash
 source ~/setup_env.sh
-source .retriever/bin/activate
+source .nr/bin/activate
 uv pip install -e ./nemo_retriever
 ```
 
 Single run:
 
 ```bash
-retriever harness run --dataset jp20 --preset single_gpu
-retriever harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
+nr harness run --dataset jp20 --preset single_gpu
+nr harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
 ```
 
 Sweep:
 
 ```bash
-retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
+nr harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
 ```
 
 Nightly:
 
 ```bash
-retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
-retriever harness nightly --dry-run
-retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+nr harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
+nr harness nightly --dry-run
+nr harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
 ```
 
 Session inspection:
 
 ```bash
-retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
-retriever harness compare \
+nr harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
+nr harness compare \
   nemo_retriever/artifacts/nightly_20260305_010203_UTC \
   nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```
@@ -148,9 +148,9 @@ Notes:
   - `financebench` now defaults to `data/financebench_train.json` with recall enabled.
 - Session UX improvements:
   - Runs, sweeps, and nightly sessions accept repeatable `--tag` values persisted into artifacts.
-  - `retriever harness summary` prints a compact table from `session_summary.json`.
+  - `nr harness summary` prints a compact table from `session_summary.json`.
 - Comparison utility:
-  - `retriever harness compare` prints pages/sec and recall deltas by run name for two sessions.
+  - `nr harness compare` prints pages/sec and recall deltas by run name for two sessions.
 
 ## Current Validation Status
 

@@ -1,4 +1,4 @@
-# nv-ingest retriever consolidated configuration
+# nv-ingest nr consolidated configuration
 #
 # This single file replaces the older per-stage YAML configs:
 #   - pdf_stage_config.yaml
@@ -17,7 +17,7 @@
 # - Sections below are consumed by their respective stages.
 
 pdf:
-  # Example config for: `retriever pdf stage page-elements --config <this.yaml>`
+  # Example config for: `nr pdf stage page-elements --config <this.yaml>`
   #
   # Directory containing PDFs (scanned recursively for *.pdf)
   input_dir: /home/local/jdyer/datasets/jp20
@@ -59,14 +59,14 @@ pdf:
   # Optionally limit number of PDFs processed
   limit: null
 
-# Optional config for `retriever txt run` and .extract_txt() API
+# Optional config for `nr txt run` and .extract_txt() API
 txt:
   max_tokens: 512
   overlap_tokens: 0
   tokenizer_model_id: nvidia/llama-nemotron-embed-1b-v2
   encoding: utf-8
 
-# Optional config for `retriever html run` and .extract_html() API
+# Optional config for `nr html run` and .extract_html() API
 html:
   max_tokens: 512
   overlap_tokens: 0
@@ -94,8 +94,8 @@ audio_asr:
 
 table:
   # Example config for:
-  #   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`
-  #   - `retriever local stage3 run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr table stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr local stage3 run --config <this.yaml> --input <primitives.parquet>`
   #
   # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema`
   # via `nemo_retriever.table.config.load_table_extractor_schema_from_dict`.
@@ -133,8 +133,8 @@ table:
 
 chart:
   # Example config for:
-  #   - `retriever chart stage run --config <this.yaml> --input <primitives.parquet>`
-  #   - `retriever local stage4 run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr chart stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr local stage4 run --config <this.yaml> --input <primitives.parquet>`
   #
   # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_chart_schema.ChartExtractorSchema`
   # via `nemo_retriever.chart.config.load_chart_extractor_schema_from_dict`.
@@ -185,8 +185,8 @@ chart:
 
 infographic:
   # Example config for:
-  #   - `retriever infographic stage run --config <this.yaml> --input <primitives.parquet>`
-  #   - `retriever local stage2 run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr infographic stage run --config <this.yaml> --input <primitives.parquet>`
+  #   - `nr local stage2 run --config <this.yaml> --input <primitives.parquet>`
   #
   # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_infographic_schema.InfographicExtractorSchema`
   # via `nemo_retriever.infographic.config.load_infographic_extractor_schema_from_dict`.
@@ -231,7 +231,7 @@ embedding:
   api_key: ""  # e.g. $NGC_API_KEY or $NVIDIA_API_KEY
 
   # Embedding service settings
-  # If set to null/empty, `retriever local stage5` will fall back to local HF embeddings
+  # If set to null/empty, `nr local stage5` will fall back to local HF embeddings
   # via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
   embedding_nim_endpoint: null
   # embedding_nim_endpoint: "http://localhost:8012/v1"

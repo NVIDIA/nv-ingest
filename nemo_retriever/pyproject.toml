@@ -69,6 +69,7 @@ dependencies = [
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
   "nvidia-ml-py",
+  "pytest"
 ]
 
 [project.optional-dependencies]
@@ -78,7 +79,7 @@ dev = [
 ]
 
 [project.scripts]
-retriever = "nemo_retriever.__main__:main"
+nr = "nemo_retriever.__main__:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "nemo_retriever.version.get_build_version"}

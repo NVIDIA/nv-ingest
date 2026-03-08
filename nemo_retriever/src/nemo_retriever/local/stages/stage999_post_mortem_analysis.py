@@ -659,7 +659,7 @@ def _gather_results_zip(
 
         # Include a small readme to guide recipients.
         readme = (
-            "retriever stage999 gathered results\n"
+            "nr stage999 gathered results\n"
             "\n"
             "Contents:\n"
             "- bo767_query_gt.csv: original query->pdf_page mapping\n"
@@ -1697,7 +1697,7 @@ def _run_ui(*, examples: Sequence[ResolvedExample], global_metrics: Dict[str, An
     summary_cache: Dict[int, Dict[str, Any]] = {}
 
     root = tk.Tk()
-    root.title("retriever stage999 post-mortem analysis")
+    root.title("nr stage999 post-mortem analysis")
 
     # Layout: left search+list, right detail panel.
     root.columnconfigure(0, weight=0)

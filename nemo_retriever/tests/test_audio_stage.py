@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Tests for the audio extraction-only stage (retriever audio extract).
+Tests for the audio extraction-only stage (nr audio extract).
 """
 
 from pathlib import Path

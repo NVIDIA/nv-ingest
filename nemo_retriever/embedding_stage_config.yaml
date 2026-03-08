@@ -11,7 +11,7 @@
 api_key: ""  # e.g. $NGC_API_KEY or $NVIDIA_API_KEY
 
 # Embedding service settings
-# If set to null/empty, `retriever local stage5` will fall back to local HF embeddings
+# If set to null/empty, `nr local stage5` will fall back to local HF embeddings
 # via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
 embedding_nim_endpoint: null
 # embedding_nim_endpoint: "http://localhost:8012/v1"

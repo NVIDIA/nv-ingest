@@ -1,6 +1,6 @@
 # Example config for:
-#   - `retriever table stage run --config <this.yaml> --input <primitives.parquet>`
-#   - `retriever local stage3 run --config <this.yaml> --input <primitives.parquet>`
+#   - `nr table stage run --config <this.yaml> --input <primitives.parquet>`
+#   - `nr local stage3 run --config <this.yaml> --input <primitives.parquet>`
 #
 # This YAML is parsed into `nv_ingest_api.internal.schemas.extract.extract_table_schema.TableExtractorSchema`
 # via `nemo_retriever.table.config.load_table_extractor_schema_from_dict`.

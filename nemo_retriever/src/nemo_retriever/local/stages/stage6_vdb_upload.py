@@ -10,7 +10,7 @@ Local pipeline stage6: thin proxy for vector store upload CLI.
 This module intentionally contains no configuration logic. It re-exports the
 `nemo_retriever.vector_store.stage` Typer application so arguments provided to:
 
-  `retriever local stage6 ...`
+  `nr local stage6 ...`
 
 are handled by `nemo_retriever.vector_store.stage`.
 """
