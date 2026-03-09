@@ -711,6 +711,9 @@ def main(
             .materialize()
         )
 
+        if hasattr(ingestor, "_create_lancedb_index"):
+            ingestor._create_lancedb_index()
+
         ingest_elapsed_s = time.perf_counter() - ingest_start
         num_rows = ingest_results.groupby("source_id").count().count()
         logger.info(
