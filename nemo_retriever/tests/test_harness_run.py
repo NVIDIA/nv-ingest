@@ -3,7 +3,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from nemo_retriever.harness import app as harness_app
+from nemo_retriever.harness.cli import app as harness_app
 from nemo_retriever.harness.artifacts import create_run_artifact_dir
 from nemo_retriever.harness.config import HarnessConfig
 from nemo_retriever.harness import run as harness_run

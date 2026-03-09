@@ -25,7 +25,10 @@ def test_batch_ingestor_filters_none_runtime_env_vars(monkeypatch) -> None:
     captured: dict[str, object] = {}
     dummy_ctx = SimpleNamespace(enable_rich_progress_bars=False, use_ray_tqdm=True)
 
-    monkeypatch.delenv("NEMO_RETRIEVER_HF_CACHE_DIR", raising=False)
+    monkeypatch.setattr(
+        "nemo_retriever.ingest_modes.batch.resolve_hf_cache_dir",
+        lambda: "/tmp/hf-cache",
+    )
     monkeypatch.setattr(
         "nemo_retriever.ingest_modes.batch.ray.init",
         lambda **kwargs: captured.update(kwargs),
@@ -45,6 +48,11 @@ def test_batch_ingestor_filters_none_runtime_env_vars(monkeypatch) -> None:
 
     BatchIngestor(documents=[])
 
-    assert captured["runtime_env"] == {"env_vars": {"LOG_LEVEL": "INFO"}}
+    assert captured["runtime_env"] == {
+        "env_vars": {
+            "LOG_LEVEL": "INFO",
+            "NEMO_RETRIEVER_HF_CACHE_DIR": "/tmp/hf-cache",
+        }
+    }
     assert dummy_ctx.enable_rich_progress_bars is True
     assert dummy_ctx.use_ray_tqdm is False

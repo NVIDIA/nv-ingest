@@ -26,8 +26,10 @@ Pages/sec (ingest only; excludes Ray startup and recall): 15.77
 
 def test_parse_stream_text_extracts_rows_and_logger_prefixed_recall_lines() -> None:
     stdout = """
-2026-03-06 20:12:42,120 INFO nemo_retriever.examples.batch_pipeline: Ingestion complete. 3181 rows procesed in 151.40 seconds. 21.01 PPS
-2026-03-06 20:12:42,121 INFO nemo_retriever.examples.batch_pipeline: Recall metrics (matching nemo_retriever.recall.core):
+2026-03-06 20:12:42,120 INFO nemo_retriever.examples.batch_pipeline: \
+Ingestion complete. 3181 rows procesed in 151.40 seconds. 21.01 PPS
+2026-03-06 20:12:42,121 INFO nemo_retriever.examples.batch_pipeline: \
+Recall metrics (matching nemo_retriever.recall.core):
 2026-03-06 20:12:42,122 INFO nemo_retriever.examples.batch_pipeline:   recall@1: 0.6087
 2026-03-06 20:12:42,123 INFO nemo_retriever.examples.batch_pipeline:   recall@5: 0.9043
 2026-03-06 20:12:42,124 INFO nemo_retriever.examples.batch_pipeline:   recall@10: 0.9565

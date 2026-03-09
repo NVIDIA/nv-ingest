@@ -41,7 +41,7 @@ It captures what exists now, what was intentionally chosen, and what to iterate 
 - Adapter-capable datasets:
   - `earnings` uses `recall_adapter: page_plus_one` (`page` -> `pdf_page` conversion).
   - `bo10k` wiring is included (adapter + mode), with recall disabled by default until query path is set.
-  - `financebench` wiring is included for `pdf_only` matching with `financebench_json` adapter, with recall disabled by default until query path is set.
+  - `financebench` uses `pdf_only` matching with `financebench_json` and defaults to `data/financebench_train.json`.
 
 ## Current CLI Usage
 
@@ -72,6 +72,16 @@ Nightly:
 ```bash
 retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
 retriever harness nightly --dry-run
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+```
+
+Session inspection:
+
+```bash
+retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
+retriever harness compare \
+  nemo_retriever/artifacts/nightly_20260305_010203_UTC \
+  nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```
 
 ## Artifact Contract (Current)
@@ -138,16 +148,24 @@ Notes:
   - Dataset presets can resolve from `/raid/$USER/...` when `/datasets/nv-ingest/...` is unavailable.
   - `financebench` now defaults to `data/financebench_train.json` with recall enabled.
 - Session UX improvements:
-  - Runs and sweeps accept repeatable `--tag` values persisted into artifacts.
+  - Runs, sweeps, and nightly sessions accept repeatable `--tag` values persisted into artifacts.
+  - `retriever harness summary` prints a compact table from `session_summary.json`.
+- Comparison utility:
+  - `retriever harness compare` prints pages/sec and recall deltas by run name for two sessions.
 
 ## Current Validation Status
 
 Harness-focused tests pass:
 
 ```bash
-pytest -q nemo_retriever/tests/test_harness_parsers.py \
+pytest -q nemo_retriever/tests/test_batch_ingestor.py \
+  nemo_retriever/tests/test_batch_pipeline.py \
+  nemo_retriever/tests/test_harness_parsers.py \
   nemo_retriever/tests/test_harness_config.py \
-  nemo_retriever/tests/test_harness_run.py
+  nemo_retriever/tests/test_harness_run.py \
+  nemo_retriever/tests/test_harness_reporting.py \
+  nemo_retriever/tests/test_harness_recall_adapters.py \
+  nemo_retriever/tests/test_recall_core.py
 ```
 
 ## Upstream Batch Compatibility (Mar 2026)
@@ -204,12 +222,9 @@ shim for that newer upstream behavior.
 
 - Completed in PR 1: add run-level metadata fields useful for long-term tracking:
   - `host`, `gpu_count`, `cuda_driver`, `ray_version`, `python_version`.
-- Add optional run tag support to nightly sessions too, so all harness entrypoints share the same tagging behavior.
-- Add one command to print a compact table from a session (`session_summary.json`) for quick review.
 
 ### P1
 
-- Add a stable compare utility for two sessions (delta pages/sec and recall deltas by run name).
 - Add preset inheritance or scaling helper to reduce duplicated numeric tuning in YAML.
 - Add an artifact retention helper (manual command) to prune old sessions by age/size.
 - Consider a single `recall_profile` abstraction (mapping to adapter + match mode) to reduce config coupling
