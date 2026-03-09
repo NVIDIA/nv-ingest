@@ -36,6 +36,22 @@ LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
 
 
+def _resolve_input_file_patterns(input_path: Path, input_type: str) -> list[str]:
+    input_path = Path(input_path)
+    if input_path.is_file():
+        return [str(input_path)]
+    if not input_path.is_dir():
+        raise typer.BadParameter(f"Path does not exist: {input_path}")
+
+    ext_map = {
+        "txt": ["*.txt"],
+        "html": ["*.html"],
+        "doc": ["*.docx", "*.pptx"],
+    }
+    exts = ext_map.get(input_type, ["*.pdf"])
+    return [str(input_path / "**" / ext) for ext in exts]
+
+
 def _lancedb():
     """Import lancedb lazily to avoid fork warnings during early process setup."""
     return import_module("lancedb")
@@ -514,18 +530,7 @@ def main(
             embed_gpus_per_actor = 0.0
 
         input_path = Path(input_path)
-        if input_path.is_file():
-            file_patterns = [str(input_path)]
-        elif input_path.is_dir():
-            ext_map = {
-                "txt": ["*.txt"],
-                "html": ["*.html"],
-                "doc": ["*.docx", "*.pptx"],
-            }
-            exts = ext_map.get(input_type, ["*.pdf"])
-            file_patterns = [str(input_path / e) for e in exts]
-        else:
-            raise typer.BadParameter(f"Path does not exist: {input_path}")
+        file_patterns = _resolve_input_file_patterns(input_path, input_type)
 
         ingestor = create_ingestor(
             run_mode="batch",

@@ -188,7 +188,7 @@ def test_run_entry_session_artifact_dir_uses_run_name(monkeypatch, tmp_path: Pat
             "success": True,
             "return_code": 0,
             "failure_reason": None,
-            "metrics": {"files": 0, "pages": 0},
+            "summary_metrics": {"pages": 0, "ingest_secs": 1.0, "pages_per_sec_ingest": 0.0, "recall_5": None},
         }
 
     monkeypatch.setattr(harness_run, "_run_single", _fake_run_single)
@@ -222,7 +222,7 @@ def test_run_entry_returns_tags(monkeypatch, tmp_path: Path) -> None:
             "success": True,
             "return_code": 0,
             "failure_reason": None,
-            "metrics": {"files": 0, "pages": 0},
+            "summary_metrics": {"pages": 0, "ingest_secs": 1.0, "pages_per_sec_ingest": 0.0, "recall_5": None},
         }
 
     monkeypatch.setattr(harness_run, "_run_single", _fake_run_single)
@@ -381,6 +381,12 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "rows_per_sec_ingest": 254.48,
             "recall_5": 0.9,
         },
+        "summary_metrics": {
+            "pages": 3181,
+            "ingest_secs": 12.5,
+            "pages_per_sec_ingest": 254.48,
+            "recall_5": 0.9,
+        },
         "run_metadata": {
             "host": "builder-01",
             "gpu_count": 2,
@@ -452,7 +458,45 @@ def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path:
     assert result["metrics"]["rows_processed"] == 42
     assert result["metrics"]["rows_per_sec_ingest"] == 3.5
     assert result["metrics"]["pages"] is None
+    assert result["summary_metrics"] == {
+        "pages": None,
+        "ingest_secs": 12.0,
+        "pages_per_sec_ingest": None,
+        "recall_5": None,
+    }
     assert "detection_summary_file" not in result["artifacts"]
+
+
+def test_resolve_summary_metrics_falls_back_to_dataset_page_count(monkeypatch, tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="earnings",
+        preset="single_gpu",
+        recall_required=False,
+    )
+
+    pdf_a = dataset_dir / "a.pdf"
+    pdf_b = dataset_dir / "nested" / "b.pdf"
+    pdf_b.parent.mkdir()
+    pdf_a.write_text("placeholder", encoding="utf-8")
+    pdf_b.write_text("placeholder", encoding="utf-8")
+
+    monkeypatch.setattr(harness_run, "_safe_pdf_page_count", lambda path: 3 if path.name == "a.pdf" else 7)
+
+    summary = harness_run._resolve_summary_metrics(
+        cfg,
+        {"pages": None, "ingest_secs": 5.0, "pages_per_sec_ingest": None, "recall_5": 0.75},
+        runtime_summary=None,
+    )
+
+    assert summary == {
+        "pages": 10,
+        "ingest_secs": 5.0,
+        "pages_per_sec_ingest": 2.0,
+        "recall_5": 0.75,
+    }
 
 
 def test_cli_run_accepts_repeated_tags(monkeypatch) -> None:
