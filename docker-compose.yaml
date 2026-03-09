@@ -49,6 +49,10 @@ services:
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemotron-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.8.0}
     shm_size: 16gb
+    ports:
+      - "${GRAPHIC_ELEMENTS_HTTP_PORT:-8003}:8000"
+      - "${GRAPHIC_ELEMENTS_GRPC_PORT:-8004}:8001"
+      - "${GRAPHIC_ELEMENTS_METRICS_PORT:-8005}:8002"
     expose:
       - "8000"
       - "8001"
@@ -73,6 +77,10 @@ services:
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemotron-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.8.0}
     shm_size: 16gb
+    ports:
+      - "${TABLE_STRUCTURE_HTTP_PORT:-8006}:8000"
+      - "${TABLE_STRUCTURE_GRPC_PORT:-8007}:8001"
+      - "${TABLE_STRUCTURE_METRICS_PORT:-8008}:8002"
     expose:
       - "8000"
       - "8001"
@@ -98,7 +106,7 @@ services:
     image: ${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-1.2.1}
     shm_size: 16gb
     ports:
-      - "${OCR_HTTP_PORT:-8019}:8000"
+      - "${OCR_HTTP_PORT:-8009}:8000"
       - "${OCR_GRPC_PORT:-8010}:8001"
       - "${OCR_METRICS_PORT:-8011}:8002"
     expose:
@@ -152,6 +160,8 @@ services:
     # NIM ON
     image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2}:${RERANKER_TAG:-1.10.0}
     shm_size: 16gb
+    ports:
+      - "${RERANKER_HTTP_PORT:-8020}:8000"
     expose:
       - "8000"
     environment:
