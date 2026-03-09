@@ -148,7 +148,7 @@ hostname="localhost"
 collection_name = "nemo_retriever_collection"
 sparse = True
 top_k = 5
-model_name="nvidia/llama-3.2-nv-embedqa-1b-v2"
+model_name="nvidia/llama-nemotron-embed-1b-v2"
 
 filter_expr = 'content_metadata["department"] == "Engineering"'
 

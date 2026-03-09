@@ -68,6 +68,7 @@ dependencies = [
   # Local ASR (Parakeet): read chunk files and resample to 16 kHz mono
   "soundfile>=0.12.0",
   "scipy>=1.11.0",
+  "nvidia-ml-py",
 ]
 
 [project.optional-dependencies]
@@ -100,7 +101,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.setuptools.packages.find]

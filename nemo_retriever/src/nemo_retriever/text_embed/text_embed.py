@@ -12,7 +12,7 @@ environments that don't have the full schema/transform stack installed.
 
 It mirrors the "pure pandas batch fn + Ray-friendly actor" pattern used by:
 - `nemo_retriever.page_elements.detect_page_elements_v3`
-- `nemo_retriever.chart.chart_detection.detect_graphic_elements_v1`
+- `nemo_retriever.chart.chart_detection.graphic_elements_ocr_page_elements`
 """
 
 from dataclasses import dataclass
@@ -190,28 +190,16 @@ class TextEmbedActor:
         hf_cache_dir = self.detect_kwargs.pop("hf_cache_dir", None)
         normalize = bool(self.detect_kwargs.pop("normalize", True))
         max_length = self.detect_kwargs.pop("max_length", 4096)
-        model_name = self.detect_kwargs.get("model_name")
 
-        from nemo_retriever.model import is_vl_embed_model
+        from nemo_retriever.model import create_local_embedder
 
-        if is_vl_embed_model(model_name):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            self._model = LlamaNemotronEmbedVL1BV2Embedder(
-                device=str(device) if device is not None else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-            )
-        else:
-            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-
-            self._model = LlamaNemotronEmbed1BV2Embedder(
-                device=str(device) if device is not None else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
-                normalize=normalize,
-                max_length=int(max_length),
-            )
+        self._model = create_local_embedder(
+            self.detect_kwargs.get("model_name"),
+            device=str(device) if device is not None else None,
+            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir is not None else None,
+            normalize=normalize,
+            max_length=int(max_length),
+        )
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:

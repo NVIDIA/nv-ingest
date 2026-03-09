@@ -16,6 +16,9 @@ from typing import Any, Dict
 
 import ray.data as rd
 
+from nemo_retriever.chart.chart_detection import (
+    graphic_elements_ocr_page_elements,
+)
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
@@ -38,6 +41,7 @@ def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None
         "page_elements_invoke_url",
         "ocr_invoke_url",
         "table_structure_invoke_url",
+        "graphic_elements_invoke_url",
         "embedding_endpoint",
         "embed_invoke_url",
     )
@@ -55,10 +59,8 @@ class _FusedModelActor:
     def __init__(self, **kwargs: Any) -> None:
         _assert_no_remote_endpoints(dict(kwargs), context="actor init")
 
+        from nemo_retriever.model import create_local_embedder
         from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-            LlamaNemotronEmbed1BV2Embedder,
-        )
 
         self._detect_kwargs = {
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
@@ -76,6 +78,7 @@ class _FusedModelActor:
         )
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
+        self._use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
         self._embed_granularity = str(kwargs.get("embed_granularity", "element"))
         self._embed_modality = str(kwargs.get("embed_modality", "text"))
         self._embed_kwargs = {
@@ -89,26 +92,24 @@ class _FusedModelActor:
             "has_embedding_column": str(kwargs.get("has_embedding_column", "text_embeddings_1b_v2_has_embedding")),
         }
 
-        device = kwargs.get("device")
-        hf_cache_dir = kwargs.get("hf_cache_dir")
-        normalize = bool(kwargs.get("normalize", True))
-        max_length = int(kwargs.get("max_length", 8192))
-        model_name_raw = kwargs.get("model_name")
-        model_id = model_name_raw if (isinstance(model_name_raw, str) and "/" in model_name_raw) else None
-
         self._page_elements_model = NemotronPageElementsV3()
+        self._ge_model = None
+        if self._use_graphic_elements and self._extract_charts:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+            self._ge_model = NemotronGraphicElementsV1()
         self._ocr_model = NemotronOCRV1()
         self._table_structure_model = None
         if self._extract_tables and self._use_table_structure:
             from nemo_retriever.model.local import NemotronTableStructureV1
 
             self._table_structure_model = NemotronTableStructureV1()
-        self._embed_model = LlamaNemotronEmbed1BV2Embedder(
-            device=str(device) if device else None,
-            hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-            normalize=normalize,
-            max_length=max_length,
-            model_id=model_id,
+        self._embed_model = create_local_embedder(
+            kwargs.get("model_name"),
+            device=str(kwargs["device"]) if kwargs.get("device") else None,
+            hf_cache_dir=str(kwargs["hf_cache_dir"]) if kwargs.get("hf_cache_dir") else None,
+            normalize=bool(kwargs.get("normalize", True)),
+            max_length=int(kwargs.get("max_length", 8192)),
         )
 
     def __call__(self, batch_df: Any) -> Any:
@@ -117,6 +118,16 @@ class _FusedModelActor:
             model=self._page_elements_model,
             **self._detect_kwargs,
         )
+
+        # Charts: combined graphic-elements + OCR stage (like table-structure + OCR).
+        ocr_extract_charts = self._extract_charts
+        if self._use_graphic_elements and self._extract_charts:
+            detected = graphic_elements_ocr_page_elements(
+                detected,
+                graphic_elements_model=self._ge_model,
+                ocr_model=self._ocr_model,
+            )
+            ocr_extract_charts = False  # Charts already handled.
 
         if self._extract_tables and self._use_table_structure:
             # Tables go through combined table-structure + OCR stage.
@@ -130,7 +141,7 @@ class _FusedModelActor:
                 detected,
                 model=self._ocr_model,
                 extract_tables=False,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
             )
         else:
@@ -138,10 +149,9 @@ class _FusedModelActor:
                 detected,
                 model=self._ocr_model,
                 extract_tables=self._extract_tables,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
             )
-
         if self._embed_granularity == "page":
             prepared = collapse_content_to_page_rows(
                 ocred, text_column=str(self._embed_kwargs["text_column"]), modality=self._embed_modality
@@ -188,6 +198,7 @@ class FusedIngestor(BatchIngestor):
             "table_output_format": str(kwargs.get("table_output_format", "pseudo_markdown")),
             "extract_charts": bool(kwargs.get("extract_charts", False)),
             "extract_infographics": bool(kwargs.get("extract_infographics", False)),
+            "use_graphic_elements": bool(kwargs.get("use_graphic_elements", False)),
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
         }
 

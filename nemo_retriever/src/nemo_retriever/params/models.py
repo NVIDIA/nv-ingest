@@ -42,6 +42,7 @@ class IngestorCreateParams(_ParamsModel):
     documents: list[str] = Field(default_factory=list)
     ray_address: Optional[str] = None
     ray_log_to_driver: bool = True
+    debug: bool = False
     base_url: str = "http://localhost:7670"
 
 
@@ -119,12 +120,13 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
     detect_batch_size: int = 24
-    page_elements_workers: int = 1
-    ocr_workers: int = 1
+    ocr_inference_batch_size: Optional[int] = None
+    page_elements_workers: Optional[int] = None
+    ocr_workers: Optional[int] = None
     detect_workers: Optional[int] = None
     page_elements_cpus_per_actor: float = 1
     ocr_cpus_per_actor: float = 1
-    embed_workers: int = 1
+    embed_workers: Optional[int] = None
     embed_batch_size: int = 256
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
@@ -133,6 +135,7 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_workers: float = 0.0
     gpu_nemotron_parse: float = 0.0
     nemotron_parse_batch_size: float = 0.0
+    inference_batch_size: int = 8
 
 
 class FusedTuningParams(_ParamsModel):
@@ -155,6 +158,7 @@ class ExtractParams(_ParamsModel):
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     extract_charts: bool = False
+    use_graphic_elements: bool = False
     extract_infographics: bool = False
     extract_page_as_image: Optional[bool] = None
     dpi: int = 200
@@ -168,6 +172,7 @@ class ExtractParams(_ParamsModel):
     ocr_invoke_url: Optional[str] = None
     ocr_api_key: Optional[str] = None
     ocr_request_timeout_s: Optional[float] = None
+    graphic_elements_invoke_url: Optional[str] = None
     table_structure_invoke_url: Optional[str] = None
 
     inference_batch_size: int = 8
@@ -180,14 +185,18 @@ class ExtractParams(_ParamsModel):
     batch_tuning: BatchTuningParams = Field(default_factory=BatchTuningParams)
 
     @model_validator(mode="after")
-    def _auto_enable_table_structure(self) -> "ExtractParams":
-        """Auto-configure table-structure flags.
+    def _auto_enable_features(self) -> "ExtractParams":
+        """Auto-configure feature flags from remote endpoints.
 
+        * Enable ``use_graphic_elements`` when ``graphic_elements_invoke_url``
+          is provided.
         * Enable ``use_table_structure`` when ``table_structure_invoke_url``
           is provided.
         * Default ``table_output_format`` to ``"markdown"`` when the stage is
           enabled and the caller did not explicitly choose a format.
         """
+        if self.graphic_elements_invoke_url and not self.use_graphic_elements:
+            self.use_graphic_elements = True
         if self.table_structure_invoke_url and not self.use_table_structure:
             self.use_table_structure = True
         if self.table_output_format is None:
