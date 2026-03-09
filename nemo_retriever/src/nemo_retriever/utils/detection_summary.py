@@ -55,9 +55,7 @@ def compute_detection_summary(
             },
         )
 
-        pe = _safe_int(
-            meta.get("page_elements_v3_num_detections") or raw_row.get("page_elements_v3_num_detections")
-        )
+        pe = _safe_int(meta.get("page_elements_v3_num_detections") or raw_row.get("page_elements_v3_num_detections"))
         entry["pe"] = max(entry["pe"], pe)
 
         for field, meta_key, col_key in [
@@ -72,9 +70,7 @@ def compute_detection_summary(
                     val = len(col_val)
             entry[field] = max(entry[field], val)
 
-        label_counts = meta.get("page_elements_v3_counts_by_label") or raw_row.get(
-            "page_elements_v3_counts_by_label"
-        )
+        label_counts = meta.get("page_elements_v3_counts_by_label") or raw_row.get("page_elements_v3_counts_by_label")
         if isinstance(label_counts, dict):
             for label, count in label_counts.items():
                 entry["pe_by_label"][str(label)] = max(

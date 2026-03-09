@@ -4,8 +4,6 @@
 
 """Unit tests for nemo_retriever.params.utils."""
 
-import pytest
-
 from nemo_retriever.params.models import EmbedParams
 from nemo_retriever.params.utils import build_embed_kwargs, coerce_params
 
