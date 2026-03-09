@@ -22,9 +22,15 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from nemo_retriever.application.modes.factory import create_runmode_ingestor
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
+from nemo_retriever.params import StructuredFetchParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import RunMode
+from nemo_retriever.params import StructuredDescriptionParams
+from nemo_retriever.params import StructuredExtractParams
+from nemo_retriever.params import StructuredPIIParams
+from nemo_retriever.params import StructuredSemanticLayerParams
+from nemo_retriever.params import StructuredUsageWeightsParams
 from nemo_retriever.params import VdbUploadParams
 
 
@@ -200,6 +206,110 @@ class ingestor:
         Once Ray execution is wired, this should reflect actual job/task state.
         """
         self._not_implemented("get_status")
+
+    # ------------------------------------------------------------------
+    # Structured (database) ingestion — 8-step pipeline
+    # ------------------------------------------------------------------
+
+    def extract_structured(
+        self,
+        params: StructuredExtractParams | None = None,
+        **kwargs: Any,
+    ) -> "ingestor":
+        """Step 1 — Reflect DB schema / parse SQL files → write graph nodes to Neo4j.
+
+        Uses SQLAlchemy reflection and/or SQL file parsing to produce
+        Database, Schema, Table, Column, View and Query nodes together with
+        their relationships.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("extract_structured")
+
+    def populate_structured_semantic_layer(
+        self,
+        params: StructuredSemanticLayerParams | None = None,
+        **kwargs: Any,
+    ) -> "ingestor":
+        """Step 2 — Map global business terms/attributes to graph entities.
+
+        Auto-creates Term/Attribute nodes and MAPS_TO_TABLE / MAPS_TO_COLUMN
+        relationships for entities that are not already covered by the
+        semantic-layer definition.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("populate_structured_semantic_layer")
+
+    def detect_structured_pii(
+        self,
+        params: StructuredPIIParams | None = None,
+        **kwargs: Any,
+    ) -> "ingestor":
+        """Step 3 — Tag Column nodes with PII type via regex and optional LLM.
+
+        Writes a ``pii_type`` property and a HAS_PII_TYPE relationship onto
+        each Column node that matches a known PII pattern.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("detect_structured_pii")
+
+    def populate_structured_usage_weights(
+        self,
+        params: StructuredUsageWeightsParams | None = None,
+        **kwargs: Any,
+    ) -> "ingestor":
+        """Step 4 — Derive usage weights from query log files.
+
+        Parses SQL query logs, computes Table/Column co-occurrence frequencies,
+        and writes ``usage_weight`` float properties back onto the graph nodes.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("populate_structured_usage_weights")
+
+    def generate_structured_descriptions(
+        self,
+        params: StructuredDescriptionParams | None = None,
+        **kwargs: Any,
+    ) -> "ingestor":
+        """Step 5 — LLM-generate natural-language descriptions for all node types.
+
+        Descriptions are written back to Neo4j as a ``description`` property
+        on Database, Schema, Table, Column, View and Query nodes.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("generate_structured_descriptions")
+
+    def fetch_structured(
+        self,
+        params: StructuredFetchParams | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        """Step 6 — Fetch entity descriptions from Neo4j into a DataFrame.
+
+        Builds a pandas DataFrame with columns ``text`` (the description),
+        ``_embed_modality`` = ``"text"``, and ``metadata`` (JSON blob with
+        entity_type, entity_name, node_id).  No embedding is computed here;
+        the returned DataFrame is passed directly to the embed step.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("fetch_structured")
+
+    def ingest_structured(
+        self,
+        params: StructuredExtractParams | None = None,
+    ) -> Any:
+        """Orchestrate the full 8-step structured ingestion pipeline.
+
+        Runs the following steps in order:
+        1. extract_structured
+        2. populate_structured_semantic_layer
+        3. detect_structured_pii
+        4. populate_structured_usage_weights
+        5. generate_structured_descriptions
+        6. fetch_structured
+        7. embed
+        8. vdb_upload
+        """
+        self._not_implemented("ingest_structured")
 
 
 # Backward compatibility alias.

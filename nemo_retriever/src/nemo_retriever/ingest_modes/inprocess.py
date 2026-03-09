@@ -51,8 +51,14 @@ from ..params import AudioChunkParams
 from ..params import EmbedParams
 from ..params.models import IMAGE_MODALITIES
 from ..params import ExtractParams
+from ..params import StructuredFetchParams
 from ..params import HtmlChunkParams
 from ..params import IngestExecuteParams
+from ..params import StructuredDescriptionParams
+from ..params import StructuredExtractParams
+from ..params import StructuredPIIParams
+from ..params import StructuredSemanticLayerParams
+from ..params import StructuredUsageWeightsParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
 from ..pdf.extract import pdf_extraction
@@ -1761,3 +1767,93 @@ class InProcessIngestor(Ingestor):
         if show_progress:
             _print_ingest_summary(results, time.perf_counter() - _start)
         return results
+
+    # ------------------------------------------------------------------
+    # Structured (database) ingestion — placeholder implementations
+    # ------------------------------------------------------------------
+
+    def extract_structured(
+        self,
+        params: StructuredExtractParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """Step 1 — Reflect DB schema / parse SQL files → write graph nodes to Neo4j."""
+        pass
+
+    def populate_structured_semantic_layer(
+        self,
+        params: StructuredSemanticLayerParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """Step 2 — Map global business terms/attributes to graph entities."""
+        pass
+
+    def detect_structured_pii(
+        self,
+        params: StructuredPIIParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """Step 3 — Tag Column nodes with PII type via regex and optional LLM."""
+        pass
+
+    def populate_structured_usage_weights(
+        self,
+        params: StructuredUsageWeightsParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """Step 4 — Derive usage weights from query log files."""
+        pass
+
+    def generate_structured_descriptions(
+        self,
+        params: StructuredDescriptionParams | None = None,
+        **kwargs: Any,
+    ) -> "InProcessIngestor":
+        """Step 5 — LLM-generate natural-language descriptions for all node types."""
+        pass
+
+    def fetch_structured(
+        self,
+        params: StructuredFetchParams | None = None,
+        **kwargs: Any,
+    ) -> "pd.DataFrame | None":
+        """Step 6 — Fetch entity descriptions from Neo4j into a DataFrame.
+
+        Returns a DataFrame with columns: text, _embed_modality, metadata.
+        The result is consumed directly by the embed step in ingest_structured().
+        """
+        pass
+
+    def ingest_structured(
+        self,
+        params: StructuredExtractParams | None = None,
+    ) -> Any:
+        """Orchestrate the full 8-step structured ingestion pipeline.
+
+        Runs the following steps in order:
+        1. extract_structured
+        2. populate_structured_semantic_layer
+        3. detect_structured_pii
+        4. populate_structured_usage_weights
+        5. generate_structured_descriptions
+        6. fetch_structured  → DataFrame
+        7. embed             ← receives the DataFrame from step 6
+        8. vdb_upload        ← receives the embedded DataFrame from step 7
+        """
+        self.extract_structured(params=params)
+        self.populate_structured_semantic_layer()
+        self.detect_structured_pii()
+        self.populate_structured_usage_weights()
+        self.generate_structured_descriptions()
+
+        df = self.fetch_structured()
+
+        if df is not None:
+            # Collect the embed + vdb_upload tasks registered by the caller
+            # via the builder chain (e.g. .embed(...).vdb_upload(...)).
+            per_doc_tasks, post_tasks = self.get_pipeline_tasks()
+            # Thread the fetched DataFrame through those tasks sequentially:
+            # embed computes vector embeddings, vdb_upload writes them to LanceDB.
+            result, _ = run_pipeline_tasks_on_df(df, per_doc_tasks, post_tasks)
+            return result
+        return None

@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from nemo_retriever.params import IngestExecuteParams
+from nemo_retriever.params import IngestExecuteParams, StructuredFetchParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import RunMode
 
@@ -16,7 +16,9 @@ def run_mode_ingest(
     run_mode: RunMode,
     create_params: IngestorCreateParams | None = None,
     ingest_params: IngestExecuteParams | None = None,
+    structured_params: StructuredFetchParams | None = None,
 ) -> object:
     ingestor = create_runmode_ingestor(run_mode=run_mode, params=create_params)
-    ingestor.ingest_strucutred(params=ingest_params)
+    # Structured ingestion is available only in inprocess mode for now
+    ingestor.ingest_structured(params=structured_params)
     return ingestor.ingest(params=ingest_params)
