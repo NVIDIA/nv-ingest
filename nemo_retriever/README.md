@@ -222,6 +222,22 @@ through the `SLACK_WEBHOOK_URL` environment variable. If the variable is missing
 runs and writes artifacts but skips the Slack post. `--replay` lets you resend a previous session
 directory, run directory, or `results.json` file after fixing webhook access.
 
+For reusable box-local automation, the harness also includes shell entrypoints:
+
+```bash
+# One-shot nightly run using the repo-local .retriever env
+bash nemo_retriever/harness/run_nightly.sh
+
+# Forever loop that sleeps until the next UTC schedule window, then runs nightly
+tmux new-session -d -s retriever-nightly \
+  "cd /path/to/nv-ingest && export SLACK_WEBHOOK_URL='https://hooks.slack.com/services/...' && \
+   bash nemo_retriever/harness/run_nightly_loop.sh"
+```
+
+`run_nightly_loop.sh` is intended as a pragmatic fallback for boxes where cron or timers are
+unreliable. It does not require an interactive SSH session once launched inside `tmux`, but it is
+still less robust than a real scheduler such as `systemd` or a cluster job scheduler.
+
 The `--dry-run` option lets you verify the planned runs without executing them. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
 5. Harness artifacts
