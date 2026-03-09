@@ -191,6 +191,7 @@ class TestBuildLancedbRows:
 
 class TestLancedbSchema:
     def test_returns_schema_with_correct_fields(self):
+        pytest.importorskip("pyarrow")
         schema = lancedb_schema(768)
         names = [f.name for f in schema]
         assert "vector" in names

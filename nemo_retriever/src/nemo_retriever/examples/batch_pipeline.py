@@ -165,11 +165,6 @@ def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
     target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-<<<<<<< consolidate/pr4-detection-summary
-
-
-=======
->>>>>>> main
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     """Ensure the local LanceDB URI exists and table can be opened.
 
