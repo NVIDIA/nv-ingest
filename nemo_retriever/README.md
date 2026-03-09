@@ -95,22 +95,18 @@ retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
 ### Nightly session
 
 ```bash
+export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --skip-slack
 retriever harness nightly --dry-run
-retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+retriever harness nightly --replay nemo_retriever/artifacts/nightly_20260305_010203_UTC
 ```
 
-### Session inspection
-
-```bash
-# Print a compact table from a completed sweep/nightly session
-retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
-
-# Compare two session summaries by run name
-retriever harness compare \
-  nemo_retriever/artifacts/nightly_20260305_010203_UTC \
-  nemo_retriever/artifacts/nightly_20260306_010204_UTC
-```
+`nemo_retriever/harness/nightly_config.yaml` supports a small top-level `preset:` and `slack:`
+block alongside `runs:`. Keep the webhook secret out of YAML and source control; provide it only
+through the `SLACK_WEBHOOK_URL` environment variable. If the variable is missing, nightly still
+runs and writes artifacts but skips the Slack post. `--replay` lets you resend a previous session
+directory, run directory, or `results.json` file after fixing webhook access.
 
 ### Harness artifacts
 
@@ -121,6 +117,12 @@ Each run writes a compact artifact set (no full stdout/stderr log persistence):
 - `runtime_metrics/` (Ray runtime summary + timeline files)
 
 Recall metrics in `results.json` are normalized as `recall_1`, `recall_5`, and `recall_10`.
+Nightly/sweep rollups intentionally focus on compact `summary_metrics`:
+
+- `pages`
+- `ingest_secs`
+- `pages_per_sec_ingest`
+- `recall_5`
 
 By default, detection totals are embedded into `results.json` under `detection_summary`.
 If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
@@ -141,6 +143,10 @@ Sweep/nightly sessions additionally write:
 
 - `session_summary.json` (overall pass/fail rollup)
 
+When Slack posting is enabled, the nightly summary is built from `session_summary.json` plus each
+run's `results.json`, so the on-disk artifacts remain the source of truth even if you need to replay
+or troubleshoot a failed post later.
+
 ### Runtime metrics interpretation
 
 `runtime_metrics/` currently includes:
@@ -151,6 +157,24 @@ Sweep/nightly sessions additionally write:
 
 For routine benchmark comparison, `results.json` is the primary source.
 Use `runtime_metrics/` when investigating throughput regressions or stage-level behavior.
+
+### Cron / timer setup
+
+For a simple machine-local schedule, run the nightly command from `cron` or a `systemd` timer on the
+GPU host that already has dataset access and the retriever environment installed.
+
+Example cron entry:
+
+```bash
+0 2 * * * cd /path/to/nv-ingest && source .retriever/bin/activate && \
+  export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..." && \
+  retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml \
+  >> nemo_retriever/artifacts/nightly_cron.log 2>&1
+```
+
+If you prefer `systemd`, keep the same command in an `ExecStart=` line and move
+`SLACK_WEBHOOK_URL` into an environment file owned by the machine user so the secret stays out of
+the repo.
 
 ### Artifact size profile
 
