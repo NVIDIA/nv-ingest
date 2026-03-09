@@ -15,7 +15,6 @@ Run with:
   --run-mode online --base-url http://localhost:7670
 """
 
-import json
 from pathlib import Path
 
 import lancedb
@@ -27,45 +26,18 @@ from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
-from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.recall.core import (
+    RecallConfig,
+    gold_to_doc_page,
+    hit_key_and_distance,
+    is_hit_at_k,
+    retrieve_and_score,
+)
 
 app = typer.Typer()
 
 LANCEDB_URI = "lancedb"
 LANCEDB_TABLE = "nv-ingest"
-
-
-def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
-    s = str(golden_key)
-    if "_" not in s:
-        return s, ""
-    doc, page = s.rsplit("_", 1)
-    return doc, page
-
-
-def _is_hit_at_k(golden_key: str, retrieved_keys: list[str], k: int) -> bool:
-    doc, page = _gold_to_doc_page(golden_key)
-    specific_page = f"{doc}_{page}"
-    entire_document = f"{doc}_-1"
-    top = (retrieved_keys or [])[: int(k)]
-    return (specific_page in top) or (entire_document in top)
-
-
-def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
-    try:
-        res = json.loads(hit.get("metadata", "{}"))
-        source = json.loads(hit.get("source", "{}"))
-    except Exception:
-        return None, None
-
-    source_id = source.get("source_id")
-    page_number = res.get("page_number")
-    if not source_id or page_number is None:
-        return None, float(hit.get("_distance")) if "_distance" in hit else None
-
-    key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit.get("_distance")) if "_distance" in hit else None
-    return key, dist
 
 
 @app.command()
@@ -236,14 +208,14 @@ def main(
             _raw_hits,
         )
     ):
-        doc, page = _gold_to_doc_page(g)
+        doc, page = gold_to_doc_page(g)
         scored_hits: list[tuple[str, float | None]] = []
         for h in hits:
-            key, dist = _hit_key_and_distance(h)
+            key, dist = hit_key_and_distance(h)
             if key:
                 scored_hits.append((key, dist))
         top_keys = [k for (k, _d) in scored_hits]
-        hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+        hit = is_hit_at_k(g, top_keys, cfg.top_k, match_mode="pdf_page")
         if not no_recall_details:
             ext = ".txt" if input_type == "txt" else (".docx" if input_type == "doc" else ".pdf")
             typer.echo(f"\nQuery {i}: {q}")

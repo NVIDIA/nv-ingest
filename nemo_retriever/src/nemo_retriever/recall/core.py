@@ -299,6 +299,37 @@ def is_hit_at_k(golden_key: str, retrieved: Sequence[str], k: int, *, match_mode
     return _is_hit(str(golden_key), list(retrieved), int(k), match_mode=str(match_mode))
 
 
+def gold_to_doc_page(golden_key: str) -> tuple[str, str]:
+    """Split a golden key like ``"docname_page"`` into ``(doc, page)``."""
+    s = str(golden_key)
+    if "_" not in s:
+        return s, ""
+    doc, page = s.rsplit("_", 1)
+    return doc, page
+
+
+def hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
+    """Extract ``(pdf_page key, distance)`` from a single LanceDB hit dict.
+
+    Supports both ``_distance`` and ``_score`` fields for compatibility across
+    LanceDB query types (vector vs hybrid).
+    """
+    try:
+        res = json.loads(hit.get("metadata", "{}"))
+        source = json.loads(hit.get("source", "{}"))
+    except Exception:
+        return None, None
+
+    source_id = source.get("source_id")
+    page_number = res.get("page_number")
+    if not source_id or page_number is None:
+        return None, float(hit.get("_distance")) if "_distance" in hit else None
+
+    key = f"{Path(str(source_id)).stem}_{page_number}"
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
+    return key, dist
+
+
 def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int, *, match_mode: str) -> float:
     hits = sum(is_hit_at_k(g, r, k, match_mode=match_mode) for g, r in zip(gold, retrieved))
     return hits / max(1, len(gold))
