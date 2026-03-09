@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 HF_MODEL_REVISIONS: dict[str, str] = {
     "nvidia/llama-3.2-nv-embedqa-1b-v2": "cefc2394cc541737b7867df197984cf23f05367f",
+    "nvidia/llama-nemotron-embed-1b-v2": "cefc2394cc541737b7867df197984cf23f05367f",
     "nvidia/parakeet-ctc-1.1b": "a707e818195cb97c8f7da2fc36b221a29f69a5db",
     "nvidia/NVIDIA-Nemotron-Parse-v1.2": "f42c8040b12ee64370922d108778ab655b722c5d",
     "nvidia/llama-nemotron-embed-vl-1b-v2": "859e1f2dac29c56c37a5279cf55f53f3e74efc6b",

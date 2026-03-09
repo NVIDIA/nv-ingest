@@ -9,15 +9,42 @@ import sys
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-# The ingest_modes __init__.py eagerly imports batch/fused/inprocess/online,
-# which pull in ray, torch, etc.  Stub them so lancedb_utils can be imported
-# in lightweight CI (matching the pattern in test_multimodal_embed.py).
-for _mod_name in [
+import pytest
+
+# Stub heavy internal modules so ``nemo_retriever.ingest_modes`` can be
+# imported in lightweight CI (no ray, torch, nemotron_*, pypdfium2).
+#
+# IMPORTANT: We do NOT stub ``nemo_retriever.ingest_modes.inprocess`` itself
+# because test_multimodal_embed.py needs the real module.  Instead we stub the
+# same transitive-heavy deps that test_multimodal_embed.py does.
+_HEAVY_INTERNAL = [
     "nemo_retriever.ingest_modes.batch",
     "nemo_retriever.ingest_modes.fused",
-    "nemo_retriever.ingest_modes.inprocess",
     "nemo_retriever.ingest_modes.online",
-]:
+    "nemo_retriever.model.local",
+    "nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder",
+    "nemo_retriever.model.local.nemotron_page_elements_v3",
+    "nemo_retriever.model.local.nemotron_ocr_v1",
+    "nemo_retriever.model.local.nemotron_table_structure_v1",
+    "nemo_retriever.model.local.nemotron_graphic_elements_v1",
+    "nemo_retriever.page_elements",
+    "nemo_retriever.page_elements.page_elements",
+    "nemo_retriever.ocr",
+    "nemo_retriever.ocr.ocr",
+    "nemo_retriever.pdf",
+    "nemo_retriever.pdf.__main__",
+    "nemo_retriever.pdf.config",
+    "nemo_retriever.pdf.io",
+    "nemo_retriever.pdf.stage",
+    "nemo_retriever.pdf.extract",
+    "nemo_retriever.pdf.split",
+    "nemo_retriever.chart",
+    "nemo_retriever.chart.chart_detection",
+    "nemo_retriever.chart.commands",
+    "nemo_retriever.chart.config",
+    "nemo_retriever.chart.processor",
+]
+for _mod_name in _HEAVY_INTERNAL:
     sys.modules.setdefault(_mod_name, MagicMock())
 
 from nemo_retriever.ingest_modes.lancedb_utils import (  # noqa: E402
@@ -164,6 +191,7 @@ class TestBuildLancedbRows:
 
 class TestLancedbSchema:
     def test_returns_schema_with_correct_fields(self):
+        pytest.importorskip("pyarrow")
         schema = lancedb_schema(768)
         names = [f.name for f in schema]
         assert "vector" in names
