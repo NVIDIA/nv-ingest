@@ -64,6 +64,7 @@ Sweep:
 
 ```bash
 retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
+retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
 ```
 
 Nightly:
@@ -157,13 +158,63 @@ Notes:
 Harness-focused tests pass:
 
 ```bash
-pytest -q nemo_retriever/tests/test_harness_parsers.py \
+pytest -q nemo_retriever/tests/test_batch_ingestor.py \
+  nemo_retriever/tests/test_batch_pipeline.py \
+  nemo_retriever/tests/test_harness_parsers.py \
   nemo_retriever/tests/test_harness_config.py \
   nemo_retriever/tests/test_harness_run.py \
   nemo_retriever/tests/test_harness_reporting.py \
   nemo_retriever/tests/test_harness_recall_adapters.py \
   nemo_retriever/tests/test_recall_core.py
 ```
+
+## Upstream Batch Compatibility (Mar 2026)
+
+The upstream `nemo_retriever.examples.batch_pipeline` CLI and log output changed
+after the initial harness work landed. The harness now carries a compatibility
+shim for that newer upstream behavior.
+
+### CLI compatibility
+
+- Harness config field names remain unchanged for now.
+- `harness.run._build_command()` maps those fields to the newer public batch CLI
+  flags, including:
+  - `pdf_extract_workers` -> `--pdf-extract-tasks`
+  - `pdf_extract_num_cpus` -> `--pdf-extract-cpus-per-task`
+  - `page_elements_workers` -> `--page-elements-actors`
+  - `ocr_workers` -> `--ocr-actors`
+  - `embed_workers` -> `--embed-actors`
+  - `gpu_page_elements` -> `--page-elements-gpus-per-actor`
+  - `gpu_ocr` -> `--ocr-gpus-per-actor`
+  - `gpu_embed` -> `--embed-gpus-per-actor`
+
+### Artifact / parser semantics
+
+- Current upstream batch mode no longer emits the old plain `[done]` / `Pages/sec`
+  lines on the main ingest path.
+- Harness parsers now accept:
+  - the legacy plain-text format when present
+  - the newer logged line:
+    - `Ingestion complete. <rows> rows procesed in <secs> seconds. <pps> PPS`
+  - logger-prefixed recall lines such as:
+    - `2026-... INFO ... recall@5: 0.9043`
+- `results.json` keeps the legacy page fields for backward compatibility:
+  - `metrics.pages`
+  - `metrics.pages_per_sec_ingest`
+- For current upstream batch runs, those legacy page fields may be `null`.
+- The authoritative ingest counters for the current upstream path are:
+  - `metrics.rows_processed`
+  - `metrics.rows_per_sec_ingest`
+- `metrics.ingest_secs` is still populated from whichever upstream ingest summary
+  line is available.
+
+### Remaining caveat
+
+- This compatibility follow-up restores harness operability and recall gating.
+- It does **not** solve the larger semantic question of authoritative physical PDF
+  page counts versus uploaded unique pages versus post-explode rows.
+- `runtime_summary` and `detection_summary` remain best-effort side artifacts and
+  may still be `null` until upstream batch mode writes them consistently again.
 
 ## Recommended Next Iterations
 

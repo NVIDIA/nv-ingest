@@ -71,12 +71,15 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
         logger.debug("%s | %s | %r", location, message, data)
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
-    if params is None:
-        return model_cls(**kwargs)
-    if kwargs:
-        return params.model_copy(update=kwargs)  # type: ignore[return-value]
-    return params
+from nemo_retriever.params.utils import coerce_params as _coerce_params
+
+
+def _runtime_env_vars() -> dict[str, str]:
+    env_vars = {
+        "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
+        "LOG_LEVEL": "INFO",
+    }
+    return {key: value for key, value in env_vars.items() if isinstance(value, str)}
 
 
 class _LanceDBWriteActor:
@@ -202,17 +205,12 @@ class BatchIngestor(Ingestor):
         if self._debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        runtime_env_vars = {
-            "LOG_LEVEL": "INFO",
-            "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
-        }
-
         # Initialize Ray for distributed execution.
         ray.init(
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={"env_vars": runtime_env_vars},
+            runtime_env={"env_vars": _runtime_env_vars()},
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
@@ -715,17 +713,10 @@ class BatchIngestor(Ingestor):
                 "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
             )
 
-        resolved = _coerce_params(params, EmbedParams, kwargs)
-        kwargs = {
-            **resolved.model_dump(
-                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
-            ),
-            **resolved.runtime.model_dump(mode="python", exclude_none=True),
-            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
-        }
+        from nemo_retriever.params.utils import build_embed_kwargs
 
-        if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
-            kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
