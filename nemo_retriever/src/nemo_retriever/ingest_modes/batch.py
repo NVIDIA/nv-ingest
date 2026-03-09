@@ -24,11 +24,13 @@ from typing import Union
 import ray
 import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
+from nemo_retriever.chart.chart_detection import GraphicElementsActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
+from nemo_retriever.utils.hf_cache import resolve_hf_cache_dir
 from nemo_retriever.utils.ray_resource_hueristics import (
     gather_cluster_resources,
     resolve_requested_plan,
@@ -69,12 +71,7 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
         logger.debug("%s | %s | %r", location, message, data)
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]):
-    if params is None:
-        return model_cls(**kwargs)
-    if kwargs:
-        return params.model_copy(update=kwargs)  # type: ignore[return-value]
-    return params
+from nemo_retriever.params.utils import coerce_params as _coerce_params
 
 
 class _LanceDBWriteActor:
@@ -86,11 +83,8 @@ class _LanceDBWriteActor:
     """
 
     def __init__(self, params: VdbUploadParams | None = None) -> None:
-        import json
-        from pathlib import Path
+        from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 
-        self._json = json
-        self._Path = Path
         lancedb_params = (params or VdbUploadParams()).lancedb
 
         self._lancedb_uri = lancedb_params.lancedb_uri
@@ -102,30 +96,13 @@ class _LanceDBWriteActor:
         self._text_column = lancedb_params.text_column
 
         import lancedb  # type: ignore
-        import pyarrow as pa  # type: ignore
 
-        self._pa = pa
         self._db = lancedb.connect(uri=self._lancedb_uri)
-        self._table = None
-        self._schema = None
-        self._first_batch = True
         self._total_rows = 0
-        self._table = None
-        mode = "overwrite" if self._overwrite else "create"
-        fields = [
-            pa.field("vector", pa.list_(pa.float32(), 2048)),
-            pa.field("pdf_page", pa.string()),
-            pa.field("filename", pa.string()),
-            pa.field("pdf_basename", pa.string()),
-            pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
-            pa.field("path", pa.string()),
-            pa.field("text", pa.string()),
-            pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
-        ]
-        self._schema = pa.schema(fields)
 
+        # Use a default dim for the initial empty table; rows are appended via add().
+        self._schema = lancedb_schema(2048)
+        mode = "overwrite" if self._overwrite else "create"
         self._table = self._db.create_table(
             self._table_name,
             schema=self._schema,
@@ -133,95 +110,16 @@ class _LanceDBWriteActor:
         )
 
     def _build_rows(self, df: Any) -> list:
-        """Build LanceDB rows from a pandas DataFrame batch.
+        """Build LanceDB rows from a pandas DataFrame batch."""
+        from nemo_retriever.ingest_modes.lancedb_utils import build_lancedb_rows
 
-        Mirrors the row-building logic from
-        ``upload_embeddings_to_lancedb_inprocess`` in inprocess.py.
-        """
-        rows: list = []
-        for row in df.itertuples(index=False):
-            # Extract embedding
-            emb = None
-            meta = getattr(row, "metadata", None)
-            if isinstance(meta, dict):
-                emb = meta.get("embedding")
-                if not (isinstance(emb, list) and emb):
-                    emb = None
-            if emb is None:
-                payload = getattr(row, self._embedding_column, None)
-                if isinstance(payload, dict):
-                    emb = payload.get(self._embedding_key)
-                    if not (isinstance(emb, list) and emb):
-                        emb = None
-            if emb is None:
-                continue
-
-            # Extract source path and page number
-            path = ""
-            page = -1
-            v = getattr(row, "path", None)
-            if isinstance(v, str) and v.strip():
-                path = v.strip()
-            v = getattr(row, "page_number", None)
-            try:
-                if v is not None:
-                    page = int(v)
-            except Exception:
-                pass
-            if isinstance(meta, dict):
-                sp = meta.get("source_path")
-                if isinstance(sp, str) and sp.strip():
-                    path = sp.strip()
-
-            p = self._Path(path) if path else None
-            filename = p.name if p is not None else ""
-            pdf_basename = p.stem if p is not None else ""
-            pdf_page = f"{pdf_basename}_{page}" if (pdf_basename and page >= 0) else ""
-            source_id = path or filename or pdf_basename
-
-            metadata_obj = {"page_number": int(page) if page is not None else -1}
-            if pdf_page:
-                metadata_obj["pdf_page"] = pdf_page
-            # Persist per-page detection counters for end-of-run summaries.
-            # These may be duplicated across exploded content rows; downstream
-            # summary logic should dedupe by (source_id, page_number).
-            pe_num = getattr(row, "page_elements_v3_num_detections", None)
-            if pe_num is not None:
-                try:
-                    metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
-                except Exception:
-                    pass
-            pe_counts = getattr(row, "page_elements_v3_counts_by_label", None)
-            if isinstance(pe_counts, dict):
-                metadata_obj["page_elements_v3_counts_by_label"] = {
-                    str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
-                }
-            for ocr_col in ("table", "chart", "infographic"):
-                entries = getattr(row, ocr_col, None)
-                if isinstance(entries, list):
-                    metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
-            source_obj = {"source_id": str(path)}
-
-            row_out = {
-                "vector": emb,
-                "pdf_page": pdf_page,
-                "filename": filename,
-                "pdf_basename": pdf_basename,
-                "page_number": int(page) if page is not None else -1,
-                "source_id": str(source_id),
-                "path": str(path),
-                "metadata": self._json.dumps(metadata_obj, ensure_ascii=False),
-                "source": self._json.dumps(source_obj, ensure_ascii=False),
-            }
-
-            if self._include_text:
-                t = getattr(row, self._text_column, None)
-                row_out["text"] = str(t) if isinstance(t, str) else ""
-            else:
-                row_out["text"] = ""
-
-            rows.append(row_out)
-        return rows
+        return build_lancedb_rows(
+            df,
+            embedding_column=self._embedding_column,
+            embedding_key=self._embedding_key,
+            text_column=self._text_column,
+            include_text=self._include_text,
+        )
 
     def __call__(self, batch_df: Any) -> Any:
         rows = self._build_rows(batch_df)
@@ -266,38 +164,15 @@ class _BatchEmbedActor:
             self._model = None
             return
 
-        device = self._kwargs.get("device")
-        hf_cache_dir = self._kwargs.get("hf_cache_dir")
-        normalize = bool(self._kwargs.get("normalize", True))
-        max_length = int(self._kwargs.get("max_length", 8192))
-        model_name_raw = self._kwargs.get("model_name")
+        from nemo_retriever.model import create_local_embedder
 
-        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
-
-        model_id = resolve_embed_model(model_name_raw)
-
-        if is_vl_embed_model(model_name_raw):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            self._model = LlamaNemotronEmbedVL1BV2Embedder(
-                device=str(device) if device else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-                model_id=model_id,
-            )
-        else:
-            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-                LlamaNemotronEmbed1BV2Embedder,
-            )
-
-            self._model = LlamaNemotronEmbed1BV2Embedder(
-                device=str(device) if device else None,
-                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
-                normalize=normalize,
-                max_length=max_length,
-                model_id=model_id,
-            )
+        self._model = create_local_embedder(
+            self._kwargs.get("model_name"),
+            device=str(self._kwargs["device"]) if self._kwargs.get("device") else None,
+            hf_cache_dir=str(self._kwargs["hf_cache_dir"]) if self._kwargs.get("hf_cache_dir") else None,
+            normalize=bool(self._kwargs.get("normalize", True)),
+            max_length=int(self._kwargs.get("max_length", 8192)),
+        )
 
     def __call__(self, batch_df: Any) -> Any:
         from nemo_retriever.ingest_modes.inprocess import embed_text_main_text_embed
@@ -322,17 +197,17 @@ class BatchIngestor(Ingestor):
         if self._debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
+        runtime_env_vars = {
+            "LOG_LEVEL": "INFO",
+            "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
+        }
+
         # Initialize Ray for distributed execution.
         ray.init(
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={
-                "env_vars": {
-                    "NEMO_RETRIEVER_HF_CACHE_DIR": os.getenv("NEMO_RETRIEVER_HF_CACHE_DIR", ""),
-                    "LOG_LEVEL": "INFO",
-                }
-            },
+            runtime_env={"env_vars": runtime_env_vars},
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
@@ -579,6 +454,49 @@ class BatchIngestor(Ingestor):
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
+            # Graphic elements detection for charts (runs before OCR).
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                ge_kwargs: dict[str, Any] = {}
+                ge_invoke_url = kwargs.get("graphic_elements_invoke_url", "")
+                if ge_invoke_url:
+                    ge_kwargs["graphic_elements_invoke_url"] = ge_invoke_url
+                ocr_invoke_url_for_ge = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+                if ocr_invoke_url_for_ge:
+                    ge_kwargs["ocr_invoke_url"] = ocr_invoke_url_for_ge
+                if "inference_batch_size" in kwargs:
+                    ge_kwargs["inference_batch_size"] = kwargs["inference_batch_size"]
+                for k in (
+                    "api_key",
+                    "request_timeout_s",
+                    "remote_max_pool_workers",
+                    "remote_max_retries",
+                    "remote_max_429_retries",
+                ):
+                    if k in kwargs:
+                        ge_kwargs[k] = kwargs[k]
+                if "ocr_request_timeout_s" in kwargs:
+                    ge_kwargs["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+                if "ocr_api_key" in kwargs:
+                    ge_kwargs["api_key"] = kwargs["ocr_api_key"]
+                ge_gpu = (
+                    0.0
+                    if (ge_invoke_url and ocr_invoke_url_for_ge)
+                    else self._requested_plan.get_page_elements_gpus_per_actor()
+                )
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    GraphicElementsActor,
+                    batch_size=self._requested_plan.get_page_elements_batch_size(),
+                    batch_format="pandas",
+                    num_gpus=ge_gpu,
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_page_elements_initial_actors(),
+                        min_size=self._requested_plan.get_page_elements_min_actors(),
+                        max_size=self._requested_plan.get_page_elements_max_actors(),
+                    ),
+                    fn_constructor_kwargs=ge_kwargs,
+                )
+
             use_table_structure = bool(kwargs.get("use_table_structure", False))
             from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
 
@@ -629,7 +547,7 @@ class BatchIngestor(Ingestor):
             ocr_flags = {}
             if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
-            if kwargs.get("extract_charts") is True:
+            if kwargs.get("extract_charts") is True and not use_graphic_elements:
                 ocr_flags["extract_charts"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True
@@ -789,17 +707,10 @@ class BatchIngestor(Ingestor):
                 "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
             )
 
-        resolved = _coerce_params(params, EmbedParams, kwargs)
-        kwargs = {
-            **resolved.model_dump(
-                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
-            ),
-            **resolved.runtime.model_dump(mode="python", exclude_none=True),
-            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
-        }
+        from nemo_retriever.params.utils import build_embed_kwargs
 
-        if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
-            kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality

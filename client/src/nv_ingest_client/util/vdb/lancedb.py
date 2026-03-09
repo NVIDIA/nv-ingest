@@ -282,7 +282,7 @@ def lancedb_retrieval(
     table=None,
     embedding_endpoint: str = "http://localhost:8012/v1",
     nvidia_api_key: str = None,
-    model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2",
+    model_name: str = "nvidia/llama-nemotron-embed-1b-v2",
     top_k: int = 10,
     refine_factor: int = 50,
     n_probe: int = 64,
@@ -317,7 +317,7 @@ def lancedb_retrieval(
     nvidia_api_key : str, optional
         NVIDIA API key for authentication. If None, no auth is used.
     model_name : str, optional
-        Name of the embedding model (default: "nvidia/llama-3.2-nv-embedqa-1b-v2").
+        Name of the embedding model (default: "nvidia/llama-nemotron-embed-1b-v2").
     top_k : int, optional
         Number of results to return per query (default: 10).
     refine_factor : int, optional
@@ -455,7 +455,7 @@ def lancedb_hybrid_retrieval(
     table=None,
     embedding_endpoint: str = "http://localhost:8012/v1",
     nvidia_api_key: str = None,
-    model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2",
+    model_name: str = "nvidia/llama-nemotron-embed-1b-v2",
     top_k: int = 10,
     refine_factor: int = 50,
     n_probe: int = 64,
