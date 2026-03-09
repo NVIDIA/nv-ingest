@@ -382,9 +382,9 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "recall_5": 0.9,
         },
         "summary_metrics": {
-            "pages": 3181,
+            "pages": None,
             "ingest_secs": 12.5,
-            "pages_per_sec_ingest": 254.48,
+            "pages_per_sec_ingest": None,
             "recall_5": 0.9,
         },
         "run_metadata": {
