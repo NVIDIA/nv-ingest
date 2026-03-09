@@ -37,14 +37,9 @@ from nemo_retriever.harness.config import (
 )
 from nemo_retriever.harness.parsers import StreamMetrics
 from nemo_retriever.harness.recall_adapters import prepare_recall_query_file
+from nemo_retriever.utils.input_files import resolve_input_files
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-INPUT_TYPE_PATTERNS = {
-    "pdf": ("*.pdf",),
-    "txt": ("*.txt",),
-    "html": ("*.html",),
-    "doc": ("*.docx", "*.pptx"),
-}
 
 
 def _collect_gpu_metadata() -> tuple[int | None, str | None]:
@@ -137,20 +132,6 @@ def _safe_pdf_page_count(path: Path) -> int | None:
         return None
 
 
-def _resolve_input_files(dataset_dir: str, input_type: str) -> list[Path]:
-    root = Path(dataset_dir).expanduser().resolve()
-    if root.is_file():
-        return [root]
-    if not root.exists():
-        return []
-
-    patterns = INPUT_TYPE_PATTERNS.get(input_type, INPUT_TYPE_PATTERNS["pdf"])
-    files: list[Path] = []
-    for pattern in patterns:
-        files.extend(path for path in root.rglob(pattern) if path.is_file())
-    return sorted(set(files))
-
-
 def _resolve_summary_metrics(
     cfg: HarnessConfig,
     metrics_payload: dict[str, Any],
@@ -176,7 +157,7 @@ def _resolve_summary_metrics(
     if summary_metrics["pages"] is None and cfg.input_type == "pdf":
         total_pages = 0
         counted_any = False
-        for path in _resolve_input_files(cfg.dataset_dir, cfg.input_type):
+        for path in resolve_input_files(Path(cfg.dataset_dir), cfg.input_type):
             page_count = _safe_pdf_page_count(path)
             if page_count is None:
                 continue
