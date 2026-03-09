@@ -278,10 +278,21 @@ class TestGraphicElementsActor:
 
     def test_actor_error_returns_dataframe_with_error(self) -> None:
         """Actor should never raise; errors go into metadata columns."""
-        from nemo_retriever.chart.chart_detection import GraphicElementsActor
+        import sys
+
+        # Other test files (e.g. test_multimodal_embed) stub chart_detection in sys.modules.
+        # Ensure we get the real class so __new__ works.
+        mod_name = "nemo_retriever.chart.chart_detection"
+        stubbed = sys.modules.get(mod_name)
+        if stubbed is not None and type(stubbed).__name__ == "MagicMock":
+            del sys.modules[mod_name]
+        try:
+            from nemo_retriever.chart.chart_detection import GraphicElementsActor
+        finally:
+            if stubbed is not None:
+                sys.modules[mod_name] = stubbed
 
         # Build instance via __new__ only (__init__ is not called), then set attrs.
-        # We cannot patch __init__ because unittest.mock disallows patching magic methods.
         actor = GraphicElementsActor.__new__(GraphicElementsActor)
         actor._graphic_elements_model = None
         actor._ocr_model = None
