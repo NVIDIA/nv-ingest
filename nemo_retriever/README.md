@@ -1,62 +1,147 @@
-# Retriever
+# Quick Start for NeMo Retriever Library
 
-RAG ingestion pipeline for PDFs: extract structure (text, tables, charts, infographics), embed, optionally upload to LanceDB, and run recall evaluation.
+NeMo Retriever Library is a retrieval-augmented generation (RAG) ingestion pipeline for documents that can parse text, tables, charts, and infographics. NeMo Retriever Library parses documents, creates embeddings, optionally stores embeddings in LanceDB, and performs recall evaluation.
+
+This quick start guide shows how to run NeMo Retriever Library in library mode, directly from your application, without Docker. In library mode, NeMo Retriever Library supports two deployment options:
+- Load Hugging Face models locally on your GPU.
+- Use locally deployed NeMo Retriever NIM endpoints for embedding and OCR.
+
+You’ll set up a CUDA 13–compatible environment, install the library and its dependencies, and run GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB, with optional Ray‑based scaling and built‑in recall benchmarking.
 
 ## Prerequisites
 
-- **CUDA 13** — required for **OCR** (Nemotron); text extraction and other stages may work without it.
-- **Python 3.12**
-- **UV** (required) — [install UV](https://docs.astral.sh/uv/getting-started/installation/) (e.g. `curl -LsSf https://astral.sh/uv/install.sh | sh`)
+Before you start, make sure your system meets the following requirements:
 
-## Installation
+- The host is running CUDA 13.x so that `libcudart.so.13` is available.
+- Your GPUs are visible to the system and compatible with CUDA 13.x.
+​
+If optical character recognition (OCR) fails with a `libcudart.so.13` error, install the CUDA 13 runtime for your platform and update `LD_LIBRARY_PATH` to include the CUDA lib64 directory, then rerun the pipeline. 
 
-Installation is done with **UV** from the **nv-ingest root**. UV manages the environment and dependencies; pip is not supported.
-
-From the repo root:
+For example, the following command can be used to update the `LD_LIBRARY_PATH` value.
 
 ```bash
-cd /path/to/nv-ingest
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/lib64
+```
+
+## Setup your environment
+
+Complete the following steps to setup your environment. You will create and activate isolated Python and project virtual environments, install the NeMo Retriever Library and its CUDA 13–compatible GPU dependencies, and then run the ingestion, benchmarking, and audio pipelines to validate the full setup.
+
+1. Create and activate the NeMo Retriever Library environment
+
+Before installing NeMo Retriever Library, create an isolated Python environment so its dependencies do not conflict with other projects on your system. In this step, you set up a new virtual environment and activate it so that all subsequent installs are scoped to NeMo Retriever Library.
+
+In your terminal, run the following commands from any location.
+
+```bash
+uv venv .nemotron-ocr-test --python 3.12
+source .nemotron-ocr-test/bin/activate
+uv pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple nemo-retriever
+```
+This creates a dedicated Python environment and installs the `nemo-retriever` PyPI package, the canonical distribution for the NeMo Retriever Library.
+
+2. Install NeMo Retriever Library and Dependencies
+
+Install the latest nightly builds of the NeMo Retriever Library so you can test the most recent features and fixes before they are rolled into a stable release. 
+
+In this step, you install the core library, its API layer, and the client package, ensuring the ingestion pipeline and related tooling all come from a consistent, up‑to‑date version set.
+
+In your terminal, run the following commands from any location.
+
+
+```bash
+uv pip install -i https://test.pypi.org/simple nemo-retriever==2026.3.3.dev20260303 nemo-retriever-api==2026.3.3.dev20260303 nemo-retriever-client==2026.3.3.dev20260303 --no-deps
+uv pip install nemo-retriever nemo-retriever-api nemo-retriever-client
+```
+These packages provide the ingestion pipeline and APIs used by NeMo Retriever Library until everything is consolidated under the single `nemo-retriever` surface.
+
+3. Install CUDA 13 builds of Torch and Torchvision
+
+To ensure NeMo Retriever Library’s OCR and GPU‑accelerated components run correctly on your system, you need PyTorch and TorchVision builds that are compiled for CUDA 13. In this step, you uninstall any existing Torch/TorchVision packages and reinstall them from a dedicated CUDA 13.0 wheel index so they link against the same CUDA runtime as the rest of your pipeline.
+
+Use the CUDA 13.0 wheels from the dedicated index by running the following command.
+
+```bash
+uv pip uninstall torch torchvision
+uv pip install torch==2.9.1 torchvision -i https://download.pytorch.org/whl/cu130
+```
+This ensures the OCR and GPU‑accelerated components in NeMo Retriever Library run against the right CUDA runtime.
+
+4. Set up the NeMo Retriever Library project environment
+
+For local development, you need a project-scoped environment tied directly to the NeMo Retriever Library source tree. 
+
+In this step, you create a virtual environment in the repo itself and install the `nemo_retriever` package in editable mode so you can run examples, tweak the code, and pick up changes without reinstallation.
+
+Run the following code from the NeMo Retriever Library repo root (NVIDIA/NeMo-Retriever).
+
+```bash
+cd /path/to/NeMo-Retriever
 uv venv .retriever
 source .retriever/bin/activate
 uv pip install -e ./nemo_retriever
 ```
+This creates a project-local environment and installs the `nemo_retriever` Python package in editable mode for running the examples.
 
-This installs the retriever in editable mode and its in-repo dependencies. Core dependencies (see `nemo_retriever/pyproject.toml`) include Ray, pypdfium2, pandas, LanceDB, PyYAML, torch, transformers, and the Nemotron packages (page-elements, graphic-elements, table-structure). The retriever also depends on the sibling packages `nv-ingest`, `nv-ingest-api`, and `nv-ingest-client` in this repo.
+5. Run the batch pipeline on PDFs
 
-### OCR and CUDA 13 runtime
+In this procedure, you run the end‑to‑end NeMo Retriever Library batch pipeline to ingest a collection of PDFs and generate embeddings for them. Pointing the script at a directory of PDF files lets the pipeline handle parsing, OCR, embedding, optional LanceDB upload, and (if configured) recall evaluation in a single command.
 
-The Nemotron OCR native extension requires **libcudart.so.13** (CUDA 13 runtime). If you see:
-
-```text
-ImportError: libcudart.so.13: cannot open shared object file: No such file or directory
-```
-
-your system CUDA Toolkit is missing or older than 13. Install CUDA 13 runtime support on your host, or run the retriever Docker image which includes the required runtime.
-
-If CUDA libraries are installed in a non-standard path, expose them explicitly:
-   ```bash
-   export LD_LIBRARY_PATH=/path/to/cuda/lib64:$LD_LIBRARY_PATH
-   ```
-
-## Quick start
-
-From the nv-ingest root, install with UV then run the batch pipeline with a directory of PDFs:
+Run the batch pipeline script and point it at the directory that contains your PDFs using the following command.
 
 ```bash
-cd /path/to/nv-ingest
-uv venv .retriever
-source .retriever/bin/activate
-uv pip install -e ./nemo_retriever
 uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs
 ```
 
+The first positional argument is the `input-dir`, the directory with the PDF files to ingest.
+
+For recall evaluation, the pipeline uses bo767_query_gt.csv from the current working directory by default; you can override this by running the following command.
+
+```bash
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs \
+  --query-csv /path/to/custom_query_gt.csv
+```
+
+If the specified query CSV does not exist, recall evaluation is skipped automatically and only the ingestion process runs.
+
+By default, the pipeline prints per‑query details (query text, gold answers, and hits); use `--no-recall-details` to show only the missed‑gold summary and overall recall metrics.
+
+To reuse an existing Ray cluster, append --ray-address using the following command.
+
+```bash
+--ray-address auto
+```
+
+By doing this the pipeline connects to the running Ray deployment instead of starting a new one.
+
+6. Ingest HTML or plain text instead of PDFs
+
+If your documents aren't stored as PDFs, you can point the same NeMo Retriever Library batch pipeline to directories of HTML or plain text files instead. 
+
+In this step, you either pass an input‑type flag to the batch example for a simple one‑shot run, or use a staged HTML CLI flow for more control over each phase of ingestion.
+
+To run the batch example directly on HTML or plain text, use one of the following commands in your terminal.
+
+```bash
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py <dir> --input-type html
+```
+or
+
+```bash
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py <dir> --input-type txt
+```
 Pass the directory that contains your PDFs as the first argument (`input-dir`). For recall evaluation, the pipeline uses `bo767_query_gt.csv` in the current directory by default; override with `--query-csv <path>`. For document-level recall, use `--recall-match-mode pdf_only` with `query,expected_pdf` data. Recall is skipped if the query file does not exist. By default, per-query details (query, gold, hits) are printed; use `--no-recall-details` to print only the missed-gold summary and recall metrics. To use an existing Ray cluster, pass `--ray-address auto`. If OCR fails with a missing `libcudart.so.13`, install the CUDA 13 runtime and set `LD_LIBRARY_PATH` as shown above.
 
-For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt` with the same examples (e.g. `batch_pipeline.py <dir> --input-type html`). HTML files are converted to markdown via markitdown, then chunked with the same tokenizer as .txt. Staged CLI: `retriever html run --input-dir <dir>` writes `*.html_extraction.json`; then `retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"` and `retriever local stage6 run --input-dir <dir>`.
+Use `--input-type html` for HTML files and `--input-type txt` for plain text.  HTML inputs are converted to markdown using the same tokenizer and chunking strategy used for `.txt` ingestion.
 
-## Harness (run, sweep, nightly)
+For more step‑by‑step control with HTML, use the following staged HTML CLI flow commands instead.
 
-`nemo_retriever` includes a lightweight harness for benchmark orchestration without Docker.
+```bash
+retriever html run --input-dir <dir>
+retriever local stage5 run --input-dir <dir> --pattern "*.html_extraction.json"
+retriever local stage6 run --input-dir <dir>
+```
+`retriever html run` parses the HTML and writes `*.html_extraction.json` sidecar files into the input directory. `retriever local stage5 run` performs downstream processing over those JSON files, and `retriever local stage6 run` completes the final ingestion stages, such as embedding and optional upload, using the same core extraction pipeline.
 
 - Config files:
   - `nemo_retriever/harness/test_configs.yaml`
@@ -73,11 +158,36 @@ For **HTML** or **text** ingestion, use `--input-type html` or `--input-type txt
 - Relative `query_csv` entries in harness YAML resolve from the config file directory first, then fall back to the repo root.
 - The default `financebench` dataset preset now points at `data/financebench_train.json` and enables recall out of the box.
 
-### Single run
+After you’ve finished installing and configuring NeMo Retriever Library, it's a good idea to validate the entire pipeline with a small, known dataset. In this step, you run the batch pipeline module against the sample `bo20` dataset to confirm that ingestion, OCR under CUDA 13, embedding, and any configured recall evaluation all run end‑to‑end without errors.
 
+```bash
+uv run python -m nemo_retriever.examples.batch_pipeline /datasets/nemo-retriever/bo20
+```
+This uses the module form of the NeMo Retriever Library batch pipeline example and points it at a sample dataset directory, verifying both ingestion and OCR under CUDA 13.
+
+## Benchmark harness
+
+NeMo Retriever Library includes a lightweight benchmark harness that lets you run repeatable evaluations and sweeps without using Docker. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
+
+1. Configuration
+
+The harness is configured using the following configuration files:
+
+- `nemo_retriever/harness/test_configs.yaml`  
+- `nemo_retriever/harness/nightly_config.yaml`  
+
+The CLI entrypoint is nested under `retriever harness`. The first pass is LanceDB‑only and enforces recall‑required pass/fail by default, and single‑run artifact directories default to `<dataset>_<timestamp>`. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
+
+2. Single run
+
+You can run a single benchmark either from a preset dataset name or a direct path.
+
+Preset dataset name
 ```bash
 # Dataset preset from test_configs.yaml (recall-required example)
 retriever harness run --dataset jp20 --preset single_gpu
+```
+or
 
 # Direct dataset path
 retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
@@ -86,13 +196,17 @@ retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
 retriever harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
 ```
 
-### Sweep runs (explicit runs list)
+3. Sweep runs
+
+To sweep multiple runs defined in a config file use the following command.
 
 ```bash
 retriever harness sweep --runs-config nemo_retriever/harness/nightly_config.yaml
 ```
 
-### Nightly session
+4. Nightly sessions
+
+To orchestrate a full nightly benchmark session use the following command.
 
 ```bash
 retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
@@ -112,9 +226,11 @@ retriever harness compare \
   nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```
 
-### Harness artifacts
+The `--dry-run` option lets you verify the planned runs without executing them. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
-Each run writes a compact artifact set (no full stdout/stderr log persistence):
+5. Harness artifacts
+
+Each harness run writes a compact artifact set (no full stdout/stderr log persistence):
 
 - `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
 - `command.txt` (exact invoked command)
@@ -139,62 +255,66 @@ These fields use best-effort discovery and fall back to `null` or `"unknown"` ra
 
 Sweep/nightly sessions additionally write:
 
-- `session_summary.json` (overall pass/fail rollup)
+The `runtime_metrics/` directory contains:
 
-### Runtime metrics interpretation
+- **`run.runtime.summary.json`** - run totals (input files, pages, elapsed seconds)  
+- **`run.ray.timeline.json`** - detailed Ray execution timeline  
+- **`run.rd_dataset.stats.txt`** - Ray dataset stats dump  
 
-`runtime_metrics/` currently includes:
+Use `results.json` for routine benchmark comparison, and use the files under `runtime_metrics/` when investigating throughput regressions or stage‑level behavior. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
 
-- `run.runtime.summary.json`: high-level run totals (input files, pages, elapsed seconds)
-- `run.ray.timeline.json`: detailed Ray execution timeline for deeper profiling
-- `run.rd_dataset.stats.txt`: Ray dataset stats dump (can be empty on some runs)
+6. Artifact size profile
 
-For routine benchmark comparison, `results.json` is the primary source.
-Use `runtime_metrics/` when investigating throughput regressions or stage-level behavior.
+Current benchmark runs show that the LanceDB data dominates the artifact footprint:
 
-### Artifact size profile
+- **`bo20`** - ~9.0 MiB total, ~8.6 MiB LanceDB  
+- **`jp20`** - ~36.8 MiB total, ~36.2 MiB LanceDB 
 
-Current observed runs show that per-run LanceDB data dominates footprint:
+## Audio ingestion pipeline
 
-- `bo20`: ~9.0 MiB total, ~8.6 MiB LanceDB (~96%)
-- `jp20`: ~36.8 MiB total, ~36.2 MiB LanceDB (~98%)
+NeMo Retriever Library also supports audio ingestion alongside documents. Audio pipelines typically follow a chained pattern such as the following.  
 
-So storage growth is mostly driven by `lancedb/`, not the summary JSON artifacts.
+```python
+.files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest()
+```
 
-### Audio pipeline
+This can be run in batch, in‑process, or fused mode within NeMo Retriever Library. [NeMo Retriever Library audio extraction documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/audio/)
 
-Audio ingestion uses `.files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest()` in batch, inprocess, or fused mode. **ASR** (speech-to-text) can be:
+### ASR options
 
-- **Local**: When `audio_endpoints` are not set (e.g. `[null, null]` in `ingest-config.yaml` under `audio_asr`), the pipeline uses the local HuggingFace model **nvidia/parakeet-ctc-1.1b** (Transformers first, with NeMo fallback if needed). No NIM or gRPC endpoint required.
-- **Remote**: When `audio_endpoints` is set (e.g. Parakeet NIM or self-deployed Riva gRPC), the pipeline uses the remote client. Set `AUDIO_GRPC_ENDPOINT`, `NGC_API_KEY`, and optionally `AUDIO_FUNCTION_ID` for NGC cloud ASR.
+For automatic speech recognition (ASR), you have the following two options:
 
-See `ingest-config.yaml` (`audio_chunk`, `audio_asr`) and the audio scripts under `retriever/scripts/` for examples.
+- Local: When `audio_endpoints` are not set, the pipeline uses local HuggingFace ASR (`nvidia/parakeet-ctc-1.1b`) through Transformers with NeMo fallback; no NIM or gRPC endpoint is required. [Parakeet CTC 1.1B model on Hugging Face](https://huggingface.co/nvidia/parakeet-ctc-1.1b)
+- Remote: When `audio_endpoints` is set (for example, Parakeet NIM or self‑deployed Riva gRPC), the pipeline uses the remote client; set `AUDIO_GRPC_ENDPOINT`, `NGC_API_KEY`, and optionally `AUDIO_FUNCTION_ID`. [NeMo Retriever Library audio extraction documentation (25.6.3)](https://docs.nvidia.com/nemo/retriever/25.6.3/extraction/audio/)
 
-### Starting a Ray cluster
+See `ingest-config.yaml` (sections `audio_chunk`, `audio_asr`) and audio scripts under `retriever/scripts/` for concrete configuration examples. [NeMo Retriever Library audio extraction documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/audio/)
 
-This project uses Ray Data. You can start a Ray cluster yourself to use the dashboard and control GPU usage.
+## Ray cluster setup
 
-**Cluster with Ray Dashboard**
+NeMo Retriever Library uses Ray Data for distributed ingestion and benchmarking. [NeMo Ray run guide](https://docs.nvidia.com/nemo/run/latest/guides/ray.html)
 
-Start a head node (dashboard is enabled by default on port 8265):
+### Local Ray cluster with dashboard
+
+To start a Ray cluster with the dashboard on a single machine use the following command.
 
 ```bash
 ray start --head
 ```
 
-Open the dashboard at **http://127.0.0.1:8265**. Run your pipeline in the same machine; pass `--ray-address auto` to attach to this cluster (e.g. `uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs --ray-address auto` or the batch pipeline CLI with `--ray-address auto`).
+Open `http://127.0.0.1:8265` in your browser for the Ray Dashboard, and run your NeMo Retriever Library pipeline on the same machine with `--ray-address auto` to attach to this cluster. [Connecting to a remote Ray cluster on Kubernetes](https://discuss.ray.io/t/connecting-to-remote-ray-cluster-on-k8s/7460)
 
-**Single-GPU cluster (multi-GPU nodes)**
+### Single‑GPU cluster on multi‑GPU nodes
 
-To use only one GPU on a node that has more (e.g. for testing), limit visible devices and start Ray with one GPU:
+To restrict Ray to a single GPU on a multi‑GPU node use the following command.
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 ray start --head --num-gpus=1
 ```
+Then run your pipeline as before with `--ray-address auto` so it connects to this single‑GPU Ray cluster. [NeMo Ray run guide](https://docs.nvidia.com/nemo/run/latest/guides/ray.html)
 
-Then run your pipeline as above (e.g. `--ray-address auto` for the CLI, or `ray_address="auto"` in Python).
+## Running multiple NIM instances on multi‑GPU hosts
 
-## Resource heuristics (batch mode)
+### Resource heuristics (batch mode)
 
 By default, batch mode computes resources using this order:
 
@@ -224,36 +344,36 @@ This means defaults are deterministic but easy to override when you need fixed b
 
 ### Running multiple NIM service instances on multi-GPU hosts
 
-If you want more than one `page-elements` and `ocr` instance on the same machine, run separate Docker Compose projects and pin each project to a specific physical GPU.
-
-From the `nv-ingest` repo root:
+### Start two stacks on separate GPUs
 
 ```bash
 # GPU 0 stack
 GPU_ID=0 \
 PAGE_ELEMENTS_HTTP_PORT=8000 PAGE_ELEMENTS_GRPC_PORT=8001 PAGE_ELEMENTS_METRICS_PORT=8002 \
 OCR_HTTP_PORT=8019 OCR_GRPC_PORT=8010 OCR_METRICS_PORT=8011 \
-docker compose -p ingest-gpu0 up -d page-elements ocr
+docker compose -p retriever-gpu0 up -d page-elements ocr
 
 # GPU 1 stack
 GPU_ID=1 \
 PAGE_ELEMENTS_HTTP_PORT=8100 PAGE_ELEMENTS_GRPC_PORT=8101 PAGE_ELEMENTS_METRICS_PORT=8102 \
 OCR_HTTP_PORT=8119 OCR_GRPC_PORT=8110 OCR_METRICS_PORT=8111 \
-docker compose -p ingest-gpu1 up -d page-elements ocr
+docker compose -p retriever-gpu1 up -d page-elements ocr
 ```
 
-The `-p` values create isolated stacks, while `GPU_ID` pins each stack to a different physical GPU. Distinct host ports prevent collisions and keep both stacks externally accessible.
+The `-p` project names create isolated stacks, `GPU_ID` pins each stack to a specific physical GPU, and distinct host ports avoid collisions between the services.  
 
-Useful checks:
+### Check and tear down stacks
+
+To verify that both stacks are running use the following command.
 
 ```bash
-docker compose -p ingest-gpu0 ps
-docker compose -p ingest-gpu1 ps
+docker compose -p retriever-gpu0 ps
+docker compose -p retriever-gpu1 ps
 ```
 
-To stop and remove both stacks:
+To stop and remove both stacks use the following command.
 
 ```bash
-docker compose -p ingest-gpu0 down
-docker compose -p ingest-gpu1 down
+docker compose -p retriever-gpu0 down
+docker compose -p retriever-gpu1 down
 ```
