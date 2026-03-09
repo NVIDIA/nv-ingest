@@ -340,29 +340,7 @@ This means defaults are deterministic but easy to override when you need fixed b
 
 | Variable | Where to set | Meaning |
 |---|---|---|
-| `NEMO_RETRIEVER_BATCH_NUM_CPUS` | env | Override resolved CPU count |
-| `NEMO_RETRIEVER_BATCH_NUM_GPUS` | env | Override resolved GPU count |
 | `override_cpu_count`, `override_gpu_count` | function args | Highest-priority CPU/GPU override |
-| `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU` | env | Page-elements workers per GPU |
-| `NEMO_RETRIEVER_BATCH_OCR_PER_GPU` | env | OCR workers per GPU |
-| `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU` | env | Embed workers per GPU |
-| `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS` | env | GPU request for CPU-only stages (usually `0.0`) |
-| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS` | env | Page-elements GPU share in 3-stage overlap mode |
-| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS` | env | OCR GPU share in 3-stage overlap mode |
-| `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS` | env | Embed GPU share in 3-stage overlap mode |
-| `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE` | env | Cap for per-stage GPU share in non-overlap mode |
-
-Environment variable names for heuristic knobs:
-- `NEMO_RETRIEVER_BATCH_NUM_CPUS`
-- `NEMO_RETRIEVER_BATCH_NUM_GPUS`
-- `NEMO_RETRIEVER_BATCH_PAGE_ELEMENTS_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_OCR_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_EMBED_PER_GPU`
-- `NEMO_RETRIEVER_BATCH_CPU_ONLY_STAGE_NUM_GPUS`
-- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_PAGE_ELEMENTS_NUM_GPUS`
-- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_OCR_NUM_GPUS`
-- `NEMO_RETRIEVER_BATCH_HIGH_OVERLAP_EMBED_NUM_GPUS`
-- `NEMO_RETRIEVER_BATCH_MAX_GPU_PER_STAGE`
 
 ### Running multiple NIM service instances on multi-GPU hosts
 
