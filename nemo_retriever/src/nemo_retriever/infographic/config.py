@@ -7,7 +7,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from nemo_retriever.config_utils import endpoints_from_yaml
+from nemo_retriever.utils.config_utils import endpoints_from_yaml
 
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
