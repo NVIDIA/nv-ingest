@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import pandas as pd
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
+from nemo_retriever.chart.chart_detection import graphic_elements_ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
@@ -187,6 +188,7 @@ def explode_content_to_rows(
         if isinstance(page_text, str) and page_text.strip():
             page_row = _deep_copy_row(row_dict)
             page_row["_embed_modality"] = text_mod
+            page_row["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 page_row["_image_b64"] = page_image_b64
             new_rows.append(page_row)
@@ -206,6 +208,7 @@ def explode_content_to_rows(
                 content_row = _deep_copy_row(row_dict)
                 content_row[text_column] = t.strip()
                 content_row["_embed_modality"] = struct_mod
+                content_row["_content_type"] = col
                 if struct_mod in IMAGE_MODALITIES and page_image_b64:
                     bbox = item.get("bbox_xyxy_norm")
                     if bbox and len(bbox) == 4:
@@ -222,6 +225,7 @@ def explode_content_to_rows(
         if not exploded_any:
             preserved = _deep_copy_row(row_dict)
             preserved["_embed_modality"] = text_mod
+            preserved["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 preserved["_image_b64"] = page_image_b64
             new_rows.append(preserved)
@@ -1009,8 +1013,8 @@ class InProcessIngestor(Ingestor):
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
-        # the caller explicitly disables it.
-        if "extract_page_as_image" not in extract_kwargs:
+        # the caller explicitly set it to False.
+        if extract_kwargs.get("extract_page_as_image") is None:
             if any(
                 extract_kwargs.get(k) is True
                 for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")
@@ -1096,6 +1100,40 @@ class InProcessIngestor(Ingestor):
                     )
                 )
 
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+
+            # When use_graphic_elements is True, charts go through the
+            # combined graphic-elements + OCR stage instead of OCR-only.
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                print("Adding graphic-elements+OCR extraction task")
+                ge_invoke_url = kwargs.get("graphic_elements_invoke_url", "")
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                )
+
+                ge_ocr_kwargs: dict[str, Any] = {}
+                if ge_invoke_url:
+                    ge_ocr_kwargs["graphic_elements_invoke_url"] = ge_invoke_url
+                    ge_ocr_kwargs["graphic_elements_model"] = None
+                else:
+                    from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+                    ge_ocr_kwargs["graphic_elements_model"] = NemotronGraphicElementsV1()
+
+                if ocr_invoke_url:
+                    ge_ocr_kwargs["ocr_invoke_url"] = ocr_invoke_url
+                    ge_ocr_kwargs["ocr_model"] = None
+                else:
+                    ocr_model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                    ge_ocr_kwargs["ocr_model"] = ocr_model
+
+                ge_ocr_kwargs.update(_stage_remote_kwargs("ocr"))
+                self._tasks.append((graphic_elements_ocr_page_elements, ge_ocr_kwargs))
+
             use_table_structure = bool(kwargs.get("use_table_structure", False))
             from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
 
@@ -1136,12 +1174,12 @@ class InProcessIngestor(Ingestor):
                 self._tasks.append((table_structure_ocr_page_elements, ts_ocr_kwargs))
 
             # OCR-based extraction for tables/charts/infographics.
-            # When use_table_structure is True, tables are handled above;
-            # charts/infographics still go through OCR.
+            # When use_graphic_elements is True, charts are handled above;
+            # when use_table_structure is True, tables are handled above.
             ocr_flags = {}
             if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
-            if kwargs.get("extract_charts") is True:
+            if kwargs.get("extract_charts") is True and not use_graphic_elements:
                 ocr_flags["extract_charts"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True
