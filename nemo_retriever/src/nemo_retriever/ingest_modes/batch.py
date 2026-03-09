@@ -74,6 +74,14 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
 from nemo_retriever.params.utils import coerce_params as _coerce_params
 
 
+def _runtime_env_vars() -> dict[str, str]:
+    env_vars = {
+        "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
+        "LOG_LEVEL": "INFO",
+    }
+    return {key: value for key, value in env_vars.items() if isinstance(value, str)}
+
+
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
@@ -197,17 +205,12 @@ class BatchIngestor(Ingestor):
         if self._debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        runtime_env_vars = {
-            "LOG_LEVEL": "INFO",
-            "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
-        }
-
         # Initialize Ray for distributed execution.
         ray.init(
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={"env_vars": runtime_env_vars},
+            runtime_env={"env_vars": _runtime_env_vars()},
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
