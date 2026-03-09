@@ -71,12 +71,7 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
         logger.debug("%s | %s | %r", location, message, data)
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
-    if params is None:
-        return model_cls(**kwargs)
-    if kwargs:
-        return params.model_copy(update=kwargs)  # type: ignore[return-value]
-    return params
+from nemo_retriever.params.utils import coerce_params as _coerce_params
 
 
 class _LanceDBWriteActor:
@@ -712,17 +707,10 @@ class BatchIngestor(Ingestor):
                 "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
             )
 
-        resolved = _coerce_params(params, EmbedParams, kwargs)
-        kwargs = {
-            **resolved.model_dump(
-                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
-            ),
-            **resolved.runtime.model_dump(mode="python", exclude_none=True),
-            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
-        }
+        from nemo_retriever.params.utils import build_embed_kwargs
 
-        if "embedding_endpoint" not in kwargs and kwargs.get("embed_invoke_url"):
-            kwargs["embedding_endpoint"] = kwargs.get("embed_invoke_url")
+        resolved = _coerce_params(params, EmbedParams, kwargs)
+        kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality
