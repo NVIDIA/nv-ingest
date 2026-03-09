@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import importlib
 import io
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -278,37 +278,25 @@ class TestGraphicElementsActor:
 
     def test_actor_error_returns_dataframe_with_error(self) -> None:
         """Actor should never raise; errors go into metadata columns."""
-        import sys
+        from nemo_retriever.chart.chart_detection import GraphicElementsActor
 
-        # Other test files (e.g. test_multimodal_embed) stub chart_detection in sys.modules.
-        # Ensure we get the real class so __new__ works.
-        mod_name = "nemo_retriever.chart.chart_detection"
-        stubbed = sys.modules.get(mod_name)
-        if stubbed is not None and type(stubbed).__name__ == "MagicMock":
-            del sys.modules[mod_name]
-        try:
-            from nemo_retriever.chart.chart_detection import GraphicElementsActor
-        finally:
-            if stubbed is not None:
-                sys.modules[mod_name] = stubbed
+        with patch("nemo_retriever.chart.chart_detection.GraphicElementsActor.__init__", return_value=None):
+            actor = GraphicElementsActor.__new__(GraphicElementsActor)
+            actor._graphic_elements_model = None
+            actor._ocr_model = None
+            actor._graphic_elements_invoke_url = ""
+            actor._ocr_invoke_url = ""
+            actor._api_key = None
+            actor._request_timeout_s = 120.0
+            actor._remote_retry = None
 
-        # Build instance via __new__ only (__init__ is not called), then set attrs.
-        actor = GraphicElementsActor.__new__(GraphicElementsActor)
-        actor._graphic_elements_model = None
-        actor._ocr_model = None
-        actor._graphic_elements_invoke_url = ""
-        actor._ocr_invoke_url = ""
-        actor._api_key = None
-        actor._request_timeout_s = 120.0
-        actor._remote_retry = None
-
-        df = _make_chart_page_df()
-        # This will fail because both models are None and no URLs set.
-        result = actor(df)
-        assert "chart" in result.columns
-        assert "graphic_elements_ocr_v1" in result.columns
-        meta = result.iloc[0]["graphic_elements_ocr_v1"]
-        assert meta["error"] is not None
+            df = _make_chart_page_df()
+            # This will fail because both models are None and no URLs set.
+            result = actor(df)
+            assert "chart" in result.columns
+            assert "graphic_elements_ocr_v1" in result.columns
+            meta = result.iloc[0]["graphic_elements_ocr_v1"]
+            assert meta["error"] is not None
 
 
 # ---------------------------------------------------------------------------
