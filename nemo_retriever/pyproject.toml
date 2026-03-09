@@ -49,7 +49,7 @@ dependencies = [
   # transformers>=5 enables loading nvidia/parakeet-ctc-1.1b via pipeline (see
   # parakeet-ctc-1.1b README). If using llama_nemotron_embed_1b_v2, verify
   # compatibility with transformers 5 (it previously relied on HybridCache).
-  "transformers==4.57.6",
+  "transformers>=5.0.0",
   "tokenizers>=0.20.3",
   "accelerate>=1.1.0",
   "torch~=2.9.1",
