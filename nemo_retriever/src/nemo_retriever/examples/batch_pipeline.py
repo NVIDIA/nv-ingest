@@ -283,6 +283,11 @@ def main(
         "--lancedb-uri",
         help="LanceDB URI/path for this run.",
     ),
+    method: str = typer.Option(
+        "pdfium",
+        "--method",
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
+    ),
     log_file: Optional[Path] = typer.Option(
         None,
         "--log-file",
@@ -570,6 +575,7 @@ def main(
                 ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
+                        method=method,
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
@@ -635,6 +641,7 @@ def main(
                 ingestor.files(file_patterns)
                 .extract(
                     ExtractParams(
+                        method=method,
                         extract_text=True,
                         extract_tables=True,
                         extract_charts=True,
