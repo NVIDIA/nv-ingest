@@ -15,7 +15,7 @@ class Retriever:
 
     lancedb_uri: str = "lancedb"
     lancedb_table: str = "nv-ingest"
-    embedder: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    embedder: str = "nvidia/llama-nemotron-embed-1b-v2"
     embedding_http_endpoint: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embedding_api_key: str = ""
@@ -66,31 +66,14 @@ class Retriever:
         return out
 
     def _embed_queries_local_hf(self, query_texts: list[str], *, model_name: str) -> list[list[float]]:
-        from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+        from nemo_retriever.model import create_local_embedder, is_vl_embed_model
 
-        model_id = resolve_embed_model(model_name)
         cache_dir = str(self.local_hf_cache_dir) if self.local_hf_cache_dir else None
+        embedder = create_local_embedder(model_name, device=self.local_hf_device, hf_cache_dir=cache_dir)
 
         if is_vl_embed_model(model_name):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            embedder = LlamaNemotronEmbedVL1BV2Embedder(
-                device=self.local_hf_device,
-                hf_cache_dir=cache_dir,
-                model_id=model_id,
-            )
             vectors = embedder.embed_queries(query_texts, batch_size=int(self.local_hf_batch_size))
         else:
-            from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-
-            embedder = LlamaNemotronEmbed1BV2Embedder(
-                device=self.local_hf_device,
-                hf_cache_dir=cache_dir,
-                normalize=True,
-                model_id=model_id,
-            )
             vectors = embedder.embed(["query: " + q for q in query_texts], batch_size=int(self.local_hf_batch_size))
         return vectors.detach().to("cpu").tolist()
 

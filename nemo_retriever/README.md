@@ -143,7 +143,20 @@ retriever local stage6 run --input-dir <dir>
 ```
 `retriever html run` parses the HTML and writes `*.html_extraction.json` sidecar files into the input directory. `retriever local stage5 run` performs downstream processing over those JSON files, and `retriever local stage6 run` completes the final ingestion stages, such as embedding and optional upload, using the same core extraction pipeline.
 
-7. Quick end‑to‑end test
+- Config files:
+  - `nemo_retriever/harness/test_configs.yaml`
+  - `nemo_retriever/harness/nightly_config.yaml`
+- CLI entrypoint is nested under `retriever harness`.
+- First pass is LanceDB-only and enforces recall-required pass/fail by default.
+- Single-run artifact directories default to `<dataset>_<timestamp>`.
+- Dataset-specific recall adapters are supported via config:
+  - `recall_adapter: none` (default passthrough)
+  - `recall_adapter: page_plus_one` (convert zero-indexed `page` CSVs to `pdf_page`)
+  - `recall_adapter: financebench_json` (convert FinanceBench JSON to `query,expected_pdf`)
+  - `recall_match_mode: pdf_page|pdf_only` controls recall matching mode.
+- Dataset presets configured under `/datasets/nv-ingest/...` will fall back to `/raid/$USER/...` when the dataset is not present in `/datasets`.
+- Relative `query_csv` entries in harness YAML resolve from the config file directory first, then fall back to the repo root.
+- The default `financebench` dataset preset now points at `data/financebench_train.json` and enables recall out of the box.
 
 After you’ve finished installing and configuring NeMo Retriever Library, it's a good idea to validate the entire pipeline with a small, known dataset. In this step, you run the batch pipeline module against the sample `bo20` dataset to confirm that ingestion, OCR under CUDA 13, embedding, and any configured recall evaluation all run end‑to‑end without errors.
 
@@ -176,9 +189,11 @@ retriever harness run --dataset jp20 --preset single_gpu
 ```
 or
 
-Direct dataset path
-```bash
-retriever harness run --dataset /datasets/nemo-retriever/bo767 --preset single_gpu
+# Direct dataset path
+retriever harness run --dataset /datasets/nv-ingest/bo767 --preset single_gpu
+
+# Add repeatable run or session tags for later review
+retriever harness run --dataset jp20 --preset single_gpu --tag nightly --tag candidate
 ```
 
 3. Sweep runs
@@ -196,6 +211,19 @@ To orchestrate a full nightly benchmark session use the following command.
 ```bash
 retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml
 retriever harness nightly --dry-run
+retriever harness nightly --runs-config nemo_retriever/harness/nightly_config.yaml --tag nightly
+```
+
+### Session inspection
+
+```bash
+# Print a compact table from a completed sweep/nightly session
+retriever harness summary nemo_retriever/artifacts/nightly_20260305_010203_UTC
+
+# Compare two session summaries by run name
+retriever harness compare \
+  nemo_retriever/artifacts/nightly_20260305_010203_UTC \
+  nemo_retriever/artifacts/nightly_20260306_010204_UTC
 ```
 
 The `--dry-run` option lets you verify the planned runs without executing them. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
@@ -208,7 +236,12 @@ Each harness run writes a compact artifact set (no full stdout/stderr log persis
 - `command.txt` (exact invoked command)
 - `runtime_metrics/` (Ray runtime summary + timeline files)
 
-By default, detection totals are embedded into `results.json` under `detection_summary`. To obtain a separate detection file set, set `write_detection_file: true` in `nemo_retriever/harness/test_configs.yaml`. Sweep and nightly sessions additionally write `session_summary.json`, which contains an overall pass/fail rollup. [NeMo Retriever Library benchmarking documentation](https://docs.nvidia.com/nemo/retriever/latest/extraction/benchmarking/)
+Recall metrics in `results.json` are normalized as `recall_1`, `recall_5`, and `recall_10`.
+
+By default, detection totals are embedded into `results.json` under `detection_summary`.
+If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
+`nemo_retriever/harness/test_configs.yaml`.
+When tags are supplied with `--tag`, they are persisted in `results.json` and in session rollups for sweep/nightly runs.
 
 `results.json` also includes a nested `run_metadata` block for lightweight environment context:
 
