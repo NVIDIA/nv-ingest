@@ -204,20 +204,7 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     import pyarrow as pa  # type: ignore
 
     schema = lancedb_schema()
-    empty = pa.table(
-        {
-            "vector": [],
-            "pdf_page": [],
-            "filename": [],
-            "pdf_basename": [],
-            "page_number": [],
-            "source": [],
-            "path": [],
-            "text": [],
-            "metadata": [],
-        },
-        schema=schema,
-    )
+    empty = pa.table({f.name: [] for f in schema}, schema=schema)
     db.create_table(table_name, data=empty, schema=schema, mode="create")
 
 
