@@ -123,6 +123,11 @@ class ingestor:
         _ = _merge_params(params, kwargs)
         self._not_implemented("extract")
 
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "ingestor":
+        """Record an extract-image-files task configuration."""
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("extract_image_files")
+
     def filter(self) -> "ingestor":
         """Record a filter task configuration."""
         self._not_implemented("filter")
