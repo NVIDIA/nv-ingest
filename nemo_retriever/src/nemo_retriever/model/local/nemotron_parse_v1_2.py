@@ -37,7 +37,7 @@ class NemotronParseV12(BaseModel):
 
         self._model_path = model_path
         self._task_prompt = task_prompt
-        self._device = torch.device(device or ("cuda:0" if torch.cuda.is_available() else "cpu"))
+        self._device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self._dtype = torch.bfloat16 if self._device.type == "cuda" else torch.float32
         hf_cache_dir = configure_global_hf_cache_base(hf_cache_dir)
         _revision = get_hf_revision(self._model_path)
