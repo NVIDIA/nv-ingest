@@ -12,7 +12,7 @@ import typer
 import pandas as pd  # noqa: F401
 from rich.console import Console
 
-from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df  # noqa: F401
+from .core import RecallConfig, retrieve_and_score
 
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()

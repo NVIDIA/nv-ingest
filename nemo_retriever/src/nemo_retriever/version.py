@@ -13,13 +13,9 @@ from pathlib import Path
 import os
 import subprocess
 
-try:
-    from ._build_info import BUILD_DATE as _PACKAGE_BUILD_DATE
-    from ._build_info import BUILD_GIT_SHA as _PACKAGE_BUILD_GIT_SHA
-except ImportError:
-    # During setuptools build isolation the package may not be importable
-    _PACKAGE_BUILD_DATE = "unknown"
-    _PACKAGE_BUILD_GIT_SHA = "unknown"
+# Overwritten by CI before packaging; see .github/workflows/*.yml.
+_PACKAGE_BUILD_GIT_SHA = "unknown"
+_PACKAGE_BUILD_DATE = "unknown"
 
 _PKG_NAME = "nemo-retriever"
 _UNKNOWN = "unknown"

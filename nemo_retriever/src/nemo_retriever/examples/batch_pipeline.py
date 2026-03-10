@@ -165,19 +165,6 @@ def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
     target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
-def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
-    if ingest_elapsed_s <= 0:
-        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
-        return
-    if processed_pages is None:
-        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
-        return
-
-    pps = processed_pages / ingest_elapsed_s
-    print(f"Pages processed: {processed_pages}")
-    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
-
-
 def _count_materialized_rows(dataset: object) -> int:
     """Count rows from a materialized Ray Dataset without relying on ``len()``."""
     count = getattr(dataset, "count", None)

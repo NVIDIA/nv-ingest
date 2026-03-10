@@ -22,6 +22,8 @@ import traceback
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
 from nemo_retriever.nim.nim import invoke_image_inference_batches
+from nemo_retriever.ocr.ocr import crop_b64_image_by_norm_bbox
+from nemo_retriever.utils.detection import prediction_to_detections
 
 try:
     import numpy as np
@@ -66,64 +68,6 @@ def _decode_b64_image_to_chw_tensor(image_b64: str) -> Tuple["torch.Tensor", Tup
     return t, (int(h), int(w))
 
 
-def _crop_b64_image_by_norm_bbox(
-    page_image_b64: str,
-    *,
-    bbox_xyxy_norm: Sequence[float],
-    image_format: str = "png",
-) -> Tuple[Optional[str], Optional[Tuple[int, int]]]:
-    """
-    Crop a base64-encoded RGB image by a normalized xyxy bbox.
-
-    Returns:
-      - cropped_image_b64 (png) or None
-      - cropped_shape_hw (H,W) or None
-    """
-    if Image is None:  # pragma: no cover
-        raise ImportError("Cropping requires pillow.")
-    if not isinstance(page_image_b64, str) or not page_image_b64:
-        return None, None
-    try:
-        x1n, y1n, x2n, y2n = [float(x) for x in bbox_xyxy_norm]
-    except Exception:
-        return None, None
-
-    try:
-        raw = base64.b64decode(page_image_b64)
-        with Image.open(io.BytesIO(raw)) as im0:
-            im = im0.convert("RGB")
-            w, h = im.size
-            if w <= 1 or h <= 1:
-                return None, None
-
-            def _clamp_int(v: float, lo: int, hi: int) -> int:
-                if v != v:  # NaN
-                    return lo
-                return int(min(max(v, float(lo)), float(hi)))
-
-            x1 = _clamp_int(x1n * w, 0, w)
-            x2 = _clamp_int(x2n * w, 0, w)
-            y1 = _clamp_int(y1n * h, 0, h)
-            y2 = _clamp_int(y2n * h, 0, h)
-
-            if x2 <= x1 or y2 <= y1:
-                return None, None
-
-            crop = im.crop((x1, y1, x2, y2))
-            cw, ch = crop.size
-            if cw <= 1 or ch <= 1:
-                return None, None
-
-            buf = io.BytesIO()
-            fmt = str(image_format or "png").lower()
-            if fmt not in {"png"}:
-                fmt = "png"
-            crop.save(buf, format=fmt.upper())
-            return base64.b64encode(buf.getvalue()).decode("ascii"), (int(ch), int(cw))
-    except Exception:
-        return None, None
-
-
 def _labels_from_model(model: Any) -> List[str]:
     try:
         labels = getattr(getattr(model, "_model", None), "labels", None)
@@ -142,93 +86,6 @@ def _labels_from_model(model: Any) -> List[str]:
         pass
 
     return []
-
-
-def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict[str, Any]]:
-    if torch is None:  # pragma: no cover
-        raise ImportError("torch required for prediction parsing.")
-
-    boxes = labels = scores = None
-    if isinstance(pred, dict):
-        # IMPORTANT: do not use `or` chains here. torch.Tensor truthiness is ambiguous and raises.
-        def _get_any(d: Dict[str, Any], *keys: str) -> Any:
-            for k in keys:
-                if k in d:
-                    v = d.get(k)
-                    if v is not None:
-                        return v
-            return None
-
-        boxes = _get_any(pred, "boxes", "bboxes", "bbox", "box")
-        labels = _get_any(pred, "labels", "classes", "class_ids", "class")
-        scores = _get_any(pred, "scores", "conf", "confidences", "score")
-    elif isinstance(pred, (list, tuple)) and len(pred) >= 3:
-        boxes, labels, scores = pred[0], pred[1], pred[2]
-
-    if boxes is None or labels is None:
-        return []
-
-    def _to_tensor(x: Any) -> Optional["torch.Tensor"]:
-        if x is None:
-            return None
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu()
-        try:
-            return torch.as_tensor(x).detach().cpu()
-        except Exception:
-            return None
-
-    b = _to_tensor(boxes)
-    l = _to_tensor(labels)  # noqa: E741
-    s = _to_tensor(scores) if scores is not None else None
-    if b is None or l is None:
-        return []
-
-    if b.ndim != 2 or int(b.shape[-1]) != 4:
-        return []
-    if l.ndim == 2 and int(l.shape[-1]) == 1:
-        l = l.squeeze(-1)  # noqa: E741
-    if l.ndim != 1:
-        return []
-
-    n = int(min(b.shape[0], l.shape[0]))
-    dets: List[Dict[str, Any]] = []
-    for i in range(n):
-        try:
-            x1, y1, x2, y2 = [float(x) for x in b[i].tolist()]
-        except Exception:
-            continue
-
-        label_i: Optional[int]
-        try:
-            label_i = int(l[i].item())
-        except Exception:
-            label_i = None
-
-        score_f: Optional[float]
-        if s is not None and s.ndim >= 1 and int(s.shape[0]) > i:
-            try:
-                score_f = float(s[i].item())
-            except Exception:
-                score_f = None
-        else:
-            score_f = None
-
-        label_name = None
-        if label_i is not None and 0 <= label_i < len(label_names):
-            label_name = label_names[label_i]
-        if not label_name:
-            label_name = f"label_{label_i}" if label_i is not None else "unknown"
-
-        dets.append(
-            {
-                "bbox_xyxy_norm": [x1, y1, x2, y2],
-                "label": label_i,
-                "label_name": str(label_name),
-                "score": score_f,
-            }
-        )
-    return dets
 
 
 def _extract_remote_pred_item(response_item: Any) -> Any:
@@ -344,7 +201,7 @@ def detect_infographic_elements_v1(
                 raise RuntimeError(f"Expected {len(valid)} remote predictions, got {len(response_items)}")
             for local_j, row_i in enumerate(valid):
                 pred_item = _extract_remote_pred_item(response_items[local_j])
-                dets = _prediction_to_detections(pred_item, label_names=label_names)
+                dets = prediction_to_detections(pred_item, label_names=label_names)
                 payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
         except BaseException as e:
             elapsed = time.perf_counter() - t0
@@ -393,7 +250,7 @@ def detect_infographic_elements_v1(
             if len(preds_list) != len(idxs):
                 raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
             for local_j, row_i in enumerate(idxs):
-                dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
+                dets = prediction_to_detections(preds_list[local_j], label_names=label_names)
                 payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
         except BaseException:
             for local_j, row_i in enumerate(idxs):
@@ -411,7 +268,7 @@ def detect_infographic_elements_v1(
                     if isinstance(pre, torch.Tensor) and pre.ndim == 3:
                         pre = pre.unsqueeze(0)
                     pred = model.invoke(pre, sh)
-                    dets = _prediction_to_detections(pred, label_names=label_names)
+                    dets = prediction_to_detections(pred, label_names=label_names)
                     payloads[row_i] = {
                         "detections": dets,
                         "timing": {"seconds": float(time.perf_counter() - t1)},
@@ -541,7 +398,7 @@ def detect_infographic_elements_v1_from_page_elements_v3(
             if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
                 continue
 
-            crop_b64, crop_shape_hw = _crop_b64_image_by_norm_bbox(
+            crop_b64, crop_shape_hw = crop_b64_image_by_norm_bbox(
                 page_image_b64, bbox_xyxy_norm=cast(Sequence[float], bbox)
             )
             if not crop_b64 or crop_shape_hw is None:
@@ -587,7 +444,7 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                     raise RuntimeError(f"Expected {len(crop_b64s)} remote predictions, got {len(response_items)}")
                 for resp in response_items:
                     pred_item = _extract_remote_pred_item(resp)
-                    dets = _prediction_to_detections(pred_item, label_names=label_names)
+                    dets = prediction_to_detections(pred_item, label_names=label_names)
                     crop_payloads.append({"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None})
             except BaseException as e:
                 elapsed = time.perf_counter() - t0
@@ -650,7 +507,7 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                             "Batched invoke returned unexpected output shape; falling back to per-image calls."
                         )
                     for local_j, crop_i in enumerate(idxs):
-                        dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
+                        dets = prediction_to_detections(preds_list[local_j], label_names=label_names)
                         crop_payloads[crop_i] = {
                             "detections": dets,
                             "timing": {"seconds": float(elapsed)},
@@ -672,7 +529,7 @@ def detect_infographic_elements_v1_from_page_elements_v3(
                             if isinstance(pre, torch.Tensor) and pre.ndim == 3:
                                 pre = pre.unsqueeze(0)
                             pred = model.invoke(pre, sh)
-                            dets = _prediction_to_detections(pred, label_names=label_names)
+                            dets = prediction_to_detections(pred, label_names=label_names)
                             crop_payloads[crop_i] = {
                                 "detections": dets,
                                 "timing": {"seconds": float(time.perf_counter() - t1)},

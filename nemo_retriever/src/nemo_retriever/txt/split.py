@@ -22,7 +22,7 @@ DEFAULT_MAX_TOKENS = 512
 DEFAULT_OVERLAP_TOKENS = 0
 
 
-def _get_tokenizer(model_id: str, cache_dir: Optional[str] = None):  # noqa: ANN201
+def get_tokenizer(model_id: str, cache_dir: Optional[str] = None):  # noqa: ANN201
     """Lazy-load HuggingFace tokenizer."""
     from transformers import AutoTokenizer
 
@@ -131,7 +131,7 @@ def txt_file_to_chunks_df(
     path = str(Path(path).resolve())
     raw = Path(path).read_text(encoding=encoding, errors="replace")
     model_id = tokenizer_model_id or DEFAULT_TOKENIZER_MODEL_ID
-    tokenizer = _get_tokenizer(model_id, cache_dir=tokenizer_cache_dir)
+    tokenizer = get_tokenizer(model_id, cache_dir=tokenizer_cache_dir)
     chunk_texts = split_text_by_tokens(
         raw,
         tokenizer=tokenizer,
@@ -183,7 +183,7 @@ def txt_bytes_to_chunks_df(
     path = str(Path(path).resolve())
     raw = content_bytes.decode(encoding, errors="replace")
     model_id = tokenizer_model_id or DEFAULT_TOKENIZER_MODEL_ID
-    tokenizer = _get_tokenizer(model_id, cache_dir=tokenizer_cache_dir)
+    tokenizer = get_tokenizer(model_id, cache_dir=tokenizer_cache_dir)
     chunk_texts = split_text_by_tokens(
         raw,
         tokenizer=tokenizer,

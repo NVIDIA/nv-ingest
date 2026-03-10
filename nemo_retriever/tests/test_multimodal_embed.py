@@ -204,7 +204,7 @@ class TestExplodeContentToRows:
         assert list(result["_embed_modality"]) == ["text", "text"]
         assert "_image_b64" not in result.columns
 
-    @patch("nemo_retriever.ingest_modes.inprocess._crop_b64_image_by_norm_bbox")
+    @patch("nemo_retriever.ingest_modes.inprocess.crop_b64_image_by_norm_bbox")
     def test_text_image_carries_image(self, mock_crop):
         """text_image mode copies page image to _image_b64, crops for structured content."""
         mock_crop.return_value = ("cropped_b64", None)

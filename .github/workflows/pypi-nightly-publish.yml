@@ -121,15 +121,16 @@ jobs:
         run: |
           cd nemo_retriever
           python - <<'PY'
+          import re
           from datetime import datetime, timezone
           from pathlib import Path
 
-          Path("src/nemo_retriever/_build_info.py").write_text(
-              '"""Build metadata written by CI before packaging."""\n\n'
-              'BUILD_GIT_SHA = "${{ github.sha }}"\n'
-              f'BUILD_DATE = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n',
-              encoding="utf-8",
-          )
+          vf = Path("src/nemo_retriever/version.py")
+          src = vf.read_text(encoding="utf-8")
+          src = re.sub(r'^_PACKAGE_BUILD_GIT_SHA = .*$', '_PACKAGE_BUILD_GIT_SHA = "${{ github.sha }}"', src, flags=re.M)
+          build_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+          src = re.sub(r'^_PACKAGE_BUILD_DATE = .*$', f'_PACKAGE_BUILD_DATE = "{build_date}"', src, flags=re.M)
+          vf.write_text(src, encoding="utf-8")
           PY
           RETRIEVER_RELEASE_TYPE=${{ env.RELEASE_TYPE }} \
           RETRIEVER_VERSION=${{ env.VERSION }} \

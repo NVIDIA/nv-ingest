@@ -91,7 +91,7 @@ def _collect_run_metadata() -> dict[str, Any]:
     }
 
 
-def _normalize_tags(tags: list[str] | None) -> list[str]:
+def normalize_tags(tags: list[str] | None) -> list[str]:
     normalized: list[str] = []
     seen: set[str] = set()
 
@@ -466,7 +466,7 @@ def _run_entry(
         artifact_dir.mkdir(parents=True, exist_ok=True)
 
     resolved_run_name = run_name or cfg.dataset_label
-    normalized_tags = _normalize_tags(tags)
+    normalized_tags = normalize_tags(tags)
     result = _run_single(cfg, artifact_dir, run_id=resolved_run_name, tags=normalized_tags)
     run_result = {
         "run_name": resolved_run_name,
@@ -548,7 +548,7 @@ def sweep_command(
     tag: list[str] = typer.Option([], "--tag", help="Session tag to persist on each run. Repeatable."),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print run plan without executing."),
 ) -> None:
-    normalized_tags = _normalize_tags(tag)
+    normalized_tags = normalize_tags(tag)
     runs = load_runs_config(runs_config)
     if dry_run:
         typer.echo("Sweep dry run:")

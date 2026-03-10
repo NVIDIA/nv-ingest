@@ -11,6 +11,7 @@ import traceback
 
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
+from nemo_retriever.utils.detection import prediction_to_detections
 
 try:
     import torch
@@ -39,114 +40,6 @@ def _labels_from_model(model: Any) -> List[str]:
         pass
 
     return []
-
-
-def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict[str, Any]]:
-    """
-    Best-effort conversion of model output into a standard detection list.
-
-    Produces dicts of the form:
-      {"bbox_xyxy_norm": [...], "label": int|None, "label_name": str, "score": float|None}
-    """
-    if torch is None:  # pragma: no cover
-        raise ImportError("torch required for prediction parsing.")
-
-    boxes = labels = scores = None
-    if isinstance(pred, dict):
-        # IMPORTANT: do not use `or` chains here. torch.Tensor truthiness is ambiguous and raises.
-        def _get_any(d: Dict[str, Any], *keys: str) -> Any:
-            for k in keys:
-                if k in d:
-                    v = d.get(k)
-                    if v is not None:
-                        return v
-            return None
-
-        boxes = _get_any(pred, "boxes", "bboxes", "bbox", "box")
-        labels = _get_any(pred, "labels", "classes", "class_ids", "class")
-        scores = _get_any(pred, "scores", "conf", "confidences", "score")
-    elif isinstance(pred, (list, tuple)) and len(pred) >= 3:
-        boxes, labels, scores = pred[0], pred[1], pred[2]
-
-    if boxes is None or labels is None:
-        return []
-
-    # Normalize to torch tensors.
-    def _to_tensor(x: Any) -> Optional["torch.Tensor"]:
-        if x is None:
-            return None
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu()
-        try:
-            return torch.as_tensor(x).detach().cpu()
-        except Exception:
-            return None
-
-    # Handle string labels (e.g. NIM returns ["cell", "row", "column", ...]).
-    # torch.as_tensor cannot convert strings, so handle them before tensor conversion.
-    _string_labels: Optional[List[str]] = None
-    if isinstance(labels, (list, tuple)) and labels and isinstance(labels[0], str):
-        _string_labels = [str(x) for x in labels]
-
-    b = _to_tensor(boxes)
-    labels_t = _to_tensor(labels) if _string_labels is None else None
-    s = _to_tensor(scores) if scores is not None else None
-    if b is None:
-        return []
-    if labels_t is None and _string_labels is None:
-        return []
-
-    # Expect boxes (N,4), labels (N,)
-    if b.ndim != 2 or int(b.shape[-1]) != 4:
-        return []
-    if labels_t is not None:
-        if labels_t.ndim == 2 and int(labels_t.shape[-1]) == 1:
-            labels_t = labels_t.squeeze(-1)
-        if labels_t.ndim != 1:
-            return []
-
-    n_labels = len(_string_labels) if _string_labels is not None else int(labels_t.shape[0])
-    n = int(min(b.shape[0], n_labels))
-    dets: List[Dict[str, Any]] = []
-    for i in range(n):
-        try:
-            x1, y1, x2, y2 = [float(x) for x in b[i].tolist()]
-        except Exception:
-            continue
-
-        if _string_labels is not None:
-            label_i = i
-            label_name = _string_labels[i]
-        else:
-            try:
-                label_i = int(labels_t[i].item())
-            except Exception:
-                label_i = None
-
-            label_name = None
-            if label_i is not None and 0 <= label_i < len(label_names):
-                label_name = label_names[label_i]
-            if not label_name:
-                label_name = f"label_{label_i}" if label_i is not None else "unknown"
-
-        score_f: Optional[float]
-        if s is not None and s.ndim >= 1 and int(s.shape[0]) > i:
-            try:
-                score_f = float(s[i].item())
-            except Exception:
-                score_f = None
-        else:
-            score_f = None
-
-        dets.append(
-            {
-                "bbox_xyxy_norm": [x1, y1, x2, y2],
-                "label": label_i,
-                "label_name": str(label_name),
-                "score": score_f,
-            }
-        )
-    return dets
 
 
 def _parse_nim_bounding_boxes(response_item: Any) -> List[Dict[str, Any]]:
@@ -255,13 +148,13 @@ def table_structure_ocr_page_elements(
     """
     from nemo_retriever.nim.nim import invoke_image_inference_batches
     from nemo_retriever.ocr.ocr import (
-        _blocks_to_pseudo_markdown,
-        _crop_all_from_page,
-        _extract_remote_ocr_item,
-        _np_rgb_to_b64_png,
-        _parse_ocr_result,
+        blocks_to_pseudo_markdown,
+        crop_all_from_page,
+        extract_remote_ocr_item,
+        np_rgb_to_b64_png,
+        parse_ocr_result,
     )
-    from nemo_retriever.util.table_and_chart import join_table_structure_and_ocr_output
+    from nemo_retriever.utils.table_and_chart import join_table_structure_and_ocr_output
 
     retry = remote_retry or RemoteRetryParams(
         remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
@@ -316,7 +209,7 @@ def table_structure_ocr_page_elements(
                 continue
 
             # --- Pass 1: Collect table crops ---
-            crops = _crop_all_from_page(page_image_b64, dets, {"table"})
+            crops = crop_all_from_page(page_image_b64, dets, {"table"})
 
             if not crops:
                 all_table.append(table_items)
@@ -325,7 +218,7 @@ def table_structure_ocr_page_elements(
 
             # Pre-compute base64 encodings once for remote paths.
             crop_b64s = (
-                [_np_rgb_to_b64_png(crop_array) for _, _, crop_array in crops]
+                [np_rgb_to_b64_png(crop_array) for _, _, crop_array in crops]
                 if (use_remote_ts or use_remote_ocr)
                 else []
             )
@@ -350,7 +243,7 @@ def table_structure_ocr_page_elements(
                     parsed = _parse_nim_bounding_boxes(resp)
                     if not parsed:
                         pred_item = _extract_remote_pred_item(resp)
-                        parsed = _prediction_to_detections(pred_item, label_names=label_names)
+                        parsed = prediction_to_detections(pred_item, label_names=label_names)
                     structure_results.append(parsed)
             else:
                 # Local batched inference.
@@ -365,7 +258,7 @@ def table_structure_ocr_page_elements(
                     if isinstance(pre, torch.Tensor) and pre.ndim == 3:
                         pre = pre.unsqueeze(0)
                     pred = table_structure_model.invoke(pre, (h, w))
-                    dets = _prediction_to_detections(pred, label_names=label_names)
+                    dets = prediction_to_detections(pred, label_names=label_names)
                     structure_results.append(dets)
 
             # --- Pass 3: Run OCR on all crops ---
@@ -384,7 +277,7 @@ def table_structure_ocr_page_elements(
                 if len(ocr_response_items) != len(crops):
                     raise RuntimeError(f"Expected {len(crops)} OCR responses, got {len(ocr_response_items)}")
                 for resp in ocr_response_items:
-                    ocr_results.append(_extract_remote_ocr_item(resp))
+                    ocr_results.append(extract_remote_ocr_item(resp))
             else:
                 for _, _, crop_array in crops:
                     ocr_results.append(ocr_model.invoke(crop_array, merge_level="word"))
@@ -400,13 +293,13 @@ def table_structure_ocr_page_elements(
 
                 # Fallback: if no cells were detected, use OCR-only pseudo-markdown.
                 if not markdown:
-                    blocks = _parse_ocr_result(ocr_preds)
-                    markdown = _blocks_to_pseudo_markdown(blocks)
+                    blocks = parse_ocr_result(ocr_preds)
+                    markdown = blocks_to_pseudo_markdown(blocks)
                     if not markdown:
                         # Last resort: plain text.
-                        from nemo_retriever.ocr.ocr import _blocks_to_text
+                        from nemo_retriever.ocr.ocr import blocks_to_text
 
-                        markdown = _blocks_to_text(blocks)
+                        markdown = blocks_to_text(blocks)
 
                 table_items.append({"bbox_xyxy_norm": bbox, "text": markdown})
 

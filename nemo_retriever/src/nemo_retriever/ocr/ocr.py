@@ -48,7 +48,7 @@ def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
     }
 
 
-def _crop_b64_image_by_norm_bbox(
+def crop_b64_image_by_norm_bbox(
     page_image_b64: str,
     *,
     bbox_xyxy_norm: Sequence[float],
@@ -110,7 +110,7 @@ def _crop_b64_image_by_norm_bbox(
         return None, None
 
 
-def _crop_all_from_page(
+def crop_all_from_page(
     page_image_b64: str,
     detections: List[Dict[str, Any]],
     wanted_labels: set,
@@ -188,7 +188,7 @@ def _crop_all_from_page(
     return results
 
 
-def _np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
+def np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
     if Image is None:  # pragma: no cover
         raise ImportError("Pillow is required for image encoding.")
     img = Image.fromarray(crop_array.astype(np.uint8), mode="RGB")
@@ -197,7 +197,7 @@ def _np_rgb_to_b64_png(crop_array: np.ndarray) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-def _extract_remote_ocr_item(response_item: Any) -> Any:
+def extract_remote_ocr_item(response_item: Any) -> Any:
     if isinstance(response_item, dict):
         # NIM text_detections format: return full list (not v[0])
         td = response_item.get("text_detections")
@@ -212,7 +212,7 @@ def _extract_remote_ocr_item(response_item: Any) -> Any:
     return response_item
 
 
-def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
+def parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
     """
     Parse the output of ``NemotronOCRV1.invoke()`` into a flat list of
     ``{"text": str, "sort_y": float, "sort_x": float}`` blocks.
@@ -317,13 +317,13 @@ def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
     return blocks
 
 
-def _blocks_to_text(blocks: List[Dict[str, Any]]) -> str:
+def blocks_to_text(blocks: List[Dict[str, Any]]) -> str:
     """Sort text blocks by reading order (y then x) and join with newlines."""
     blocks.sort(key=lambda b: (b.get("sort_y", 0.0), b.get("sort_x", 0.0)))
     return "\n".join(b["text"] for b in blocks if b.get("text"))
 
 
-def _blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
+def blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
     """Convert OCR text blocks into pseudo-markdown table format.
 
     Uses DBSCAN clustering on y-coordinates to identify rows, then
@@ -501,13 +501,13 @@ def ocr_page_elements(
                 continue
 
             # --- decode page image once, crop all matching detections ---
-            crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
+            crops = crop_all_from_page(page_image_b64, dets, wanted_labels)
 
             if use_remote:
                 crop_b64s: List[str] = []
                 crop_meta: List[Tuple[str, List[float], Tuple[int, int]]] = []
                 for label_name, bbox, crop_array in crops:
-                    crop_b64s.append(_np_rgb_to_b64_png(crop_array))
+                    crop_b64s.append(np_rgb_to_b64_png(crop_array))
                     crop_meta.append((label_name, bbox, (crop_array.shape[0], crop_array.shape[1])))
 
                 if crop_b64s:
@@ -525,7 +525,7 @@ def ocr_page_elements(
                         raise RuntimeError(f"Expected {len(crop_meta)} OCR responses, got {len(response_items)}")
 
                     for i, (label_name, bbox, crop_hw) in enumerate(crop_meta):
-                        preds = _extract_remote_ocr_item(response_items[i])
+                        preds = extract_remote_ocr_item(response_items[i])
 
                         if label_name == "chart" and use_graphic_elements:
                             ge_dets = _find_ge_detections_for_bbox(row, bbox)
@@ -535,11 +535,11 @@ def ocr_page_elements(
                                     chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
                                     continue
 
-                        blocks = _parse_ocr_result(preds)
+                        blocks = parse_ocr_result(preds)
                         if label_name == "table":
-                            text = _blocks_to_pseudo_markdown(blocks) or _blocks_to_text(blocks)
+                            text = blocks_to_pseudo_markdown(blocks) or blocks_to_text(blocks)
                         else:
-                            text = _blocks_to_text(blocks)
+                            text = blocks_to_text(blocks)
                         entry = {"bbox_xyxy_norm": bbox, "text": text}
                         if label_name == "table":
                             table_items.append(entry)
@@ -572,13 +572,13 @@ def ocr_page_elements(
                             if text:
                                 chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
                                 return
-                    blocks = _parse_ocr_result(preds)
+                    blocks = parse_ocr_result(preds)
                     if label_name == "table":
-                        text = _blocks_to_pseudo_markdown(blocks)
+                        text = blocks_to_pseudo_markdown(blocks)
                         if not text:
-                            text = _blocks_to_text(blocks)
+                            text = blocks_to_text(blocks)
                     else:
-                        text = _blocks_to_text(blocks)
+                        text = blocks_to_text(blocks)
                     entry = {"bbox_xyxy_norm": bbox, "text": text}
                     if label_name == "table":
                         table_items.append(entry)
@@ -832,7 +832,7 @@ def nemotron_parse_page_elements(
                 all_meta.append({"timing": None, "error": None})
                 continue
 
-            crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
+            crops = crop_all_from_page(page_image_b64, dets, wanted_labels)
             # Parse-only mode may skip page-elements detection entirely. In that
             # case, parse the full page once and fan out the text to enabled
             # content channels.
@@ -849,7 +849,7 @@ def nemotron_parse_page_elements(
                 crop_b64s: List[str] = []
                 crop_meta: List[Tuple[str, List[float]]] = []
                 for label_name, bbox, crop_array in crops:
-                    crop_b64s.append(_np_rgb_to_b64_png(crop_array))
+                    crop_b64s.append(np_rgb_to_b64_png(crop_array))
                     crop_meta.append((label_name, bbox))
 
                 if crop_b64s:
