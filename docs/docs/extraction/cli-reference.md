@@ -31,7 +31,7 @@ The following table lists all CLI options: flag name, type, default, whether the
 
 | Flag | Aliases | Type | Default | Required | Description |
 |------|---------|------|---------|----------|-------------|
-| `--doc` | — | path (multiple) | none | No | Path to a document to process. May be specified multiple times. Files must exist. Supports glob-style patterns. |
+| `--doc` | — | path (multiple) | none | No | Path to a document to process. Can be specified multiple times. Files must exist. Supports glob-style patterns. |
 | `--dataset` | — | path | none | No | Path to a dataset definition file (JSON with `sampled_files` list). |
 | `--output_directory` | — | path | none | No | Directory where result metadata and optional media are written. If omitted, results are not saved to disk. |
 | `--task` | — | string (multiple) | none | No | Task definition in `task_id:{"key":"value"}` format. Repeat for multiple tasks (e.g. extract, split, caption). |
