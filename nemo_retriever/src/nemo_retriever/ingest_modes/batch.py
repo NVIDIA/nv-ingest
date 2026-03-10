@@ -345,7 +345,8 @@ class BatchIngestor(Ingestor):
         # 1700x2200) gives enough detail while reducing extraction time and
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
-
+        kwargs.setdefault("image_format", "jpeg")
+        kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
 
