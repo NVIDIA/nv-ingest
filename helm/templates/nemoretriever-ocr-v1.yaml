@@ -2,7 +2,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: nemoretriever-ocr-v1
+  name: nemotron-ocr-v1
   annotations:
     helm.sh/resource-policy: keep
 spec:
@@ -21,7 +21,7 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: nemoretriever-ocr-v1
+  name: nemotron-ocr-v1
 spec:
   image:
     repository: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}
@@ -31,7 +31,7 @@ spec:
   authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
   storage:
     nimCache:
-      name: nemoretriever-ocr-v1
+      name: nemotron-ocr-v1
   replicas: {{ .Values.nimOperator.nemoretriever_ocr_v1.replicas }}
   nodeSelector: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.nodeSelector | nindent 4 }}
   resources: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.resources | nindent 4 }}
