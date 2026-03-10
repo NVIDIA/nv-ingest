@@ -25,7 +25,7 @@ nemo-retriever --help
 
 ## Parameter Reference
 
-The following table lists all CLI options: flag name, type, default, whether the option is required, and a short description.
+The following table lists all CLI options.
 
 \* At least one of `--doc` or `--dataset` must be provided; otherwise there are no files to process.
 
@@ -41,7 +41,7 @@ The following table lists all CLI options: flag name, type, default, whether the
 | `--pdf_split_page_count` | — | int | none | No | Pages per PDF chunk when splitting (V2 API). Typically 1–128; server default if unset. |
 | `--client_type` | — | enum | `rest` | No | Client transport: `rest` or `simple`. |
 | `--client_kwargs` | — | string (JSON) | `{}` | No | Extra JSON object passed to the client. |
-| `--batch_size` | — | int | `10` | No | Number of in-flight jobs (must be ≥ 1). |
+| `--batch_size` | — | int | `10` | No | The number of in-flight jobs. This value must be greater than or equal to 1. |
 | `--concurrency_n` | — | int | `10` | No | Number of concurrent jobs to maintain. |
 | `--log_level` | — | enum | `INFO` | No | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
 | `--dry_run` | — | flag | false | No | Do not run the pipeline; only validate and log what would be done. |

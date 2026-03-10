@@ -118,7 +118,7 @@ Use the following code.
 | `show_telemetry`         | bool    | `None`  | Print telemetry summary after ingest (env: `NV_INGEST_CLIENT_SHOW_TELEMETRY`). |
 | `include_parent_trace_ids` | bool  | `False` | If `True`, also return parent job trace IDs (V2 API). |
 
-**Return value** depends on the flags:
+The return value depends on the following flags:
 
 - **Default:** `list` of results.
 - **`return_failures=True`:** `(results, failures)`.
