@@ -1,8 +1,10 @@
+from types import SimpleNamespace
+
 import pytest
 
 pytest.importorskip("ray")
 
-from nemo_retriever.examples.batch_pipeline import _count_materialized_rows
+from nemo_retriever.examples.batch_pipeline import _count_materialized_rows, _ensure_lancedb_table
 from nemo_retriever.utils.input_files import resolve_input_patterns
 
 
@@ -29,3 +31,19 @@ def test_resolve_input_file_patterns_recurses_for_directory_inputs(tmp_path) -> 
     assert pdf_patterns == [str(dataset_dir / "**" / "*.pdf")]
     assert txt_patterns == [str(dataset_dir / "**" / "*.txt")]
     assert doc_patterns == [str(dataset_dir / "**" / "*.docx"), str(dataset_dir / "**" / "*.pptx")]
+
+
+def test_ensure_lancedb_table_only_creates_uri_dir(monkeypatch, tmp_path) -> None:
+    lancedb_dir = tmp_path / "lancedb"
+
+    class _FakeDb:
+        def open_table(self, _name: str):
+            raise RuntimeError("missing")
+
+    monkeypatch.setattr(
+        "nemo_retriever.examples.batch_pipeline._lancedb",
+        lambda: SimpleNamespace(connect=lambda _uri: _FakeDb()),
+    )
+
+    assert _ensure_lancedb_table(str(lancedb_dir), "nv-ingest") is False
+    assert lancedb_dir.exists()

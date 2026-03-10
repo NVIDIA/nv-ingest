@@ -247,6 +247,9 @@ Each harness run writes a compact artifact set (no full stdout/stderr log persis
 - `results.json` (normalized metrics + pass/fail + config snapshot + `run_metadata`)
 - `command.txt` (exact invoked command)
 - `runtime_metrics/` (Ray runtime summary + timeline files)
+- `observability/extracts/` (JSONL snapshots of per-run extract outputs)
+- `observability/chunks/` (JSONL snapshots of the exact pre-embed chunk rows)
+- `ingest_errors.json` (only written when ingest error rows are detected)
 
 Recall metrics in `results.json` are normalized as `recall_1`, `recall_5`, and `recall_10`.
 Nightly/sweep rollups intentionally focus on compact `summary_metrics`:
@@ -260,6 +263,9 @@ By default, detection totals are embedded into `results.json` under `detection_s
 If you want a separate detection file for ad hoc inspection, set `write_detection_file: true` in
 `nemo_retriever/harness/test_configs.yaml`.
 When tags are supplied with `--tag`, they are persisted in `results.json` and in session rollups for sweep/nightly runs.
+By default, harness runs also mirror the extract/chunk observability snapshots to
+`/datasets/nv-ingest/nemo_retriever/harness_observability/<session-or-run>/...` so regressions can be diffed
+across nightly runs even after repo-local artifact cleanup.
 
 `results.json` also includes a nested `run_metadata` block for lightweight environment context:
 

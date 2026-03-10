@@ -126,7 +126,6 @@ class TestBuildLancedbRow:
             "filename",
             "pdf_basename",
             "page_number",
-            "source_id",
             "path",
             "metadata",
             "source",
@@ -156,6 +155,13 @@ class TestBuildLancedbRow:
         meta = json.loads(result["metadata"])
         assert meta["page_number"] == 1
         assert meta["pdf_page"] == "test_1"
+        assert meta["source_id"] == "/docs/test.pdf"
+        assert meta["source_path"] == "/docs/test.pdf"
+
+    def test_source_column_carries_path(self):
+        result = build_lancedb_row(self._row())
+        assert result["source"] == "/docs/test.pdf"
+        assert result["path"] == "/docs/test.pdf"
 
     def test_returns_none_when_no_embedding(self):
         row = SimpleNamespace(metadata=None, path="/x.pdf", page_number=1, text="hi")
@@ -172,6 +178,24 @@ class TestBuildLancedbRow:
         assert meta["page_elements_v3_num_detections"] == 5
         assert meta["page_elements_v3_counts_by_label"] == {"text": 3, "figure": 2}
         assert meta["ocr_table_detections"] == 2
+
+    def test_provenance_metadata_included(self):
+        row = self._row(
+            _content_type="table",
+            _content_index=2,
+            _content_id="table:2",
+            _embed_modality="text_image",
+            _embed_granularity="element",
+            text="table body",
+        )
+        result = build_lancedb_row(row)
+        meta = json.loads(result["metadata"])
+        assert meta["content_type"] == "table"
+        assert meta["content_index"] == 2
+        assert meta["content_id"] == "table:2"
+        assert meta["embed_modality"] == "text_image"
+        assert meta["embed_granularity"] == "element"
+        assert meta["text_length"] == len("table body")
 
 
 class TestBuildLancedbRows:
@@ -198,7 +222,8 @@ class TestLancedbSchema:
         assert "text" in names
         assert "metadata" in names
         assert "source" in names
-        assert len(names) == 10
+        assert "source_id" not in names
+        assert len(names) == 9
 
 
 class TestInferVectorDim:

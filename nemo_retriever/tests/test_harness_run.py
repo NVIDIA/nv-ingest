@@ -51,8 +51,15 @@ def test_build_command_uses_hidden_detection_file_by_default(tmp_path: Path) -> 
         query_csv=str(query_csv),
         write_detection_file=False,
     )
-    cmd, runtime_dir, detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
+    cmd, runtime_dir, detection_file, effective_query_csv, observability_artifacts = _build_command(
+        cfg, tmp_path, run_id="r1"
+    )
     assert "--detection-summary-file" in cmd
+    assert "--extract-output-dir" in cmd
+    assert "--chunk-manifest-dir" in cmd
+    assert "--durable-extract-output-dir" in cmd
+    assert "--durable-chunk-manifest-dir" in cmd
+    assert "--ingest-errors-file" in cmd
     assert "--recall-match-mode" in cmd
     assert "pdf_page" in cmd
     assert "--pdf-extract-tasks" in cmd
@@ -74,6 +81,11 @@ def test_build_command_uses_hidden_detection_file_by_default(tmp_path: Path) -> 
     assert detection_file.parent == runtime_dir
     assert detection_file.name == ".detection_summary.json"
     assert effective_query_csv == query_csv
+    assert observability_artifacts["extract_artifacts_dir"] == tmp_path / "observability" / "extracts"
+    assert observability_artifacts["chunk_manifest_dir"] == tmp_path / "observability" / "chunks"
+    assert observability_artifacts["durable_extract_artifacts_dir"].name == "extracts"
+    assert observability_artifacts["durable_chunk_manifest_dir"].name == "chunks"
+    assert observability_artifacts["ingest_errors_file"] == tmp_path / "ingest_errors.json"
 
 
 def test_build_command_uses_top_level_detection_file_when_enabled(tmp_path: Path) -> None:
@@ -89,11 +101,14 @@ def test_build_command_uses_top_level_detection_file_when_enabled(tmp_path: Path
         query_csv=str(query_csv),
         write_detection_file=True,
     )
-    cmd, runtime_dir, detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
+    cmd, runtime_dir, detection_file, effective_query_csv, observability_artifacts = _build_command(
+        cfg, tmp_path, run_id="r1"
+    )
     assert "--detection-summary-file" in cmd
     assert detection_file.parent == tmp_path
     assert detection_file.name == "detection_summary.json"
     assert effective_query_csv == query_csv
+    assert observability_artifacts["extract_artifacts_dir"] == tmp_path / "observability" / "extracts"
 
 
 def test_build_command_applies_page_plus_one_adapter(tmp_path: Path) -> None:
@@ -109,7 +124,9 @@ def test_build_command_applies_page_plus_one_adapter(tmp_path: Path) -> None:
         query_csv=str(query_csv),
         recall_adapter="page_plus_one",
     )
-    cmd, runtime_dir, _detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
+    cmd, runtime_dir, _detection_file, effective_query_csv, _observability_artifacts = _build_command(
+        cfg, tmp_path, run_id="r1"
+    )
 
     assert effective_query_csv.parent == runtime_dir
     assert effective_query_csv.name == "query_adapter.page_plus_one.csv"
@@ -143,7 +160,13 @@ def test_run_single_writes_tags_to_results_json(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(
         harness_run,
         "_build_command",
-        lambda *_args, **_kwargs: (["python", "-V"], runtime_dir, runtime_dir / ".detection_summary.json", query_csv),
+        lambda *_args, **_kwargs: (
+            ["python", "-V"],
+            runtime_dir,
+            runtime_dir / ".detection_summary.json",
+            query_csv,
+            {"ingest_errors_file": tmp_path / "ingest_errors.json"},
+        ),
     )
 
     def _fake_run_subprocess(_cmd: list[str], metrics) -> int:
@@ -301,6 +324,13 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
     detection_file.write_text(json.dumps({"total_detections": 7}), encoding="utf-8")
     runtime_summary_file = runtime_dir / "jp20_single.runtime.summary.json"
     runtime_summary_file.write_text(json.dumps({"elapsed_secs": 12.5}), encoding="utf-8")
+    observability_artifacts = {
+        "extract_artifacts_dir": artifact_dir / "observability" / "extracts",
+        "chunk_manifest_dir": artifact_dir / "observability" / "chunks",
+        "durable_extract_artifacts_dir": tmp_path / "durable" / "extracts",
+        "durable_chunk_manifest_dir": tmp_path / "durable" / "chunks",
+        "ingest_errors_file": artifact_dir / "ingest_errors.json",
+    }
 
     cfg = HarnessConfig(
         dataset_dir=str(dataset_dir),
@@ -318,6 +348,7 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             runtime_dir,
             detection_file,
             query_csv,
+            observability_artifacts,
         ),
     )
 
@@ -369,6 +400,9 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "hybrid": cfg.hybrid,
             "embed_model_name": cfg.embed_model_name,
             "write_detection_file": True,
+            "write_extract_artifacts": True,
+            "write_chunk_manifest": True,
+            "observability_archive_dir": cfg.observability_archive_dir,
             "lancedb_uri": str((artifact_dir / "lancedb").resolve()),
             "tuning": {field: getattr(cfg, field) for field in sorted(harness_run.TUNING_FIELDS)},
         },
@@ -400,6 +434,11 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "command_file": str((artifact_dir / "command.txt").resolve()),
             "runtime_metrics_dir": str(runtime_dir.resolve()),
             "detection_summary_file": str(detection_file.resolve()),
+            "extract_artifacts_dir": str(observability_artifacts["extract_artifacts_dir"].resolve()),
+            "chunk_manifest_dir": str(observability_artifacts["chunk_manifest_dir"].resolve()),
+            "durable_extract_artifacts_dir": str(observability_artifacts["durable_extract_artifacts_dir"].resolve()),
+            "durable_chunk_manifest_dir": str(observability_artifacts["durable_chunk_manifest_dir"].resolve()),
+            "ingest_errors_file": str(observability_artifacts["ingest_errors_file"].resolve()),
         },
     }
 
@@ -427,6 +466,13 @@ def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path:
         write_detection_file=False,
         recall_required=False,
     )
+    observability_artifacts = {
+        "extract_artifacts_dir": artifact_dir / "observability" / "extracts",
+        "chunk_manifest_dir": artifact_dir / "observability" / "chunks",
+        "durable_extract_artifacts_dir": tmp_path / "durable" / "extracts",
+        "durable_chunk_manifest_dir": tmp_path / "durable" / "chunks",
+        "ingest_errors_file": artifact_dir / "ingest_errors.json",
+    }
 
     monkeypatch.setattr(
         harness_run,
@@ -436,6 +482,7 @@ def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path:
             runtime_dir,
             detection_file,
             query_csv,
+            observability_artifacts,
         ),
     )
 
@@ -465,6 +512,7 @@ def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path:
         "recall_5": None,
     }
     assert "detection_summary_file" not in result["artifacts"]
+    assert result["artifacts"]["ingest_errors_file"] == str(observability_artifacts["ingest_errors_file"].resolve())
 
 
 def test_resolve_summary_metrics_falls_back_to_dataset_page_count(monkeypatch, tmp_path: Path) -> None:

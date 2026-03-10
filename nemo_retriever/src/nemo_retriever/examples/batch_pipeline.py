@@ -22,6 +22,7 @@ from nemo_retriever import create_ingestor
 from nemo_retriever.ingest_modes.batch import BatchIngestor
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
+from nemo_retriever.params import HtmlChunkParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
@@ -116,7 +117,7 @@ def _to_int(value: object, default: int = 0) -> int:
 
 
 def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
-    """Collect per-model detection totals deduped by (source_id, page_number)."""
+    """Collect per-model detection totals deduped by (source, page_number)."""
     from nemo_retriever.utils.detection_summary import collect_detection_summary_from_lancedb
 
     return collect_detection_summary_from_lancedb(uri, table_name)
@@ -187,27 +188,16 @@ def _count_materialized_rows(dataset: object) -> int:
     return len(dataset)  # type: ignore[arg-type]
 
 
-def _ensure_lancedb_table(uri: str, table_name: str) -> None:
-    """Ensure the local LanceDB URI exists and table can be opened.
-
-    Creates an empty table with the expected schema if it does not exist yet.
-    """
-    from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
-
+def _ensure_lancedb_table(uri: str, table_name: str) -> bool:
+    """Ensure the LanceDB URI exists and report whether the table is already present."""
     Path(uri).mkdir(parents=True, exist_ok=True)
 
     db = _lancedb().connect(uri)
     try:
         db.open_table(table_name)
-        return
+        return True
     except Exception:
-        pass
-
-    import pyarrow as pa  # type: ignore
-
-    schema = lancedb_schema(2048)
-    empty = pa.table({f.name: [] for f in schema}, schema=schema)
-    db.create_table(table_name, data=empty, schema=schema, mode="create")
+        return False
 
 
 @app.command()
@@ -229,6 +219,45 @@ def main(
         path_type=Path,
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
+    ),
+    extract_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--extract-output-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where per-run extract snapshots are written as JSONL.",
+    ),
+    durable_extract_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--durable-extract-output-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional durable mirror directory for extract snapshots.",
+    ),
+    chunk_manifest_dir: Optional[Path] = typer.Option(
+        None,
+        "--chunk-manifest-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where pre-embed chunk manifests are written as JSONL.",
+    ),
+    durable_chunk_manifest_dir: Optional[Path] = typer.Option(
+        None,
+        "--durable-chunk-manifest-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional durable mirror directory for chunk manifests.",
+    ),
+    ingest_errors_file: Optional[Path] = typer.Option(
+        None,
+        "--ingest-errors-file",
+        path_type=Path,
+        dir_okay=False,
+        help="Optional JSON file path where ingest error rows are written on failure.",
     ),
     recall_match_mode: str = typer.Option(
         "pdf_page",
@@ -490,6 +519,17 @@ def main(
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
+        extract_output_dir = extract_output_dir.expanduser().resolve() if extract_output_dir is not None else None
+        durable_extract_output_dir = (
+            durable_extract_output_dir.expanduser().resolve() if durable_extract_output_dir is not None else None
+        )
+        chunk_manifest_dir = chunk_manifest_dir.expanduser().resolve() if chunk_manifest_dir is not None else None
+        durable_chunk_manifest_dir = (
+            durable_chunk_manifest_dir.expanduser().resolve()
+            if durable_chunk_manifest_dir is not None
+            else None
+        )
+        ingest_errors_file = ingest_errors_file.expanduser().resolve() if ingest_errors_file is not None else None
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
 
         # Remote endpoints don't need local model GPUs for their stage.
@@ -527,189 +567,141 @@ def main(
             ),
         )
 
+        extract_snapshot_drop_columns: list[str] = []
+        chunk_snapshot_drop_columns = [
+            "bytes",
+            "page_image",
+            "_image_b64",
+            "page_elements_v3",
+            "table",
+            "chart",
+            "infographic",
+            "text_embeddings_1b_v2",
+        ]
+
+        ingestor = ingestor.files(file_patterns)
         if input_type == "txt":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
-            )
+            ingestor = ingestor.extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
         elif input_type == "html":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
-            )
+            ingestor = ingestor.extract_html(HtmlChunkParams(max_tokens=512, overlap_tokens=0))
         elif input_type == "doc":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            extract_snapshot_drop_columns = ["bytes", "page_image"]
+            ingestor = ingestor.extract(
+                ExtractParams(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
+                    inference_batch_size=page_elements_batch_size,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                        "pdf_extract_workers": pdf_extract_tasks,
+                        "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
+                        "pdf_split_batch_size": pdf_split_batch_size,
+                        "pdf_extract_batch_size": pdf_extract_batch_size,
+                        "page_elements_batch_size": page_elements_batch_size,
+                        "page_elements_workers": page_elements_actors,
+                        "detect_workers": ocr_actors,
+                        "detect_batch_size": ocr_batch_size,
+                        "ocr_inference_batch_size": ocr_batch_size,
+                        "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                        "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                        "gpu_page_elements": page_elements_gpus_per_actor,
+                        "gpu_ocr": ocr_gpus_per_actor,
+                        "gpu_embed": embed_gpus_per_actor,
+                        "nemotron_parse_workers": nemotron_parse_actors,
+                        "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
+                        "nemotron_parse_batch_size": nemotron_parse_batch_size,
+                    },
                 )
             )
         else:
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "inference_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            extract_snapshot_drop_columns = ["bytes", "page_image"]
+            ingestor = ingestor.extract(
+                ExtractParams(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
+                    inference_batch_size=page_elements_batch_size,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                        "pdf_extract_workers": pdf_extract_tasks,
+                        "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
+                        "pdf_split_batch_size": pdf_split_batch_size,
+                        "pdf_extract_batch_size": pdf_extract_batch_size,
+                        "page_elements_batch_size": page_elements_batch_size,
+                        "inference_batch_size": page_elements_batch_size,
+                        "page_elements_workers": page_elements_actors,
+                        "detect_workers": ocr_actors,
+                        "detect_batch_size": ocr_batch_size,
+                        "ocr_inference_batch_size": ocr_batch_size,
+                        "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                        "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                        "gpu_page_elements": page_elements_gpus_per_actor,
+                        "gpu_ocr": ocr_gpus_per_actor,
+                        "gpu_embed": embed_gpus_per_actor,
+                        "nemotron_parse_workers": nemotron_parse_actors,
+                        "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
+                        "nemotron_parse_batch_size": nemotron_parse_batch_size,
+                    },
                 )
             )
+
+        if extract_output_dir is not None:
+            ingestor = ingestor.write_observability_snapshot(
+                str(extract_output_dir),
+                stage_name="extract",
+                durable_output_dir=str(durable_extract_output_dir) if durable_extract_output_dir is not None else None,
+                drop_columns=extract_snapshot_drop_columns,
+            )
+
+        ingestor = ingestor.embed(
+            EmbedParams(
+                model_name=str(embed_model_name),
+                embed_invoke_url=embed_invoke_url,
+                embed_modality=embed_modality,
+                text_elements_modality=text_elements_modality,
+                structured_elements_modality=structured_elements_modality,
+                embed_granularity=embed_granularity,
+                batch_tuning={
+                    "embed_workers": embed_actors,
+                    "embed_batch_size": int(embed_batch_size),
+                    "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                },
+            ),
+            chunk_manifest_output_dir=str(chunk_manifest_dir) if chunk_manifest_dir is not None else None,
+            durable_chunk_manifest_dir=(
+                str(durable_chunk_manifest_dir) if durable_chunk_manifest_dir is not None else None
+            ),
+            chunk_manifest_drop_columns=chunk_snapshot_drop_columns,
+        )
+
+        ingestor = ingestor.vdb_upload(
+            VdbUploadParams(
+                lancedb={
+                    "lancedb_uri": lancedb_uri,
+                    "table_name": LANCEDB_TABLE,
+                    "overwrite": True,
+                    "create_index": True,
+                    "hybrid": hybrid,
+                }
+            )
+        )
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()
@@ -735,13 +727,23 @@ def main(
             f"{ingest_elapsed_s:.2f} seconds. {rows_processed/ingest_elapsed_s:.2f} PPS"
         )
 
+        if detection_summary_file is not None:
+            try:
+                detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
+            except Exception:
+                logger.exception("Failed collecting detection summary from LanceDB.")
+                detection_summary = None
+            _write_detection_summary(detection_summary_file, detection_summary)
+            _print_detection_summary(detection_summary)
+
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
             error_count = int(error_rows.count())
 
             # Error out, stop processing, and write top 5 errors rows to a local file for analysis.
             if error_count > 0:
-                error_file = Path("ingest_errors.json").resolve()
+                error_file = ingest_errors_file or Path("ingest_errors.json").resolve()
+                error_file.parent.mkdir(parents=True, exist_ok=True)
                 max_error_rows_to_write = 5
                 error_rows_to_write = error_rows.take(min(max_error_rows_to_write, error_count))
                 with error_file.open("w", encoding="utf-8") as fh:

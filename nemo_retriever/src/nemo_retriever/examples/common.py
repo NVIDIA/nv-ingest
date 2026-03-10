@@ -10,7 +10,7 @@ from typing import Optional
 
 
 def estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
-    """Estimate pages processed by counting unique (source_id, page_number) pairs.
+    """Estimate pages processed by counting unique (source, page_number) pairs.
 
     Falls back to table row count if page-level fields are unavailable.
     """
@@ -23,8 +23,15 @@ def estimate_processed_pages(uri: str, table_name: str) -> Optional[int]:
         return None
 
     try:
-        df = table.to_pandas()[["source_id", "page_number"]]
-        return int(df.dropna(subset=["source_id", "page_number"]).drop_duplicates().shape[0])
+        df = table.to_pandas()
+        source_col = "source" if "source" in df.columns else "path" if "path" in df.columns else "source_id"
+        if source_col not in df.columns or "page_number" not in df.columns:
+            raise KeyError("Missing source/page_number columns")
+        return int(
+            df.dropna(subset=[source_col, "page_number"])
+            .drop_duplicates(subset=[source_col, "page_number"])
+            .shape[0]
+        )
     except Exception:
         try:
             return int(table.count_rows())

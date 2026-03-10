@@ -63,6 +63,9 @@ def test_load_harness_config_precedence(tmp_path: Path, monkeypatch: pytest.Monk
     assert cfg.gpu_ocr == 0.7  # sweep override
     assert cfg.gpu_embed == 0.9  # env override (highest)
     assert cfg.recall_required is True
+    assert cfg.write_extract_artifacts is True
+    assert cfg.write_chunk_manifest is True
+    assert cfg.observability_archive_dir == harness_config.DEFAULT_OBSERVABILITY_ARCHIVE_DIR
 
 
 def test_load_harness_config_fails_when_recall_required_without_query(tmp_path: Path) -> None:

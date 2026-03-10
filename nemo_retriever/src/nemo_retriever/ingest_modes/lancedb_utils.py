@@ -100,6 +100,40 @@ def _build_detection_metadata(row: Any) -> Dict[str, Any]:
     return out
 
 
+def _build_provenance_metadata(row: Any, *, text_column: str) -> Dict[str, Any]:
+    """Capture stable chunk provenance for later LanceDB-to-chunk diffs."""
+    out: Dict[str, Any] = {}
+
+    content_type = getattr(row, "_content_type", None)
+    if isinstance(content_type, str) and content_type.strip():
+        out["content_type"] = content_type.strip()
+
+    content_id = getattr(row, "_content_id", None)
+    if isinstance(content_id, str) and content_id.strip():
+        out["content_id"] = content_id.strip()
+
+    content_index = getattr(row, "_content_index", None)
+    try:
+        if content_index is not None:
+            out["content_index"] = int(content_index)
+    except Exception:
+        pass
+
+    embed_modality = getattr(row, "_embed_modality", None)
+    if isinstance(embed_modality, str) and embed_modality.strip():
+        out["embed_modality"] = embed_modality.strip()
+
+    embed_granularity = getattr(row, "_embed_granularity", None)
+    if isinstance(embed_granularity, str) and embed_granularity.strip():
+        out["embed_granularity"] = embed_granularity.strip()
+
+    text_value = getattr(row, text_column, None)
+    if isinstance(text_value, str):
+        out["text_length"] = int(len(text_value))
+
+    return out
+
+
 def build_lancedb_row(
     row: Any,
     *,
@@ -122,13 +156,17 @@ def build_lancedb_row(
     pdf_basename = p.stem if p is not None else ""
     pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
     source_id = path or filename or pdf_basename
+    source_value = str(path or source_id)
 
-    metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
+    metadata_obj: Dict[str, Any] = {
+        "page_number": int(page_number) if page_number is not None else -1,
+        "source_id": str(source_id),
+        "source_path": source_value,
+    }
     if pdf_page:
         metadata_obj["pdf_page"] = pdf_page
     metadata_obj.update(_build_detection_metadata(row))
-
-    source_obj: Dict[str, Any] = {"source_id": str(path)}
+    metadata_obj.update(_build_provenance_metadata(row, text_column=text_column))
 
     row_out: Dict[str, Any] = {
         "vector": emb,
@@ -136,10 +174,9 @@ def build_lancedb_row(
         "filename": filename,
         "pdf_basename": pdf_basename,
         "page_number": int(page_number) if page_number is not None else -1,
-        "source_id": str(source_id),
-        "path": str(path),
+        "source": source_value,
+        "path": source_value,
         "metadata": json.dumps(metadata_obj, ensure_ascii=False),
-        "source": json.dumps(source_obj, ensure_ascii=False),
     }
 
     if include_text:
@@ -178,7 +215,7 @@ def build_lancedb_rows(
     return rows
 
 
-def lancedb_schema(vector_dim: int) -> Any:
+def lancedb_schema(vector_dim: int = 2048) -> Any:
     """Return a PyArrow schema for the standard LanceDB table layout."""
     import pyarrow as pa  # type: ignore
 
@@ -189,11 +226,10 @@ def lancedb_schema(vector_dim: int) -> Any:
             pa.field("filename", pa.string()),
             pa.field("pdf_basename", pa.string()),
             pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
+            pa.field("source", pa.string()),
             pa.field("path", pa.string()),
             pa.field("text", pa.string()),
             pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
         ]
     )
 

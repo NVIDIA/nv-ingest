@@ -15,9 +15,10 @@ import glob
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
 from datetime import timedelta
 from functools import partial
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from typing import Union
 
@@ -49,6 +50,7 @@ from ..params import TextChunkParams
 from ..params import VdbUploadParams
 
 logger = logging.getLogger(__name__)
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
 def _setup_batch_debug_logger(enabled: bool) -> logging.Logger:
@@ -82,6 +84,132 @@ def _runtime_env_vars() -> dict[str, str]:
     return {key: value for key, value in env_vars.items() if isinstance(value, str)}
 
 
+def _runtime_env() -> dict[str, Any]:
+    return {
+        "env_vars": _runtime_env_vars(),
+        "working_dir": str(REPO_ROOT),
+        "excludes": [
+            ".git/",
+            "nemo_retriever/.venv/",
+            "nemo_retriever/artifacts/",
+            "**/__pycache__/",
+        ],
+    }
+
+
+def _observability_to_jsonable(value: Any) -> Any:
+    """Convert snapshot payloads into JSON-safe values without keeping large binaries."""
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+
+    if isinstance(value, (bytes, bytearray)):
+        return {"omitted_bytes": int(len(value))}
+
+    if isinstance(value, dict):
+        out: Dict[str, Any] = {}
+        for raw_key, raw_value in value.items():
+            child_key = str(raw_key)
+            if child_key == "image_b64" and isinstance(raw_value, str):
+                out["image_b64_chars"] = int(len(raw_value))
+                out["image_b64_omitted"] = True
+                continue
+            if child_key == "embedding":
+                try:
+                    dim = len(raw_value)  # type: ignore[arg-type]
+                except Exception:
+                    dim = None
+                out["embedding_dimensions"] = int(dim) if dim is not None else None
+                out["embedding_omitted"] = True
+                continue
+            out[child_key] = _observability_to_jsonable(raw_value)
+        return out
+
+    if isinstance(value, (list, tuple)):
+        return [_observability_to_jsonable(item) for item in value]
+
+    item = getattr(value, "item", None)
+    if callable(item):
+        try:
+            return _observability_to_jsonable(item())
+        except Exception:
+            pass
+
+    tolist = getattr(value, "tolist", None)
+    if callable(tolist):
+        try:
+            return _observability_to_jsonable(tolist())
+        except Exception:
+            pass
+
+    return str(value)
+
+
+def _normalize_snapshot_record(record: dict[str, Any], *, drop_columns: set[str]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    for key, value in record.items():
+        if key in drop_columns:
+            continue
+        out[str(key)] = _observability_to_jsonable(value)
+    return out
+
+
+def _atomic_write_snapshot(path: Path, payload: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_name(path.name + ".tmp")
+    with tmp_path.open("w", encoding="utf-8") as fh:
+        fh.write(payload)
+        fh.flush()
+        try:
+            os.fsync(fh.fileno())
+        except Exception:
+            pass
+    tmp_path.replace(path)
+
+
+class _DatasetSnapshotWriterActor:
+    """Write sanitized JSONL batch snapshots while passing the batch through."""
+
+    def __init__(
+        self,
+        *,
+        output_dir: str,
+        stage_name: str,
+        durable_output_dir: str | None = None,
+        drop_columns: list[str] | None = None,
+    ) -> None:
+        self._stage_name = str(stage_name).strip() or "snapshot"
+        self._drop_columns = {str(col) for col in (drop_columns or [])}
+        self._counter = 0
+
+        target_dirs = [Path(output_dir).expanduser().resolve()]
+        if durable_output_dir:
+            durable_path = Path(durable_output_dir).expanduser().resolve()
+            if durable_path not in target_dirs:
+                target_dirs.append(durable_path)
+        self._target_dirs = target_dirs
+        for target_dir in self._target_dirs:
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+    def __call__(self, batch_df: Any) -> Any:
+        raw_records = batch_df.to_dict(orient="records")
+        if not raw_records:
+            return batch_df
+
+        records = [
+            _normalize_snapshot_record(record, drop_columns=self._drop_columns)
+            for record in raw_records
+        ]
+        if not records:
+            return batch_df
+
+        self._counter += 1
+        file_name = f"{self._stage_name}-{self._counter:05d}.jsonl"
+        payload = "".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records)
+        for target_dir in self._target_dirs:
+            _atomic_write_snapshot(target_dir / file_name, payload)
+        return batch_df
+
+
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
@@ -91,8 +219,6 @@ class _LanceDBWriteActor:
     """
 
     def __init__(self, params: VdbUploadParams | None = None) -> None:
-        from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
-
         lancedb_params = (params or VdbUploadParams()).lancedb
 
         self._lancedb_uri = lancedb_params.lancedb_uri
@@ -107,15 +233,7 @@ class _LanceDBWriteActor:
 
         self._db = lancedb.connect(uri=self._lancedb_uri)
         self._total_rows = 0
-
-        # Use a default dim for the initial empty table; rows are appended via add().
-        self._schema = lancedb_schema(2048)
-        mode = "overwrite" if self._overwrite else "create"
-        self._table = self._db.create_table(
-            self._table_name,
-            schema=self._schema,
-            mode=mode,
-        )
+        self._table = None
 
     def _build_rows(self, df: Any) -> list:
         """Build LanceDB rows from a pandas DataFrame batch."""
@@ -130,12 +248,28 @@ class _LanceDBWriteActor:
         )
 
     def __call__(self, batch_df: Any) -> Any:
+        from nemo_retriever.ingest_modes.lancedb_utils import (
+            create_or_append_lancedb_table,
+            infer_vector_dim,
+            lancedb_schema,
+        )
+
         rows = self._build_rows(batch_df)
         if rows:
-            # Infer schema from first batch
             if self._table is None:
-                self._table = self._db.open_table(self._table_name)
-            self._table.add(rows)
+                dim = infer_vector_dim(rows)
+                if dim <= 0:
+                    raise ValueError("Failed to infer embedding dimension from LanceDB batch rows.")
+                schema = lancedb_schema(dim)
+                self._table = create_or_append_lancedb_table(
+                    self._db,
+                    str(self._table_name),
+                    rows,
+                    schema,
+                    overwrite=bool(self._overwrite),
+                )
+            else:
+                self._table.add(rows)
 
             self._total_rows += len(rows)
 
@@ -210,7 +344,7 @@ class BatchIngestor(Ingestor):
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={"env_vars": _runtime_env_vars()},
+            runtime_env=_runtime_env(),
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
@@ -710,6 +844,10 @@ class BatchIngestor(Ingestor):
                 "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
             )
 
+        chunk_manifest_output_dir = kwargs.pop("chunk_manifest_output_dir", None)
+        durable_chunk_manifest_dir = kwargs.pop("durable_chunk_manifest_dir", None)
+        chunk_manifest_drop_columns = kwargs.pop("chunk_manifest_drop_columns", None)
+
         from nemo_retriever.params.utils import build_embed_kwargs
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
@@ -745,6 +883,23 @@ class BatchIngestor(Ingestor):
             batch_format="pandas",
             num_cpus=1,
         )
+
+        if chunk_manifest_output_dir:
+            actor_kwargs: dict[str, Any] = {
+                "output_dir": str(chunk_manifest_output_dir),
+                "stage_name": "chunk-manifest",
+            }
+            if durable_chunk_manifest_dir:
+                actor_kwargs["durable_output_dir"] = str(durable_chunk_manifest_dir)
+            if chunk_manifest_drop_columns:
+                actor_kwargs["drop_columns"] = list(chunk_manifest_drop_columns)
+            self._rd_dataset = self._rd_dataset.map_batches(
+                _DatasetSnapshotWriterActor,
+                batch_format="pandas",
+                num_cpus=1,
+                compute=rd.ActorPoolStrategy(size=1),
+                fn_constructor_kwargs=actor_kwargs,
+            )
 
         # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
@@ -801,6 +956,39 @@ class BatchIngestor(Ingestor):
             fn_constructor_kwargs={"params": p},
         )
 
+        return self
+
+    def write_observability_snapshot(
+        self,
+        output_dir: str,
+        *,
+        stage_name: str,
+        durable_output_dir: str | None = None,
+        drop_columns: list[str] | None = None,
+    ) -> "BatchIngestor":
+        """Persist the current dataset as JSONL snapshots without adding a second pipeline pass."""
+        if not isinstance(output_dir, str) or not output_dir.strip():
+            raise ValueError(f"output_dir must be a non-empty string, got {output_dir!r}")
+        if self._rd_dataset is None:
+            raise RuntimeError("No Ray Dataset to snapshot. Call .files(...) and a pipeline stage first.")
+
+        actor_kwargs: dict[str, Any] = {
+            "output_dir": output_dir,
+            "stage_name": stage_name,
+        }
+        if durable_output_dir is not None:
+            actor_kwargs["durable_output_dir"] = durable_output_dir
+        if drop_columns:
+            actor_kwargs["drop_columns"] = list(drop_columns)
+
+        # Use one writer actor so file numbering is deterministic across a run.
+        self._rd_dataset = self._rd_dataset.map_batches(
+            _DatasetSnapshotWriterActor,
+            batch_format="pandas",
+            num_cpus=1,
+            compute=rd.ActorPoolStrategy(size=1),
+            fn_constructor_kwargs=actor_kwargs,
+        )
         return self
 
     def save_intermediate_results(self, output_dir: str) -> "BatchIngestor":
@@ -996,8 +1184,14 @@ class BatchIngestor(Ingestor):
             print(f"Warning: failed to create LanceDB index (continuing without index): {e}")
 
         if kw.get("hybrid", False):
-            text_column = str(kw.get("text_column", "text"))
+            configured_text_column = str(kw.get("text_column", "text"))
+            text_column = "text"
             fts_language = str(kw.get("fts_language", "English"))
+            if configured_text_column != "text":
+                print(
+                    "Warning: LanceDB rows are stored in column 'text'; "
+                    f"ignoring configured text_column={configured_text_column!r} for FTS indexing."
+                )
             try:
                 table.create_fts_index(text_column, language=fts_language)
             except Exception as e:

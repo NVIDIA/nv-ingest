@@ -184,6 +184,9 @@ def explode_content_to_rows(
             page_row = _deep_copy_row(row_dict)
             page_row["_embed_modality"] = text_mod
             page_row["_content_type"] = "text"
+            page_row["_content_index"] = 0
+            page_row["_content_id"] = "text:0"
+            page_row["_embed_granularity"] = "element"
             if text_mod in IMAGE_MODALITIES:
                 page_row["_image_b64"] = page_image_b64
             new_rows.append(page_row)
@@ -194,7 +197,7 @@ def explode_content_to_rows(
             content_list = row_dict.get(col)
             if not isinstance(content_list, list):
                 continue
-            for item in content_list:
+            for item_idx, item in enumerate(content_list):
                 if not isinstance(item, dict):
                     continue
                 t = item.get("text", "")
@@ -204,6 +207,9 @@ def explode_content_to_rows(
                 content_row[text_column] = t.strip()
                 content_row["_embed_modality"] = struct_mod
                 content_row["_content_type"] = col
+                content_row["_content_index"] = int(item_idx)
+                content_row["_content_id"] = f"{col}:{item_idx}"
+                content_row["_embed_granularity"] = "element"
                 if struct_mod in IMAGE_MODALITIES and page_image_b64:
                     bbox = item.get("bbox_xyxy_norm")
                     if bbox and len(bbox) == 4:
@@ -221,6 +227,9 @@ def explode_content_to_rows(
             preserved = _deep_copy_row(row_dict)
             preserved["_embed_modality"] = text_mod
             preserved["_content_type"] = "text"
+            preserved["_content_index"] = 0
+            preserved["_content_id"] = "text:0"
+            preserved["_embed_granularity"] = "element"
             if text_mod in IMAGE_MODALITIES:
                 preserved["_image_b64"] = page_image_b64
             new_rows.append(preserved)
@@ -272,6 +281,10 @@ def collapse_content_to_page_rows(
             batch_df["_image_b64"] = None
 
     batch_df["_embed_modality"] = modality
+    batch_df["_content_type"] = "page"
+    batch_df["_content_index"] = -1
+    batch_df["_content_id"] = "page"
+    batch_df["_embed_granularity"] = "page"
     return batch_df
 
 

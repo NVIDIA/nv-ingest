@@ -12,7 +12,14 @@ import typer
 import pandas as pd  # noqa: F401
 from rich.console import Console
 
-from .core import RecallConfig, evaluate_recall, retrieve_and_score, _normalize_query_df  # noqa: F401
+from .core import (  # noqa: F401
+    RecallConfig,
+    _normalize_query_df,
+    _page_number_from_hit,
+    _source_path_from_hit,
+    evaluate_recall,
+    retrieve_and_score,
+)
 
 app = typer.Typer(help="Embed query CSV rows, search LanceDB, print hits, and compute recall@k.")
 console = Console()
@@ -182,10 +189,11 @@ def recall_with_main(
         print(f"\tTop-k Results:")  # noqa: F541
 
         for i, h in enumerate(hits[:top_k]):
-            meta = json.loads(h["metadata"]) if isinstance(h["metadata"], str) else h["metadata"]
-            src = json.loads(h["source"]) if isinstance(h["source"], str) else h["source"]
-            pdf_name = Path(src["source_id"]).stem
-            page_number = meta.get("page_number", -1)
+            source_path = _source_path_from_hit(h) or ""
+            pdf_name = Path(source_path).stem if source_path else "unknown"
+            page_number = _page_number_from_hit(h)
+            if page_number is None:
+                page_number = -1
             print(f"\tResult {i}: {pdf_name} - {page_number}")
 
             if page_number == -1:

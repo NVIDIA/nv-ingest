@@ -220,29 +220,91 @@ def _search_lancedb(
             from lancedb.rerankers import RRFReranker  # type: ignore
 
             text = query_texts[i]
-            hits = (
+            base_query = (
                 table.search(query_type="hybrid")
                 .vector(q)
                 .text(text)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source"])
-                .limit(top_k)
-                .rerank(RRFReranker())
-                .to_list()
+            )
+            selected_fields = ["text", "metadata", "source", "page_number", "_score"]
+            try:
+                hits = base_query.select(selected_fields).limit(top_k).rerank(RRFReranker()).to_list()
+            except Exception:
+                selected_fields = ["text", "metadata", "source", "page_number"]
+                hits = base_query.select(selected_fields).limit(top_k).rerank(RRFReranker()).to_list()
+            logger.debug(
+                "LanceDB search mode=hybrid query_index=%d nprobes=%d refine_factor=%d "
+                "selected_fields=%s returned_hits=%d has_score=%s",
+                i,
+                effective_nprobes,
+                int(refine_factor),
+                selected_fields,
+                len(hits),
+                any("_score" in hit for hit in hits),
             )
         else:
             hits = (
                 table.search(q, vector_column_name=vector_column_name)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source", "_distance"])
+                .select(["text", "metadata", "source", "page_number", "_distance"])
                 .limit(top_k)
                 .to_list()
+            )
+            logger.debug(
+                "LanceDB search mode=vector query_index=%d nprobes=%d refine_factor=%d "
+                "selected_fields=%s returned_hits=%d has_distance=%s",
+                i,
+                effective_nprobes,
+                int(refine_factor),
+                ["text", "metadata", "source", "_distance"],
+                len(hits),
+                any("_distance" in hit for hit in hits),
             )
 
         results.append(hits)
     return results
+
+
+def _source_path_from_hit(hit: dict) -> str | None:
+    source = hit.get("source")
+    if isinstance(source, str):
+        stripped = source.strip()
+        if not stripped:
+            return None
+        try:
+            parsed = json.loads(stripped)
+        except Exception:
+            return stripped
+        if isinstance(parsed, dict):
+            source_id = parsed.get("source_id") or parsed.get("path")
+            return str(source_id) if source_id else None
+        return stripped
+    if isinstance(source, dict):
+        source_id = source.get("source_id") or source.get("path")
+        return str(source_id) if source_id else None
+    return None
+
+
+def _page_number_from_hit(hit: dict) -> int | None:
+    page_number = hit.get("page_number")
+    try:
+        if page_number is not None:
+            return int(page_number)
+    except Exception:
+        pass
+
+    try:
+        res = json.loads(hit.get("metadata", "{}"))
+    except Exception:
+        return None
+    try:
+        if isinstance(res, dict) and res.get("page_number") is not None:
+            return int(res.get("page_number"))
+    except Exception:
+        pass
+    return None
 
 
 def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
@@ -250,12 +312,11 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     for hits in raw_hits:
         keys: List[str] = []
         for h in hits:
-            res = json.loads(h["metadata"])
-            source = json.loads(h["source"])
-            # Prefer explicit `pdf_page` column; fall back to derived form.
-            if res.get("page_number") is not None and source.get("source_id"):
-                filename = Path(source["source_id"]).stem
-                keys.append(filename + "_" + str(res["page_number"]))
+            page_number = _page_number_from_hit(h)
+            source_path = _source_path_from_hit(h)
+            if page_number is not None and source_path:
+                filename = Path(source_path).stem
+                keys.append(f"{filename}_{page_number}")
             else:
                 logger.warning(
                     "Skipping hit with missing page_number or source_id: metadata=%s source=%s",
@@ -314,18 +375,12 @@ def hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
     Supports both ``_distance`` and ``_score`` fields for compatibility across
     LanceDB query types (vector vs hybrid).
     """
-    try:
-        res = json.loads(hit.get("metadata", "{}"))
-        source = json.loads(hit.get("source", "{}"))
-    except Exception:
-        return None, None
-
-    source_id = source.get("source_id")
-    page_number = res.get("page_number")
-    if not source_id or page_number is None:
+    source_path = _source_path_from_hit(hit)
+    page_number = _page_number_from_hit(hit)
+    if not source_path or page_number is None:
         return None, float(hit.get("_distance")) if "_distance" in hit else None
 
-    key = f"{Path(str(source_id)).stem}_{page_number}"
+    key = f"{Path(str(source_path)).stem}_{page_number}"
     dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
     return key, dist
 

@@ -188,7 +188,46 @@ def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     return str(p)
 
 
-def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path]:
+def _resolve_observability_archive_run_dir(cfg: HarnessConfig, artifact_dir: Path) -> Path | None:
+    raw = cfg.observability_archive_dir
+    if raw is None:
+        return None
+
+    root = Path(str(raw)).expanduser()
+    if not root.is_absolute():
+        root = (Path.cwd() / root).resolve()
+
+    parent_name = artifact_dir.parent.name.strip()
+    run_name = artifact_dir.name.strip() or "run"
+    if parent_name and parent_name != run_name:
+        return root / parent_name / run_name
+    return root / run_name
+
+
+def _resolve_observability_artifacts(cfg: HarnessConfig, artifact_dir: Path) -> dict[str, Path]:
+    artifacts: dict[str, Path] = {
+        "ingest_errors_file": artifact_dir / "ingest_errors.json",
+    }
+    observability_dir = artifact_dir / "observability"
+    if cfg.write_extract_artifacts:
+        artifacts["extract_artifacts_dir"] = observability_dir / "extracts"
+    if cfg.write_chunk_manifest:
+        artifacts["chunk_manifest_dir"] = observability_dir / "chunks"
+
+    durable_run_dir = _resolve_observability_archive_run_dir(cfg, artifact_dir)
+    if durable_run_dir is not None:
+        if cfg.write_extract_artifacts:
+            artifacts["durable_extract_artifacts_dir"] = durable_run_dir / "extracts"
+        if cfg.write_chunk_manifest:
+            artifacts["durable_chunk_manifest_dir"] = durable_run_dir / "chunks"
+    return artifacts
+
+
+def _build_command(
+    cfg: HarnessConfig,
+    artifact_dir: Path,
+    run_id: str,
+) -> tuple[list[str], Path, Path, Path, dict[str, Path]]:
     runtime_dir = artifact_dir / "runtime_metrics"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     if cfg.write_detection_file:
@@ -201,6 +240,7 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         recall_adapter=cfg.recall_adapter,
         output_dir=runtime_dir,
     )
+    observability_artifacts = _resolve_observability_artifacts(cfg, artifact_dir)
 
     cmd = [
         sys.executable,
@@ -256,14 +296,24 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(detection_summary_file),
         "--lancedb-uri",
         _resolve_lancedb_uri(cfg, artifact_dir),
+        "--ingest-errors-file",
+        str(observability_artifacts["ingest_errors_file"]),
     ]
 
     if cfg.ray_address:
         cmd += ["--ray-address", cfg.ray_address]
     if cfg.hybrid:
         cmd += ["--hybrid"]
+    if cfg.write_extract_artifacts and "extract_artifacts_dir" in observability_artifacts:
+        cmd += ["--extract-output-dir", str(observability_artifacts["extract_artifacts_dir"])]
+    if "durable_extract_artifacts_dir" in observability_artifacts:
+        cmd += ["--durable-extract-output-dir", str(observability_artifacts["durable_extract_artifacts_dir"])]
+    if cfg.write_chunk_manifest and "chunk_manifest_dir" in observability_artifacts:
+        cmd += ["--chunk-manifest-dir", str(observability_artifacts["chunk_manifest_dir"])]
+    if "durable_chunk_manifest_dir" in observability_artifacts:
+        cmd += ["--durable-chunk-manifest-dir", str(observability_artifacts["durable_chunk_manifest_dir"])]
 
-    return cmd, runtime_dir, detection_summary_file, query_csv
+    return cmd, runtime_dir, detection_summary_file, query_csv, observability_artifacts
 
 
 def _evaluate_run_outcome(
@@ -352,7 +402,9 @@ def _run_subprocess_with_tty(cmd: list[str], metrics: StreamMetrics) -> int:
 
 
 def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[str] | None = None) -> dict[str, Any]:
-    cmd, runtime_dir, detection_summary_file, effective_query_csv = _build_command(cfg, artifact_dir, run_id)
+    cmd, runtime_dir, detection_summary_file, effective_query_csv, observability_artifacts = _build_command(
+        cfg, artifact_dir, run_id
+    )
     command_text = " ".join(shlex.quote(token) for token in cmd)
     (artifact_dir / "command.txt").write_text(command_text + "\n", encoding="utf-8")
 
@@ -407,6 +459,9 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
             "hybrid": cfg.hybrid,
             "embed_model_name": cfg.embed_model_name,
             "write_detection_file": cfg.write_detection_file,
+            "write_extract_artifacts": cfg.write_extract_artifacts,
+            "write_chunk_manifest": cfg.write_chunk_manifest,
+            "observability_archive_dir": cfg.observability_archive_dir,
             "lancedb_uri": _resolve_lancedb_uri(cfg, artifact_dir),
             "tuning": {field: getattr(cfg, field) for field in sorted(TUNING_FIELDS)},
         },
@@ -426,6 +481,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
         "artifacts": {
             "command_file": str((artifact_dir / "command.txt").resolve()),
             "runtime_metrics_dir": str(runtime_dir.resolve()),
+            **{key: str(path.resolve()) for key, path in observability_artifacts.items()},
         },
     }
     if cfg.write_detection_file:

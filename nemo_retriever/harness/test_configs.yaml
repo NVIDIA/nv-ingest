@@ -14,6 +14,9 @@ active:
   hybrid: false
   embed_model_name: nvidia/llama-nemotron-embed-1b-v2
   write_detection_file: false
+  write_extract_artifacts: true
+  write_chunk_manifest: true
+  observability_archive_dir: /datasets/nv-ingest/nemo_retriever/harness_observability
 
 presets:
   single_gpu:

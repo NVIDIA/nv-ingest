@@ -35,7 +35,7 @@ def compute_detection_summary(
     Each element is ``(page_key, metadata_dict, row_dict)`` where:
 
     - *page_key* is a hashable value used to deduplicate exploded content rows
-      (e.g. ``(source_id, page_number)``).
+      (e.g. ``(source_path, page_number)``).
     - *metadata_dict* is the parsed JSON metadata (may contain counters from the
       LanceDB metadata column or from direct DataFrame columns).
     - *row_dict* is the raw row dict, used as fallback for counters stored as
@@ -98,16 +98,47 @@ def compute_detection_summary(
     }
 
 
+def _source_path_from_lancedb_row(row_dict: Dict[str, Any], metadata_dict: Dict[str, Any]) -> str:
+    source = row_dict.get("source")
+    if isinstance(source, str) and source.strip():
+        stripped = source.strip()
+        try:
+            parsed = json.loads(stripped)
+        except Exception:
+            return stripped
+        if isinstance(parsed, dict):
+            value = parsed.get("source_id") or parsed.get("path")
+            if value:
+                return str(value)
+        return stripped
+
+    if isinstance(source, dict):
+        value = source.get("source_id") or source.get("path")
+        if value:
+            return str(value)
+
+    for key in ("path", "source_id"):
+        value = row_dict.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for key in ("source_path", "source_id"):
+        value = metadata_dict.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    return ""
+
+
 def iter_lancedb_rows(uri: str, table_name: str):
     """Yield ``(page_key, meta, row_dict)`` tuples from a LanceDB table."""
     import lancedb  # type: ignore
 
     db = lancedb.connect(uri)
     table = db.open_table(table_name)
-    df = table.to_pandas()[["source_id", "page_number", "metadata"]]
+    df = table.to_pandas()
 
     for row in df.itertuples(index=False):
-        source_id = str(getattr(row, "source_id", "") or "")
         page_number = _safe_int(getattr(row, "page_number", -1), default=-1)
         raw_metadata = getattr(row, "metadata", None)
         meta: dict = {}
@@ -118,7 +149,9 @@ def iter_lancedb_rows(uri: str, table_name: str):
                     meta = parsed
             except Exception:
                 pass
-        yield (source_id, page_number), meta, {}
+        row_dict = row._asdict()
+        source_path = _source_path_from_lancedb_row(row_dict, meta)
+        yield (source_path, page_number), meta, row_dict
 
 
 def iter_dataframe_rows(df):
@@ -158,7 +191,7 @@ def print_detection_summary(summary: Optional[Dict[str, Any]]) -> None:
     if summary is None:
         print("Detection summary: unavailable (could not read metadata).")
         return
-    print("\nDetection summary (deduped by source_id/page_number):")
+    print("\nDetection summary (deduped by source/page_number):")
     print(f"  Pages seen: {summary['pages_seen']}")
     print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
     print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
