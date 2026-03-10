@@ -27,6 +27,7 @@ from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+from nemo_retriever.utils.remote_auth import resolve_remote_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -103,13 +104,6 @@ def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tupl
     )
     logging.getLogger(__name__).info("Writing combined pipeline logs to %s", str(target))
     return fh, original_stdout, original_stderr
-
-
-def _resolve_remote_api_key(explicit_api_key: Optional[str] = None) -> Optional[str]:
-    """Resolve a bearer token for hosted NIM endpoints."""
-    token = explicit_api_key or os.getenv("NVIDIA_API_KEY") or os.getenv("NGC_API_KEY")
-    token = (token or "").strip()
-    return token or None
 
 
 def _to_int(value: object, default: int = 0) -> int:
@@ -525,7 +519,7 @@ def main(
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
-        remote_api_key = _resolve_remote_api_key(api_key)
+        remote_api_key = resolve_remote_api_key(api_key)
         extract_remote_api_key = (
             remote_api_key
             if any(
