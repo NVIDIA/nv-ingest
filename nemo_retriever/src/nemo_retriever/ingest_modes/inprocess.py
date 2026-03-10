@@ -947,8 +947,8 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract), "txt" (extract_txt), or "html" (extract_html). Loader dispatch in ingest().
-        self._pipeline_type: Literal["pdf", "txt", "html"] = "pdf"
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), "html" (extract_html), or "image" (extract_image_files).
+        self._pipeline_type: Literal["pdf", "txt", "html", "image"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
         self._extract_html_kwargs: Dict[str, Any] = {}
 
@@ -1017,6 +1017,23 @@ class InProcessIngestor(Ingestor):
                 extract_kwargs["extract_page_as_image"] = True
         self._pipeline_type = "pdf"
         self._tasks.append((pdf_extraction, extract_kwargs))
+
+        self._append_detection_tasks(kwargs, use_nemotron_parse_only=use_nemotron_parse_only)
+
+        return self
+
+    def _append_detection_tasks(
+        self,
+        kwargs: dict[str, Any],
+        *,
+        use_nemotron_parse_only: bool = False,
+    ) -> None:
+        """Append page-element detection, OCR, table/chart/infographic tasks.
+
+        Shared by ``extract()`` (PDF) and ``extract_image_files()`` (standalone images).
+        """
+        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
+        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
 
         # Common, optional knobs shared by our detect_* helpers.
         detect_passthrough_keys = {
@@ -1198,6 +1215,24 @@ class InProcessIngestor(Ingestor):
                     model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
                     self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
 
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "InProcessIngestor":
+        """
+        Configure image ingestion: standalone image -> page DataFrame -> detection/OCR.
+
+        Use with .files("*.png").extract_image_files(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_image_files().
+        """
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        kwargs = resolved.model_dump(mode="python")
+        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
+        nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(batch_tuning.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        use_nemotron_parse_only = (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
+        self._pipeline_type = "image"
+        self._append_detection_tasks(kwargs, use_nemotron_parse_only=use_nemotron_parse_only)
         return self
 
     def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1663,6 +1698,13 @@ class InProcessIngestor(Ingestor):
 
             def _loader(p: str) -> pd.DataFrame:
                 return html_file_to_chunks_df(p, params=HtmlChunkParams(**self._extract_html_kwargs))
+
+        elif self._pipeline_type == "image":
+
+            def _loader(p: str) -> pd.DataFrame:
+                from nemo_retriever.image.load import image_file_to_pages_df
+
+                return image_file_to_pages_df(p)
 
         elif self._pipeline_type == "audio":
 
