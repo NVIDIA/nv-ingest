@@ -27,16 +27,18 @@ nemo-retriever --help
 
 The following table lists all CLI options: flag name, type, default, whether the option is required, and a short description.
 
+\* At least one of `--doc` or `--dataset` must be provided; otherwise there are no files to process.
+
 | Flag | Aliases | Type | Default | Required | Description |
 |------|---------|------|---------|----------|-------------|
-| `--doc` | — | path (multiple) | *none* | No* | Path to a document to process. May be specified multiple times. Files must exist. Supports glob-style patterns. |
-| `--dataset` | — | path | *none* | No* | Path to a dataset definition file (JSON with `sampled_files` list). |
-| `--output_directory` | — | path | *none* | No | Directory where result metadata and optional media are written. If omitted, results are not saved to disk. |
-| `--task` | — | string (multiple) | *none* | No | Task definition in `task_id:{"key":"value"}` format. Repeat for multiple tasks (e.g. extract, split, caption). |
+| `--doc` | — | path (multiple) | none | No | Path to a document to process. May be specified multiple times. Files must exist. Supports glob-style patterns. |
+| `--dataset` | — | path | none | No | Path to a dataset definition file (JSON with `sampled_files` list). |
+| `--output_directory` | — | path | none | No | Directory where result metadata and optional media are written. If omitted, results are not saved to disk. |
+| `--task` | — | string (multiple) | none | No | Task definition in `task_id:{"key":"value"}` format. Repeat for multiple tasks (e.g. extract, split, caption). |
 | `--client_host` | — | string | `localhost` | No | Hostname or IP of the ingest service. |
 | `--client_port` | — | int | `7670` | No | Port of the ingest service. |
 | `--api_version` | — | choice | `v2` | No | API version: `v1` or `v2`. Required for `--pdf_split_page_count`. |
-| `--pdf_split_page_count` | — | int | *none* | No | Pages per PDF chunk when splitting (V2 API). Typically 1–128; server default if unset. |
+| `--pdf_split_page_count` | — | int | none | No | Pages per PDF chunk when splitting (V2 API). Typically 1–128; server default if unset. |
 | `--client_type` | — | choice | `rest` | No | Client transport: `rest` or `simple`. |
 | `--client_kwargs` | — | string (JSON) | `{}` | No | Extra JSON object passed to the client. |
 | `--batch_size` | — | int | `10` | No | Number of in-flight jobs (must be ≥ 1). |
@@ -51,14 +53,14 @@ The following table lists all CLI options: flag name, type, default, whether the
 | `--zipkin_port` | — | int | `9411` | No | Port for Zipkin API. |
 | `--version` | — | flag | — | No | Print nv-ingest and nv-ingest-cli versions and exit. |
 
-\* At least one of `--doc` or `--dataset` must be provided; otherwise there are no files to process.
+
 
 
 ## Output format and output_directory layout
 
 ### Output format
 
-- **Metadata**: When `--output_directory` is set, the CLI writes **JSON** files. Each result is a JSON structure that follows the [content metadata schema](content-metadata.md): `content`, `content_url`, `source_metadata`, `content_metadata`, and type-specific blocks (`text_metadata`, `image_metadata`, `table_metadata`, etc.).
+- **Metadata**: When `--output_directory` is set, the CLI writes JSON files. Each result is a JSON structure that follows the [content metadata schema](content-metadata.md): `content`, `content_url`, `source_metadata`, `content_metadata`, and type-specific blocks (`text_metadata`, `image_metadata`, `table_metadata`, etc.).
 - **Streaming / stdout**: Progress and telemetry are written to stderr (e.g. progress bar, timing). No structured result stream is written to stdout unless you use a different mode (e.g. streaming APIs) not covered by this CLI.
 
 ### output_directory structure
