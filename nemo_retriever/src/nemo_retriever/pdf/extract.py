@@ -39,7 +39,7 @@ def _render_page_to_base64(
     *,
     dpi: int = 200,
     image_format: str = "jpeg",
-    jpeg_quality: int = 95,
+    jpeg_quality: int = 100,
 ) -> Dict[str, Any]:
     """
     Render a page at full DPI and encode as JPEG or PNG.
@@ -141,7 +141,7 @@ def pdf_extraction(
     extract_infographics: bool = False,
     dpi: int = 200,
     image_format: str = "jpeg",
-    jpeg_quality: int = 95,
+    jpeg_quality: int = 100,
     text_extraction_method: str = "pdfium_hybrid",
     text_depth: str = "page",
     **kwargs: Any,

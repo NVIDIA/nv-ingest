@@ -332,7 +332,7 @@ class BatchIngestor(Ingestor):
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
         kwargs.setdefault("image_format", "jpeg")
-        kwargs.setdefault("jpeg_quality", 95)
+        kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
 

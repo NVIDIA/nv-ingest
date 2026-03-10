@@ -166,7 +166,7 @@ class ExtractParams(_ParamsModel):
     use_graphic_elements: bool = False
     dpi: int = 200
     image_format: str = "jpeg"
-    jpeg_quality: int = 95
+    jpeg_quality: int = 100
     inference_batch_size: int = 8
     ocr_model_dir: Optional[str] = None
 
