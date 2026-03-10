@@ -27,6 +27,7 @@ from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+from nemo_retriever.utils.remote_auth import resolve_remote_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +292,11 @@ def main(
         "--graphic-elements-invoke-url",
         help="Optional remote endpoint URL for graphic-elements model inference.",
     ),
+    api_key: Optional[str] = typer.Option(
+        None,
+        "--api-key",
+        help="Optional bearer token for remote NIM endpoints. Defaults to NVIDIA_API_KEY, then NGC_API_KEY.",
+    ),
     embed_invoke_url: Optional[str] = typer.Option(
         None,
         "--embed-invoke-url",
@@ -513,6 +519,37 @@ def main(
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
         _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+        remote_api_key = resolve_remote_api_key(api_key)
+        extract_remote_api_key = (
+            remote_api_key
+            if any(
+                (
+                    page_elements_invoke_url,
+                    ocr_invoke_url,
+                    graphic_elements_invoke_url,
+                    table_structure_invoke_url,
+                )
+            )
+            else None
+        )
+        embed_remote_api_key = remote_api_key if embed_invoke_url else None
+
+        if (
+            any(
+                (
+                    page_elements_invoke_url,
+                    ocr_invoke_url,
+                    graphic_elements_invoke_url,
+                    table_structure_invoke_url,
+                    embed_invoke_url,
+                )
+            )
+            and remote_api_key is None
+        ):
+            logger.warning(
+                "Remote endpoint URL(s) were configured without an API key. "
+                "If these endpoints are hosted on build.nvidia.com, set --api-key or NVIDIA_API_KEY."
+            )
 
         # Remote endpoints don't need local model GPUs for their stage.
         if page_elements_invoke_url and float(page_elements_gpus_per_actor) != 0.0:
@@ -592,6 +629,7 @@ def main(
         embed_params = EmbedParams(
             model_name=str(embed_model_name),
             embed_invoke_url=embed_invoke_url,
+            api_key=embed_remote_api_key,
             embed_modality=embed_modality,
             text_elements_modality=text_elements_modality,
             structured_elements_modality=structured_elements_modality,
@@ -640,6 +678,7 @@ def main(
                 extract_tables=True,
                 extract_charts=True,
                 extract_infographics=False,
+                api_key=extract_remote_api_key,
                 use_graphic_elements=use_graphic_elements,
                 graphic_elements_invoke_url=graphic_elements_invoke_url,
                 inference_batch_size=page_elements_batch_size,
@@ -777,6 +816,7 @@ def main(
             lancedb_table=str(LANCEDB_TABLE),
             embedding_model=_recall_model,
             embedding_http_endpoint=embed_invoke_url,
+            embedding_api_key=embed_remote_api_key or "",
             top_k=10,
             ks=(1, 5, 10),
             hybrid=hybrid,
