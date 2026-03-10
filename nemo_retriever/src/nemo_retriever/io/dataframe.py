@@ -65,7 +65,7 @@ def write_dataframe(df: pd.DataFrame, path: Path) -> None:
 
 
 def _unwrap_records_from_mapping(obj: dict) -> list:
-    for key in ("extracted_df_records", "primitives"):
+    for key in ("records", "df_records", "extracted_df_records", "primitives"):
         value = obj.get(key)
         if isinstance(value, list) and (not value or isinstance(value[0], dict)):
             return value
