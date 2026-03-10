@@ -156,6 +156,10 @@ def pdf_extraction(
     6. Return a list of dictionaries containing the text, images, tables, charts, infographics, and page numbers.
     """
 
+    # Allow callers to pass `method=` (the ExtractParams field name) as an
+    # alias for `text_extraction_method`.
+    text_extraction_method = kwargs.pop("method", None) or text_extraction_method
+
     # Assumption: PDF splitting ran earlier and produced a dataset where each row
     # contains a *single-page* PDF in the `"bytes"` column. We therefore open the
     # document and only process page 0 for each row.

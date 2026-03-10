@@ -4,12 +4,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -226,7 +226,7 @@ def _search_lancedb(
                 .text(text)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source"])
+                .select(["text", "metadata", "source", "page_number"])
                 .limit(top_k)
                 .rerank(RRFReranker())
                 .to_list()
@@ -236,7 +236,7 @@ def _search_lancedb(
                 table.search(q, vector_column_name=vector_column_name)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source", "_distance"])
+                .select(["text", "metadata", "source", "page_number", "_distance"])
                 .limit(top_k)
                 .to_list()
             )
@@ -250,12 +250,13 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     for hits in raw_hits:
         keys: List[str] = []
         for h in hits:
-            res = json.loads(h["metadata"])
-            source = json.loads(h["source"])
+            page_number = h["page_number"]
+            source = h["source"]
             # Prefer explicit `pdf_page` column; fall back to derived form.
-            if res.get("page_number") is not None and source.get("source_id"):
-                filename = Path(source["source_id"]).stem
-                keys.append(filename + "_" + str(res["page_number"]))
+            # if res.get("page_number") is not None and source.get("source_id"):
+            if page_number is not None and source:
+                filename = Path(source).stem
+                keys.append(f"{filename}_{str(page_number)}")
             else:
                 logger.warning(
                     "Skipping hit with missing page_number or source_id: metadata=%s source=%s",

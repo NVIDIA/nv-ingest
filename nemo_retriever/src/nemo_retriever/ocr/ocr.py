@@ -32,6 +32,15 @@ except Exception:  # pragma: no cover
 
 
 # ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+# Page-element labels that carry running text (as opposed to structured
+# content like tables/charts/infographics).  Used by the OCR stage to
+# decide which detections contribute to the page's ``text`` column.
+_TEXT_LABELS: frozenset[str] = frozenset({"text", "title", "header_footer"})
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -421,6 +430,7 @@ def ocr_page_elements(
     invoke_url: Optional[str] = None,
     api_key: Optional[str] = None,
     request_timeout_s: float = 120.0,
+    extract_text: bool = False,
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
@@ -467,6 +477,7 @@ def ocr_page_elements(
         raise ValueError("A local `model` is required when `invoke_url` is not provided.")
 
     # Determine which labels we need to process.
+    # Text/title labels are added per-row based on needs_ocr_for_text metadata.
     wanted_labels: set[str] = set()
     if extract_tables:
         wanted_labels.add("table")
@@ -479,6 +490,7 @@ def ocr_page_elements(
     all_table: List[List[Dict[str, Any]]] = []
     all_chart: List[List[Dict[str, Any]]] = []
     all_infographic: List[List[Dict[str, Any]]] = []
+    all_text: List[str] = []
     all_ocr_meta: List[Dict[str, Any]] = []
 
     t0_total = time.perf_counter()
@@ -487,6 +499,7 @@ def ocr_page_elements(
         table_items: List[Dict[str, Any]] = []
         chart_items: List[Dict[str, Any]] = []
         infographic_items: List[Dict[str, Any]] = []
+        row_ocr_text_blocks: List[Dict[str, Any]] = []
         row_error: Any = None
 
         try:
@@ -507,12 +520,21 @@ def ocr_page_elements(
                 all_table.append(table_items)
                 all_chart.append(chart_items)
                 all_infographic.append(infographic_items)
+                all_text.append(None)
                 all_ocr_meta.append({"timing": None, "error": None})
                 continue
 
+            # --- determine per-row labels (text/title only for pages needing OCR) ---
+            row_wanted = wanted_labels
+            if extract_text:
+                meta = getattr(row, "metadata", None) or {}
+                needs_ocr = meta.get("needs_ocr_for_text", False) if isinstance(meta, dict) else False
+                if needs_ocr:
+                    row_wanted = wanted_labels | _TEXT_LABELS
+
             # --- decode page image once, crop all matching detections ---
             if use_remote:
-                crops = _crop_all_from_page(page_image_b64, dets, wanted_labels, as_b64=True)
+                crops = _crop_all_from_page(page_image_b64, dets, row_wanted, as_b64=True)
                 crop_b64s: List[str] = [b64 for _label, _bbox, b64 in crops]
                 crop_meta: List[Tuple[str, List[float]]] = [(label, bbox) for label, bbox, _b64 in crops]
 
@@ -562,8 +584,10 @@ def ocr_page_elements(
                             chart_items.append(entry)
                         elif label_name == "infographic":
                             infographic_items.append(entry)
+                        elif label_name in _TEXT_LABELS:
+                            row_ocr_text_blocks.extend(blocks)
             else:
-                crops = _crop_all_from_page(page_image_b64, dets, wanted_labels)
+                crops = _crop_all_from_page(page_image_b64, dets, row_wanted)
 
                 if inference_batch_size is None or inference_batch_size < 1:
                     raise ValueError(
@@ -603,6 +627,8 @@ def ocr_page_elements(
                         chart_items.append(entry)
                     elif label_name == "infographic":
                         infographic_items.append(entry)
+                    elif label_name in _TEXT_LABELS:
+                        row_ocr_text_blocks.extend(blocks)
 
                 for ml, jobs in local_jobs.items():
                     if not jobs:
@@ -639,6 +665,13 @@ def ocr_page_elements(
                 "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
             }
 
+        # Assemble OCR'd text from text/title detections for this row.
+        # Use None as sentinel for "keep existing native text".
+        if extract_text and row_ocr_text_blocks:
+            all_text.append(_blocks_to_text(row_ocr_text_blocks))
+        else:
+            all_text.append(None)
+
         all_table.append(table_items)
         all_chart.append(chart_items)
         all_infographic.append(infographic_items)
@@ -661,6 +694,13 @@ def ocr_page_elements(
         out["chart"] = all_chart
     if extract_infographics or "infographic" not in out.columns:
         out["infographic"] = all_infographic
+    if extract_text and "text" in out.columns:
+        # Only overwrite rows where OCR produced text; preserve native text otherwise.
+        for i, ocr_text in enumerate(all_text):
+            if ocr_text is not None:
+                out.iat[i, out.columns.get_loc("text")] = ocr_text
+    elif extract_text:
+        out["text"] = [t if t is not None else "" for t in all_text]
     out["ocr_v1"] = all_ocr_meta
     return out
 
@@ -702,6 +742,7 @@ class OCRActor:
             self.ocr_kwargs["invoke_url"] = invoke_url
 
         # Normalize common constructor kwargs to expected runtime types/defaults.
+        self.ocr_kwargs["extract_text"] = bool(self.ocr_kwargs.get("extract_text", False))
         self.ocr_kwargs["extract_tables"] = bool(self.ocr_kwargs.get("extract_tables", False))
         self.ocr_kwargs["extract_charts"] = bool(self.ocr_kwargs.get("extract_charts", False))
         self.ocr_kwargs["extract_infographics"] = bool(self.ocr_kwargs.get("extract_infographics", False))
@@ -785,6 +826,7 @@ def nemotron_parse_page_elements(
     invoke_url: Optional[str] = None,
     api_key: Optional[str] = None,
     request_timeout_s: float = 120.0,
+    extract_text: bool = False,
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
@@ -822,6 +864,7 @@ def nemotron_parse_page_elements(
     all_table: List[List[Dict[str, Any]]] = []
     all_chart: List[List[Dict[str, Any]]] = []
     all_infographic: List[List[Dict[str, Any]]] = []
+    all_text: List[str] = []
     all_meta: List[Dict[str, Any]] = []
 
     t0_total = time.perf_counter()
@@ -830,6 +873,7 @@ def nemotron_parse_page_elements(
         table_items: List[Dict[str, Any]] = []
         chart_items: List[Dict[str, Any]] = []
         infographic_items: List[Dict[str, Any]] = []
+        row_text: Optional[str] = None
         row_error: Any = None
 
         try:
@@ -846,6 +890,7 @@ def nemotron_parse_page_elements(
                 all_table.append(table_items)
                 all_chart.append(chart_items)
                 all_infographic.append(infographic_items)
+                all_text.append(None)
                 all_meta.append({"timing": None, "error": None})
                 continue
 
@@ -917,6 +962,32 @@ def nemotron_parse_page_elements(
                         if extract_infographics:
                             infographic_items.append(dict(entry))
 
+            # When extract_text is requested, parse the full page for text
+            # (only for pages that need OCR-based text extraction).
+            meta = getattr(row, "metadata", None) or {}
+            needs_ocr = meta.get("needs_ocr_for_text", False) if isinstance(meta, dict) else False
+            if extract_text and needs_ocr:
+                try:
+                    if use_remote:
+                        resp = invoke_image_inference_batches(
+                            invoke_url=invoke_url,
+                            image_b64_list=[page_image_b64],
+                            api_key=api_key,
+                            timeout_s=float(request_timeout_s),
+                            max_batch_size=1,
+                            max_pool_workers=int(retry.remote_max_pool_workers),
+                            max_retries=int(retry.remote_max_retries),
+                            max_429_retries=int(retry.remote_max_429_retries),
+                        )
+                        row_text = _extract_parse_text(resp[0]) if resp else ""
+                    else:
+                        raw = base64.b64decode(page_image_b64)
+                        with Image.open(io.BytesIO(raw)) as im0:
+                            full_crop = np.asarray(im0.convert("RGB"), dtype=np.uint8).copy()
+                        row_text = str(model.invoke(full_crop, task_prompt=task_prompt) or "").strip()
+                except Exception:
+                    row_text = ""
+
         except BaseException as e:
             print(f"Warning: Nemotron Parse failed: {type(e).__name__}: {e}")
             row_error = {
@@ -926,6 +997,7 @@ def nemotron_parse_page_elements(
                 "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
             }
 
+        all_text.append(row_text)
         all_table.append(table_items)
         all_chart.append(chart_items)
         all_infographic.append(infographic_items)
@@ -936,6 +1008,13 @@ def nemotron_parse_page_elements(
         meta["timing"] = {"seconds": float(elapsed)}
 
     out = batch_df.copy()
+    if extract_text and "text" in out.columns:
+        # Only overwrite rows where parse produced text; preserve native text otherwise.
+        for i, parse_text in enumerate(all_text):
+            if parse_text is not None:
+                out.iat[i, out.columns.get_loc("text")] = parse_text
+    elif extract_text:
+        out["text"] = [t if t is not None else "" for t in all_text]
     out["table"] = all_table
     out["chart"] = all_chart
     out["infographic"] = all_infographic

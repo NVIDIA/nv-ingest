@@ -4,7 +4,7 @@
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 In addition, you can use library mode, which is intended for the following cases:
 
@@ -65,7 +65,7 @@ You can submit jobs programmatically by using Python.
 
 !!! tip
 
-    For more Python examples, refer to [NeMo Retriever: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+    For more Python examples, refer to [NeMo Retriever Library: Python Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 If you have a very high number of CPUs, and see the process hang without progress, 
