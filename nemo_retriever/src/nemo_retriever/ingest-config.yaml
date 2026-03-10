@@ -73,6 +73,18 @@ html:
   tokenizer_model_id: nvidia/llama-nemotron-embed-1b-v2
   encoding: utf-8
 
+# Optional config for .extract_image_files() API (batch, inprocess).
+# Standalone image files (PNG, JPEG, BMP, TIFF, SVG) are converted to the same
+# single-page DataFrame schema as PDF extraction, then reuse all downstream GPU
+# stages (page-element detection, OCR, table/chart/infographic extraction).
+# No separate configuration is needed: images use ExtractParams and the same
+# detection/OCR/embedding settings as PDF pages.
+image:
+  # Supported extensions: .png, .jpg, .jpeg, .bmp, .tiff, .tif, .svg
+  # SVG requires the optional `cairosvg` package.
+  # All ExtractParams options (extract_text, extract_tables, etc.) apply.
+  pass: true  # placeholder; no image-specific knobs beyond ExtractParams
+
 # Optional config for .extract_audio() API (batch, inprocess, fused, online).
 # ASR can be remote (Parakeet/Riva gRPC) or local (HuggingFace nvidia/parakeet-ctc-1.1b).
 audio_chunk:
