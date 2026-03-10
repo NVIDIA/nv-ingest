@@ -121,8 +121,6 @@ def build_lancedb_row(
     filename = p.name if p is not None else ""
     pdf_basename = p.stem if p is not None else ""
     pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
-    source_id = path or filename or pdf_basename
-
     metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
     if pdf_page:
         metadata_obj["pdf_page"] = pdf_page
@@ -136,7 +134,6 @@ def build_lancedb_row(
         "filename": filename,
         "pdf_basename": pdf_basename,
         "page_number": int(page_number) if page_number is not None else -1,
-        "source_id": str(source_id),
         "path": str(path),
         "metadata": json.dumps(metadata_obj, ensure_ascii=False),
         "source": json.dumps(source_obj, ensure_ascii=False),
