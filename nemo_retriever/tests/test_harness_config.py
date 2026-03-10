@@ -65,6 +65,98 @@ def test_load_harness_config_precedence(tmp_path: Path, monkeypatch: pytest.Monk
     assert cfg.recall_required is True
 
 
+def test_load_harness_config_supports_preset_inheritance(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf_page\nq,doc_1\n", encoding="utf-8")
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                "  dataset: tiny",
+                "  preset: derived",
+                "presets:",
+                "  base:",
+                "    pdf_extract_workers: 4",
+                "    embed_workers: 2",
+                "    gpu_embed: 0.3",
+                "  derived:",
+                "    extends: base",
+                "    embed_workers: 6",
+                "datasets:",
+                "  tiny:",
+                f"    path: {dataset_dir}",
+                f"    query_csv: {query_csv}",
+                "    recall_required: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_harness_config(config_file=str(cfg_path))
+    assert cfg.pdf_extract_workers == 4
+    assert cfg.embed_workers == 6
+    assert cfg.gpu_embed == 0.3
+
+
+def test_load_harness_config_normalizes_auto_tuning_values(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf_page\nq,doc_1\n", encoding="utf-8")
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                "  dataset: tiny",
+                "  preset: auto_workers",
+                "presets:",
+                "  auto_workers:",
+                "    pdf_extract_workers: auto",
+                "    page_elements_workers: 0",
+                "    ocr_workers: auto",
+                "    embed_workers: auto",
+                "datasets:",
+                "  tiny:",
+                f"    path: {dataset_dir}",
+                f"    query_csv: {query_csv}",
+                "    recall_required: true",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_harness_config(config_file=str(cfg_path))
+    assert cfg.pdf_extract_workers is None
+    assert cfg.page_elements_workers is None
+    assert cfg.ocr_workers is None
+    assert cfg.embed_workers is None
+
+
+def test_load_harness_config_supports_auto_env_and_cli_overrides(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("query,pdf_page\nq,doc_1\n", encoding="utf-8")
+    cfg_path = tmp_path / "test_configs.yaml"
+    _write_harness_config(cfg_path, dataset_dir, query_csv)
+
+    monkeypatch.setenv("HARNESS_EMBED_WORKERS", "auto")
+
+    cfg = load_harness_config(
+        config_file=str(cfg_path),
+        cli_overrides=["page_elements_workers=auto"],
+    )
+
+    assert cfg.page_elements_workers is None
+    assert cfg.embed_workers is None
+
+
 def test_load_harness_config_fails_when_recall_required_without_query(tmp_path: Path) -> None:
     dataset_dir = tmp_path / "dataset"
     dataset_dir.mkdir()

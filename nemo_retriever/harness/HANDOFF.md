@@ -35,9 +35,11 @@ It captures what exists now, what was intentionally chosen, and what to iterate 
 
 - Active default dataset: `jp20` (recall-required workflow).
 - `bo20` remains ingestion-only (`query_csv: null`, `recall_required: false`).
-- Two main presets are available:
+- Presets now support `extends:` inheritance and selective `auto` tuning values.
+- Commonly used presets are:
   - `single_gpu`
   - `dgx_8gpu`
+  - `auto_workers` (keeps conservative batch sizes, defers worker counts to runtime heuristics)
 - Adapter-capable datasets:
   - `earnings` uses `recall_adapter: page_plus_one` (`page` -> `pdf_page` conversion).
   - `bo10k` wiring is included (adapter + mode), with recall disabled by default until query path is set.
@@ -147,6 +149,9 @@ Notes:
   - Relative `query_csv` paths are stable across cwd/worktree runs.
   - Dataset presets can resolve from `/raid/$USER/...` when `/datasets/nv-ingest/...` is unavailable.
   - `financebench` now defaults to `data/financebench_train.json` with recall enabled.
+- Preset usability improvement:
+  - Harness presets can inherit from a shared base preset.
+  - Worker-count fields can use `auto` so batch mode sizes them from Ray GPU inventory.
 - Session UX improvements:
   - Runs, sweeps, and nightly sessions accept repeatable `--tag` values persisted into artifacts.
   - `retriever harness summary` prints a compact table from `session_summary.json`.
@@ -225,7 +230,6 @@ shim for that newer upstream behavior.
 
 ### P1
 
-- Add preset inheritance or scaling helper to reduce duplicated numeric tuning in YAML.
 - Add an artifact retention helper (manual command) to prune old sessions by age/size.
 - Consider a single `recall_profile` abstraction (mapping to adapter + match mode) to reduce config coupling
   and avoid invalid combinations.
