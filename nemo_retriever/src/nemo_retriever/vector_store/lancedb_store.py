@@ -9,9 +9,12 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple  # noqa: F401
+from datetime import timedelta
 
 from nv_ingest_client.util.vdb.lancedb import LanceDB
+from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 import pandas as pd
+import lancedb
 
 logger = logging.getLogger(__name__)
 
@@ -117,7 +120,7 @@ def _extract_page_number(meta: Dict[str, Any]) -> int:
         return -1
 
 
-def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
+def _build_lancedb_rows_from_df(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Transform an embeddings-enriched primitives DataFrame into LanceDB rows.
 
@@ -131,7 +134,7 @@ def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
     """
     out: List[Dict[str, Any]] = []
 
-    for _, row in df.iterrows():
+    for row in rows:
         meta = row.get("metadata")
         if not isinstance(meta, dict):
             continue
@@ -146,9 +149,12 @@ def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 embedding = list(embedding)  # type: ignore[arg-type]
             except Exception:
                 continue
-
-        path, source_id = _extract_source_path_and_id(meta)
-        page_number = _extract_page_number(meta)
+        meta.pop("embedding", None)  # Remove embedding from metadata to save space in LanceDB.
+        # path, source_id = _extract_source_path_and_id(meta)
+        path = row.get("path", "")
+        source_id = meta.get("source_path", path)
+        # page_number = _extract_page_number(meta)
+        page_number = row.get("page_number", -1)
         p = Path(path) if path else None
         filename = p.name if p is not None else ""
         pdf_basename = p.stem if p is not None else ""
@@ -164,8 +170,10 @@ def _build_lancedb_rows_from_df(df: pd.DataFrame) -> List[Dict[str, Any]]:
                 "filename": filename,
                 "pdf_basename": pdf_basename,
                 "page_number": int(page_number),
-                "source_id": source_id,
+                "source": source_id,
                 "path": path,
+                "text": row.get("text", ""),
+                "metadata": str(meta),
             }
         )
 
@@ -195,13 +203,16 @@ def create_lancedb_index(table: Any, *, cfg: LanceDBConfig, text_column: str = "
 
     if cfg.hybrid:
         try:
-            table.create_fts_index(text_column, language=cfg.fts_language)
+            table.create_fts_index(text_column, replace=True, language=cfg.fts_language)
         except Exception:
             logger.warning(
                 "FTS index creation failed on column %r; continuing with vector-only search.",
                 text_column,
                 exc_info=True,
             )
+
+    for index_stub in table.list_indices():
+        table.wait_for_index([index_stub.name], timeout=timedelta(seconds=600))
 
 
 def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig) -> None:
@@ -215,7 +226,6 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
 
     try:
         import lancedb  # type: ignore
-        import pyarrow as pa  # type: ignore
     except Exception as e:
         raise RuntimeError(
             "LanceDB write requested but dependencies are missing. "
@@ -224,17 +234,7 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
 
     db = lancedb.connect(uri=cfg.uri)
 
-    schema = pa.schema(
-        [
-            pa.field("vector", pa.list_(pa.float32(), dim)),
-            pa.field("pdf_page", pa.string()),
-            pa.field("filename", pa.string()),
-            pa.field("pdf_basename", pa.string()),
-            pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
-            pa.field("path", pa.string()),
-        ]
-    )
+    schema = lancedb_schema(vector_dim=dim)
 
     mode = "overwrite" if cfg.overwrite else "append"
     table = db.create_table(cfg.table_name, data=list(rows), schema=schema, mode=mode)
@@ -323,3 +323,28 @@ def write_text_embeddings_dir_to_lancedb(
         # "rows_written": len(all_rows),
         "lancedb": {"uri": cfg.uri, "table_name": cfg.table_name, "overwrite": cfg.overwrite},
     }
+
+
+def handle_lancedb(
+    rows: Path,
+    uri: str,
+    table_name: str,
+    hybrid: bool = False,
+    mode: str = "overwrite",
+) -> Dict[str, Any]:
+    """
+        Handle LanceDB writing for a batch pipeline run.
+
+        This is used by `nemo_retriever.examples.batch_pipeline.run(...)` after the embedding stage.
+
+        Reads `*.text_embeddings.json` files from `input_dir`, extracts embeddings, and uploads to LanceDB.
+    )
+    """
+    lancedb_config = LanceDBConfig(
+        uri=uri, table_name=table_name, hybrid=hybrid
+    )  # Use the same LanceDB config for writing and recall.
+    db = lancedb.connect(uri=lancedb_config.uri)
+    cleaned_rows = _build_lancedb_rows_from_df(rows)
+    _write_rows_to_lancedb(cleaned_rows, cfg=lancedb_config)
+    table = db.open_table(lancedb_config.table_name)  # Ensure table is open and metadata is updated before proceeding.
+    create_lancedb_index(table, cfg=lancedb_config)
