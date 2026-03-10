@@ -1,0 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+# Openshift-specific overrides for NIM Operator.
+
+nimOperator:
+  embedqa:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: OMP_NUM_THREADS
+        value: "1"
+      - name: NIM_TRITON_PERFORMANCE_MODE
+        value: "throughput"
+      - name: RAYON_NUM_THREADS
+        value: "4"
+      - name: TOKENIZERS_PARALLELISM
+        value: "false"
