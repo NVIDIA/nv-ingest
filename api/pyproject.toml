@@ -30,7 +30,6 @@ dependencies = [
     "tritonclient",
     "glom",
     "pypdfium2==4.30.0",
-    "pillow==12.1.1",
 ]
 
 [project.optional-dependencies]
