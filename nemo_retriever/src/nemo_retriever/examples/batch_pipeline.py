@@ -27,6 +27,7 @@ from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+from nemo_retriever.utils.input_files import resolve_input_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -545,18 +546,10 @@ def main(
             embed_gpus_per_actor = 0.0
 
         input_path = Path(input_path)
-        if input_path.is_file():
-            file_patterns = [str(input_path)]
-        elif input_path.is_dir():
-            ext_map = {
-                "txt": ["*.txt"],
-                "html": ["*.html"],
-                "doc": ["*.docx", "*.pptx"],
-            }
-            exts = ext_map.get(input_type, ["*.pdf"])
-            file_patterns = [str(input_path / e) for e in exts]
-        else:
-            raise typer.BadParameter(f"Path does not exist: {input_path}")
+        try:
+            file_patterns = resolve_input_patterns(input_path, input_type)
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
         ingestor = create_ingestor(
             run_mode="batch",
