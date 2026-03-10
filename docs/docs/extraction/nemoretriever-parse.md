@@ -4,7 +4,7 @@ For scanned documents, or documents with complex layouts,
 we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
 Nemotron parse provides higher-accuracy text extraction. 
 
-This documentation describes the following two methods 
+This documentation describes the following three methods
 to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
