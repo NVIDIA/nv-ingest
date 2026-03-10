@@ -12,6 +12,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple  # noqa:
 from datetime import timedelta
 
 from nv_ingest_client.util.vdb.lancedb import LanceDB
+from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 import pandas as pd
 import lancedb
 
@@ -202,7 +203,7 @@ def create_lancedb_index(table: Any, *, cfg: LanceDBConfig, text_column: str = "
 
     if cfg.hybrid:
         try:
-            table.create_fts_index(text_column, language=cfg.fts_language)
+            table.create_fts_index(text_column, replace=True, language=cfg.fts_language)
         except Exception:
             logger.warning(
                 "FTS index creation failed on column %r; continuing with vector-only search.",
@@ -225,7 +226,6 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
 
     try:
         import lancedb  # type: ignore
-        import pyarrow as pa  # type: ignore
     except Exception as e:
         raise RuntimeError(
             "LanceDB write requested but dependencies are missing. "
@@ -234,19 +234,7 @@ def _write_rows_to_lancedb(rows: Sequence[Dict[str, Any]], *, cfg: LanceDBConfig
 
     db = lancedb.connect(uri=cfg.uri)
 
-    schema = pa.schema(
-        [
-            pa.field("vector", pa.list_(pa.float32(), dim)),
-            pa.field("pdf_page", pa.string()),
-            pa.field("filename", pa.string()),
-            pa.field("pdf_basename", pa.string()),
-            pa.field("page_number", pa.int32()),
-            pa.field("source", pa.string()),
-            pa.field("path", pa.string()),
-            pa.field("text", pa.string()),
-            pa.field("metadata", pa.string()),
-        ]
-    )
+    schema = lancedb_schema(vector_dim=dim)
 
     mode = "overwrite" if cfg.overwrite else "append"
     table = db.create_table(cfg.table_name, data=list(rows), schema=schema, mode=mode)
