@@ -337,7 +337,7 @@ services:
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
       - OCR_INFER_PROTOCOL=grpc
-      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-scene_text_ensemble}
+      - OCR_MODEL_NAME=${OCR_MODEL_NAME:-pipeline}
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v1
       #- OCR_INFER_PROTOCOL=http

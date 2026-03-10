@@ -193,7 +193,7 @@ envVars:
   OCR_GRPC_ENDPOINT: nemotron-ocr-v1:8001
   OCR_HTTP_ENDPOINT: http://nemotron-ocr-v1:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
-  OCR_MODEL_NAME: scene_text_ensemble
+  OCR_MODEL_NAME: pipeline
 
   MINIO_BUCKET: nv-ingest
   MINIO_ACCESS_KEY: minioadmin
