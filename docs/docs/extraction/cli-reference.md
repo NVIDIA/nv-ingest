@@ -37,13 +37,13 @@ The following table lists all CLI options: flag name, type, default, whether the
 | `--task` | — | string (multiple) | none | No | Task definition in `task_id:{"key":"value"}` format. Repeat for multiple tasks (e.g. extract, split, caption). |
 | `--client_host` | — | string | `localhost` | No | Hostname or IP of the ingest service. |
 | `--client_port` | — | int | `7670` | No | Port of the ingest service. |
-| `--api_version` | — | choice | `v2` | No | API version: `v1` or `v2`. Required for `--pdf_split_page_count`. |
+| `--api_version` | — | enum | `v2` | No | API version: `v1` or `v2`. Required for `--pdf_split_page_count`. |
 | `--pdf_split_page_count` | — | int | none | No | Pages per PDF chunk when splitting (V2 API). Typically 1–128; server default if unset. |
-| `--client_type` | — | choice | `rest` | No | Client transport: `rest` or `simple`. |
+| `--client_type` | — | enum | `rest` | No | Client transport: `rest` or `simple`. |
 | `--client_kwargs` | — | string (JSON) | `{}` | No | Extra JSON object passed to the client. |
 | `--batch_size` | — | int | `10` | No | Number of in-flight jobs (must be ≥ 1). |
 | `--concurrency_n` | — | int | `10` | No | Number of concurrent jobs to maintain. |
-| `--log_level` | — | choice | `INFO` | No | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
+| `--log_level` | — | enum | `INFO` | No | Logging level: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`. |
 | `--dry_run` | — | flag | false | No | Do not run the pipeline; only validate and log what would be done. |
 | `--fail_on_error` | — | flag | false | No | Stop on first job error instead of continuing. |
 | `--save_images_separately` | — | flag | false | No | Write extracted images to disk under `output_directory` and set `content_url` in metadata. |
