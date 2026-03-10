@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-# GPU-specific overrides for L40S (loaded by harness when --deployment-type helm --sku l40s).
-# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.l40s.yaml.
+# Openshift-specific overrides for NIM Operator.
 
 nimOperator:
   embedqa:
