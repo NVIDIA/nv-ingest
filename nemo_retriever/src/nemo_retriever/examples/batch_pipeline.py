@@ -25,7 +25,6 @@ from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
-from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.utils.input_files import resolve_input_patterns
 
@@ -192,8 +191,6 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
 
     Creates an empty table with the expected schema if it does not exist yet.
     """
-    from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
-
     Path(uri).mkdir(parents=True, exist_ok=True)
 
     db = _lancedb().connect(uri)
@@ -205,9 +202,54 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
 
     import pyarrow as pa  # type: ignore
 
-    schema = lancedb_schema(2048)
-    empty = pa.table({f.name: [] for f in schema}, schema=schema)
+    schema = pa.schema(
+        [
+            pa.field("vector", pa.list_(pa.float32(), 2048)),
+            pa.field("pdf_page", pa.string()),
+            pa.field("filename", pa.string()),
+            pa.field("pdf_basename", pa.string()),
+            pa.field("page_number", pa.int32()),
+            pa.field("source", pa.string()),
+            pa.field("path", pa.string()),
+            pa.field("text", pa.string()),
+            pa.field("metadata", pa.string()),
+        ]
+    )
+    empty = pa.table(
+        {
+            "vector": [],
+            "pdf_page": [],
+            "filename": [],
+            "pdf_basename": [],
+            "page_number": [],
+            "source": [],
+            "path": [],
+            "text": [],
+            "metadata": [],
+        },
+        schema=schema,
+    )
     db.create_table(table_name, data=empty, schema=schema, mode="create")
+
+
+def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
+    s = str(golden_key)
+    if "_" not in s:
+        return s, ""
+    doc, page = s.rsplit("_", 1)
+    return doc, page
+
+
+def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
+
+    source_id = hit.get("source_id")
+    page_number = hit.get("page_number")
+    if not source_id or page_number is None:
+        return None, float(hit.get("_distance")) if "_distance" in hit else None
+
+    key = f"{Path(str(source_id)).stem}_{page_number}"
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
+    return key, dist
 
 
 @app.command()
@@ -541,17 +583,6 @@ def main(
                         embed_granularity=embed_granularity,
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
         elif input_type == "html":
             ingestor = (
@@ -565,17 +596,6 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -630,17 +650,6 @@ def main(
                             "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -698,17 +707,6 @@ def main(
                         },
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
 
         logger.info("Running extraction...")
@@ -725,8 +723,11 @@ def main(
             .materialize()
         )
 
-        if hasattr(ingestor, "_create_lancedb_index"):
-            ingestor._create_lancedb_index()
+        # if hasattr(ingestor, "_create_lancedb_index"):
+        #     ingestor._create_lancedb_index()
+        from nemo_retriever.vector_store.lancedb_store import handle_lancedb
+
+        handle_lancedb(ingest_results.take_all(), lancedb_uri, LANCEDB_TABLE, hybrid=hybrid, mode="overwrite")
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         rows_processed = _count_materialized_rows(ingest_results)
