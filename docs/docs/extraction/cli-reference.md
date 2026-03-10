@@ -155,7 +155,7 @@ Options:
   --help                         Show this message and exit.
 ```
 
-For detailed **task** syntax (`extract`, `split`, `caption`, `embed`, `udf`, etc.), see the `--task` option in the parameter table and the examples below.
+For detailed **task** syntax (`extract`, `split`, `caption`, `embed`, `udf`, etc.), refer to the `--task` option in the parameter table and the examples below.
 
 
 ## Examples
