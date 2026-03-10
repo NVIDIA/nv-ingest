@@ -4,7 +4,7 @@ After you install the Python dependencies, you can use the [NeMo Retriever Libra
 To use the CLI, use the `nemo-retriever` command.
 
 !!! note "Command name"
-    Depending on your installation (NeMo Retriever Library vs. nv-ingest-client), the CLI may be invoked as `nemo-retriever` or `nv-ingest-cli`. Both expose the same options and behavior. The following sections use `nemo-retriever` for consistency with the examples.
+    Depending on your installation (NeMo Retriever Library vs. nv-ingest-client), you invoke the CLI by using `nemo-retriever` or `nv-ingest-cli`. Both expose the same options and behavior. The following sections use `nemo-retriever` for consistency with the examples.
 
 To check the version of the CLI that you have installed, run the following command.
 
