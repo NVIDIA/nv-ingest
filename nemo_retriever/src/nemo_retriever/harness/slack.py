@@ -6,8 +6,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import requests
-
 from nemo_retriever.harness.artifacts import now_timestr
 
 DEFAULT_USERNAME = "nemo_retriever Nightly"
@@ -339,6 +337,11 @@ def build_slack_payload(report: NightlySessionReport, slack_config: dict[str, An
 
 
 def post_slack_payload(payload: dict[str, Any], webhook_url: str) -> None:
+    try:
+        import requests
+    except ModuleNotFoundError as exc:
+        raise RuntimeError("requests is required for Slack posting") from exc
+
     response = requests.post(
         webhook_url,
         json=payload,
