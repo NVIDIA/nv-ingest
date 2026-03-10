@@ -34,10 +34,12 @@ try:
     from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
         postprocess_page_elements_v3,
         YOLOX_PAGE_V3_CLASS_LABELS,
+        YOLOX_PAGE_V3_FINAL_SCORE,
     )
 except ImportError:
     postprocess_page_elements_v3 = None  # type: ignore[assignment,misc]
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
+    YOLOX_PAGE_V3_FINAL_SCORE = {}  # type: ignore[assignment]
 
 from nemo_retriever.nim.nim import invoke_page_elements_batches
 
@@ -495,7 +497,11 @@ def detect_page_elements_v3(
     if model is not None and hasattr(model, "thresholds_per_class"):
         thresholds_per_class = getattr(model, "thresholds_per_class")
     else:
-        thresholds_per_class = [0.0 for _ in label_names]
+        # Use the same per-class thresholds as the yolox pipeline.
+        # label_names uses "text" where yolox uses "paragraph"; _RETRIEVER_TO_API maps between them.
+        thresholds_per_class = [
+            YOLOX_PAGE_V3_FINAL_SCORE.get(_RETRIEVER_TO_API.get(name, name), 0.0) for name in label_names
+        ]
 
     for _, row in pages_df.iterrows():
         try:
