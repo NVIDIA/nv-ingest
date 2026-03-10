@@ -1,21 +1,34 @@
+preset: dgx_8gpu
+
 runs:
-  - name: jp20_single
+  - name: jp20_dgx_8gpu
     dataset: jp20
-    preset: single_gpu
 
-  - name: bo20_single
+  - name: bo20_dgx_8gpu
     dataset: bo20
-    preset: single_gpu
 
-  # - name: bo767_single
-  #   dataset: bo767
-  #   preset: single_gpu
+  - name: bo767_dgx_8gpu
+    dataset: bo767
+
+  - name: earnings_dgx_8gpu
+    dataset: earnings
+
+  - name: financebench_dgx_8gpu
+    dataset: financebench
+
   # - name: earnings_single
   #   dataset: earnings
-  #   preset: single_gpu
   # - name: financebench_single
   #   dataset: financebench
-  #   preset: single_gpu
   # - name: bo10k_single
   #   dataset: bo10k
-  #   preset: single_gpu
+
+slack:
+  enabled: true
+  title: nemo_retriever Nightly Harness
+  post_artifact_paths: true
+  metric_keys:
+    - pages
+    - ingest_secs
+    - pages_per_sec_ingest
+    - recall_5
