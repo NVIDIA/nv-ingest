@@ -14,7 +14,9 @@ from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-from PIL import Image
+
+PIL = pytest.importorskip("PIL")
+from PIL import Image  # noqa: E402
 
 _extract = pytest.importorskip("nemo_retriever.pdf.extract")
 _ocr = pytest.importorskip("nemo_retriever.ocr.ocr")
