@@ -4,7 +4,7 @@ For scanned documents, or documents with complex layouts,
 we recommend that you use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse). 
 Nemotron parse provides higher-accuracy text extraction. 
 
-This documentation describes the following two methods 
+This documentation describes the following three methods
 to run [NeMo Retriever Library](overview.md) with nemotron-parse.
 
 - Run the NIM locally by using Docker Compose
@@ -118,7 +118,7 @@ To enable `nemotron-parse` in the batch pipeline, set each of the following opti
 For example, to run the batch pipeline on a directory of PDFs with `nemotron-parse` turned on, use the following code:
 
 ```shell
-python ./retriever/src/retriever/examples/batch_pipeline.py /path/to/pdfs \
+python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/pdfs \
   --nemotron-parse-workers 16 \
   --gpu-nemotron-parse .25 \
   --nemotron-parse-batch-size 32
