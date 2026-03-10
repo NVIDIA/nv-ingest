@@ -93,7 +93,7 @@ def main(
         help="Embedding model name passed to .embed().",
     ),
     method: str = typer.Option(
-        "pdfium",
+        "pdfium_hybrid",
         "--method",
         help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
     ),

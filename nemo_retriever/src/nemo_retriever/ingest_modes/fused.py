@@ -77,7 +77,7 @@ class _FusedModelActor:
             str(kwargs.get("table_output_format", "pseudo_markdown")),
         )
         self._extract_text = bool(kwargs.get("extract_text", False))
-        self._method = str(kwargs.get("method", "pdfium"))
+        self._method = str(kwargs.get("method", "pdfium_hybrid"))
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
         self._use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
@@ -201,7 +201,7 @@ class FusedIngestor(BatchIngestor):
         self._tasks.append(("extract", dict(kwargs)))
         self._fused_extract_flags = {
             "extract_text": bool(kwargs.get("extract_text", False)),
-            "method": str(kwargs.get("method", "pdfium")),
+            "method": str(kwargs.get("method", "pdfium_hybrid")),
             "extract_tables": bool(kwargs.get("extract_tables", False)),
             "use_table_structure": bool(kwargs.get("use_table_structure", False)),
             "table_output_format": str(kwargs.get("table_output_format", "pseudo_markdown")),

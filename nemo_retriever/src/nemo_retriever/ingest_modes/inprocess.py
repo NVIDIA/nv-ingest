@@ -1172,7 +1172,7 @@ class InProcessIngestor(Ingestor):
             # When use_graphic_elements is True, charts are handled above;
             # when use_table_structure is True, tables are handled above.
             ocr_flags = {}
-            method = kwargs.get("method", "pdfium")
+            method = kwargs.get("method", "pdfium_hybrid")
             if method in ("pdfium_hybrid", "ocr") and kwargs.get("extract_text") is True:
                 ocr_flags["extract_text"] = True
             if kwargs.get("extract_tables") is True and not use_table_structure:
