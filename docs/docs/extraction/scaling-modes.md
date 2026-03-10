@@ -102,4 +102,4 @@ Open `docker-compose.yaml` and locate:
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Troubleshooting](troubleshooting.md)
+- [Troubleshooting](troubleshoot.md)
