@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv]
@@ -52,22 +52,25 @@ dependencies = [
     "prometheus-client",
     "ray[all]>=2.49.0",
     "redis>=5.2.1",
-    "requests>=2.28.2",
+    "requests>=2.32.5",
     "scikit-learn>=1.6.0",
     "scipy>=1.15.1",
     "setuptools>=78.1.1",
     "tabulate>=0.9.0",
-    "transformers>=4.47.0",
+    "transformers>=4.57.6",
     "tqdm>=4.67.1",
+    "urllib3==2.6.3",
+    "nltk==3.9.3",
     "uvicorn",
     "pip",
-    "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
+    "opencv-python",
     "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",
     "tritonclient",
-    "nvidia-riva-client==2.20.0",
-    "unstructured-client",
+    "nvidia-riva-client==2.25.0",
+    "unstructured-client>=0.25.9",
     "markitdown",
+    "python-multipart",
 ]
 
 [project.urls]

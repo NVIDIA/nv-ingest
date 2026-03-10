@@ -7,6 +7,7 @@ from typing import List, Any
 from typing import Optional
 from typing import Tuple
 
+import cv2
 import numpy as np
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
@@ -24,6 +25,46 @@ from nv_ingest_api.util.metadata.aggregators import Base64Image
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_IMAGE_FORMAT
 
 logger = logging.getLogger(__name__)
+
+
+def _compute_render_scale_to_fit(
+    page: pdfium.PdfPage,
+    target_wh: Tuple[int, int],
+    rotation: int = 0,
+) -> float:
+    """
+    Compute a PDFium render scale that fits the rotated page within target pixel bounds.
+
+    Uses the standard fit-to-box formula: min(target_w/page_w, target_h/page_h)
+
+    Parameters
+    ----------
+    page : pdfium.PdfPage
+        The PDF page to compute scale for.
+    target_wh : Tuple[int, int]
+        Target (width, height) in pixels.
+    rotation : int, optional
+        Page rotation in degrees (0, 90, 180, 270). Defaults to 0.
+
+    Returns
+    -------
+    float
+        The scale factor to use for rendering.
+    """
+    target_w, target_h = target_wh
+    if target_w <= 0 or target_h <= 0:
+        return 1.0
+
+    page_w, page_h = float(page.get_width()), float(page.get_height())
+    if page_w <= 0.0 or page_h <= 0.0:
+        return 1.0
+
+    # Swap dimensions if rotated 90 or 270 degrees
+    if (rotation % 180) != 0:
+        page_w, page_h = page_h, page_w
+
+    return max(min(target_w / page_w, target_h / page_h), 1e-3)
+
 
 PDFIUM_PAGEOBJ_MAPPING = {
     pdfium_c.FPDF_PAGEOBJ_TEXT: "TEXT",
@@ -49,16 +90,16 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     np.ndarray
         A NumPy array representing the correctly formatted image data.
     """
-    mode = bitmap.mode  # Use the mode to identify the correct format
-
-    # Convert to a NumPy array using the built-in method
     img_arr = bitmap.to_numpy().copy()
 
-    # Automatically handle channel swapping if necessary
+    # In-place SIMD-optimized BGR→RGB swap via OpenCV. This replaces pdfium's
+    # rev_byteorder flag, which triggers a non-thread-safe code path in
+    # CFX_AggDeviceDriver::GetDIBits() that SIGTRAPs under concurrent rendering.
+    mode = bitmap.mode
     if mode in {"BGRA", "BGRX"}:
-        img_arr = img_arr[..., [2, 1, 0, 3]]  # Swap BGR(A) to RGB(A)
+        cv2.cvtColor(img_arr, cv2.COLOR_BGRA2RGBA, dst=img_arr)
     elif mode == "BGR":
-        img_arr = img_arr[..., [2, 1, 0]]  # Swap BGR to RGB
+        cv2.cvtColor(img_arr, cv2.COLOR_BGR2RGB, dst=img_arr)
 
     return img_arr
 
@@ -147,7 +188,8 @@ def pdfium_pages_to_numpy(
         Defaults to None.
     padding_tuple : Optional[Tuple[int, int]], optional
         A tuple (width, height) to pad the image to. Defaults to None.
-    rotation:
+    rotation : int, optional
+        Page rotation in degrees (0, 90, 180, 270). Defaults to 0.
 
     Returns
     -------
@@ -171,15 +213,21 @@ def pdfium_pages_to_numpy(
 
     images = []
     padding_offsets = []
-    scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
+    base_scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
 
     for idx, page in enumerate(pages):
-        # Render the page as a bitmap with the specified scale and rotation
-        page_bitmap = page.render(scale=scale, rotation=rotation)
-        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
-        # Apply scaling using the thumbnail approach if specified
+        # Render at target scale directly when scale_tuple specified to avoid large intermediate bitmaps
+        render_scale = base_scale
         if scale_tuple:
+            render_scale = min(base_scale, _compute_render_scale_to_fit(page, scale_tuple, rotation))
+
+        page_bitmap = page.render(scale=render_scale, rotation=rotation)
+        img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
+
+        # Safety fallback for rounding edge cases - only scale down if needed
+        if scale_tuple and (img_arr.shape[1] > scale_tuple[0] or img_arr.shape[0] > scale_tuple[1]):
             img_arr = scale_numpy_image(img_arr, scale_tuple)
+
         # Apply padding if specified
         if padding_tuple:
             img_arr, (pad_width, pad_height) = pad_image(

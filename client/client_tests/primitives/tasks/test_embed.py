@@ -81,7 +81,7 @@ def test_embed_task_deprecated_parameters():
 def test_embed_task_str_representation():
     task = EmbedTask(
         endpoint_url="http://embedding-ms:8000/v1",
-        model_name="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        model_name="nvidia/llama-nemotron-embed-1b-v2",
         api_key="api-key",
         filter_errors=False,
         dimensions=2048,
@@ -89,7 +89,7 @@ def test_embed_task_str_representation():
     expected_str = (
         "Embed Task:\n"
         "  endpoint_url: http://embedding-ms:8000/v1\n"
-        "  model_name: nvidia/llama-3.2-nv-embedqa-1b-v2\n"
+        "  model_name: nvidia/llama-nemotron-embed-1b-v2\n"
         "  api_key: [redacted]\n"
         "  filter_errors: False\n"
         "  dimensions: 2048\n"
@@ -104,7 +104,7 @@ def test_embed_task_str_representation():
     "endpoint_url, model_name, api_key, filter_errors, dimensions",
     [
         ("https://integrate.api.nvidia.com/v1", "nvidia/embedding-model", "", True, 2048),
-        ("http://embedding-ms:8000/v1", "nvidia/llama-3.2-nv-embedqa-1b-v2", "test-key", False, 1024),
+        ("http://embedding-ms:8000/v1", "nvidia/llama-nemotron-embed-1b-v2", "test-key", False, 1024),
         ("", "nvidia/nv-embedqa-e5-v5", "42", True, None),
         (None, None, None, False, 512),
     ],

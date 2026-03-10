@@ -15,7 +15,16 @@ from nv_ingest_harness.utils.session import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[5]
-CASES = ["e2e", "e2e_with_llm_summary", "recall", "e2e_recall"]
+CASES = [
+    "e2e",
+    "e2e_with_llm_summary",
+    "recall",
+    "e2e_recall",
+    "page_elements",
+    "table_structure",
+    "graphic_elements",
+    "ocr",
+]
 
 
 def run_datasets(
@@ -29,6 +38,7 @@ def run_datasets(
     session_dir: str | None = None,
     sku: str | None = None,
     dump_logs: bool = True,
+    config_file: str | None = None,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
@@ -39,6 +49,7 @@ def run_datasets(
     if managed:
         # Load config for first dataset to get profiles
         first_config = load_config(
+            config_file=config_file or "test_configs.yaml",
             case=case,
             dataset=dataset_list[0],
             deployment_type=deployment_type,
@@ -67,6 +78,7 @@ def run_datasets(
         # Load config for this dataset (applies dataset-specific extraction configs)
         try:
             config = load_config(
+                config_file=config_file or "test_configs.yaml",
                 case=case,
                 dataset=dataset_name,
                 deployment_type=deployment_type,
@@ -342,13 +354,20 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
     "--sku",
     type=str,
     default=None,
-    help="GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s). Only applies to managed Compose "
-    "services.",
+    help="GPU SKU for override file (Compose: docker-compose.<sku>.yaml; Helm: helm/overrides/values-<sku>.yaml). "
+    "Applies to managed Compose and Helm deployments (e.g., a10g, a100-40gb, l40s).",
 )
 @click.option(
     "--dump-logs/--no-dump-logs",
     default=True,
     help="Dump service logs to artifacts directory before cleanup (managed mode only). Default: enabled",
+)
+@click.option(
+    "--test-config",
+    "test_config_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to test config YAML (default: tools/harness/test_configs.yaml)",
 )
 def main(
     case,
@@ -362,6 +381,7 @@ def main(
     session_name,
     sku,
     dump_logs,
+    test_config_path,
 ):
 
     if not dataset:
@@ -396,6 +416,7 @@ def main(
         session_dir=str(session_dir) if session_dir else None,
         sku=sku,
         dump_logs=dump_logs,
+        config_file=test_config_path,
     )
 
 

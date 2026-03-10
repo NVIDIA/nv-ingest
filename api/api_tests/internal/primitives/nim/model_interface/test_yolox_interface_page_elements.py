@@ -100,9 +100,9 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         try:
             result = self.model_interface.postprocess_annotations(annotations, original_image_shapes=original_shapes)
 
-            # Check that both expansion functions were called
-            self.mock_expand_table.assert_called_once_with(annotations[0])
-            self.mock_expand_chart.assert_called_once()
+            # v3 path does not call legacy v2 expansion functions.
+            self.mock_expand_table.assert_not_called()
+            self.mock_expand_chart.assert_not_called()
 
             # Check that transform_normalized_coordinates_to_original was called
             self.model_interface.transform_normalized_coordinates_to_original.assert_called_once()
@@ -139,9 +139,9 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         try:
             result = self.model_interface.postprocess_annotations(annotations, original_image_shapes=original_shapes)
 
-            # Check that both expansion functions were called
-            self.mock_expand_table.assert_called_once()
-            self.mock_expand_chart.assert_called_once()
+            # v3 path does not call legacy v2 expansion functions.
+            self.mock_expand_table.assert_not_called()
+            self.mock_expand_chart.assert_not_called()
 
             # Check the result (should have only one chart entry with confidence >= 0.4)
             self.assertEqual(len(result), 1)
@@ -239,10 +239,14 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         try:
             result = self.model_interface.postprocess_annotations(annotations, original_image_shapes=original_shapes)
 
-            # Check that transform_normalized_coordinates_to_original was called with both images
-            self.model_interface.transform_normalized_coordinates_to_original.assert_called_once_with(
-                [{"table": [[0.1, 0.2, 0.3, 0.4, 0.5]]}, {"chart": [[0.1, 0.2, 0.3, 0.4, 0.5]]}], original_shapes
+            # v3 post-processing mutates annotation dicts before coordinate transform.
+            self.model_interface.transform_normalized_coordinates_to_original.assert_called_once()
+            transform_args, transform_kwargs = (
+                self.model_interface.transform_normalized_coordinates_to_original.call_args
             )
+            self.assertEqual(len(transform_args[0]), 2)
+            self.assertEqual(transform_args[1], original_shapes)
+            self.assertEqual(transform_kwargs, {})
 
             # Check the result (should match the transformed results)
             self.assertEqual(len(result), 2)
@@ -325,16 +329,9 @@ class TestYoloxPageElementsV3Interface(unittest.TestCase):
         self.expand_chart_patcher.stop()
 
     def test_postprocess_annotations_v3_path_is_taken(self):
-        v3_annotations = [
-            {
-                "table": [],
-                "chart": [],
-                "title": [],
-                "infographic": [],
-                "paragraph": [[0.1, 0.1, 0.2, 0.2, 0.9]],
-                "header_footer": [],
-            }
-        ]
+        # Even if a page has no v3-only detections (e.g., no paragraph/header_footer),
+        # v3 post-processing must still run when the interface is configured for a v3 model.
+        v3_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
 
         self.model_interface.postprocess_annotations(v3_annotations)
 
@@ -343,9 +340,12 @@ class TestYoloxPageElementsV3Interface(unittest.TestCase):
         self.mock_expand_chart.assert_not_called()
 
     def test_postprocess_annotations_v2_fallback_path_is_taken(self):
+        # A v2-configured interface should use the legacy expansion functions.
+        model_v2 = YoloxPageElementsModelInterface(version="nemoretriever-page-elements-v2")
+        model_v2.transform_normalized_coordinates_to_original = MagicMock(side_effect=lambda x, y: x)
         v2_annotations = [{"table": [[0.1, 0.1, 0.2, 0.2, 0.9]], "chart": [], "title": [], "infographic": []}]
 
-        self.model_interface.postprocess_annotations(v2_annotations)
+        model_v2.postprocess_annotations(v2_annotations)
 
         self.mock_postprocess_v3.assert_not_called()
         self.mock_expand_table.assert_called_once()

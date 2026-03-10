@@ -19,10 +19,10 @@ services:
     environment:
       - NIM_TRITON_MAX_BATCH_SIZE=1
 
-  embedding:
-    environment:
-      - NIM_TRITON_MAX_SEQ_LENGTH=128
-
   reranker:
     environment:
       - NIM_TRITON_MAX_BATCH_SIZE=1
+
+  vlm:
+    environment:
+      - NIM_ENABLE_KV_CACHE_REUSE=0

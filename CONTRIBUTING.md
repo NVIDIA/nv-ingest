@@ -137,19 +137,20 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 
 ### Updating Dependencies
 
-- Dependencies are managed via 'Conda' and 'Pip'.
-- Dependencies are stored in .yml files
-    1. **Service Dependencies** 'conda/environments/nv_ingest_environment.yml' file.
-    2. **Client Dependencies** 'conda/environments/nv_ingest_client_environment.yml' file.
+- Dependencies are managed with `uv` and project-local `pyproject.toml` files.
+- Dependencies are stored in package definitions:
+    1. **Service Dependencies** `src/pyproject.toml`.
+    2. **Client Dependencies** `client/pyproject.toml`.
 
 - To update dependencies:
-  - Create a clean environment using the relevant .yml file.
-  - Update the dependencies using 'Conda' or 'Pip' and validate the changes.
-  - Update the .yml file by exporting the updated environment.
+  - Create a clean environment using `uv venv`.
+  - Update dependencies in the relevant `pyproject.toml` and validate the changes.
+  - Recreate the environment and install via `uv pip`.
     - For example:
       ```bash
-      conda env export --name nv_ingest_runtime --no-builds > conda/environment/nv_ingest_environment.yml
-      conda env export --name nv_ingest_client --no-builds > conda/environment/nv_ingest_client_environment.yml
+      uv venv .venv
+      source .venv/bin/activate
+      uv pip install -e ./src -e ./client -e ./api
       ```
 
 ### Common Processing Patterns

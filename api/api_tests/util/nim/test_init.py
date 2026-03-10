@@ -7,6 +7,32 @@ from unittest.mock import MagicMock, patch
 import nv_ingest_api.util.nim as module_under_test
 
 
+def test_create_inference_client_defaults_to_local_when_no_endpoints():
+    mock_interface = MagicMock()
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
+        result = module_under_test.create_inference_client(
+            (None, None),
+            model_interface=mock_interface,
+        )
+
+        # Local path should not touch NimClientManager.
+        mock_client.assert_not_called()
+        assert result.protocol == "local"
+
+
+def test_create_inference_client_honors_explicit_protocol_local():
+    mock_interface = MagicMock()
+    with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
+        result = module_under_test.create_inference_client(
+            ("grpc://localhost:50051", "http://localhost:8000"),
+            model_interface=mock_interface,
+            infer_protocol="local",
+        )
+
+        mock_client.assert_not_called()
+        assert result.protocol == "local"
+
+
 def test_create_inference_client_defaults_to_grpc_when_grpc_endpoint_present():
     mock_interface = MagicMock()
     with patch(f"{module_under_test.__name__}.get_nim_client_manager") as mock_client:
@@ -114,7 +140,7 @@ def test_create_inference_client_honors_explicit_protocol_http():
 
 def test_create_inference_client_raises_for_invalid_protocol():
     mock_interface = MagicMock()
-    with pytest.raises(ValueError, match="Invalid infer_protocol specified. Must be 'grpc' or 'http'."):
+    with pytest.raises(ValueError, match="Invalid infer_protocol specified. Must be 'grpc', 'http', or 'local'."):
         module_under_test.create_inference_client(
             ("grpc://localhost:50051", "http://localhost:8000"),
             model_interface=mock_interface,

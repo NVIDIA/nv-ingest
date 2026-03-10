@@ -32,9 +32,9 @@ def test_valid_config_with_http_only():
 
 
 def test_invalid_config_with_empty_services():
-    with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=(None, None))
-    assert "Both gRPC and HTTP services cannot be empty" in str(excinfo.value)
+    config = ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=(None, None))
+    assert config.yolox_infer_protocol == "local"
+    assert config.ocr_infer_protocol == "local"
 
 
 def test_valid_config_with_both_grpc_and_http():

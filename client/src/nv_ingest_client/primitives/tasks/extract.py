@@ -99,6 +99,7 @@ class ExtractTask(Task):
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         extract_infographics: bool = False,
         extract_page_as_image: bool = False,
+        page_image_max_dimension: int = 1024,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
         table_output_format: str = "markdown",
@@ -143,6 +144,7 @@ class ExtractTask(Task):
             "extract_charts": extract_charts,
             "extract_infographics": extract_infographics,
             "extract_page_as_image": extract_page_as_image,
+            "page_image_max_dimension": page_image_max_dimension,
             "text_depth": text_depth,
             "table_output_format": table_output_format,
         }
@@ -172,6 +174,7 @@ class ExtractTask(Task):
         self._extract_charts = extract_charts
         self._extract_infographics = extract_infographics
         self._extract_page_as_image = extract_page_as_image
+        self._page_image_max_dimension = page_image_max_dimension
         self._extract_text = extract_text
         self._text_depth = text_depth
         self._paddle_output_format = paddle_output_format
@@ -191,6 +194,7 @@ class ExtractTask(Task):
         info += f"  extract_charts: {self._extract_charts}\n"
         info += f"  extract_infographics: {self._extract_infographics}\n"
         info += f"  extract_page_as_image: {self._extract_page_as_image}\n"
+        info += f"  page_image_max_dimension: {self._page_image_max_dimension}\n"
         info += f"  text_depth: {self._text_depth}\n"
         info += f"  table_output_format: {self._table_output_format}\n"
         return info

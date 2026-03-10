@@ -6,7 +6,7 @@ and use it for filtering results during retrieval operations.
 For example, you can add author metadata to your documents, and filter by author when you retrieve results. 
 To create filters, you use [Milvus Filtering Expressions](https://milvus.io/docs/boolean.md).
 
-Use this documentation to use custom metadata to filter search results when you work with [NeMo Retriever extraction](overview.md).
+Use this documentation to use custom metadata to filter search results when you work with [NeMo Retriever Library](overview.md).
 
 
 ## Limitations
@@ -56,14 +56,14 @@ meta_df.to_csv(file_path)
 ### Example: Add Custom Metadata During Ingestion
 
 The following example adds custom metadata during ingestion. 
-For more information about the `Ingestor` class, see [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+For more information about the `Ingestor` class, see [Use the NeMo Retriever Python API](python-api-reference.md).
 For more information about the `vdb_upload` method, see [Upload Data](data-store.md).
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nemo_retriever.client import Ingestor
 
 hostname="localhost"
-collection_name = "nv_ingest_collection"
+collection_name = "nemo_retriever_collection"
 sparse = True
 
 ingestor = ( 
@@ -142,13 +142,13 @@ you can use the `content_metadata` field to filter search results.
 The following example uses a filter expression to narrow results by department.
 
 ```python
-from nv_ingest_client.util.milvus import nvingest_retrieval
+from nemo_retriever.util.milvus import query
 
 hostname="localhost"
-collection_name = "nv_ingest_collection"
+collection_name = "nemo_retriever_collection"
 sparse = True
 top_k = 5
-model_name="nvidia/llama-3.2-nv-embedqa-1b-v2"
+model_name="nvidia/llama-nemotron-embed-1b-v2"
 
 filter_expr = 'content_metadata["department"] == "Engineering"'
 
@@ -156,7 +156,7 @@ queries = ["this is expensive"]
 q_results = []
 for que in queries:
     q_results.append(
-        nvingest_retrieval(
+        query(
             [que], 
             collection_name, 
             milvus_uri=f"http://{hostname}:19530", 
@@ -177,4 +177,4 @@ print(f"{q_results}")
 ## Related Content
 
 - For a notebook that uses the CLI to add custom metadata and filter query results, see [metadata_and_filtered_search.ipynb
-](https://github.com/NVIDIA/nv-ingest/blob/main/examples/metadata_and_filtered_search.ipynb).
+](https://github.com/NVIDIA/NeMo-Retriever/blob/main/examples/metadata_and_filtered_search.ipynb).

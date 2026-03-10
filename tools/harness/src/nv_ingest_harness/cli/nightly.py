@@ -38,6 +38,7 @@ def run_harness(
     deployment_type: str = "compose",
     managed: bool = False,
     sku: str | None = None,
+    test_config_path: str | None = None,
 ) -> tuple[int, Path | None]:
     """Run a single harness test."""
     cmd = [
@@ -58,6 +59,9 @@ def run_harness(
     if sku:
         cmd.append(f"--sku={sku}")
 
+    if test_config_path:
+        cmd.append(f"--test-config={test_config_path}")
+
     print(f"\n{'='*60}")
     print(f"Running: {' '.join(cmd)}")
     print(f"{'='*60}\n")
@@ -77,7 +81,7 @@ def run_harness(
                 if artifact_dir.exists() and (artifact_dir / "results.json").exists():
                     return result.returncode, artifact_dir
 
-        cfg = load_config(case=case, dataset=dataset)
+        cfg = load_config(config_file=test_config_path or "test_configs.yaml", case=case, dataset=dataset)
         artifact_name = cfg.test_name or dataset
         candidate = session_dir / artifact_name
         if candidate.exists() and (candidate / "results.json").exists():
@@ -183,6 +187,13 @@ def load_results(artifact_dir: Path) -> dict:
     default=True,
     help="Dump service logs to artifacts directory before cleanup. Default: enabled",
 )
+@click.option(
+    "--test-config",
+    "test_config_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Path to test config YAML (default: tools/harness/test_configs.yaml)",
+)
 def main(
     config_path: Path | None,
     deployment_type: str,
@@ -196,6 +207,7 @@ def main(
     note: str | None,
     sku: str | None,
     dump_logs: bool,
+    test_config_path: str | None,
 ):
     """Run nightly benchmarks and post results."""
     if replay_dirs:
@@ -293,6 +305,7 @@ def main(
             return 1
 
         service_config = load_config(
+            config_file=test_config_path or "test_configs.yaml",
             case="e2e",
             dataset=first_dataset,
             deployment_type=deployment_type,
@@ -316,6 +329,7 @@ def main(
             return 1
 
         service_config = load_config(
+            config_file=test_config_path or "test_configs.yaml",
             case="e2e",
             dataset=first_dataset,
             deployment_type=deployment_type,
@@ -348,6 +362,7 @@ def main(
             deployment_type=deployment_type,
             managed=False,  # Don't manage per-dataset, already managed at nightly level
             sku=sku,
+            test_config_path=test_config_path,
         )
         result = _process_result(dataset, rc, artifact_dir, case="e2e")
         all_results.append(result)
@@ -364,6 +379,7 @@ def main(
             deployment_type=deployment_type,
             managed=False,  # Don't manage per-dataset, already managed at nightly level
             sku=sku,
+            test_config_path=test_config_path,
         )
         result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
         all_results.append(result)

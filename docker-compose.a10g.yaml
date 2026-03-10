@@ -19,10 +19,6 @@ services:
     environment:
       - NIM_TRITON_MAX_BATCH_SIZE=1
 
-  embedding:
-    environment:
-      - NIM_TRITON_MAX_SEQ_LENGTH=128
-
   reranker:
     environment:
       - NIM_TRITON_MAX_BATCH_SIZE=1

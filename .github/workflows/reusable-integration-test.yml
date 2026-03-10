@@ -12,20 +12,23 @@ on:
         description: 'Python version'
         required: false
         type: string
-        default: '3.12.11'
+        default: '3.12'
       timeout-minutes:
         description: 'Job timeout in minutes'
         required: false
         type: number
         default: 60
+      source-ref:
+        description: 'Git ref to test'
+        required: false
+        type: string
+        default: 'main'
     secrets:
       AUDIO_FUNCTION_ID:
         required: true
       EMBEDDING_NIM_MODEL_NAME:
         required: true
       NEMOTRON_PARSE_MODEL_NAME:
-        required: true
-      NGC_API_KEY:
         required: true
       NVIDIA_API_KEY:
         required: true
@@ -48,43 +51,35 @@ jobs:
     timeout-minutes: ${{ inputs.timeout-minutes }}
 
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          name: test_artifacts
-        continue-on-error: true
+          ref: ${{ inputs.source-ref }}
 
-      - name: Setup Miniconda
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          auto-update-conda: true
+          python-version: ${{ inputs.python-version }}
 
-      - name: Install Conda Packages & Dependencies
-        shell: bash -el {0}
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install local packages and dependencies
+        shell: bash
         run: |
-          conda create -y --name nvingest python=${{ inputs.python-version }}
-          conda activate nvingest
-
-          # Install from the downloaded local channel first
-          conda install -y \
-            -c ./conda/output_conda_channel \
-            -c rapidsai \
-            -c conda-forge \
-            -c nvidia \
-            nv_ingest nv_ingest_api nv_ingest_client
-
-          # Install other dependencies
-          conda install -y -c conda-forge librosa
-
-          # Install pip dependencies
-          $CONDA/envs/nvingest/bin/python -m pip install \
+          uv venv .venv
+          source .venv/bin/activate
+          uv pip install -e ./src -e ./api -e ./client
+          # block pulling in breaking changes in pypdfium2 v5
+          uv pip install \
             opencv-python \
             llama-index-embeddings-nvidia \
             pymilvus \
             'pymilvus[bulk_writer, model]' \
             'milvus-lite==2.4.12' \
-            'nvidia-riva-client==2.20.0' \
-            unstructured-client \
+            'nvidia-riva-client==2.25.0' \
+            'unstructured-client>=0.25.9' \
+            'pypdfium2<5' \
             tritonclient \
             markitdown \
             glom
@@ -95,7 +90,6 @@ jobs:
           AUDIO_INFER_PROTOCOL: http
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
           NEMOTRON_PARSE_MODEL_NAME: ${{ secrets.NEMOTRON_PARSE_MODEL_NAME }}
-          NGC_API_KEY: ${{ secrets.NGC_API_KEY }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           OCR_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
           OCR_INFER_PROTOCOL: http
@@ -108,8 +102,9 @@ jobs:
           YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
           YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
           NV_INGEST_PIPELINE_CONFIG_PATH: ./config/default_pipeline.yaml
-        shell: bash -el {0}
+        shell: bash
         run: |
+          source .venv/bin/activate
           echo 'Running integration tests...'
-          unset LD_LIBRARY_PATH  # https://github.com/pytorch/pytorch/issues/111469
-          $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
+          unset LD_LIBRARY_PATH
+          python -m pytest -rsx -m integration tests/integration

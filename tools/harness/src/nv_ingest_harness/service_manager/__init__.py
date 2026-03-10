@@ -14,7 +14,8 @@ def create_service_manager(config, repo_root: Path, sku: str | None = None) -> S
     Args:
         config: Configuration object with deployment_type attribute
         repo_root: Path to the repository root
-        sku: Optional GPU SKU for Docker Compose override file (e.g., a10g, a100-40gb, l40s)
+        sku: Optional GPU SKU for override file (Compose: docker-compose.<sku>.yaml;
+            Helm: helm/overrides/values-<sku>.yaml)
 
     Returns:
         ServiceManager instance (DockerComposeManager or HelmManager)
@@ -27,7 +28,7 @@ def create_service_manager(config, repo_root: Path, sku: str | None = None) -> S
     if deployment_type == "compose":
         return DockerComposeManager(config, repo_root, sku=sku)
     elif deployment_type == "helm":
-        return HelmManager(config, repo_root)
+        return HelmManager(config, repo_root, sku=sku)
     else:
         raise ValueError(f"Unknown deployment_type: {deployment_type}. Must be 'compose' or 'helm'")
 

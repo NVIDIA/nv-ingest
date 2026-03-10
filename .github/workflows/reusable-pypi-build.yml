@@ -31,8 +31,6 @@ on:
 jobs:
   build:
     runs-on: ${{ inputs.runner }}
-    container:
-      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     outputs:
       version: ${{ steps.set-version.outputs.version }}
 
@@ -52,6 +50,11 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Validate release type
         run: |
@@ -84,6 +87,26 @@ jobs:
           NV_INGEST_VERSION=${{ steps.set-version.outputs.version }} \
           python -m build
 
+      - name: Build nemo-retriever wheel
+        run: |
+          cd nemo_retriever
+          python - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path("src/nemo_retriever/_build_info.py").write_text(
+              '"""Build metadata written by CI before packaging."""\n\n'
+              'BUILD_GIT_SHA = "${{ github.sha }}"\n'
+              f'BUILD_DATE = "{datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}"\n',
+              encoding="utf-8",
+          )
+          PY
+          RETRIEVER_RELEASE_TYPE=${{ inputs.release-type }} \
+          RETRIEVER_VERSION=${{ steps.set-version.outputs.version }} \
+          RETRIEVER_BUILD_NUMBER=${{ github.run_number }} \
+          RETRIEVER_GIT_SHA=${{ github.sha }} \
+          python -m build
+
       - name: Upload wheel artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -95,4 +118,6 @@ jobs:
             client/dist/*.tar.gz
             src/dist/*.whl
             src/dist/*.tar.gz
+            nemo_retriever/dist/*.whl
+            nemo_retriever/dist/*.tar.gz
           retention-days: 7

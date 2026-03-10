@@ -44,7 +44,7 @@
       "NVIDIA_API_KEY": "${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
       "OCR_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1",
       "OCR_INFER_PROTOCOL": "http",
-      "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v3",
+      "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-page-elements-v3",
       "YOLOX_INFER_PROTOCOL": "http",
       "VLM_CAPTION_ENDPOINT": "https://integrate.api.nvidia.com/v1/chat/completions"
     },
@@ -82,7 +82,7 @@
           "stkb.rewrap" // Wrapping all text in any language
         ],
         "settings": {
-          "cmake.cmakePath": "/tmp/.current-conda-env/bin/cmake",
+          "cmake.cmakePath": "/usr/bin/cmake",
           "C_Cpp.intelliSenseEngine": "disabled",
           "python.terminal.activateEnvironment": false,
           "files.watcherExclude": {
