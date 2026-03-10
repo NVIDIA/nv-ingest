@@ -9,7 +9,7 @@ to extract speech from audio files.
 
 !!! note
 
-    NVIDIA Ingest and nv-ingest is now known as the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 Currently, you can extract speech from the following file types:
 

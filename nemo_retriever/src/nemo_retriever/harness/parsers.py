@@ -8,8 +8,12 @@ import re
 from dataclasses import dataclass, field
 
 DONE_RE = re.compile(r"\[done\]\s+(?P<files>\d+)\s+files,\s+(?P<pages>\d+)\s+pages\s+in\s+(?P<secs>[0-9.]+)s")
+INGEST_ROWS_RE = re.compile(
+    r"Ingestion complete\.\s+(?P<rows>\d+)\s+rows\s+proces+ed\s+in\s+(?P<secs>[0-9.]+)\s+seconds\.\s+"
+    r"(?P<pps>[0-9.]+)\s+PPS"
+)
 PAGES_PER_SEC_RE = re.compile(r"Pages/sec \(ingest only; excludes Ray startup and recall\):\s*(?P<val>[0-9.]+)")
-RECALL_RE = re.compile(r"^\s*(?P<metric>recall@\d+):\s*(?P<val>[0-9.]+)\s*$")
+RECALL_RE = re.compile(r"(?P<metric>recall@\d+):\s*(?P<val>[0-9.]+)\s*$")
 
 
 @dataclass
@@ -18,6 +22,8 @@ class StreamMetrics:
     pages: int | None = None
     ingest_secs: float | None = None
     pages_per_sec_ingest: float | None = None
+    rows_processed: int | None = None
+    rows_per_sec_ingest: float | None = None
     recall_metrics: dict[str, float] = field(default_factory=dict)
     _in_recall_block: bool = False
 
@@ -28,6 +34,12 @@ class StreamMetrics:
             self.pages = int(done_match.group("pages"))
             self.ingest_secs = float(done_match.group("secs"))
 
+        ingest_rows_match = INGEST_ROWS_RE.search(line)
+        if ingest_rows_match:
+            self.rows_processed = int(ingest_rows_match.group("rows"))
+            self.ingest_secs = float(ingest_rows_match.group("secs"))
+            self.rows_per_sec_ingest = float(ingest_rows_match.group("pps"))
+
         pps_match = PAGES_PER_SEC_RE.search(line)
         if pps_match:
             self.pages_per_sec_ingest = float(pps_match.group("val"))
@@ -37,7 +49,7 @@ class StreamMetrics:
             return
 
         if self._in_recall_block:
-            recall_match = RECALL_RE.match(line)
+            recall_match = RECALL_RE.search(line)
             if recall_match:
                 metric = recall_match.group("metric")
                 self.recall_metrics[metric] = float(recall_match.group("val"))

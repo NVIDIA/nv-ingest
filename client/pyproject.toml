@@ -28,6 +28,7 @@ dependencies = [
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "requests>=2.32.5",
+    "urllib3==2.6.3",
     "setuptools>=78.1.1",
     "tqdm>=4.67.1",
     "lancedb>=0.25.3",

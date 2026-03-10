@@ -4,7 +4,7 @@ Before you begin using [NeMo Retriever Library](overview.md), ensure that you ha
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 ## Core and Advanced Pipeline Features
