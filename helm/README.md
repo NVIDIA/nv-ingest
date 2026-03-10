@@ -517,7 +517,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemotron_nano_12b_v2_vl.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.image.pullSecrets[0] | string | `"ngc-secret"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl"` |  |
-| nimOperator.nemotron_nano_12b_v2_vl.image.tag | string | `"1.6.0"` |  |
+| nimOperator.nemotron_nano_12b_v2_vl.image.tag | string | `"1.5.0"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.replicas | int | `1` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.resources.limits."nvidia.com/gpu" | int | `1` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.storage.pvc.create | bool | `true` |  |
