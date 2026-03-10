@@ -166,6 +166,10 @@ class FusedIngestor(BatchIngestor):
     RUN_MODE = "fused"
     _fused_extract_flags: Dict[str, Any] = {}
 
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
+        """Fused mode does not yet support extract_image_files."""
+        raise NotImplementedError("Fused mode does not yet support extract_image_files")
+
     def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
         """
         Configure extraction for fused execution.

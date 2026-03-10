@@ -14,7 +14,7 @@ import sys
 import time
 from importlib import import_module
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Any, Optional, TextIO
 
 import ray
 import typer
@@ -27,7 +27,6 @@ from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
-from nemo_retriever.utils.input_files import resolve_input_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +315,7 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
+        help="Input format: 'pdf', 'txt', 'html', 'doc', or 'image'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice), 'image' for standalone image files (PNG, JPEG, BMP, TIFF, SVG).",  # noqa: E501
     ),
     lancedb_uri: str = typer.Option(
         LANCEDB_URI,
@@ -532,11 +531,50 @@ def main(
             )
             embed_gpus_per_actor = 0.0
 
+        # Map single-extension image shortcuts (e.g. "png", "jpg") to a specific
+        # glob while routing through the "image" pipeline.
+        _image_ext_map = {
+            "png": ["*.png"],
+            "jpg": ["*.jpg", "*.jpeg"],
+            "jpeg": ["*.jpg", "*.jpeg"],
+            "bmp": ["*.bmp"],
+            "tiff": ["*.tiff", "*.tif"],
+            "tif": ["*.tiff", "*.tif"],
+            "svg": ["*.svg"],
+        }
+        # Remember the original input_type for glob selection before normalizing
+        # to the canonical pipeline name.
+        _original_input_type = input_type
+        if input_type in _image_ext_map:
+            input_type = "image"
+
         input_path = Path(input_path)
-        try:
-            file_patterns = resolve_input_patterns(input_path, input_type)
-        except FileNotFoundError as exc:
-            raise typer.BadParameter(str(exc)) from exc
+        if input_path.is_file():
+            file_patterns = [str(input_path)]
+        elif input_path.is_dir():
+            ext_map = {
+                "txt": ["*.txt"],
+                "html": ["*.html"],
+                "doc": ["*.docx", "*.pptx"],
+                "image": ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tiff", "*.tif", "*.svg"],
+            }
+            # If a specific image extension was requested, use only that extension's globs.
+            if _original_input_type in _image_ext_map:
+                exts = _image_ext_map[_original_input_type]
+            else:
+                exts = ext_map.get(input_type, ["*.pdf"])
+            import glob as _glob
+
+            all_candidates = [str(input_path / e) for e in exts]
+            # Only keep globs that match at least one file (avoids errors for
+            # missing extensions when input_type covers multiple formats).
+            file_patterns = [p for p in all_candidates if _glob.glob(p)]
+            if not file_patterns:
+                raise typer.BadParameter(
+                    f"No files found for input_type={input_type!r} in {input_path} " f"(tried: {', '.join(exts)})"
+                )
+        else:
+            raise typer.BadParameter(f"Path does not exist: {input_path}")
 
         ingestor = create_ingestor(
             run_mode="batch",
@@ -545,144 +583,93 @@ def main(
             ),
         )
 
+        # -- Shared params used by multiple input-type branches ----------------
+        embed_params = EmbedParams(
+            model_name=str(embed_model_name),
+            embed_invoke_url=embed_invoke_url,
+            embed_modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+            embed_granularity=embed_granularity,
+            batch_tuning={
+                "embed_workers": embed_actors,
+                "embed_batch_size": int(embed_batch_size),
+                "embed_cpus_per_actor": float(embed_cpus_per_actor),
+            },
+        )
+        # txt/html don't use embed_granularity from batch_tuning the same way,
+        # but the extra keys are harmlessly ignored by EmbedParams.
+
+        # Detection batch_tuning shared by pdf, doc, and image pipelines.
+        _detection_batch_tuning = {
+            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+            "page_elements_batch_size": page_elements_batch_size,
+            "page_elements_workers": page_elements_actors,
+            "detect_workers": ocr_actors,
+            "detect_batch_size": ocr_batch_size,
+            "ocr_inference_batch_size": ocr_batch_size,
+            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+            "ocr_cpus_per_actor": ocr_cpus_per_actor,
+            "gpu_page_elements": page_elements_gpus_per_actor,
+            "gpu_ocr": ocr_gpus_per_actor,
+            "gpu_embed": embed_gpus_per_actor,
+            "nemotron_parse_workers": nemotron_parse_actors,
+            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
+            "nemotron_parse_batch_size": nemotron_parse_batch_size,
+        }
+
+        # PDF-specific tuning keys (split/extract workers) on top of detection tuning.
+        _pdf_batch_tuning = {
+            **_detection_batch_tuning,
+            "pdf_extract_workers": pdf_extract_tasks,
+            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
+            "pdf_split_batch_size": pdf_split_batch_size,
+            "pdf_extract_batch_size": pdf_extract_batch_size,
+        }
+
+        # ExtractParams shared by detection-based pipelines (pdf, doc, image).
+        def _extract_params(batch_tuning: dict, **overrides: Any) -> ExtractParams:
+            return ExtractParams(
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+                use_graphic_elements=use_graphic_elements,
+                graphic_elements_invoke_url=graphic_elements_invoke_url,
+                inference_batch_size=page_elements_batch_size,
+                use_table_structure=use_table_structure,
+                table_output_format=table_output_format,
+                table_structure_invoke_url=table_structure_invoke_url,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
+                batch_tuning={**batch_tuning, **overrides},
+            )
+
         if input_type == "txt":
             ingestor = (
                 ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
+                .embed(embed_params)
             )
         elif input_type == "html":
             ingestor = (
                 ingestor.files(file_patterns)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
+                .embed(embed_params)
             )
-        elif input_type == "doc":
+        elif input_type == "image":
             ingestor = (
                 ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
+                .extract_image_files(_extract_params(_detection_batch_tuning))
+                .embed(embed_params)
             )
+        elif input_type == "doc":
+            ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning)).embed(embed_params)
         else:
             ingestor = (
                 ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "inference_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
+                .extract(_extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size))
+                .embed(embed_params)
             )
 
         logger.info("Running extraction...")
