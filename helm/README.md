@@ -321,8 +321,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.NEMOTRON_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NEMOTRON_PARSE_MODEL_NAME | string | `"nvidia/nemotron-parse"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
-| envVars.OCR_GRPC_ENDPOINT | string | `"nemoretriever-ocr-v1:8001"` |  |
-| envVars.OCR_HTTP_ENDPOINT | string | `"http://nemoretriever-ocr-v1:8000/v1/infer"` |  |
+| envVars.OCR_GRPC_ENDPOINT | string | `"nemotron-ocr-v1:8001"` |  |
+| envVars.OCR_HTTP_ENDPOINT | string | `"http://nemotron-ocr-v1:8000/v1/infer"` |  |
 | envVars.OCR_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.OCR_MODEL_NAME | string | `"scene_text_ensemble"` |  |
 | envVars.OMP_NUM_THREADS | int | `1` |  |
@@ -501,7 +501,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nemoretriever_ocr_v1.expose.service.type | string | `"ClusterIP"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.nemoretriever_ocr_v1.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1"` |  |
+| nimOperator.nemoretriever_ocr_v1.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemotron-ocr-v1"` |  |
 | nimOperator.nemoretriever_ocr_v1.image.tag | string | `"1.1.0"` |  |
 | nimOperator.nemoretriever_ocr_v1.replicas | int | `1` |  |
 | nimOperator.nemoretriever_ocr_v1.resources.limits."nvidia.com/gpu" | int | `1` |  |
