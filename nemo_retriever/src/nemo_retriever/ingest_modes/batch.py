@@ -82,6 +82,13 @@ def _runtime_env_vars() -> dict[str, str]:
     return {key: value for key, value in env_vars.items() if isinstance(value, str)}
 
 
+def _resolve_remote_api_key(explicit_api_key: Optional[str] = None) -> Optional[str]:
+    """Resolve bearer token for hosted NIM endpoints."""
+    token = explicit_api_key or os.getenv("NVIDIA_API_KEY") or os.getenv("NGC_API_KEY")
+    token = (token or "").strip()
+    return token or None
+
+
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
@@ -308,6 +315,16 @@ class BatchIngestor(Ingestor):
         """
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if any(
+            (
+                resolved.invoke_url,
+                resolved.page_elements_invoke_url,
+                resolved.ocr_invoke_url,
+                resolved.graphic_elements_invoke_url,
+                resolved.table_structure_invoke_url,
+            )
+        ) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": _resolve_remote_api_key()})
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -609,6 +626,16 @@ class BatchIngestor(Ingestor):
         from nemo_retriever.image.ray_data import ImageLoadActor
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if any(
+            (
+                resolved.invoke_url,
+                resolved.page_elements_invoke_url,
+                resolved.ocr_invoke_url,
+                resolved.graphic_elements_invoke_url,
+                resolved.table_structure_invoke_url,
+            )
+        ) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": _resolve_remote_api_key()})
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -755,6 +782,8 @@ class BatchIngestor(Ingestor):
         from nemo_retriever.params.utils import build_embed_kwargs
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
+        if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": _resolve_remote_api_key()})
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.
