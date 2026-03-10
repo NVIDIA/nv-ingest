@@ -9,7 +9,7 @@ from __future__ import annotations
 import base64
 import importlib
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pandas as pd
 import pytest
@@ -280,23 +280,22 @@ class TestGraphicElementsActor:
         """Actor should never raise; errors go into metadata columns."""
         from nemo_retriever.chart.chart_detection import GraphicElementsActor
 
-        with patch("nemo_retriever.chart.chart_detection.GraphicElementsActor.__init__", return_value=None):
-            actor = GraphicElementsActor.__new__(GraphicElementsActor)
-            actor._graphic_elements_model = None
-            actor._ocr_model = None
-            actor._graphic_elements_invoke_url = ""
-            actor._ocr_invoke_url = ""
-            actor._api_key = None
-            actor._request_timeout_s = 120.0
-            actor._remote_retry = None
+        actor = GraphicElementsActor.__new__(GraphicElementsActor)
+        actor._graphic_elements_model = None
+        actor._ocr_model = None
+        actor._graphic_elements_invoke_url = ""
+        actor._ocr_invoke_url = ""
+        actor._api_key = None
+        actor._request_timeout_s = 120.0
+        actor._remote_retry = None
 
-            df = _make_chart_page_df()
-            # This will fail because both models are None and no URLs set.
-            result = actor(df)
-            assert "chart" in result.columns
-            assert "graphic_elements_ocr_v1" in result.columns
-            meta = result.iloc[0]["graphic_elements_ocr_v1"]
-            assert meta["error"] is not None
+        df = _make_chart_page_df()
+        # This will fail because both models are None and no URLs set.
+        result = actor(df)
+        assert "chart" in result.columns
+        assert "graphic_elements_ocr_v1" in result.columns
+        meta = result.iloc[0]["graphic_elements_ocr_v1"]
+        assert meta["error"] is not None
 
 
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 import nemo_retriever.harness.config as harness_config
-from nemo_retriever.harness.config import load_harness_config, load_runs_config
+from nemo_retriever.harness.config import load_harness_config, load_nightly_config, load_runs_config
 
 
 def _write_harness_config(path: Path, dataset_dir: Path, query_csv: Path) -> None:
@@ -201,6 +201,48 @@ def test_load_runs_config_parses_runs_list(tmp_path: Path) -> None:
     assert len(runs) == 2
     assert runs[0]["name"] == "r1"
     assert runs[0]["overrides"]["gpu_embed"] == 0.25
+
+
+def test_load_nightly_config_parses_slack_defaults(tmp_path: Path) -> None:
+    runs_path = tmp_path / "nightly.yaml"
+    runs_path.write_text(
+        "\n".join(
+            [
+                "preset: dgx_8gpu",
+                "runs:",
+                "  - name: r1",
+                "    dataset: bo20",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_nightly_config(str(runs_path))
+
+    assert cfg["runs"][0]["name"] == "r1"
+    assert cfg["preset"] == "dgx_8gpu"
+    assert cfg["slack"]["enabled"] is True
+    assert cfg["slack"]["title"] == "nemo_retriever Nightly Harness"
+    assert cfg["slack"]["post_artifact_paths"] is True
+    assert "recall_5" in cfg["slack"]["metric_keys"]
+
+
+def test_load_nightly_config_rejects_invalid_metric_keys(tmp_path: Path) -> None:
+    runs_path = tmp_path / "nightly.yaml"
+    runs_path.write_text(
+        "\n".join(
+            [
+                "runs:",
+                "  - dataset: bo20",
+                "slack:",
+                "  metric_keys: invalid",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="slack.metric_keys"):
+        load_nightly_config(str(runs_path))
 
 
 def test_load_harness_config_supports_recall_adapter_and_match_mode(tmp_path: Path) -> None:
