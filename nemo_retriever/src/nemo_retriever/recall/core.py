@@ -16,8 +16,6 @@ logger = logging.getLogger(__name__)
 import numpy as np
 import pandas as pd
 
-from nv_ingest_api.util.nim import infer_microservice
-
 
 @dataclass(frozen=True)
 class RecallConfig:
@@ -46,24 +44,51 @@ class RecallConfig:
     local_hf_device: Optional[str] = None
     local_hf_cache_dir: Optional[str] = None
     local_hf_batch_size: int = 64
+    # Gold/retrieval comparison mode:
+    # - pdf_page: compare on "{pdf}_{page}" keys
+    # - pdf_only: compare on "{pdf}" document keys
+    match_mode: str = "pdf_page"
 
 
-def _normalize_query_df(df: pd.DataFrame) -> pd.DataFrame:
+def _normalize_pdf_name(value: str) -> str:
+    return str(value).replace(".pdf", "")
+
+
+def _normalize_query_df(df: pd.DataFrame, *, match_mode: str) -> pd.DataFrame:
     """
     Normalize a query CSV into:
       - query (string)
       - golden_answer (string key that should match LanceDB `pdf_page`)
 
-    Supported inputs:
-      - query,pdf_page
-      - query,pdf,page (or query,pdf,gt_page)
+    Supported inputs by match mode:
+      - pdf_page:
+        - query,pdf_page
+        - query,pdf,page (or query,pdf,gt_page)
+      - pdf_only:
+        - query,expected_pdf
+        - query,pdf
     """
+    if match_mode not in {"pdf_page", "pdf_only"}:
+        raise ValueError(f"Unsupported recall match mode: {match_mode}")
+
     df = df.copy()
-    if "gt_page" in df.columns and "page" not in df.columns:
-        df = df.rename(columns={"gt_page": "page"})
 
     if "query" not in df.columns:
         raise KeyError("Query CSV must contain a 'query' column.")
+
+    if match_mode == "pdf_only":
+        if "expected_pdf" in df.columns:
+            df["golden_answer"] = df["expected_pdf"].astype(str).apply(_normalize_pdf_name)
+            return df
+        if "pdf" in df.columns:
+            df["golden_answer"] = df["pdf"].astype(str).apply(_normalize_pdf_name)
+            return df
+        raise KeyError(
+            "For pdf_only mode, query data must contain ['query','expected_pdf'] or ['query','pdf'] columns."
+        )
+
+    if "gt_page" in df.columns and "page" not in df.columns:
+        df = df.rename(columns={"gt_page": "page"})
 
     if "pdf_page" in df.columns:
         df["golden_answer"] = df["pdf_page"].astype(str)
@@ -114,6 +139,8 @@ def _embed_queries_nim(
     api_key: str,
     grpc: bool,
 ) -> List[List[float]]:
+    from nv_ingest_api.util.nim import infer_microservice
+
     # `infer_microservice` returns a list of embeddings.
     embeddings = infer_microservice(
         queries,
@@ -141,25 +168,14 @@ def _embed_queries_local_hf(
     batch_size: int,
     model_name: Optional[str] = None,
 ) -> List[List[float]]:
-    # Lazy import: only load torch/HF when needed.
-    from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+    from nemo_retriever.model import create_local_embedder, is_vl_embed_model
 
-    model_id = resolve_embed_model(model_name)
+    embedder = create_local_embedder(model_name, device=device, hf_cache_dir=cache_dir)
 
     if is_vl_embed_model(model_name):
-        from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
-
-        embedder = LlamaNemotronEmbedVL1BV2Embedder(device=device, hf_cache_dir=cache_dir, model_id=model_id)
-        # VL model handles query formatting internally via encode_queries().
         vecs = embedder.embed_queries(queries, batch_size=int(batch_size))
     else:
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-
-        embedder = LlamaNemotronEmbed1BV2Embedder(
-            device=device, hf_cache_dir=cache_dir, normalize=True, model_id=model_id
-        )
         vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
-    # Ensure list-of-list floats.
     return vecs.detach().to("cpu").tolist()
 
 
@@ -250,12 +266,24 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     return retrieved_keys
 
 
-def _is_hit(golden_key: str, retrieved: List[str], k: int) -> bool:
+def _extract_doc_from_pdf_page(key: str) -> str:
+    parts = str(key).rsplit("_", 1)
+    if len(parts) != 2:
+        return str(key)
+    return parts[0]
+
+
+def _is_hit(golden_key: str, retrieved: List[str], k: int, *, match_mode: str) -> bool:
     """Check if a golden key is found in the top-k retrieved keys.
 
     Handles filenames with underscores via ``rsplit`` and also accepts
     whole-document keys (page ``-1``).
     """
+    if match_mode == "pdf_only":
+        gold_doc = _normalize_pdf_name(str(golden_key))
+        top_docs = [_extract_doc_from_pdf_page(r) for r in retrieved[:k]]
+        return gold_doc in top_docs
+
     parts = golden_key.rsplit("_", 1)
     if len(parts) != 2:
         return golden_key in retrieved[:k]
@@ -266,8 +294,44 @@ def _is_hit(golden_key: str, retrieved: List[str], k: int) -> bool:
     return specific_page in top or entire_document in top
 
 
-def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int) -> float:
-    hits = sum(_is_hit(g, r, k) for g, r in zip(gold, retrieved))
+def is_hit_at_k(golden_key: str, retrieved: Sequence[str], k: int, *, match_mode: str) -> bool:
+    """Public wrapper for top-k hit checks across match modes."""
+    return _is_hit(str(golden_key), list(retrieved), int(k), match_mode=str(match_mode))
+
+
+def gold_to_doc_page(golden_key: str) -> tuple[str, str]:
+    """Split a golden key like ``"docname_page"`` into ``(doc, page)``."""
+    s = str(golden_key)
+    if "_" not in s:
+        return s, ""
+    doc, page = s.rsplit("_", 1)
+    return doc, page
+
+
+def hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
+    """Extract ``(pdf_page key, distance)`` from a single LanceDB hit dict.
+
+    Supports both ``_distance`` and ``_score`` fields for compatibility across
+    LanceDB query types (vector vs hybrid).
+    """
+    try:
+        res = json.loads(hit.get("metadata", "{}"))
+        source = json.loads(hit.get("source", "{}"))
+    except Exception:
+        return None, None
+
+    source_id = source.get("source_id")
+    page_number = res.get("page_number")
+    if not source_id or page_number is None:
+        return None, float(hit.get("_distance")) if "_distance" in hit else None
+
+    key = f"{Path(str(source_id)).stem}_{page_number}"
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
+    return key, dist
+
+
+def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int, *, match_mode: str) -> float:
+    hits = sum(is_hit_at_k(g, r, k, match_mode=match_mode) for g, r in zip(gold, retrieved))
     return hits / max(1, len(gold))
 
 
@@ -288,7 +352,7 @@ def retrieve_and_score(
       - retrieved keys (pdf_page-like)
       - metrics dict (recall@k)
     """
-    df_query = _normalize_query_df(pd.read_csv(query_csv))
+    df_query = _normalize_query_df(pd.read_csv(query_csv), match_mode=str(cfg.match_mode))
     if limit is not None:
         df_query = df_query.head(int(limit)).copy()
 
@@ -324,7 +388,9 @@ def retrieve_and_score(
         hybrid=bool(cfg.hybrid),
     )
     retrieved_keys = _hits_to_keys(raw_hits)
-    metrics = {f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k)) for k in cfg.ks}
+    metrics = {
+        f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k), match_mode=str(cfg.match_mode)) for k in cfg.ks
+    }
     return df_query, gold, raw_hits, retrieved_keys, metrics
 
 
@@ -347,8 +413,15 @@ def evaluate_recall(
         row = {"query_id": i, "query": q, "golden_answer": g, "top_retrieved": r[: cfg.top_k]}
         for k in cfg.ks:
             k = int(k)
-            row[f"hit@{k}"] = _is_hit(g, r, k)
-            row[f"rank@{k}"] = (r[: cfg.top_k].index(g) + 1) if (g in r[: cfg.top_k]) else None
+            row[f"hit@{k}"] = is_hit_at_k(g, r, k, match_mode=str(cfg.match_mode))
+            if str(cfg.match_mode) == "pdf_only":
+                top_docs = [_extract_doc_from_pdf_page(key) for key in r[: cfg.top_k]]
+                try:
+                    row[f"rank@{k}"] = top_docs.index(_normalize_pdf_name(str(g))) + 1
+                except ValueError:
+                    row[f"rank@{k}"] = None
+            else:
+                row[f"rank@{k}"] = (r[: cfg.top_k].index(g) + 1) if (g in r[: cfg.top_k]) else None
         rows.append(row)
     results_df = pd.DataFrame(rows)
 

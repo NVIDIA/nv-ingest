@@ -201,7 +201,6 @@ def test_transform_create_text_embeddings_internal_uses_callable_embedder_when_n
         return [[0.9, 0.8]] * len(list(texts))
 
     task_cfg = {
-        "endpoint_url": None,  # Explicitly disable remote endpoint
         "embedder": _local_embedder,
         "local_batch_size": 2,
     }

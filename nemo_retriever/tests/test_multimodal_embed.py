@@ -54,6 +54,20 @@ _HEAVY_INTERNAL = [
     "nemo_retriever.page_elements.page_elements",
     "nemo_retriever.ocr",
     "nemo_retriever.ocr.ocr",
+    # -- chart (nv_ingest_api → cv2) ----------------------------------------
+    "nemo_retriever.chart",
+    "nemo_retriever.chart.chart_detection",
+    "nemo_retriever.chart.commands",
+    "nemo_retriever.chart.processor",
+    "nemo_retriever.chart.config",
+    "nemo_retriever.chart.stage",
+    # -- table (nv_ingest_api → cv2) ----------------------------------------
+    "nemo_retriever.table",
+    "nemo_retriever.table.table_detection",
+    "nemo_retriever.table.config",
+    "nemo_retriever.table.stage",
+    "nemo_retriever.table.commands",
+    "nemo_retriever.table.processor",
     # -- PDF (pypdfium2, nv_ingest_api via pdf/__init__ → __main__ → stage) --
     "nemo_retriever.pdf",
     "nemo_retriever.pdf.__main__",
@@ -63,10 +77,21 @@ _HEAVY_INTERNAL = [
     "nemo_retriever.pdf.extract",
     "nemo_retriever.pdf.split",
 ]
+# Track which modules we injected (vs. ones already loaded) so we can
+# remove only our stubs after the import, preventing leaks into other
+# test files that need the real modules.
+_injected: list[str] = []
 for _mod_name in _HEAVY_INTERNAL:
-    sys.modules.setdefault(_mod_name, MagicMock())
+    if _mod_name not in sys.modules:
+        sys.modules[_mod_name] = MagicMock()
+        _injected.append(_mod_name)
 
-from nemo_retriever.ingest_modes.inprocess import explode_content_to_rows  # noqa: E402
+from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows  # noqa: E402
+
+# Clean up injected mocks so they don't poison imports in other test files.
+for _mod_name in _injected:
+    sys.modules.pop(_mod_name, None)
+del _injected
 
 
 # ===================================================================
@@ -210,3 +235,98 @@ class TestExplodeContentToRows:
             "full_page_b64",
             bbox_xyxy_norm=[0.1, 0.2, 0.9, 0.8],
         )
+
+
+# ===================================================================
+# collapse_content_to_page_rows
+# ===================================================================
+
+
+class TestCollapseContentToPageRows:
+    def test_text_concatenation(self):
+        """Page text + table + chart text are concatenated into one string per page."""
+        df = pd.DataFrame(
+            {
+                "text": ["Hello world"],
+                "table": [[{"text": "table data"}]],
+                "chart": [[{"text": "chart data"}]],
+                "infographic": [[]],
+            }
+        )
+
+        result = collapse_content_to_page_rows(df)
+
+        assert len(result) == 1
+        assert result["text"].iloc[0] == "Hello world\n\ntable data\n\nchart data"
+        assert result["_embed_modality"].iloc[0] == "text"
+
+    def test_full_page_image_used(self):
+        """In image modalities, _image_b64 is the full page image (no cropping)."""
+        df = pd.DataFrame(
+            {
+                "text": ["some text"],
+                "page_image": [{"image_b64": "full_page_b64"}],
+                "table": [[{"text": "table cell", "bbox_xyxy_norm": [0.1, 0.2, 0.9, 0.8]}]],
+            }
+        )
+
+        result = collapse_content_to_page_rows(df, modality="text_image")
+
+        assert len(result) == 1
+        assert result["_image_b64"].iloc[0] == "full_page_b64"
+        assert result["_embed_modality"].iloc[0] == "text_image"
+
+    def test_multiple_pages_produce_one_row_each(self):
+        """Each page produces exactly one row in the output."""
+        df = pd.DataFrame(
+            {
+                "text": ["page 1 text", "page 2 text"],
+                "table": [[{"text": "t1"}], [{"text": "t2"}]],
+            }
+        )
+
+        result = collapse_content_to_page_rows(df)
+
+        assert len(result) == 2
+        assert "t1" in result["text"].iloc[0]
+        assert "t2" in result["text"].iloc[1]
+
+    def test_empty_content_handled(self):
+        """Pages with no text and no structured content produce an empty string."""
+        df = pd.DataFrame(
+            {
+                "text": ["", None],
+                "table": [[], None],
+            }
+        )
+
+        result = collapse_content_to_page_rows(df)
+
+        assert len(result) == 2
+        assert result["text"].iloc[0] == ""
+        assert result["text"].iloc[1] == ""
+
+    def test_image_modality_without_page_image_column(self):
+        """When page_image column is missing, _image_b64 is set to None."""
+        df = pd.DataFrame(
+            {
+                "text": ["some text"],
+                "table": [[{"text": "data"}]],
+            }
+        )
+
+        result = collapse_content_to_page_rows(df, modality="image")
+
+        assert len(result) == 1
+        assert result["_image_b64"].iloc[0] is None
+
+    def test_empty_dataframe_passthrough(self):
+        """Empty DataFrame is returned as-is."""
+        df = pd.DataFrame()
+        result = collapse_content_to_page_rows(df)
+        assert result.empty
+
+    def test_non_dataframe_passthrough(self):
+        """Non-DataFrame input is returned as-is."""
+        result = collapse_content_to_page_rows(None)
+        assert result is None

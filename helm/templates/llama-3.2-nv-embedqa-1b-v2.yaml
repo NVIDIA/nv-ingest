@@ -2,7 +2,7 @@
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMCache
 metadata:
-  name: llama-3.2-nv-embedqa-1b-v2
+  name: llama-nemotron-embed-1b-v2
   annotations:
     helm.sh/resource-policy: keep
 spec:
@@ -32,7 +32,7 @@ spec:
   authSecret: {{ .Values.nimOperator.embedqa.authSecret }}
   storage:
     nimCache:
-      name: llama-3.2-nv-embedqa-1b-v2
+      name: llama-nemotron-embed-1b-v2
   replicas: {{ .Values.nimOperator.embedqa.replicas }}
   nodeSelector:
 {{ toYaml .Values.nimOperator.embedqa.nodeSelector | nindent 4 }}

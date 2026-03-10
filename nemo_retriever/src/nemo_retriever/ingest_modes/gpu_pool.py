@@ -77,29 +77,14 @@ class EmbeddingModelConfig:
     model_id: Optional[str] = None
 
     def create(self) -> Any:
-        from nemo_retriever.model import is_vl_embed_model
+        from nemo_retriever.model import create_local_embedder
 
-        if is_vl_embed_model(self.model_id):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            return LlamaNemotronEmbedVL1BV2Embedder(
-                device=self.device,
-                hf_cache_dir=self.hf_cache_dir,
-                model_id=self.model_id,
-            )
-
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-            LlamaNemotronEmbed1BV2Embedder,
-        )
-
-        return LlamaNemotronEmbed1BV2Embedder(
+        return create_local_embedder(
+            self.model_id,
             device=self.device,
             hf_cache_dir=self.hf_cache_dir,
             normalize=self.normalize,
             max_length=self.max_length,
-            model_id=self.model_id,
         )
 
 
@@ -141,7 +126,7 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
     """Extract a picklable model config from live kwargs, or None."""
     from nemo_retriever.page_elements import detect_page_elements_v3
     from nemo_retriever.ocr.ocr import nemotron_parse_page_elements, ocr_page_elements
-    from .inprocess import embed_text_main_text_embed, explode_content_to_rows
+    from .inprocess import collapse_content_to_page_rows, embed_text_main_text_embed, explode_content_to_rows
 
     if func is detect_page_elements_v3:
         if kwargs.get("invoke_url"):
@@ -177,6 +162,9 @@ def _extract_model_config(func: Callable, kwargs: dict[str, Any]) -> Any:
         )
 
     if func is explode_content_to_rows:
+        return None  # CPU-only, no model
+
+    if func is collapse_content_to_page_rows:
         return None  # CPU-only, no model
 
     return None
