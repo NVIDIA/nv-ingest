@@ -55,6 +55,22 @@ def test_build_command_uses_hidden_detection_file_by_default(tmp_path: Path) -> 
     assert "--detection-summary-file" in cmd
     assert "--recall-match-mode" in cmd
     assert "pdf_page" in cmd
+    assert "--pdf-extract-tasks" in cmd
+    assert "--pdf-extract-cpus-per-task" in cmd
+    assert "--page-elements-actors" in cmd
+    assert "--ocr-actors" in cmd
+    assert "--embed-actors" in cmd
+    assert "--page-elements-gpus-per-actor" in cmd
+    assert "--ocr-gpus-per-actor" in cmd
+    assert "--embed-gpus-per-actor" in cmd
+    assert "--pdf-extract-workers" not in cmd
+    assert "--pdf-extract-num-cpus" not in cmd
+    assert "--page-elements-workers" not in cmd
+    assert "--ocr-workers" not in cmd
+    assert "--embed-workers" not in cmd
+    assert "--gpu-page-elements" not in cmd
+    assert "--gpu-ocr" not in cmd
+    assert "--gpu-embed" not in cmd
     assert detection_file.parent == runtime_dir
     assert detection_file.name == ".detection_summary.json"
     assert effective_query_csv == query_csv
@@ -172,7 +188,7 @@ def test_run_entry_session_artifact_dir_uses_run_name(monkeypatch, tmp_path: Pat
             "success": True,
             "return_code": 0,
             "failure_reason": None,
-            "metrics": {"files": 0, "pages": 0},
+            "summary_metrics": {"pages": 0, "ingest_secs": 1.0, "pages_per_sec_ingest": 0.0, "recall_5": None},
         }
 
     monkeypatch.setattr(harness_run, "_run_single", _fake_run_single)
@@ -206,7 +222,7 @@ def test_run_entry_returns_tags(monkeypatch, tmp_path: Path) -> None:
             "success": True,
             "return_code": 0,
             "failure_reason": None,
-            "metrics": {"files": 0, "pages": 0},
+            "summary_metrics": {"pages": 0, "ingest_secs": 1.0, "pages_per_sec_ingest": 0.0, "recall_5": None},
         }
 
     monkeypatch.setattr(harness_run, "_run_single", _fake_run_single)
@@ -306,10 +322,12 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
     )
 
     def _fake_run_subprocess(_cmd: list[str], metrics) -> int:
-        metrics.files = 20
-        metrics.pages = 3181
+        metrics.files = None
+        metrics.pages = None
         metrics.ingest_secs = 12.5
-        metrics.pages_per_sec_ingest = 254.48
+        metrics.pages_per_sec_ingest = None
+        metrics.rows_processed = 3181
+        metrics.rows_per_sec_ingest = 254.48
         metrics.recall_metrics = {"recall@5": 0.9}
         return 0
 
@@ -355,10 +373,18 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "tuning": {field: getattr(cfg, field) for field in sorted(harness_run.TUNING_FIELDS)},
         },
         "metrics": {
-            "files": 20,
-            "pages": 3181,
+            "files": None,
+            "pages": None,
             "ingest_secs": 12.5,
-            "pages_per_sec_ingest": 254.48,
+            "pages_per_sec_ingest": None,
+            "rows_processed": 3181,
+            "rows_per_sec_ingest": 254.48,
+            "recall_5": 0.9,
+        },
+        "summary_metrics": {
+            "pages": None,
+            "ingest_secs": 12.5,
+            "pages_per_sec_ingest": None,
             "recall_5": 0.9,
         },
         "run_metadata": {
@@ -379,6 +405,98 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
 
     assert result == expected
     assert payload == expected
+
+
+def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path: Path) -> None:
+    artifact_dir = tmp_path / "run_artifacts"
+    artifact_dir.mkdir()
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("q,s,p\nx,y,1\n", encoding="utf-8")
+
+    runtime_dir = artifact_dir / "runtime_metrics"
+    runtime_dir.mkdir()
+    detection_file = runtime_dir / ".detection_summary.json"
+
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="jp20",
+        preset="single_gpu",
+        query_csv=str(query_csv),
+        write_detection_file=False,
+        recall_required=False,
+    )
+
+    monkeypatch.setattr(
+        harness_run,
+        "_build_command",
+        lambda _cfg, _artifact_dir, _run_id: (
+            ["python", "-m", "nemo_retriever.examples.batch_pipeline", str(dataset_dir)],
+            runtime_dir,
+            detection_file,
+            query_csv,
+        ),
+    )
+
+    def _fake_run_subprocess(_cmd: list[str], metrics) -> int:
+        metrics.rows_processed = 42
+        metrics.rows_per_sec_ingest = 3.5
+        metrics.ingest_secs = 12.0
+        return 0
+
+    monkeypatch.setattr(harness_run, "_run_subprocess_with_tty", _fake_run_subprocess)
+    monkeypatch.setattr(harness_run, "now_timestr", lambda: "20260306_210000_UTC")
+    monkeypatch.setattr(harness_run, "last_commit", lambda: "abc1234")
+    monkeypatch.setattr(harness_run, "_collect_run_metadata", lambda: {"host": "builder-01"})
+
+    result = harness_run._run_single(cfg, artifact_dir, run_id="jp20_single")
+
+    assert result["success"] is True
+    assert result["runtime_summary"] is None
+    assert result["detection_summary"] is None
+    assert result["metrics"]["rows_processed"] == 42
+    assert result["metrics"]["rows_per_sec_ingest"] == 3.5
+    assert result["metrics"]["pages"] is None
+    assert result["summary_metrics"] == {
+        "pages": None,
+        "ingest_secs": 12.0,
+        "pages_per_sec_ingest": None,
+        "recall_5": None,
+    }
+    assert "detection_summary_file" not in result["artifacts"]
+
+
+def test_resolve_summary_metrics_falls_back_to_dataset_page_count(monkeypatch, tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="earnings",
+        preset="single_gpu",
+        recall_required=False,
+    )
+
+    pdf_a = dataset_dir / "a.pdf"
+    pdf_b = dataset_dir / "nested" / "b.pdf"
+    pdf_b.parent.mkdir()
+    pdf_a.write_text("placeholder", encoding="utf-8")
+    pdf_b.write_text("placeholder", encoding="utf-8")
+
+    monkeypatch.setattr(harness_run, "_safe_pdf_page_count", lambda path: 3 if path.name == "a.pdf" else 7)
+
+    summary = harness_run._resolve_summary_metrics(
+        cfg,
+        {"pages": None, "ingest_secs": 5.0, "pages_per_sec_ingest": None, "recall_5": 0.75},
+        runtime_summary=None,
+    )
+
+    assert summary == {
+        "pages": 10,
+        "ingest_secs": 5.0,
+        "pages_per_sec_ingest": 2.0,
+        "recall_5": 0.75,
+    }
 
 
 def test_cli_run_accepts_repeated_tags(monkeypatch) -> None:

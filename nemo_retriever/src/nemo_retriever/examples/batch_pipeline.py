@@ -27,6 +27,7 @@ from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.utils.input_files import resolve_input_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,12 @@ def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
     target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
 
 
+def _count_materialized_rows(dataset: object) -> int:
+    """Count rows from a materialized Ray Dataset without relying on ``len()``."""
+    count = getattr(dataset, "count", None)
+    if callable(count):
+        return int(count())
+    return len(dataset)  # type: ignore[arg-type]
 
 
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
@@ -248,6 +255,11 @@ def main(
         "element",
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
+    ),
+    graphic_elements_invoke_url: Optional[str] = typer.Option(
+        None,
+        "--graphic-elements-invoke-url",
+        help="Optional remote endpoint URL for graphic-elements model inference.",
     ),
     embed_invoke_url: Optional[str] = typer.Option(
         None,
@@ -429,6 +441,11 @@ def main(
         "--text-elements-modality",
         help="Embedding modality override for page-text rows. Falls back to --embed-modality.",
     ),
+    use_graphic_elements: bool = typer.Option(
+        False,
+        "--use-graphic-elements",
+        help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
+    ),
     use_table_structure: bool = typer.Option(
         False,
         "--use-table-structure",
@@ -485,18 +502,10 @@ def main(
             embed_gpus_per_actor = 0.0
 
         input_path = Path(input_path)
-        if input_path.is_file():
-            file_patterns = [str(input_path)]
-        elif input_path.is_dir():
-            ext_map = {
-                "txt": ["*.txt"],
-                "html": ["*.html"],
-                "doc": ["*.docx", "*.pptx"],
-            }
-            exts = ext_map.get(input_type, ["*.pdf"])
-            file_patterns = [str(input_path / e) for e in exts]
-        else:
-            raise typer.BadParameter(f"Path does not exist: {input_path}")
+        try:
+            file_patterns = resolve_input_patterns(input_path, input_type)
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
         ingestor = create_ingestor(
             run_mode="batch",
@@ -566,6 +575,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         inference_batch_size=page_elements_batch_size,
                         use_table_structure=use_table_structure,
                         table_output_format=table_output_format,
@@ -629,6 +640,8 @@ def main(
                         extract_tables=True,
                         extract_charts=True,
                         extract_infographics=False,
+                        use_graphic_elements=use_graphic_elements,
+                        graphic_elements_invoke_url=graphic_elements_invoke_url,
                         inference_batch_size=page_elements_batch_size,
                         use_table_structure=use_table_structure,
                         table_output_format=table_output_format,
@@ -699,11 +712,14 @@ def main(
             .materialize()
         )
 
+        if hasattr(ingestor, "_create_lancedb_index"):
+            ingestor._create_lancedb_index()
+
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        num_rows = ingest_results.groupby("source_id").count().count()
+        rows_processed = _count_materialized_rows(ingest_results)
         logger.info(
-            f"Ingestion complete. {num_rows} rows procesed in "
-            f"{ingest_elapsed_s:.2f} seconds. {num_rows/ingest_elapsed_s:.2f} PPS"
+            f"Ingestion complete. {rows_processed} rows procesed in "
+            f"{ingest_elapsed_s:.2f} seconds. {rows_processed/ingest_elapsed_s:.2f} PPS"
         )
 
         if isinstance(ingestor, BatchIngestor):

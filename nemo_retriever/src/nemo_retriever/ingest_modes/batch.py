@@ -24,6 +24,7 @@ from typing import Union
 import ray
 import ray.data as rd
 from nemo_retriever.utils.convert import DocToPdfConversionActor
+from nemo_retriever.chart.chart_detection import GraphicElementsActor
 from nemo_retriever.page_elements import PageElementDetectionActor
 from nemo_retriever.ocr.ocr import NemotronParseActor, OCRActor
 from nemo_retriever.table.table_detection import TableStructureActor
@@ -71,6 +72,14 @@ def _debug_log(*, logger: logging.Logger, location: str, message: str, data: dic
 
 
 from nemo_retriever.params.utils import coerce_params as _coerce_params
+
+
+def _runtime_env_vars() -> dict[str, str]:
+    env_vars = {
+        "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
+        "LOG_LEVEL": "INFO",
+    }
+    return {key: value for key, value in env_vars.items() if isinstance(value, str)}
 
 
 class _LanceDBWriteActor:
@@ -196,17 +205,12 @@ class BatchIngestor(Ingestor):
         if self._debug:
             logging.getLogger().setLevel(logging.DEBUG)
 
-        runtime_env_vars = {
-            "LOG_LEVEL": "INFO",
-            "NEMO_RETRIEVER_HF_CACHE_DIR": resolve_hf_cache_dir(),
-        }
-
         # Initialize Ray for distributed execution.
         ray.init(
             address=ray_address or "local",
             ignore_reinit_error=True,
             log_to_driver=bool(ray_log_to_driver),
-            runtime_env={"env_vars": runtime_env_vars},
+            runtime_env={"env_vars": _runtime_env_vars()},
         )
 
         # Use the new Rich progress UI instead of verbose tqdm bars.
@@ -453,6 +457,49 @@ class BatchIngestor(Ingestor):
                 fn_constructor_kwargs=dict(detect_kwargs),
             )
 
+            # Graphic elements detection for charts (runs before OCR).
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                ge_kwargs: dict[str, Any] = {}
+                ge_invoke_url = kwargs.get("graphic_elements_invoke_url", "")
+                if ge_invoke_url:
+                    ge_kwargs["graphic_elements_invoke_url"] = ge_invoke_url
+                ocr_invoke_url_for_ge = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url"))
+                if ocr_invoke_url_for_ge:
+                    ge_kwargs["ocr_invoke_url"] = ocr_invoke_url_for_ge
+                if "inference_batch_size" in kwargs:
+                    ge_kwargs["inference_batch_size"] = kwargs["inference_batch_size"]
+                for k in (
+                    "api_key",
+                    "request_timeout_s",
+                    "remote_max_pool_workers",
+                    "remote_max_retries",
+                    "remote_max_429_retries",
+                ):
+                    if k in kwargs:
+                        ge_kwargs[k] = kwargs[k]
+                if "ocr_request_timeout_s" in kwargs:
+                    ge_kwargs["request_timeout_s"] = kwargs["ocr_request_timeout_s"]
+                if "ocr_api_key" in kwargs:
+                    ge_kwargs["api_key"] = kwargs["ocr_api_key"]
+                ge_gpu = (
+                    0.0
+                    if (ge_invoke_url and ocr_invoke_url_for_ge)
+                    else self._requested_plan.get_page_elements_gpus_per_actor()
+                )
+                self._rd_dataset = self._rd_dataset.map_batches(
+                    GraphicElementsActor,
+                    batch_size=self._requested_plan.get_page_elements_batch_size(),
+                    batch_format="pandas",
+                    num_gpus=ge_gpu,
+                    compute=rd.ActorPoolStrategy(
+                        initial_size=self._requested_plan.get_page_elements_initial_actors(),
+                        min_size=self._requested_plan.get_page_elements_min_actors(),
+                        max_size=self._requested_plan.get_page_elements_max_actors(),
+                    ),
+                    fn_constructor_kwargs=ge_kwargs,
+                )
+
             use_table_structure = bool(kwargs.get("use_table_structure", False))
             from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
 
@@ -503,7 +550,7 @@ class BatchIngestor(Ingestor):
             ocr_flags = {}
             if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
-            if kwargs.get("extract_charts") is True:
+            if kwargs.get("extract_charts") is True and not use_graphic_elements:
                 ocr_flags["extract_charts"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True

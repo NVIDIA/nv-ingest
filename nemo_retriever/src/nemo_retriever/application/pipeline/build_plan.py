@@ -52,6 +52,7 @@ def stage_names_from_flags(
     use_table_structure: bool = False,
     table_output_format: str = "pseudo_markdown",
     extract_charts: bool = False,
+    use_graphic_elements: bool = False,
     embed_text: bool = False,
 ) -> Iterable[str]:
     validate_table_structure_flags(use_table_structure, table_output_format)
@@ -61,7 +62,9 @@ def stage_names_from_flags(
         yield "enrich_table_structure"
     elif extract_tables:
         yield "enrich_table"
-    if extract_charts:
+    if extract_charts and use_graphic_elements:
+        yield "enrich_graphic_elements"
+    elif extract_charts:
         yield "enrich_chart"
     if embed_text:
         yield "embed_text"

@@ -37,6 +37,7 @@ from nemo_retriever.harness.config import (
 )
 from nemo_retriever.harness.parsers import StreamMetrics
 from nemo_retriever.harness.recall_adapters import prepare_recall_query_file
+from nemo_retriever.utils.input_files import resolve_input_files
 
 ANSI_ESCAPE_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
@@ -111,6 +112,72 @@ def _normalize_recall_metric_key(key: str) -> str:
     return metric.replace("@", "_").replace("-", "_")
 
 
+def _safe_pdf_page_count(path: Path) -> int | None:
+    try:
+        import pypdfium2 as pdfium  # type: ignore
+
+        doc = pdfium.PdfDocument(str(path))
+        try:
+            try:
+                count = int(len(doc))
+            except Exception:
+                count = int(doc.get_page_count())  # type: ignore[attr-defined]
+        finally:
+            try:
+                doc.close()
+            except Exception:
+                pass
+        return max(count, 0)
+    except Exception:
+        return None
+
+
+def _resolve_summary_metrics(
+    cfg: HarnessConfig,
+    metrics_payload: dict[str, Any],
+    runtime_summary: dict[str, Any] | None,
+) -> dict[str, Any]:
+    summary_metrics: dict[str, Any] = {
+        "pages": metrics_payload.get("pages"),
+        "ingest_secs": metrics_payload.get("ingest_secs"),
+        "pages_per_sec_ingest": metrics_payload.get("pages_per_sec_ingest"),
+        "recall_5": metrics_payload.get("recall_5"),
+    }
+
+    if summary_metrics["pages"] is None and isinstance(runtime_summary, dict):
+        runtime_pages = runtime_summary.get("num_pages")
+        if runtime_pages is None:
+            runtime_pages = runtime_summary.get("input_pages")
+        if runtime_pages is not None:
+            try:
+                summary_metrics["pages"] = int(runtime_pages)
+            except (TypeError, ValueError):
+                summary_metrics["pages"] = None
+
+    if summary_metrics["pages"] is None and cfg.input_type == "pdf":
+        total_pages = 0
+        counted_any = False
+        for path in resolve_input_files(Path(cfg.dataset_dir), cfg.input_type):
+            page_count = _safe_pdf_page_count(path)
+            if page_count is None:
+                continue
+            counted_any = True
+            total_pages += page_count
+        if counted_any:
+            summary_metrics["pages"] = total_pages
+
+    if summary_metrics["pages_per_sec_ingest"] is None:
+        pages = summary_metrics.get("pages")
+        ingest_secs = summary_metrics.get("ingest_secs")
+        if pages is not None and ingest_secs not in {None, 0, 0.0}:
+            try:
+                summary_metrics["pages_per_sec_ingest"] = round(float(pages) / float(ingest_secs), 2)
+            except (TypeError, ValueError, ZeroDivisionError):
+                summary_metrics["pages_per_sec_ingest"] = None
+
+    return summary_metrics
+
+
 def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     raw = str(cfg.lancedb_uri or "lancedb")
     if raw == "lancedb":
@@ -147,9 +214,9 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         "--recall-match-mode",
         cfg.recall_match_mode,
         "--no-recall-details",
-        "--pdf-extract-workers",
+        "--pdf-extract-tasks",
         str(cfg.pdf_extract_workers),
-        "--pdf-extract-num-cpus",
+        "--pdf-extract-cpus-per-task",
         str(cfg.pdf_extract_num_cpus),
         "--pdf-extract-batch-size",
         str(cfg.pdf_extract_batch_size),
@@ -157,13 +224,13 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(cfg.pdf_split_batch_size),
         "--page-elements-batch-size",
         str(cfg.page_elements_batch_size),
-        "--page-elements-workers",
+        "--page-elements-actors",
         str(cfg.page_elements_workers),
-        "--ocr-workers",
+        "--ocr-actors",
         str(cfg.ocr_workers),
         "--ocr-batch-size",
         str(cfg.ocr_batch_size),
-        "--embed-workers",
+        "--embed-actors",
         str(cfg.embed_workers),
         "--embed-batch-size",
         str(cfg.embed_batch_size),
@@ -173,11 +240,11 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(cfg.ocr_cpus_per_actor),
         "--embed-cpus-per-actor",
         str(cfg.embed_cpus_per_actor),
-        "--gpu-page-elements",
+        "--page-elements-gpus-per-actor",
         str(cfg.gpu_page_elements),
-        "--gpu-ocr",
+        "--ocr-gpus-per-actor",
         str(cfg.gpu_ocr),
-        "--gpu-embed",
+        "--embed-gpus-per-actor",
         str(cfg.gpu_embed),
         "--embed-model-name",
         cfg.embed_model_name,
@@ -311,6 +378,15 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
         recall_metrics=metrics.recall_metrics,
     )
 
+    metrics_payload = {
+        "files": metrics.files,
+        "pages": metrics.pages,
+        "ingest_secs": metrics.ingest_secs,
+        "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
+        **recall_metrics_normalized,
+    }
+    summary_metrics = _resolve_summary_metrics(cfg, metrics_payload, runtime_summary)
+
     result_payload: dict[str, Any] = {
         "timestamp": now_timestr(),
         "latest_commit": last_commit(),
@@ -339,8 +415,11 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
             "pages": metrics.pages,
             "ingest_secs": metrics.ingest_secs,
             "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
+            "rows_processed": metrics.rows_processed,
+            "rows_per_sec_ingest": metrics.rows_per_sec_ingest,
             **recall_metrics_normalized,
         },
+        "summary_metrics": summary_metrics,
         "run_metadata": run_metadata,
         "runtime_summary": runtime_summary,
         "detection_summary": detection_summary,
@@ -397,7 +476,7 @@ def _run_entry(
         "success": bool(result["success"]),
         "return_code": int(result["return_code"]),
         "failure_reason": result.get("failure_reason"),
-        "metrics": dict(result.get("metrics", {})),
+        "metrics": dict(result.get("summary_metrics", result.get("metrics", {}))),
     }
     if normalized_tags:
         run_result["tags"] = normalized_tags

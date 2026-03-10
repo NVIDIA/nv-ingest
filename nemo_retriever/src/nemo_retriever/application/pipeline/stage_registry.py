@@ -8,6 +8,7 @@ from typing import Any, Callable, Dict
 
 import pandas as pd
 
+from nemo_retriever.chart.chart_detection import graphic_elements_ocr_page_elements
 from nemo_retriever.chart.processor import extract_chart_data_from_primitives_df
 from nemo_retriever.infographic.processor import extract_infographic_data_from_primitives_df
 from nemo_retriever.table.processor import extract_table_data_from_primitives_df
@@ -23,6 +24,12 @@ def _enrich_table_structure(df: pd.DataFrame, **kwargs: Any) -> tuple[pd.DataFra
     return out_df, {}
 
 
+def _enrich_graphic_elements(df: pd.DataFrame, **kwargs: Any) -> tuple[pd.DataFrame, Dict[str, Any]]:
+    """Thin wrapper so ``graphic_elements_ocr_page_elements`` matches the ``(df, info)`` contract."""
+    out_df = graphic_elements_ocr_page_elements(df, **kwargs)
+    return out_df, {}
+
+
 # Registry can be extended by future package integrations without changing
 # pipeline orchestration internals.
 STAGE_REGISTRY: Dict[str, StageHandler] = {
@@ -30,5 +37,6 @@ STAGE_REGISTRY: Dict[str, StageHandler] = {
     "enrich_table": extract_table_data_from_primitives_df,
     "enrich_table_structure": _enrich_table_structure,
     "enrich_chart": extract_chart_data_from_primitives_df,
+    "enrich_graphic_elements": _enrich_graphic_elements,
     "embed_text": embed_text_from_primitives_df,
 }

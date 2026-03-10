@@ -16,6 +16,12 @@ REPO_ROOT = NEMO_RETRIEVER_ROOT.parent
 DEFAULT_TEST_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "test_configs.yaml"
 DEFAULT_NIGHTLY_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "nightly_config.yaml"
 VALID_RECALL_ADAPTERS = {"none", "page_plus_one", "financebench_json"}
+DEFAULT_NIGHTLY_SLACK_METRIC_KEYS = [
+    "pages",
+    "ingest_secs",
+    "pages_per_sec_ingest",
+    "recall_5",
+]
 
 TUNING_FIELDS = {
     "pdf_extract_workers",
@@ -319,9 +325,7 @@ def load_harness_config(
     return cfg
 
 
-def load_runs_config(config_file: str | None = None) -> list[dict[str, Any]]:
-    config_path = _resolve_config_path(config_file, DEFAULT_NIGHTLY_CONFIG_PATH)
-    yaml_cfg = _read_yaml_mapping(config_path)
+def _load_nightly_runs_from_mapping(yaml_cfg: dict[str, Any], config_path: Path) -> list[dict[str, Any]]:
     runs = yaml_cfg.get("runs", [])
     if not isinstance(runs, list):
         raise ValueError(f"'runs' must be a list in {config_path}")
@@ -333,3 +337,55 @@ def load_runs_config(config_file: str | None = None) -> list[dict[str, Any]]:
             raise ValueError(f"Run entry at index {idx} missing required key: dataset")
         normalized.append(dict(run))
     return normalized
+
+
+def _normalize_nightly_slack_config(raw_cfg: Any, config_path: Path) -> dict[str, Any]:
+    if raw_cfg is None:
+        raw_cfg = {}
+    if not isinstance(raw_cfg, dict):
+        raise ValueError(f"'slack' must be a mapping in {config_path}")
+
+    metric_keys = raw_cfg.get("metric_keys")
+    if metric_keys is None:
+        normalized_metric_keys = list(DEFAULT_NIGHTLY_SLACK_METRIC_KEYS)
+    else:
+        if not isinstance(metric_keys, list) or any(
+            not isinstance(item, str) or not item.strip() for item in metric_keys
+        ):
+            raise ValueError(f"'slack.metric_keys' must be a list of non-empty strings in {config_path}")
+        normalized_metric_keys = [item.strip() for item in metric_keys]
+
+    title = raw_cfg.get("title")
+    if title is None:
+        normalized_title = "nemo_retriever Nightly Harness"
+    else:
+        normalized_title = str(title).strip()
+        if not normalized_title:
+            raise ValueError(f"'slack.title' must be a non-empty string in {config_path}")
+
+    return {
+        "enabled": bool(raw_cfg.get("enabled", True)),
+        "title": normalized_title,
+        "post_artifact_paths": bool(raw_cfg.get("post_artifact_paths", True)),
+        "metric_keys": normalized_metric_keys,
+    }
+
+
+def load_nightly_config(config_file: str | None = None) -> dict[str, Any]:
+    config_path = _resolve_config_path(config_file, DEFAULT_NIGHTLY_CONFIG_PATH)
+    yaml_cfg = _read_yaml_mapping(config_path)
+    preset = yaml_cfg.get("preset")
+    if preset is not None:
+        preset = str(preset).strip()
+        if not preset:
+            raise ValueError(f"'preset' must be a non-empty string in {config_path}")
+    return {
+        "config_path": str(config_path.resolve()),
+        "preset": preset,
+        "runs": _load_nightly_runs_from_mapping(yaml_cfg, config_path),
+        "slack": _normalize_nightly_slack_config(yaml_cfg.get("slack", {}), config_path),
+    }
+
+
+def load_runs_config(config_file: str | None = None) -> list[dict[str, Any]]:
+    return load_nightly_config(config_file)["runs"]

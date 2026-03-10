@@ -40,8 +40,10 @@ dependencies = [
   "pydantic>=2.8.0",
   "typer>=0.12.0",
   "rich>=13.7.0",
-  "pillow>=12.0.0",
+  "pillow==12.1.1",
   "numpy>=1.26.0",
+  "nltk==3.9.3",
+  "urllib3==2.6.3",
   "debugpy>=1.8.0",
   "python-multipart>=0.0.9",
   # transformers>=5 enables loading nvidia/parakeet-ctc-1.1b via pipeline (see
@@ -101,7 +103,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.setuptools.packages.find]
