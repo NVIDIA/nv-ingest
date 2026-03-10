@@ -126,7 +126,6 @@ class TestBuildLancedbRow:
             "filename",
             "pdf_basename",
             "page_number",
-            "source_id",
             "path",
             "metadata",
             "source",
