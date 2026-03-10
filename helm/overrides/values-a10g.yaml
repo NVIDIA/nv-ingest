@@ -13,6 +13,8 @@ nimOperator:
         value: "1"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "1"
+      - name: NIM_TRITON_DATA_MAX_BATCH_SIZE
+        value: "1"
       - name: NIM_TRITON_CPU_THREADS_PRE_PROCESSOR
         value: "2"
       - name: OMP_NUM_THREADS
@@ -44,6 +46,8 @@ nimOperator:
         value: "3"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "1"
+      - name: NIM_TRITON_DATA_MAX_BATCH_SIZE
+        value: "1"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
         value: "2048"
       - name: OMP_NUM_THREADS
@@ -58,6 +62,8 @@ nimOperator:
       - name: NIM_TRITON_RATE_LIMIT
         value: "3"
       - name: NIM_TRITON_MAX_BATCH_SIZE
+        value: "1"
+      - name: NIM_TRITON_DATA_MAX_BATCH_SIZE
         value: "1"
       - name: NIM_TRITON_CUDA_MEMORY_POOL_MB
         value: "2048"
