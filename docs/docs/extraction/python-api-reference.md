@@ -37,14 +37,14 @@ The following table describes methods of the `Ingestor` class.
 | `ingest`           | Submit jobs and retrieve results synchronously.                              |
 | `ingest_async`     | Submit jobs asynchronously; returns a Future that completes when done.       |
 | `load`             | Ensure files are locally accessible (downloads if needed).                     |
-| `pdf_split_config` | Configure V2 PDF splitting (e.g. pages per chunk). See [V2 API Guide](v2-api-guide.md). |
+| `pdf_split_config` | Configure V2 PDF splitting (e.g. pages per chunk). Refer to [V2 API Guide](v2-api-guide.md). |
 | `remaining_jobs`   | Return the count of jobs not yet in a terminal state.                       |
 | `save_to_disk`     | Save ingestion results to disk instead of memory.                             |
 | `store`            | Persist extracted images/structured renderings to an fsspec-compatible backend. |
 | `store_embed`      | Add a store-embed task.                                                      |
-| `split`            | Split documents into smaller sections. See [Split Documents](chunking.md).  |
+| `split`            | Split documents into smaller sections. Refer to [Split Documents](chunking.md).  |
 | `udf`              | Add a user-defined function (UDF) task.                                      |
-| `vdb_upload`       | Push extraction results to Milvus vector database. See [Data Upload](data-store.md). |
+| `vdb_upload`       | Push extraction results to Milvus vector database. Refer to [Data Upload](data-store.md). |
 
 
 ### Extract Method Options
@@ -76,7 +76,7 @@ The caption task can call a vision-language model (VLM) with the following optio
 - `temperature` (float, optional): Sampling temperature for the VLM (e.g. 0.0–1.0). Omit or `None` for service default.
 
 !!! note
-    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` per the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
+    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` according to the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
 
 Example:
 ```python
