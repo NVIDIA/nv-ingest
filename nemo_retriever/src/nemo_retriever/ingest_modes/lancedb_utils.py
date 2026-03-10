@@ -185,7 +185,7 @@ def build_lancedb_rows(
     return rows
 
 
-def lancedb_schema(vector_dim: int) -> Any:
+def lancedb_schema(vector_dim: int = 2048) -> Any:
     """Return a PyArrow schema for the standard LanceDB table layout."""
     import pyarrow as pa  # type: ignore
 
@@ -196,11 +196,10 @@ def lancedb_schema(vector_dim: int) -> Any:
             pa.field("filename", pa.string()),
             pa.field("pdf_basename", pa.string()),
             pa.field("page_number", pa.int32()),
-            pa.field("source_id", pa.string()),
+            pa.field("source", pa.string()),
             pa.field("path", pa.string()),
             pa.field("text", pa.string()),
             pa.field("metadata", pa.string()),
-            pa.field("source", pa.string()),
         ]
     )
 

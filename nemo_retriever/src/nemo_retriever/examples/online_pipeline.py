@@ -70,6 +70,11 @@ def main(
         path_type=Path,
         help="Path to query CSV for recall evaluation. Recall is skipped if the file does not exist.",
     ),
+    method: str = typer.Option(
+        "pdfium",
+        "--method",
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
+    ),
     no_recall_details: bool = typer.Option(
         False,
         "--no-recall-details",
@@ -100,7 +105,7 @@ def main(
         ingestor = create_ingestor(run_mode="online", params=IngestorCreateParams(base_url=base_url))
         ingestor = (
             ingestor.files(file_patterns)
-            .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+            .extract(ExtractParams(method=method, extract_text=True, extract_tables=True, extract_charts=True))
             .embed(EmbedParams(model_name="nemo_retriever_v1"))
             .vdb_upload(
                 VdbUploadParams(
@@ -144,7 +149,7 @@ def main(
         elif input_type == "doc":
             ingestor = (
                 ingestor.files(file_patterns)
-                .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+                .extract(ExtractParams(method=method, extract_text=True, extract_tables=True, extract_charts=True))
                 .embed(EmbedParams(model_name="nemo_retriever_v1"))
                 .vdb_upload(
                     VdbUploadParams(
@@ -160,7 +165,7 @@ def main(
         else:
             ingestor = (
                 ingestor.files(file_patterns)
-                .extract(ExtractParams(method="pdfium", extract_text=True, extract_tables=True, extract_charts=True))
+                .extract(ExtractParams(method=method, extract_text=True, extract_tables=True, extract_charts=True))
                 .embed(EmbedParams(model_name="nemo_retriever_v1"))
                 .vdb_upload(
                     VdbUploadParams(

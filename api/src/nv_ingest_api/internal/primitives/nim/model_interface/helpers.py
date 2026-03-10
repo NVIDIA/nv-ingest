@@ -92,9 +92,9 @@ def preprocess_image_for_ocr(
     channel_first: bool = False,
 ) -> np.ndarray:
     """
-    Preprocesses an input image to be suitable for use with NemoRetriever-OCR.
+    Preprocesses an input image to be suitable for use with Nemotron-OCR.
 
-    This function is intended for preprocessing images to be passed as input to NemoRetriever-OCR using GRPC.
+    This function is intended for preprocessing images to be passed as input to Nemotron-OCR using GRPC.
     It is not necessary when using the HTTP endpoint.
 
     Parameters:
@@ -128,7 +128,7 @@ def preprocess_image_for_ocr(
         padded = padded / 255.0
 
     if channel_first:
-        # NemoRetriever-OCR NIM (GRPC) requires input to be (channel, height, width).
+        # Nemotron-OCR NIM (GRPC) requires input to be (channel, height, width).
         padded = padded.transpose((2, 0, 1))
 
     # Metadata can used for inverting transformations on the resulting bounding boxes.
