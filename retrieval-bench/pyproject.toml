@@ -1,0 +1,64 @@
+[project]
+name = "retrieval-bench"
+version = "0.1.0"
+description = "Retrieval pipeline benchmarking toolkit for ViDoRe V3 and BRIGHT leaderboards."
+authors = []
+readme = "README.md"
+requires-python = ">=3.9,<3.14"
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "vidore-benchmark @ git+https://github.com/illuin-tech/vidore-benchmark.git@a93c1d916e305a1116ea557e1170de7adeb531e4",
+    "aiofiles",
+    "bm25s",
+    "datasets>=4.5.0",
+    "jinja2",
+    "litellm",
+    "Pillow",
+    "pydantic>=2.0.0,<3.0.0",
+    "pytrec_eval",
+    "PyStemmer",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "rich",
+    "torch",
+    "transformers>=4.56.0",
+    "typer>=0.12.3,<1.0.0",
+    "torchvision>=0.23.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.2.1", "ruff>=0.4.5"]
+
+[project.scripts]
+retrieval-bench = "retrieval_bench.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retrieval_bench"]
+
+[tool.pytest.ini_options]
+filterwarnings = ["ignore::Warning"]
+markers = ["slow: marks test as slow"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
