@@ -14,6 +14,7 @@ import traceback
 import pandas as pd
 from nemo_retriever.nim.nim import invoke_image_inference_batches
 from nemo_retriever.params import RemoteRetryParams
+from nemo_retriever.utils.detection import prediction_to_detections
 
 try:
     import numpy as np
@@ -58,64 +59,6 @@ def _decode_b64_image_to_chw_tensor(image_b64: str) -> Tuple["torch.Tensor", Tup
     return t, (int(h), int(w))
 
 
-def _crop_b64_image_by_norm_bbox(
-    page_image_b64: str,
-    *,
-    bbox_xyxy_norm: Sequence[float],
-    image_format: str = "png",
-) -> Tuple[Optional[str], Optional[Tuple[int, int]]]:
-    """
-    Crop a base64-encoded RGB image by a normalized xyxy bbox.
-
-    Returns:
-      - cropped_image_b64 (png) or None
-      - cropped_shape_hw (H,W) or None
-    """
-    if Image is None:  # pragma: no cover
-        raise ImportError("Cropping requires pillow.")
-    if not isinstance(page_image_b64, str) or not page_image_b64:
-        return None, None
-    try:
-        x1n, y1n, x2n, y2n = [float(x) for x in bbox_xyxy_norm]
-    except Exception:
-        return None, None
-
-    try:
-        raw = base64.b64decode(page_image_b64)
-        with Image.open(io.BytesIO(raw)) as im0:
-            im = im0.convert("RGB")
-            w, h = im.size
-            if w <= 1 or h <= 1:
-                return None, None
-
-            def _clamp_int(v: float, lo: int, hi: int) -> int:
-                if v != v:  # NaN
-                    return lo
-                return int(min(max(v, float(lo)), float(hi)))
-
-            x1 = _clamp_int(x1n * w, 0, w)
-            x2 = _clamp_int(x2n * w, 0, w)
-            y1 = _clamp_int(y1n * h, 0, h)
-            y2 = _clamp_int(y2n * h, 0, h)
-
-            if x2 <= x1 or y2 <= y1:
-                return None, None
-
-            crop = im.crop((x1, y1, x2, y2))
-            cw, ch = crop.size
-            if cw <= 1 or ch <= 1:
-                return None, None
-
-            buf = io.BytesIO()
-            fmt = str(image_format or "png").lower()
-            if fmt not in {"png"}:
-                fmt = "png"
-            crop.save(buf, format=fmt.upper())
-            return base64.b64encode(buf.getvalue()).decode("ascii"), (int(ch), int(cw))
-    except Exception:
-        return None, None
-
-
 def _labels_from_model(model: Any) -> List[str]:
     try:
         labels = getattr(getattr(model, "_model", None), "labels", None)
@@ -134,107 +77,6 @@ def _labels_from_model(model: Any) -> List[str]:
         pass
 
     return []
-
-
-def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict[str, Any]]:
-    if torch is None:  # pragma: no cover
-        raise ImportError("torch required for prediction parsing.")
-
-    boxes = labels = scores = None
-    if isinstance(pred, dict):
-        # IMPORTANT: do not use `or` chains here. torch.Tensor truthiness is ambiguous and raises.
-        def _get_any(d: Dict[str, Any], *keys: str) -> Any:
-            for k in keys:
-                if k in d:
-                    v = d.get(k)
-                    if v is not None:
-                        return v
-            return None
-
-        boxes = _get_any(pred, "boxes", "bboxes", "bbox", "box")
-        labels = _get_any(pred, "labels", "classes", "class_ids", "class")
-        scores = _get_any(pred, "scores", "conf", "confidences", "score")
-    elif isinstance(pred, (list, tuple)) and len(pred) >= 3:
-        boxes, labels, scores = pred[0], pred[1], pred[2]
-
-    if boxes is None or labels is None:
-        return []
-
-    def _to_tensor(x: Any) -> Optional["torch.Tensor"]:
-        if x is None:
-            return None
-        if isinstance(x, torch.Tensor):
-            return x.detach().cpu()
-        try:
-            return torch.as_tensor(x).detach().cpu()
-        except Exception:
-            return None
-
-    # Handle string labels (e.g. NIM returns ["chart_title", "xlabel", ...]).
-    # torch.as_tensor cannot convert strings, so handle them before tensor conversion.
-    _string_labels: Optional[List[str]] = None
-    if isinstance(labels, (list, tuple)) and labels and isinstance(labels[0], str):
-        _string_labels = [str(x) for x in labels]
-
-    b = _to_tensor(boxes)
-    labels_t = _to_tensor(labels) if _string_labels is None else None
-    s = _to_tensor(scores) if scores is not None else None
-    if b is None:
-        return []
-    if labels_t is None and _string_labels is None:
-        return []
-
-    if b.ndim != 2 or int(b.shape[-1]) != 4:
-        return []
-    if labels_t is not None:
-        if labels_t.ndim == 2 and int(labels_t.shape[-1]) == 1:
-            labels_t = labels_t.squeeze(-1)
-        if labels_t.ndim != 1:
-            return []
-
-    n_labels = len(_string_labels) if _string_labels is not None else int(labels_t.shape[0])
-    n = int(min(b.shape[0], n_labels))
-    dets: List[Dict[str, Any]] = []
-    for i in range(n):
-        try:
-            x1, y1, x2, y2 = [float(x) for x in b[i].tolist()]
-        except Exception:
-            continue
-
-        if _string_labels is not None:
-            label_i = i
-            label_name = _string_labels[i]
-        else:
-            label_i: Optional[int]
-            try:
-                label_i = int(labels_t[i].item())
-            except Exception:
-                label_i = None
-
-            label_name = None
-            if label_i is not None and 0 <= label_i < len(label_names):
-                label_name = label_names[label_i]
-            if not label_name:
-                label_name = f"label_{label_i}" if label_i is not None else "unknown"
-
-        score_f: Optional[float]
-        if s is not None and s.ndim >= 1 and int(s.shape[0]) > i:
-            try:
-                score_f = float(s[i].item())
-            except Exception:
-                score_f = None
-        else:
-            score_f = None
-
-        dets.append(
-            {
-                "bbox_xyxy_norm": [x1, y1, x2, y2],
-                "label": label_i,
-                "label_name": str(label_name),
-                "score": score_f,
-            }
-        )
-    return dets
 
 
 def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
@@ -354,11 +196,11 @@ def graphic_elements_ocr_page_elements(
         Original columns plus ``chart`` and ``graphic_elements_ocr_v1``.
     """
     from nemo_retriever.ocr.ocr import (
-        _blocks_to_text,
-        _crop_all_from_page,
-        _extract_remote_ocr_item,
-        _np_rgb_to_b64_png,
-        _parse_ocr_result,
+        blocks_to_text,
+        crop_all_from_page,
+        extract_remote_ocr_item,
+        np_rgb_to_b64_png,
+        parse_ocr_result,
     )
     from nemo_retriever.util.table_and_chart import join_graphic_elements_and_ocr_output
 
@@ -413,7 +255,7 @@ def graphic_elements_ocr_page_elements(
                 continue
 
             # --- Crop all chart detections ---
-            crops = _crop_all_from_page(page_image_b64, dets, {"chart"})
+            crops = crop_all_from_page(page_image_b64, dets, {"chart"})
 
             if not crops:
                 all_chart.append(chart_items)
@@ -422,7 +264,7 @@ def graphic_elements_ocr_page_elements(
 
             # Pre-compute base64 encodings once for remote paths.
             crop_b64s = (
-                [_np_rgb_to_b64_png(crop_array) for _, _, crop_array in crops]
+                [np_rgb_to_b64_png(crop_array) for _, _, crop_array in crops]
                 if (use_remote_ge or use_remote_ocr)
                 else []
             )
@@ -457,7 +299,7 @@ def graphic_elements_ocr_page_elements(
                     if isinstance(pre, torch.Tensor) and pre.ndim == 3:
                         pre = pre.unsqueeze(0)
                     pred = graphic_elements_model.invoke(pre, (h, w))
-                    ge_dets = _prediction_to_detections(pred, label_names=label_names)
+                    ge_dets = prediction_to_detections(pred, label_names=label_names)
                     ge_results.append(ge_dets)
 
             # --- Run OCR on all crops ---
@@ -476,7 +318,7 @@ def graphic_elements_ocr_page_elements(
                 if len(ocr_response_items) != len(crops):
                     raise RuntimeError(f"Expected {len(crops)} OCR responses, got {len(ocr_response_items)}")
                 for resp in ocr_response_items:
-                    ocr_results.append(_extract_remote_ocr_item(resp))
+                    ocr_results.append(extract_remote_ocr_item(resp))
             else:
                 for _, _, crop_array in crops:
                     ocr_results.append(ocr_model.invoke(crop_array, merge_level="word"))
@@ -492,8 +334,8 @@ def graphic_elements_ocr_page_elements(
 
                 # Fallback: if no GE detections matched, use OCR-only text.
                 if not text:
-                    blocks = _parse_ocr_result(ocr_preds)
-                    text = _blocks_to_text(blocks)
+                    blocks = parse_ocr_result(ocr_preds)
+                    text = blocks_to_text(blocks)
 
                 chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
 

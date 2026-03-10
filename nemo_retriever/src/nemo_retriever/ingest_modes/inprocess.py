@@ -30,7 +30,7 @@ import pandas as pd
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
 from nemo_retriever.chart.chart_detection import graphic_elements_ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
-from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
+from nemo_retriever.ocr.ocr import crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
 from nemo_retriever.text_embed.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
 
@@ -57,7 +57,7 @@ from ..params import IngestExecuteParams
 from ..params import TextChunkParams
 from ..params import VdbUploadParams
 from ..pdf.extract import pdf_extraction
-from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
+from ..pdf.split import split_pdf_to_single_page_bytes, pdf_path_to_pages_df
 from ..txt import txt_file_to_chunks_df
 from ..html import html_file_to_chunks_df
 
@@ -207,7 +207,7 @@ def explode_content_to_rows(
                 if struct_mod in IMAGE_MODALITIES and page_image_b64:
                     bbox = item.get("bbox_xyxy_norm")
                     if bbox and len(bbox) == 4:
-                        cropped_b64, _ = _crop_b64_image_by_norm_bbox(page_image_b64, bbox_xyxy_norm=bbox)
+                        cropped_b64, _ = crop_b64_image_by_norm_bbox(page_image_b64, bbox_xyxy_norm=bbox)
                         content_row["_image_b64"] = cropped_b64
                     else:
                         content_row["_image_b64"] = page_image_b64
@@ -550,7 +550,7 @@ def pages_df_from_pdf_bytes(pdf_bytes: Union[bytes, bytearray], source_path: str
     Used by the online ingest mode to run the same pipeline on document bytes
     received via REST. Columns: bytes, path, page_number.
     """
-    pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+    pages = split_pdf_to_single_page_bytes(pdf_bytes)
     out_rows = [{"bytes": b, "path": source_path, "page_number": i + 1} for i, b in enumerate(pages)]
     return pd.DataFrame(out_rows)
 
@@ -1649,7 +1649,7 @@ class InProcessIngestor(Ingestor):
                         with open(abs_path, "rb") as f:
                             file_bytes = f.read()
                         pdf_bytes = convert_to_pdf_bytes(file_bytes, ext)
-                        pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+                        pages = split_pdf_to_single_page_bytes(pdf_bytes)
                         out_rows = [{"bytes": b, "path": abs_path, "page_number": i + 1} for i, b in enumerate(pages)]
                         return pd.DataFrame(out_rows)
                     except BaseException as e:

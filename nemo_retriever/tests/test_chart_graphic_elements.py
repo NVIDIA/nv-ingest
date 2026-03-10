@@ -382,7 +382,7 @@ class TestBuildPlanChartStructure:
 
 
 # ---------------------------------------------------------------------------
-# _prediction_to_detections string labels test
+# prediction_to_detections string labels test
 # ---------------------------------------------------------------------------
 
 
@@ -390,28 +390,28 @@ class TestBuildPlanChartStructure:
 class TestPredictionToDetectionsStringLabels:
     def test_string_labels_handled(self) -> None:
         import torch
-        from nemo_retriever.chart.chart_detection import _prediction_to_detections
+        from nemo_retriever.utils.detection import prediction_to_detections
 
         pred = {
             "boxes": torch.tensor([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]]),
             "labels": ["chart_title", "xlabel"],
             "scores": torch.tensor([0.9, 0.8]),
         }
-        dets = _prediction_to_detections(pred, label_names=[])
+        dets = prediction_to_detections(pred, label_names=[])
         assert len(dets) == 2
         assert dets[0]["label_name"] == "chart_title"
         assert dets[1]["label_name"] == "xlabel"
 
     def test_integer_labels_still_work(self) -> None:
         import torch
-        from nemo_retriever.chart.chart_detection import _prediction_to_detections
+        from nemo_retriever.utils.detection import prediction_to_detections
 
         pred = {
             "boxes": torch.tensor([[0.1, 0.2, 0.3, 0.4]]),
             "labels": torch.tensor([1]),
             "scores": torch.tensor([0.9]),
         }
-        dets = _prediction_to_detections(pred, label_names=["chart_title", "xlabel"])
+        dets = prediction_to_detections(pred, label_names=["chart_title", "xlabel"])
         assert len(dets) == 1
         assert dets[0]["label_name"] == "xlabel"
         assert dets[0]["label"] == 1

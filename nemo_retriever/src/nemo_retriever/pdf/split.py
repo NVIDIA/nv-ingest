@@ -46,7 +46,7 @@ def _error_record(
     }
 
 
-def _split_pdf_to_single_page_bytes(pdf_binary: Any) -> List[bytes]:
+def split_pdf_to_single_page_bytes(pdf_binary: Any) -> List[bytes]:
     """
     Split a PDF into single-page PDFs (raw bytes) using pypdfium2.
     """
@@ -103,7 +103,7 @@ def pdf_path_to_pages_df(path: str) -> pd.DataFrame:
     out_rows: List[Dict[str, Any]] = []
     try:
         raw_bytes = Path(abs_path).read_bytes()
-        pages = _split_pdf_to_single_page_bytes(raw_bytes)
+        pages = split_pdf_to_single_page_bytes(raw_bytes)
         for page_idx, page_bytes in enumerate(pages):
             out_rows.append(
                 {
@@ -141,7 +141,7 @@ def split_pdf_batch(pdf_batch: Any, params: PdfSplitParams | None = None) -> pd.
             if not isinstance(pdf_bytes, (bytes, bytearray, memoryview)):
                 raise ValueError(f"Unsupported bytes payload type: {type(pdf_bytes)!r}")
 
-            pages = _split_pdf_to_single_page_bytes(pdf_bytes)
+            pages = split_pdf_to_single_page_bytes(pdf_bytes)
             start_idx = 0 if start_page is None else max(int(start_page) - 1, 0)
             end_idx = (len(pages) - 1) if end_page is None else min(int(end_page) - 1, len(pages) - 1)
             if len(pages) == 0 or start_idx > end_idx:

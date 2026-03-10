@@ -23,7 +23,7 @@ from ..txt.split import (
     DEFAULT_TOKENIZER_MODEL_ID,
     split_text_by_tokens,
 )
-from ..txt.split import _get_tokenizer as _get_txt_tokenizer
+from ..txt.split import get_tokenizer as _get_txt_tokenizer
 
 
 def html_to_markdown(html_content: Union[str, bytes, Path]) -> str:

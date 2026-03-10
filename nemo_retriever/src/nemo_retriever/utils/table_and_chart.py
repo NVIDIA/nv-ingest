@@ -541,7 +541,7 @@ def _structure_dets_to_class_boxes(
     Parameters
     ----------
     dets : list[dict]
-        Output of ``_prediction_to_detections()`` — each dict has
+        Output of ``prediction_to_detections()`` — each dict has
         ``bbox_xyxy_norm`` (normalized [0,1]) and ``label_name``.
     crop_hw : (int, int)
         ``(H, W)`` of the crop image.
@@ -575,7 +575,7 @@ def join_table_structure_and_ocr_output(
     Parameters
     ----------
     structure_dets : list[dict]
-        From ``_prediction_to_detections()`` with label_names cell/row/column
+        From ``prediction_to_detections()`` with label_names cell/row/column
         and ``bbox_xyxy_norm`` in [0, 1].
     ocr_preds : list | dict
         Raw OCR output from ``NemotronOCRV1.invoke()``.
@@ -613,7 +613,7 @@ def join_graphic_elements_and_ocr_output(
     Parameters
     ----------
     ge_dets : list[dict]
-        From ``_prediction_to_detections()`` with chart-element label_names
+        From ``prediction_to_detections()`` with chart-element label_names
         and ``bbox_xyxy_norm`` in [0, 1].
     ocr_preds : list | dict
         Raw OCR output from ``NemotronOCRV1.invoke()``.

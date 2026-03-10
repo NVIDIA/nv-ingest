@@ -177,7 +177,7 @@ def test_inprocess_audio_pipeline_local_asr_mocked(tmp_path: Path):
 
 @pytest.mark.skipif(not is_media_available(), reason="ffmpeg not available")
 def test_fused_audio_pipeline_with_mocked_asr(tmp_path: Path):
-    """Fused: same as batch but FusedIngestor; embed() uses explode + _BatchEmbedActor when _pipeline_type==audio."""
+    """Fused: same as batch but FusedIngestor; embed() uses explode + BatchEmbedActor when _pipeline_type==audio."""
     ray = pytest.importorskip("ray")
     pytest.importorskip("lancedb")
 

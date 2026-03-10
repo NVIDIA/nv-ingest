@@ -11,7 +11,7 @@ import typer
 
 from nemo_retriever.harness.artifacts import write_session_summary
 from nemo_retriever.harness.config import DEFAULT_NIGHTLY_CONFIG_PATH, load_nightly_config
-from nemo_retriever.harness.run import _normalize_tags, execute_runs
+from nemo_retriever.harness.run import normalize_tags, execute_runs
 from nemo_retriever.harness.slack import load_replay_report, load_session_report, post_report_to_slack
 
 
@@ -58,7 +58,7 @@ def nightly_command(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print nightly run plan without executing."),
 ) -> None:
-    normalized_tags = _normalize_tags(tag)
+    normalized_tags = normalize_tags(tag)
     nightly_cfg = load_nightly_config(runs_config)
     runs = nightly_cfg["runs"]
     slack_config = nightly_cfg["slack"]

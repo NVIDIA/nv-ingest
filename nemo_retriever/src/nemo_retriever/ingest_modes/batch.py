@@ -142,7 +142,7 @@ class _LanceDBWriteActor:
         return batch_df
 
 
-class _BatchEmbedActor:
+class BatchEmbedActor:
     """Ray Data actor that holds a local text embedder on a single GPU.
 
     When ``embedding_endpoint`` is provided in kwargs, the actor skips local
@@ -754,7 +754,7 @@ class BatchIngestor(Ingestor):
             embed_actor_num_gpus = self._requested_plan.get_embed_gpus_per_actor()
 
         self._rd_dataset = self._rd_dataset.map_batches(
-            _BatchEmbedActor,
+            BatchEmbedActor,
             batch_size=self._requested_plan.get_embed_batch_size(),
             batch_format="pandas",
             num_gpus=embed_actor_num_gpus,  # pulled from if statement above
