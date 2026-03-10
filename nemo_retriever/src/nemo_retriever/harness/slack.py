@@ -110,7 +110,11 @@ def _normalize_run_report(summary_entry: dict[str, Any]) -> NightlyRunReport:
     return NightlyRunReport(
         run_name=str(summary_entry.get("run_name") or (artifact_dir.name if artifact_dir else "unknown_run")),
         dataset=str(summary_entry.get("dataset") or test_config.get("dataset_label") or "unknown_dataset"),
-        preset=str(summary_entry.get("preset") or test_config.get("preset")) if (summary_entry.get("preset") or test_config.get("preset")) else None,
+        preset=(
+            str(summary_entry.get("preset") or test_config.get("preset"))
+            if (summary_entry.get("preset") or test_config.get("preset"))
+            else None
+        ),
         success=bool(summary_entry.get("success")),
         return_code=int(summary_entry["return_code"]) if summary_entry.get("return_code") is not None else None,
         failure_reason=str(summary_entry.get("failure_reason")) if summary_entry.get("failure_reason") else None,

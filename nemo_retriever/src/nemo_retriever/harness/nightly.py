@@ -51,7 +51,10 @@ def nightly_command(
     replay: list[Path] = typer.Option(
         [],
         "--replay",
-        help="Replay a previous session directory, run directory, or results.json file to Slack. Repeatable for run dirs.",
+        help=(
+            "Replay a previous session directory, run directory, or results.json file to Slack. "
+            "Repeatable for run dirs."
+        ),
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Print nightly run plan without executing."),
 ) -> None:

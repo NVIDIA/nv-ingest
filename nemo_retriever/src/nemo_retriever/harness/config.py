@@ -349,7 +349,9 @@ def _normalize_nightly_slack_config(raw_cfg: Any, config_path: Path) -> dict[str
     if metric_keys is None:
         normalized_metric_keys = list(DEFAULT_NIGHTLY_SLACK_METRIC_KEYS)
     else:
-        if not isinstance(metric_keys, list) or any(not isinstance(item, str) or not item.strip() for item in metric_keys):
+        if not isinstance(metric_keys, list) or any(
+            not isinstance(item, str) or not item.strip() for item in metric_keys
+        ):
             raise ValueError(f"'slack.metric_keys' must be a list of non-empty strings in {config_path}")
         normalized_metric_keys = [item.strip() for item in metric_keys]
 
