@@ -71,7 +71,7 @@ def main(
         help="Path to query CSV for recall evaluation. Recall is skipped if the file does not exist.",
     ),
     method: str = typer.Option(
-        "pdfium_hybrid",
+        "pdfium",
         "--method",
         help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
     ),

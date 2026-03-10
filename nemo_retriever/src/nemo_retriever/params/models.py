@@ -160,7 +160,7 @@ class ExtractParams(_ParamsModel):
     extract_page_as_image: Optional[bool] = None
 
     # Extraction options
-    method: str = "pdfium_hybrid"
+    method: str = "pdfium"
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     use_graphic_elements: bool = False

@@ -323,7 +323,7 @@ def main(
         help="LanceDB URI/path for this run.",
     ),
     method: str = typer.Option(
-        "pdfium_hybrid",
+        "pdfium",
         "--method",
         help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
     ),
