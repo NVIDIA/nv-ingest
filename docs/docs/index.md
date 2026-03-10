@@ -46,4 +46,4 @@ The following are some applications that use NVIDIA NeMo Retriever:
 - [NeMo Retriever Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html)
 - [NeMo Retriever Text Reranking NIM](https://docs.nvidia.com/nim/nemo-retriever/text-reranking/latest/overview.html)
 - [NVIDIA NIM for Object Detection](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html)
-- [NVIDIA NIM for Image OCR](https://docs.nvidia.com/nim/ingestion/table-extraction/latest/overview.html)
+- [NVIDIA NIM for Image OCR](https://docs.nvidia.com/nim/ingestion/image-ocr/latest/overview.html)
