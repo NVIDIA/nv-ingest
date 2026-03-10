@@ -4,7 +4,7 @@ The [NeMo Retriever Library](overview.md) Python API provides a simple and flexi
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 !!! tip
 
@@ -459,7 +459,7 @@ ingestor = ingestor.embed()
 
 !!! note
 
-    By default, `embed` uses the [llama-3.2-nv-embedqa-1b-v2](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2) model.
+    By default, `embed` uses the [llama-nemotron-embed-1b-v2](https://build.nvidia.com/nvidia/llama-nemotron-embed-1b-v2) model.
 
 To use a different embedding model, such as [nv-embedqa-e5-v5](https://build.nvidia.com/nvidia/nv-embedqa-e5-v5), specify a different `model_name` and `endpoint_url`.
 

@@ -63,15 +63,27 @@ pdf:
 txt:
   max_tokens: 512
   overlap_tokens: 0
-  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  tokenizer_model_id: nvidia/llama-nemotron-embed-1b-v2
   encoding: utf-8
 
 # Optional config for `retriever html run` and .extract_html() API
 html:
   max_tokens: 512
   overlap_tokens: 0
-  tokenizer_model_id: nvidia/llama-3.2-nv-embedqa-1b-v2
+  tokenizer_model_id: nvidia/llama-nemotron-embed-1b-v2
   encoding: utf-8
+
+# Optional config for .extract_image_files() API (batch, inprocess).
+# Standalone image files (PNG, JPEG, BMP, TIFF, SVG) are converted to the same
+# single-page DataFrame schema as PDF extraction, then reuse all downstream GPU
+# stages (page-element detection, OCR, table/chart/infographic extraction).
+# No separate configuration is needed: images use ExtractParams and the same
+# detection/OCR/embedding settings as PDF pages.
+image:
+  # Supported extensions: .png, .jpg, .jpeg, .bmp, .tiff, .tif, .svg
+  # SVG requires the optional `cairosvg` package.
+  # All ExtractParams options (extract_text, extract_tables, etc.) apply.
+  pass: true  # placeholder; no image-specific knobs beyond ExtractParams
 
 # Optional config for .extract_audio() API (batch, inprocess, fused, online).
 # ASR can be remote (Parakeet/Riva gRPC) or local (HuggingFace nvidia/parakeet-ctc-1.1b).
@@ -235,7 +247,7 @@ embedding:
   # via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
   embedding_nim_endpoint: null
   # embedding_nim_endpoint: "http://localhost:8012/v1"
-  embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+  embedding_model: "nvidia/llama-nemotron-embed-1b-v2"
 
   # Request formatting
   encoding_format: "float"   # usually "float"

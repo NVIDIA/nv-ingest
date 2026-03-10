@@ -56,7 +56,7 @@ meta_df.to_csv(file_path)
 ### Example: Add Custom Metadata During Ingestion
 
 The following example adds custom metadata during ingestion. 
-For more information about the `Ingestor` class, see [Use the NeMo Retriever Python API](python-api-reference.md).
+For more information about the `Ingestor` class, see [Use the NeMo Retriever Library Python API](python-api-reference.md).
 For more information about the `vdb_upload` method, see [Upload Data](data-store.md).
 
 ```python
@@ -148,7 +148,7 @@ hostname="localhost"
 collection_name = "nemo_retriever_collection"
 sparse = True
 top_k = 5
-model_name="nvidia/llama-3.2-nv-embedqa-1b-v2"
+model_name="nvidia/llama-nemotron-embed-1b-v2"
 
 filter_expr = 'content_metadata["department"] == "Engineering"'
 

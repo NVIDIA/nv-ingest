@@ -219,7 +219,7 @@ if __name__ == "__main__":
     text_embedding_config = {
         "api_key": yolox_auth,
         "embedding_nim_endpoint": "http://localhost:8012/v1",
-        "embedding_model": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "embedding_model": "nvidia/llama-nemotron-embed-1b-v2",
     }
     image_extraction_config = {
         "yolox_endpoints": (yolox_grpc, yolox_http),

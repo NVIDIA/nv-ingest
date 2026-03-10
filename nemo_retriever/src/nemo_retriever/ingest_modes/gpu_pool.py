@@ -77,29 +77,14 @@ class EmbeddingModelConfig:
     model_id: Optional[str] = None
 
     def create(self) -> Any:
-        from nemo_retriever.model import is_vl_embed_model
+        from nemo_retriever.model import create_local_embedder
 
-        if is_vl_embed_model(self.model_id):
-            from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-                LlamaNemotronEmbedVL1BV2Embedder,
-            )
-
-            return LlamaNemotronEmbedVL1BV2Embedder(
-                device=self.device,
-                hf_cache_dir=self.hf_cache_dir,
-                model_id=self.model_id,
-            )
-
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-            LlamaNemotronEmbed1BV2Embedder,
-        )
-
-        return LlamaNemotronEmbed1BV2Embedder(
+        return create_local_embedder(
+            self.model_id,
             device=self.device,
             hf_cache_dir=self.hf_cache_dir,
             normalize=self.normalize,
             max_length=self.max_length,
-            model_id=self.model_id,
         )
 
 

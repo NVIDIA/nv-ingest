@@ -184,6 +184,10 @@ def pdf_extraction(
     6. Return a list of dictionaries containing the text, images, tables, charts, infographics, and page numbers.
     """
 
+    # Allow callers to pass `method=` (the ExtractParams field name) as an
+    # alias for `text_extraction_method`.
+    text_extraction_method = kwargs.pop("method", None) or text_extraction_method
+
     # Assumption: PDF splitting ran earlier and produced a dataset where each row
     # contains a *single-page* PDF in the `"bytes"` column. We therefore open the
     # document and only process page 0 for each row.
@@ -214,6 +218,7 @@ def pdf_extraction(
             pdf_bytes = row["bytes"] if "bytes" in pdf_binary.columns else None
             pdf_path = row["path"] if "path" in pdf_binary.columns else None
             page_number = int(row["page_number"]) if "page_number" in pdf_binary.columns else 1
+            source_id = row["source_id"] if "source_id" in pdf_binary.columns else None
 
             try:
                 if not isinstance(pdf_bytes, (bytes, bytearray, memoryview)):
@@ -273,6 +278,7 @@ def pdf_extraction(
                     page_record: Dict[str, Any] = {
                         "path": pdf_path,
                         "page_number": page_number,
+                        "source_id": source_id,
                         "text": text if extract_text else "",
                         "page_image": None,
                         "images": [],

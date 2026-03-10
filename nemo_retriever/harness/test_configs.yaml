@@ -6,11 +6,13 @@ active:
   query_csv: data/jp20_query_gt.csv
   input_type: pdf
   recall_required: true
+  recall_match_mode: pdf_page
+  recall_adapter: none
   artifacts_dir: null
   ray_address: null
   lancedb_uri: lancedb
   hybrid: false
-  embed_model_name: nvidia/llama-3.2-nv-embedqa-1b-v2
+  embed_model_name: nvidia/llama-nemotron-embed-1b-v2
   write_detection_file: false
 
 presets:
@@ -68,3 +70,32 @@ datasets:
     query_csv: data/jp20_query_gt.csv
     input_type: pdf
     recall_required: true
+    recall_match_mode: pdf_page
+    recall_adapter: none
+
+  earnings:
+    path: /datasets/nv-ingest/earnings_consulting
+    query_csv: data/earnings_consulting_multimodal.csv
+    input_type: pdf
+    recall_required: true
+    recall_match_mode: pdf_page
+    recall_adapter: page_plus_one
+
+  # Wiring for bo10k-style CSVs with zero-based page numbers.
+  # Keep recall optional by default until a local query CSV path is configured.
+  bo10k:
+    path: /datasets/nv-ingest/bo10k
+    query_csv: null
+    input_type: pdf
+    recall_required: false
+    recall_match_mode: pdf_page
+    recall_adapter: page_plus_one
+
+  # FinanceBench is document-level recall using the repository fixture JSON.
+  financebench:
+    path: /datasets/nv-ingest/financebench
+    query_csv: data/financebench_train.json
+    input_type: pdf
+    recall_required: true
+    recall_match_mode: pdf_only
+    recall_adapter: financebench_json

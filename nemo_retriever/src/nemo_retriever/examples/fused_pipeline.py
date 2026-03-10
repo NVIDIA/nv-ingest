@@ -27,29 +27,30 @@ from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.examples.batch_pipeline import (
     LANCEDB_TABLE,
     LANCEDB_URI,
+    _collect_detection_summary,
     _configure_logging,
     _ensure_lancedb_table,
-    _estimate_processed_pages,
-    _gold_to_doc_page,
-    _hit_key_and_distance,
-    _is_hit_at_k,
     _print_detection_summary,
-    _print_pages_per_second,
     _write_detection_summary,
-    _collect_detection_summary,
 )
-from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.examples.common import estimate_processed_pages, print_pages_per_second
+from nemo_retriever.recall.core import (
+    RecallConfig,
+    gold_to_doc_page,
+    hit_key_and_distance,
+    is_hit_at_k,
+    retrieve_and_score,
+)
 
 app = typer.Typer()
 
 
 @app.command()
 def main(
-    input_dir: Path = typer.Argument(
+    input_path: Path = typer.Argument(
         ...,
-        help="Directory containing PDFs to ingest.",
+        help="File or directory containing PDFs to ingest.",
         path_type=Path,
-        exists=True,
     ),
     ray_address: Optional[str] = typer.Option(
         None,
@@ -81,15 +82,15 @@ def main(
             "Only the missed-gold summary and recall metrics are printed."
         ),
     ),
-    pdf_extract_workers: int = typer.Option(
+    pdf_extract_tasks: int = typer.Option(
         12,
-        "--pdf-extract-workers",
+        "--pdf-extract-tasks",
         min=1,
-        help="Number of CPU workers for PDF extraction stage.",
+        help="Number of CPU tasks for PDF extraction stage.",
     ),
-    pdf_extract_num_cpus: float = typer.Option(
+    pdf_extract_cpus_per_task: float = typer.Option(
         2.0,
-        "--pdf-extract-num-cpus",
+        "--pdf-extract-cpus-per-task",
         min=0.1,
         help="CPUs reserved per PDF extraction task.",
     ),
@@ -182,15 +183,20 @@ def main(
             subprocess.run(["ray", "start", "--head"], check=True, env=os.environ)
             ray_address = "auto"
 
-        input_dir = Path(input_dir)
-        pdf_glob = str(input_dir / "*.pdf")
+        input_path = Path(input_path)
+        if input_path.is_file():
+            file_patterns = [str(input_path)]
+        elif input_path.is_dir():
+            file_patterns = [str(input_path / "*.pdf")]
+        else:
+            raise typer.BadParameter(f"Path does not exist: {input_path}")
 
         ingestor = create_ingestor(
             run_mode="fused",
             params=IngestorCreateParams(ray_address=ray_address, ray_log_to_driver=ray_log_to_driver),
         )
         ingestor = (
-            ingestor.files(pdf_glob)
+            ingestor.files(file_patterns)
             .extract(
                 ExtractParams(
                     extract_text=True,
@@ -198,8 +204,8 @@ def main(
                     extract_charts=True,
                     extract_infographics=False,
                     batch_tuning={
-                        "pdf_extract_workers": int(pdf_extract_workers),
-                        "pdf_extract_num_cpus": float(pdf_extract_num_cpus),
+                        "pdf_extract_workers": int(pdf_extract_tasks),
+                        "pdf_extract_num_cpus": float(pdf_extract_cpus_per_task),
                         "pdf_split_batch_size": int(pdf_split_batch_size),
                         "pdf_extract_batch_size": int(pdf_extract_batch_size),
                     },
@@ -238,7 +244,7 @@ def main(
             )
         )
         ingest_elapsed_s = time.perf_counter() - ingest_start
-        processed_pages = _estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
+        processed_pages = estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
         print("Extraction complete.")
         _print_detection_summary(detection_summary)
@@ -251,7 +257,7 @@ def main(
         query_csv = Path(query_csv)
         if not query_csv.exists():
             print(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
-            _print_pages_per_second(processed_pages, ingest_elapsed_s)
+            print_pages_per_second(processed_pages, ingest_elapsed_s)
             return
 
         db = lancedb.connect(lancedb_uri)
@@ -273,7 +279,7 @@ def main(
         try:
             if int(table.count_rows()) == 0:
                 print(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
-                _print_pages_per_second(processed_pages, ingest_elapsed_s)
+                print_pages_per_second(processed_pages, ingest_elapsed_s)
                 return
         except Exception:
             pass
@@ -284,7 +290,7 @@ def main(
         cfg = RecallConfig(
             lancedb_uri=str(lancedb_uri),
             lancedb_table=str(LANCEDB_TABLE),
-            embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+            embedding_model="nvidia/llama-nemotron-embed-1b-v2",
             top_k=10,
             ks=(1, 5, 10),
         )
@@ -301,16 +307,16 @@ def main(
                 _raw_hits,
             )
         ):
-            doc, page = _gold_to_doc_page(g)
+            doc, page = gold_to_doc_page(g)
 
             scored_hits: list[tuple[str, float | None]] = []
             for h in hits:
-                key, dist = _hit_key_and_distance(h)
+                key, dist = hit_key_and_distance(h)
                 if key:
                     scored_hits.append((key, dist))
 
             top_keys = [k for (k, _d) in scored_hits]
-            hit = _is_hit_at_k(g, top_keys, cfg.top_k)
+            hit = is_hit_at_k(g, top_keys, cfg.top_k, match_mode="pdf_page")
 
             if not no_recall_details:
                 print(f"\nQuery {i}: {q}")
@@ -341,7 +347,7 @@ def main(
         print("\nRecall metrics (matching nemo_retriever.recall.core):")
         for k, v in metrics.items():
             print(f"  {k}: {v:.4f}")
-        _print_pages_per_second(processed_pages, ingest_elapsed_s)
+        print_pages_per_second(processed_pages, ingest_elapsed_s)
     finally:
         # Restore real stdio before closing the mirror file so exception hooks
         # and late flushes never write to a closed stream wrapper.

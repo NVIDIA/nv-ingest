@@ -45,6 +45,7 @@ def embed_info(
     MODEL_DIMENSIONS = {
         "nvidia/llama-3.2-nemoretriever-1b-vlm-embed-v1": 2048,
         "nvidia/llama-3.2-nv-embedqa-1b-v2": 2048,
+        "nvidia/llama-nemotron-embed-1b-v2": 2048,
         "nvidia/llama-3.2-nemoretriever-300m-embed-v1": 2048,
         "nvidia/nv-embedqa-e5-v5": 1024,
     }

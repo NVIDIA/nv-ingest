@@ -17,7 +17,7 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 from nemo_retriever.params import TextChunkParams
 
-DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-nemotron-embed-1b-v2"
 DEFAULT_MAX_TOKENS = 512
 DEFAULT_OVERLAP_TOKENS = 0
 
@@ -26,9 +26,13 @@ def _get_tokenizer(model_id: str, cache_dir: Optional[str] = None):  # noqa: ANN
     """Lazy-load HuggingFace tokenizer."""
     from transformers import AutoTokenizer
 
+    from nemo_retriever.utils.hf_model_registry import get_hf_revision
+
     return AutoTokenizer.from_pretrained(
         model_id,
+        revision=get_hf_revision(model_id),
         cache_dir=cache_dir,
+        trust_remote_code=True,
     )
 
 
