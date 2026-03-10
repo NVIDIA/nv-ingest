@@ -23,7 +23,7 @@ nemo-retriever --help
     There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/NeMo-Retriever/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
 
-## Parameter reference
+## Parameter Reference
 
 The following table lists all CLI options: flag name, type, default, whether the option is required, and a short description.
 
@@ -56,14 +56,14 @@ The following table lists all CLI options: flag name, type, default, whether the
 
 
 
-## Output format and output_directory layout
+## Output Format and Output_Directory Layout
 
-### Output format
+### Output Format
 
 - **Metadata**: When `--output_directory` is set, the CLI writes JSON files. Each result is a JSON structure that follows the [content metadata schema](content-metadata.md): `content`, `content_url`, `source_metadata`, `content_metadata`, and type-specific blocks (`text_metadata`, `image_metadata`, `table_metadata`, etc.).
 - **Streaming / stdout**: Progress and telemetry are written to stderr (e.g. progress bar, timing). No structured result stream is written to stdout unless you use a different mode (e.g. streaming APIs) not covered by this CLI.
 
-### output_directory structure
+### Output_Directory Structure
 
 When `--output_directory DIR` is used, the CLI creates:
 
@@ -76,13 +76,13 @@ When `--output_directory DIR` is used, the CLI creates:
 - **`DIR/zipkin_profiles/`** (optional)  
   If `--collect_profiling_traces` is used, Zipkin trace JSON files are written here for profiling analysis.
 
-### Parsing results programmatically
+### Parsing Results Programmatically
 
 - Read each `*.metadata.json` file under `DIR` and parse as JSON. Each file is an array of objects; each object has a `metadata` key with the schema described in [Content Metadata](content-metadata.md).
 - To iterate over all extracted items for a single run, walk the subdirectories of `output_directory` and load every `*.metadata.json`; then iterate over the array elements in each file.
 
 
-## Errors and exit codes
+## Errors and Exit Codes
 
 The CLI does not define custom exit codes for every case. In general:
 
@@ -106,7 +106,7 @@ Common errors and how they appear:
 Running with `--fail_on_error` causes the process to exit on the first job failure; otherwise the CLI may continue and report failures at the end.
 
 
-## Complete --help output
+## Complete --help Output
 
 The following is the standard help output for the CLI (equivalent to `nemo-retriever --help` or `nv-ingest-cli --help`). Use it as a quick reference when you cannot run the command locally.
 
