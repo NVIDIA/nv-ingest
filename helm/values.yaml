@@ -841,7 +841,7 @@ nimOperator:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
-      tag: 1.2.1
+      tag: 1.3.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
