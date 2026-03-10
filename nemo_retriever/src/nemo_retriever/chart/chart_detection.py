@@ -4,8 +4,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import base64
 import io
@@ -13,6 +12,8 @@ import time
 import traceback
 
 import pandas as pd
+from nemo_retriever.nim.nim import invoke_image_inference_batches
+from nemo_retriever.params import RemoteRetryParams
 
 try:
     import numpy as np
@@ -53,7 +54,7 @@ def _decode_b64_image_to_chw_tensor(image_b64: str) -> Tuple["torch.Tensor", Tup
         arr = np.array(im, dtype=np.uint8)  # (H,W,3)
 
     t = torch.from_numpy(arr).permute(2, 0, 1).contiguous()  # (3,H,W) uint8
-    t = t.to(dtype=torch.float32) / 255.0
+    t = t.to(dtype=torch.float32)
     return t, (int(h), int(w))
 
 
@@ -169,20 +170,30 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
         except Exception:
             return None
 
+    # Handle string labels (e.g. NIM returns ["chart_title", "xlabel", ...]).
+    # torch.as_tensor cannot convert strings, so handle them before tensor conversion.
+    _string_labels: Optional[List[str]] = None
+    if isinstance(labels, (list, tuple)) and labels and isinstance(labels[0], str):
+        _string_labels = [str(x) for x in labels]
+
     b = _to_tensor(boxes)
-    l = _to_tensor(labels)  # noqa: E741
+    labels_t = _to_tensor(labels) if _string_labels is None else None
     s = _to_tensor(scores) if scores is not None else None
-    if b is None or l is None:
+    if b is None:
+        return []
+    if labels_t is None and _string_labels is None:
         return []
 
     if b.ndim != 2 or int(b.shape[-1]) != 4:
         return []
-    if l.ndim == 2 and int(l.shape[-1]) == 1:
-        l = l.squeeze(-1)  # noqa: E741
-    if l.ndim != 1:
-        return []
+    if labels_t is not None:
+        if labels_t.ndim == 2 and int(labels_t.shape[-1]) == 1:
+            labels_t = labels_t.squeeze(-1)
+        if labels_t.ndim != 1:
+            return []
 
-    n = int(min(b.shape[0], l.shape[0]))
+    n_labels = len(_string_labels) if _string_labels is not None else int(labels_t.shape[0])
+    n = int(min(b.shape[0], n_labels))
     dets: List[Dict[str, Any]] = []
     for i in range(n):
         try:
@@ -190,11 +201,21 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
         except Exception:
             continue
 
-        label_i: Optional[int]
-        try:
-            label_i = int(l[i].item())
-        except Exception:
-            label_i = None
+        if _string_labels is not None:
+            label_i = i
+            label_name = _string_labels[i]
+        else:
+            label_i: Optional[int]
+            try:
+                label_i = int(labels_t[i].item())
+            except Exception:
+                label_i = None
+
+            label_name = None
+            if label_i is not None and 0 <= label_i < len(label_names):
+                label_name = label_names[label_i]
+            if not label_name:
+                label_name = f"label_{label_i}" if label_i is not None else "unknown"
 
         score_f: Optional[float]
         if s is not None and s.ndim >= 1 and int(s.shape[0]) > i:
@@ -204,12 +225,6 @@ def _prediction_to_detections(pred: Any, *, label_names: List[str]) -> List[Dict
                 score_f = None
         else:
             score_f = None
-
-        label_name = None
-        if label_i is not None and 0 <= label_i < len(label_names):
-            label_name = label_names[label_i]
-        if not label_name:
-            label_name = f"label_{label_i}" if label_i is not None else "unknown"
 
         dets.append(
             {
@@ -235,408 +250,375 @@ def _counts_by_label(detections: Sequence[Dict[str, Any]]) -> Dict[str, int]:
     return out
 
 
-def detect_graphic_elements_v1(
+def _remote_response_to_ge_detections(response_json: Any) -> List[Dict[str, Any]]:
+    """Parse a NIM graphic-elements response into the standard detection list.
+
+    The NIM returns either:
+    * ``{"label_name": [[x0, y0, x1, y1, conf], ...], ...}`` (annotation dict), or
+    * ``{"bounding_boxes": {"label_name": [{"x_min":..., ...}]}}`` (NIM v2), or
+    * a dict with ``boxes``/``labels``/``scores`` tensors (model-pred style).
+    """
+    if not isinstance(response_json, dict):
+        return []
+
+    # Unwrap common NIM envelopes.
+    candidates: List[Any] = [response_json]
+    for key in ("data", "output", "predictions"):
+        nested = response_json.get(key)
+        if isinstance(nested, list) and nested:
+            candidates.append(nested[0])
+
+    for cand in candidates:
+        if not isinstance(cand, dict):
+            continue
+
+        # NIM v2 bounding_boxes format.
+        bb = cand.get("bounding_boxes")
+        if isinstance(bb, dict):
+            dets: List[Dict[str, Any]] = []
+            for label_name, items in bb.items():
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    if isinstance(item, dict):
+                        dets.append(
+                            {
+                                "bbox_xyxy_norm": [
+                                    float(item.get("x_min", 0)),
+                                    float(item.get("y_min", 0)),
+                                    float(item.get("x_max", 0)),
+                                    float(item.get("y_max", 0)),
+                                ],
+                                "label": None,
+                                "label_name": str(label_name),
+                                "score": float(item.get("confidence", 0)),
+                            }
+                        )
+            if dets:
+                return dets
+
+        # Annotation dict: {"chart_title": [[x0, y0, x1, y1, conf], ...]}
+        if all(isinstance(v, list) for v in cand.values()):
+            dets = []
+            for label_name, boxes in cand.items():
+                if not isinstance(boxes, list):
+                    continue
+                for box in boxes:
+                    if isinstance(box, (list, tuple)) and len(box) >= 4:
+                        dets.append(
+                            {
+                                "bbox_xyxy_norm": [float(box[0]), float(box[1]), float(box[2]), float(box[3])],
+                                "label": None,
+                                "label_name": str(label_name),
+                                "score": float(box[4]) if len(box) > 4 else None,
+                            }
+                        )
+            if dets:
+                return dets
+
+    return []
+
+
+# ---------------------------------------------------------------------------
+# Combined graphic-elements + OCR core function
+# ---------------------------------------------------------------------------
+
+
+def graphic_elements_ocr_page_elements(
     batch_df: Any,
     *,
-    model: Any,
-    inference_batch_size: int = 8,
-    output_column: str = "graphic_elements_v1",
-    num_detections_column: str = "graphic_elements_v1_num_detections",
-    counts_by_label_column: str = "graphic_elements_v1_counts_by_label",
+    graphic_elements_model: Any = None,
+    ocr_model: Any = None,
+    graphic_elements_invoke_url: str = "",
+    ocr_invoke_url: str = "",
+    api_key: str = "",
+    request_timeout_s: float = 120.0,
+    remote_retry: RemoteRetryParams | None = None,
+    **kwargs: Any,
 ) -> Any:
     """
-    Run Nemotron Graphic Elements v1 on a pandas batch.
+    Run graphic-elements + OCR on chart crops and produce structure-aware text.
+
+    For each row (page) in ``batch_df``:
+    1. Read ``page_elements_v3`` detections and ``page_image["image_b64"]``.
+    2. Crop all chart detections from the page image.
+    3. Run graphic-elements model on each crop to get element bboxes.
+    4. Run OCR on each crop to get text with bboxes.
+    5. Join the two outputs using ``join_graphic_elements_and_ocr_output()``
+       to produce semantically structured chart text.
+    6. Fall back to OCR-only text if graphic-elements returns no detections.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Original columns plus ``chart`` and ``graphic_elements_ocr_v1``.
     """
+    from nemo_retriever.ocr.ocr import (
+        _blocks_to_text,
+        _crop_all_from_page,
+        _extract_remote_ocr_item,
+        _np_rgb_to_b64_png,
+        _parse_ocr_result,
+    )
+    from nemo_retriever.util.table_and_chart import join_graphic_elements_and_ocr_output
+
+    retry = remote_retry or RemoteRetryParams(
+        remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
+        remote_max_retries=int(kwargs.get("remote_max_retries", 10)),
+        remote_max_429_retries=int(kwargs.get("remote_max_429_retries", 5)),
+    )
+
     if not isinstance(batch_df, pd.DataFrame):
-        raise NotImplementedError("detect_graphic_elements_v1 currently only supports pandas.DataFrame input.")
-    if inference_batch_size <= 0:
-        raise ValueError("inference_batch_size must be > 0")
+        raise NotImplementedError("graphic_elements_ocr_page_elements currently only supports pandas.DataFrame input.")
 
-    label_names = _labels_from_model(model)
+    ge_url = (graphic_elements_invoke_url or kwargs.get("graphic_elements_invoke_url") or "").strip()
+    ocr_url = (ocr_invoke_url or kwargs.get("ocr_invoke_url") or "").strip()
+    use_remote_ge = bool(ge_url)
+    use_remote_ocr = bool(ocr_url)
 
-    tensors: List[Optional["torch.Tensor"]] = []
-    shapes: List[Optional[Tuple[int, int]]] = []
-    payloads: List[Dict[str, Any]] = []
-    for _, row in batch_df.iterrows():
+    if not use_remote_ge and graphic_elements_model is None:
+        raise ValueError("A local `graphic_elements_model` is required when `graphic_elements_invoke_url` is not set.")
+    if not use_remote_ocr and ocr_model is None:
+        raise ValueError("A local `ocr_model` is required when `ocr_invoke_url` is not set.")
+
+    label_names = _labels_from_model(graphic_elements_model) if graphic_elements_model is not None else []
+    inference_batch_size = int(kwargs.get("inference_batch_size", 8))
+
+    # Per-row accumulators.
+    all_chart: List[List[Dict[str, Any]]] = []
+    all_meta: List[Dict[str, Any]] = []
+
+    t0_total = time.perf_counter()
+
+    for row in batch_df.itertuples(index=False):
+        chart_items: List[Dict[str, Any]] = []
+        row_error: Any = None
+
         try:
-            b64 = row.get("page_image", {}).get("image_b64", None)
-            if not b64:
-                raise ValueError("No usable image_b64 found in row.")
-            t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-            tensors.append(t)
-            shapes.append(orig_shape)
-            payloads.append({"detections": []})
-        except BaseException as e:
-            tensors.append(None)
-            shapes.append(None)
-            payloads.append(_error_payload(stage="decode_image", exc=e))
+            # --- get page elements detections ---
+            pe = getattr(row, "page_elements_v3", None)
+            dets: List[Dict[str, Any]] = []
+            if isinstance(pe, dict):
+                dets = pe.get("detections") or []
+            if not isinstance(dets, list):
+                dets = []
 
-    valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
+            # --- get page image ---
+            page_image = getattr(row, "page_image", None) or {}
+            page_image_b64 = page_image.get("image_b64") if isinstance(page_image, dict) else None
 
-    for chunk_start in range(0, len(valid), int(inference_batch_size)):
-        idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
-        if not idxs:
-            continue
-
-        pre_list: List["torch.Tensor"] = []
-        orig_shapes: List[Tuple[int, int]] = []
-        for i in idxs:
-            t = tensors[i]
-            sh = shapes[i]
-            if t is None or sh is None:
+            if not isinstance(page_image_b64, str) or not page_image_b64:
+                all_chart.append(chart_items)
+                all_meta.append({"timing": None, "error": None})
                 continue
-            orig_shapes.append(sh)
-            x = t.unsqueeze(0)  # BCHW
-            try:
-                pre = model.preprocess(x)
-            except Exception:
-                pre = x
-            if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
-                pre_list.append(pre[0])
-            elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                pre_list.append(pre)
-            else:
-                pre_list.append(t)
 
-        if not pre_list:
-            continue
+            # --- Crop all chart detections ---
+            crops = _crop_all_from_page(page_image_b64, dets, {"chart"})
 
-        batch = torch.stack(pre_list, dim=0)
-        t0 = time.perf_counter()
-        try:
-            preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
-            elapsed = time.perf_counter() - t0
-            if isinstance(preds, list):
-                preds_list = preds
+            if not crops:
+                all_chart.append(chart_items)
+                all_meta.append({"timing": None, "error": None})
+                continue
+
+            # Pre-compute base64 encodings once for remote paths.
+            crop_b64s = (
+                [_np_rgb_to_b64_png(crop_array) for _, _, crop_array in crops]
+                if (use_remote_ge or use_remote_ocr)
+                else []
+            )
+
+            # --- Run graphic-elements on all crops ---
+            ge_results: List[List[Dict[str, Any]]] = []
+            if use_remote_ge:
+                response_items = invoke_image_inference_batches(
+                    invoke_url=ge_url,
+                    image_b64_list=crop_b64s,
+                    api_key=api_key or None,
+                    timeout_s=float(request_timeout_s),
+                    max_batch_size=inference_batch_size,
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
+                )
+                if len(response_items) != len(crops):
+                    raise RuntimeError(f"Expected {len(crops)} GE responses, got {len(response_items)}")
+                for resp in response_items:
+                    ge_results.append(_remote_response_to_ge_detections(resp))
             else:
-                preds_list = [preds]
-            if len(preds_list) != len(idxs):
-                raise RuntimeError("Batched invoke returned unexpected output shape; falling back to per-image calls.")
-            for local_j, row_i in enumerate(idxs):
-                dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
-                payloads[row_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
-        except BaseException:
-            for local_j, row_i in enumerate(idxs):
-                t = tensors[row_i]
-                sh = shapes[row_i]
-                if t is None or sh is None:
-                    continue
-                x = t.unsqueeze(0)
-                t1 = time.perf_counter()
-                try:
+                # Local batched inference.
+                for _, _, crop_array in crops:
+                    chw = torch.from_numpy(crop_array).permute(2, 0, 1).contiguous().to(dtype=torch.float32)
+                    h, w = crop_array.shape[:2]
+                    x = chw.unsqueeze(0)  # BCHW
                     try:
-                        pre = model.preprocess(x)
+                        pre = graphic_elements_model.preprocess(x)
                     except Exception:
                         pre = x
                     if isinstance(pre, torch.Tensor) and pre.ndim == 3:
                         pre = pre.unsqueeze(0)
-                    pred = model.invoke(pre, sh)
-                    dets = _prediction_to_detections(pred, label_names=label_names)
-                    payloads[row_i] = {
-                        "detections": dets,
-                        "timing": {"seconds": float(time.perf_counter() - t1)},
-                        "error": None,
-                    }
-                except BaseException as e:
-                    payloads[row_i] = _error_payload(stage="invoke", exc=e) | {
-                        "timing": {"seconds": float(time.perf_counter() - t1)}
-                    }
+                    pred = graphic_elements_model.invoke(pre, (h, w))
+                    ge_dets = _prediction_to_detections(pred, label_names=label_names)
+                    ge_results.append(ge_dets)
+
+            # --- Run OCR on all crops ---
+            ocr_results: List[Any] = []
+            if use_remote_ocr:
+                ocr_response_items = invoke_image_inference_batches(
+                    invoke_url=ocr_url,
+                    image_b64_list=crop_b64s,
+                    api_key=api_key or None,
+                    timeout_s=float(request_timeout_s),
+                    max_batch_size=inference_batch_size,
+                    max_pool_workers=int(retry.remote_max_pool_workers),
+                    max_retries=int(retry.remote_max_retries),
+                    max_429_retries=int(retry.remote_max_429_retries),
+                )
+                if len(ocr_response_items) != len(crops):
+                    raise RuntimeError(f"Expected {len(crops)} OCR responses, got {len(ocr_response_items)}")
+                for resp in ocr_response_items:
+                    ocr_results.append(_extract_remote_ocr_item(resp))
+            else:
+                for _, _, crop_array in crops:
+                    ocr_results.append(ocr_model.invoke(crop_array, merge_level="word"))
+
+            # --- Join and build text per crop ---
+            for crop_i, (label_name, bbox, crop_array) in enumerate(crops):
+                crop_hw = (int(crop_array.shape[0]), int(crop_array.shape[1]))
+                ge_dets = ge_results[crop_i]
+                ocr_preds = ocr_results[crop_i]
+
+                # Try structure-aware join first.
+                text = join_graphic_elements_and_ocr_output(ge_dets, ocr_preds, crop_hw)
+
+                # Fallback: if no GE detections matched, use OCR-only text.
+                if not text:
+                    blocks = _parse_ocr_result(ocr_preds)
+                    text = _blocks_to_text(blocks)
+
+                chart_items.append({"bbox_xyxy_norm": bbox, "text": text})
+
+        except BaseException as e:
+            print(f"Warning: graphic-elements+OCR failed: {type(e).__name__}: {e}")
+            row_error = {
+                "stage": "graphic_elements_ocr_page_elements",
+                "type": e.__class__.__name__,
+                "message": str(e),
+                "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
+            }
+
+        all_chart.append(chart_items)
+        all_meta.append({"timing": None, "error": row_error})
+
+    elapsed = time.perf_counter() - t0_total
+    for meta in all_meta:
+        meta["timing"] = {"seconds": float(elapsed)}
 
     out = batch_df.copy()
-    out[output_column] = payloads
-    out[num_detections_column] = [int(len(p.get("detections") or [])) if isinstance(p, dict) else 0 for p in payloads]
-    out[counts_by_label_column] = [
-        _counts_by_label(p.get("detections") or []) if isinstance(p, dict) else {} for p in payloads
-    ]
+    out["chart"] = all_chart
+    out["graphic_elements_ocr_v1"] = all_meta
     return out
 
 
-def detect_graphic_elements_v1_from_page_elements_v3(
-    pages_df: Any,
-    *,
-    model: Any,
-    inference_batch_size: int = 8,
-    page_elements_column: str = "page_elements_v3",
-    page_elements_counts_by_label_column: str = "page_elements_v3_counts_by_label",
-    page_image_column: str = "page_image",
-    output_column: str = "graphic_elements_v1",
-    num_detections_column: str = "graphic_elements_v1_num_detections",
-    counts_by_label_column: str = "graphic_elements_v1_counts_by_label",
-) -> Any:
-    """
-    Run Nemotron Graphic Elements v1 only on cropped chart regions.
+# ---------------------------------------------------------------------------
+# Combined graphic-elements + OCR Ray Actor
+# ---------------------------------------------------------------------------
 
-    Gate per page on `page_elements_v3_counts_by_label["chart"] > 0`, then crop
-    `page_image.image_b64` to each detection whose `label_name == "chart"`, and
-    run the model on those crops.
 
-    Output payload shape:
-      - `output_column`: {"regions": [...], "timing": {...}, "error": ...}
+class GraphicElementsActor:
     """
-    if not isinstance(pages_df, pd.DataFrame):
-        raise NotImplementedError(
-            "detect_graphic_elements_v1_from_page_elements_v3 currently only supports pandas.DataFrame input."
+    Ray-friendly callable that initializes both graphic-elements and OCR
+    models once per actor and runs the combined stage.
+    """
+
+    __slots__ = (
+        "_graphic_elements_model",
+        "_ocr_model",
+        "_graphic_elements_invoke_url",
+        "_ocr_invoke_url",
+        "_api_key",
+        "_request_timeout_s",
+        "_remote_retry",
+        "_inference_batch_size",
+    )
+
+    def __init__(
+        self,
+        *,
+        graphic_elements_invoke_url: Optional[str] = None,
+        ocr_invoke_url: Optional[str] = None,
+        invoke_url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        request_timeout_s: float = 120.0,
+        remote_max_pool_workers: int = 16,
+        remote_max_retries: int = 10,
+        remote_max_429_retries: int = 5,
+        inference_batch_size: int = 8,
+    ) -> None:
+        self._graphic_elements_invoke_url = (graphic_elements_invoke_url or "").strip()
+        self._ocr_invoke_url = (ocr_invoke_url or invoke_url or "").strip()
+        self._api_key = api_key
+        self._request_timeout_s = float(request_timeout_s)
+        self._remote_retry = RemoteRetryParams(
+            remote_max_pool_workers=int(remote_max_pool_workers),
+            remote_max_retries=int(remote_max_retries),
+            remote_max_429_retries=int(remote_max_429_retries),
         )
-    if inference_batch_size <= 0:
-        raise ValueError("inference_batch_size must be > 0")
+        self._inference_batch_size = int(inference_batch_size)
 
-    out_payloads: List[Dict[str, Any]] = []
-    out_total_dets: List[int] = []
-    out_counts: List[Dict[str, int]] = []
+        if self._graphic_elements_invoke_url:
+            self._graphic_elements_model = None
+        else:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
 
-    crop_b64s: List[str] = []
-    crop_shapes: List[Tuple[int, int]] = []
-    crop_region_refs: List[Dict[str, Any]] = []
+            self._graphic_elements_model = NemotronGraphicElementsV1()
 
-    t0_total = time.perf_counter()
+        if self._ocr_invoke_url:
+            self._ocr_model = None
+        else:
+            from nemo_retriever.model.local import NemotronOCRV1
 
-    for _, row in pages_df.iterrows():
-        page_payload: Dict[str, Any] = {"regions": [], "timing": {"seconds": 0.0}, "error": None}
-
-        counts = row.get(page_elements_counts_by_label_column)
-        chart_count = 0
-        if isinstance(counts, dict):
-            try:
-                chart_count = int(counts.get("chart") or 0)
-            except Exception:
-                chart_count = 0
-
-        if chart_count <= 0:
-            out_payloads.append(page_payload)
-            out_total_dets.append(0)
-            out_counts.append({})
-            continue
-
-        pe = row.get(page_elements_column)
-        dets = pe.get("detections") if isinstance(pe, dict) else None
-        if not isinstance(dets, list) or not dets:
-            out_payloads.append(page_payload)
-            out_total_dets.append(0)
-            out_counts.append({})
-            continue
-
-        page_image = row.get(page_image_column) or {}
-        page_image_b64 = page_image.get("image_b64") if isinstance(page_image, dict) else None
-        if not isinstance(page_image_b64, str) or not page_image_b64:
-            page_payload["error"] = {
-                "stage": "crop",
-                "type": "ValueError",
-                "message": "page_image.image_b64 missing; cannot crop charts for graphic_elements_v1.",
-                "traceback": "",
-            }
-            out_payloads.append(page_payload)
-            out_total_dets.append(0)
-            out_counts.append({})
-            continue
-
-        regions: List[Dict[str, Any]] = []
-        for det in dets:
-            if not isinstance(det, dict):
-                continue
-            if str(det.get("label_name") or "").strip() != "chart":
-                continue
-            bbox = det.get("bbox_xyxy_norm")
-            if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
-                continue
-
-            crop_b64, crop_shape_hw = _crop_b64_image_by_norm_bbox(
-                page_image_b64, bbox_xyxy_norm=cast(Sequence[float], bbox)
-            )
-            if not crop_b64 or crop_shape_hw is None:
-                continue
-
-            region_payload: Dict[str, Any] = {
-                "label_name": "chart",
-                "bbox_xyxy_norm": [float(x) for x in bbox],
-                "score": det.get("score"),
-                "orig_shape_hw": crop_shape_hw,
-                "detections": [],
-                "timing": None,
-                "error": None,
-            }
-            regions.append(region_payload)
-            crop_b64s.append(crop_b64)
-            crop_shapes.append(crop_shape_hw)
-            crop_region_refs.append(region_payload)
-
-        page_payload["regions"] = regions
-        out_payloads.append(page_payload)
-        out_total_dets.append(0)
-        out_counts.append({})
-
-    if crop_b64s:
-        label_names = _labels_from_model(model)
-
-        tensors: List[Optional["torch.Tensor"]] = []
-        shapes: List[Optional[Tuple[int, int]]] = []
-        crop_payloads: List[Dict[str, Any]] = []
-        for b64 in crop_b64s:
-            try:
-                t, orig_shape = _decode_b64_image_to_chw_tensor(b64)
-                tensors.append(t)
-                shapes.append(orig_shape)
-                crop_payloads.append({"detections": []})
-            except BaseException as e:
-                tensors.append(None)
-                shapes.append(None)
-                crop_payloads.append(_error_payload(stage="decode_image", exc=e))
-
-        valid = [i for i, t in enumerate(tensors) if t is not None and shapes[i] is not None]
-
-        for chunk_start in range(0, len(valid), int(inference_batch_size)):
-            idxs = valid[chunk_start : chunk_start + int(inference_batch_size)]
-            if not idxs:
-                continue
-
-            pre_list: List["torch.Tensor"] = []
-            orig_shapes: List[Tuple[int, int]] = []
-            for i in idxs:
-                t = tensors[i]
-                sh = shapes[i]
-                if t is None or sh is None:
-                    continue
-                orig_shapes.append(sh)
-                x = t.unsqueeze(0)
-                try:
-                    pre = model.preprocess(x)
-                except Exception:
-                    pre = x
-                if isinstance(pre, torch.Tensor) and pre.ndim == 4 and int(pre.shape[0]) == 1:
-                    pre_list.append(pre[0])
-                elif isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                    pre_list.append(pre)
-                else:
-                    pre_list.append(t)
-
-            if not pre_list:
-                continue
-
-            batch = torch.stack(pre_list, dim=0)
-            t0 = time.perf_counter()
-            try:
-                preds = model.invoke(batch, orig_shapes)  # type: ignore[arg-type]
-                elapsed = time.perf_counter() - t0
-                preds_list = preds if isinstance(preds, list) else [preds]
-                if len(preds_list) != len(idxs):
-                    raise RuntimeError(
-                        "Batched invoke returned unexpected output shape; falling back to per-image calls."
-                    )
-                for local_j, crop_i in enumerate(idxs):
-                    dets = _prediction_to_detections(preds_list[local_j], label_names=label_names)
-                    crop_payloads[crop_i] = {"detections": dets, "timing": {"seconds": float(elapsed)}, "error": None}
-            except BaseException:
-                for crop_i in idxs:
-                    t = tensors[crop_i]
-                    sh = shapes[crop_i]
-                    if t is None or sh is None:
-                        continue
-                    x = t.unsqueeze(0)
-                    t1 = time.perf_counter()
-                    try:
-                        try:
-                            pre = model.preprocess(x)
-                        except Exception:
-                            pre = x
-                        if isinstance(pre, torch.Tensor) and pre.ndim == 3:
-                            pre = pre.unsqueeze(0)
-                        pred = model.invoke(pre, sh)
-                        dets = _prediction_to_detections(pred, label_names=label_names)
-                        crop_payloads[crop_i] = {
-                            "detections": dets,
-                            "timing": {"seconds": float(time.perf_counter() - t1)},
-                            "error": None,
-                        }
-                    except BaseException as e:
-                        crop_payloads[crop_i] = _error_payload(stage="invoke", exc=e) | {
-                            "timing": {"seconds": float(time.perf_counter() - t1)}
-                        }
-
-        for crop_i, region_ref in enumerate(crop_region_refs):
-            payload = crop_payloads[crop_i] if crop_i < len(crop_payloads) else {"detections": []}
-            if isinstance(payload, dict):
-                region_ref["detections"] = payload.get("detections") or []
-                region_ref["timing"] = payload.get("timing")
-                region_ref["error"] = payload.get("error")
-            else:
-                region_ref["detections"] = []
-                region_ref["timing"] = None
-                region_ref["error"] = {
-                    "stage": "invoke",
-                    "type": "TypeError",
-                    "message": "Unexpected payload type",
-                    "traceback": "",
-                }
-
-    # Aggregate counts per page.
-    for i, page_payload in enumerate(out_payloads):
-        regions = page_payload.get("regions") or []
-        total_dets = 0
-        agg_counts: Dict[str, int] = {}
-        if isinstance(regions, list):
-            for r in regions:
-                if not isinstance(r, dict):
-                    continue
-                dets = r.get("detections") or []
-                if isinstance(dets, list):
-                    total_dets += int(len(dets))
-                    for d in dets:
-                        if not isinstance(d, dict):
-                            continue
-                        name = d.get("label_name")
-                        if not isinstance(name, str) or not name.strip():
-                            name = f"label_{d.get('label')}"
-                        k = str(name)
-                        agg_counts[k] = int(agg_counts.get(k, 0) + 1)
-        out_total_dets[i] = int(total_dets)
-        out_counts[i] = agg_counts
-
-    elapsed_total = time.perf_counter() - t0_total
-    for page_payload in out_payloads:
-        if isinstance(page_payload, dict):
-            page_payload["timing"] = {"seconds": float(elapsed_total)}
-
-    out = pages_df.copy()
-    out[output_column] = out_payloads
-    out[num_detections_column] = out_total_dets
-    out[counts_by_label_column] = out_counts
-    return out
-
-
-@dataclass(slots=True)
-class ChartDetectionActor:
-    """
-    Ray-friendly callable that initializes Nemotron Graphic Elements v1 once.
-    """
-
-    detect_kwargs: Dict[str, Any]
-
-    def __init__(self, **detect_kwargs: Any) -> None:
-        self.detect_kwargs = dict(detect_kwargs)
-        from nemo_retriever.model.local import NemotronGraphicElementsV1
-
-        self._model = NemotronGraphicElementsV1()
+            self._ocr_model = NemotronOCRV1()
 
     def __call__(self, batch_df: Any, **override_kwargs: Any) -> Any:
         try:
-            # Prefer crop-based execution when page-elements are present.
-            if isinstance(batch_df, pd.DataFrame) and (
-                "page_elements_v3" in batch_df.columns or "page_elements_v3_counts_by_label" in batch_df.columns
-            ):
-                return detect_graphic_elements_v1_from_page_elements_v3(
-                    batch_df,
-                    model=self._model,
-                    **self.detect_kwargs,
-                    **override_kwargs,
-                )
-            return detect_graphic_elements_v1(batch_df, model=self._model, **self.detect_kwargs, **override_kwargs)
+            return graphic_elements_ocr_page_elements(
+                batch_df,
+                graphic_elements_model=self._graphic_elements_model,
+                ocr_model=self._ocr_model,
+                graphic_elements_invoke_url=self._graphic_elements_invoke_url,
+                ocr_invoke_url=self._ocr_invoke_url,
+                api_key=self._api_key,
+                request_timeout_s=self._request_timeout_s,
+                remote_retry=self._remote_retry,
+                inference_batch_size=self._inference_batch_size,
+                **override_kwargs,
+            )
         except BaseException as e:
             if isinstance(batch_df, pd.DataFrame):
                 out = batch_df.copy()
-                payload = _error_payload(stage="actor_call", exc=e)
-                out["graphic_elements_v1"] = [
-                    {"regions": [], "timing": None, "error": payload.get("error")} for _ in range(len(out.index))
-                ]
-                out["graphic_elements_v1_num_detections"] = [0 for _ in range(len(out.index))]
-                out["graphic_elements_v1_counts_by_label"] = [{} for _ in range(len(out.index))]
+                payload = {
+                    "timing": None,
+                    "error": {
+                        "stage": "chart_graphic_elements_ocr_actor_call",
+                        "type": e.__class__.__name__,
+                        "message": str(e),
+                        "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
+                    },
+                }
+                n = len(out.index)
+                out["chart"] = [[] for _ in range(n)]
+                out["graphic_elements_ocr_v1"] = [payload for _ in range(n)]
                 return out
-            return [{"graphic_elements_v1": _error_payload(stage="actor_call", exc=e)}]
+            return [
+                {
+                    "graphic_elements_ocr_v1": {
+                        "timing": None,
+                        "error": {
+                            "stage": "chart_graphic_elements_ocr_actor_call",
+                            "type": e.__class__.__name__,
+                            "message": str(e),
+                            "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
+                        },
+                    }
+                }
+            ]
