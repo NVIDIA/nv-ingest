@@ -83,3 +83,12 @@ nimOperator:
         value: "1"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "1"
+
+  nemotron_nano_12b_v2_vl:
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: NIM_ENABLE_KV_CACHE_REUSE
+        value: "0"

@@ -161,9 +161,13 @@ services:
     image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2}:${RERANKER_TAG:-1.10.0}
     shm_size: 16gb
     ports:
-      - "${RERANKER_HTTP_PORT:-8020}:8000"
+      - "${RERANKER_HTTP_PORT:-8015}:8000"
+      - "${RERANKER_GRPC_PORT:-8016}:8001"
+      - "${RERANKER_METRICS_PORT:-8017}:8002"
     expose:
       - "8000"
+      - "8001"
+      - "8002"
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -182,6 +186,10 @@ services:
   nemotron-parse:
     image: ${NEMOTRON_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NEMOTRON_PARSE_TAG:-1.5.0}
     shm_size: 16gb
+    ports:
+      - "${NEMOTRON_PARSE_HTTP_PORT:-8018}:8000"
+      - "${NEMOTRON_PARSE_GRPC_PORT:-8019}:8001"
+      - "${NEMOTRON_PARSE_METRICS_PORT:-8020}:8002"
     expose:
       - "8000"
       - "8001"
@@ -204,6 +212,8 @@ services:
   vlm:
     image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.6.0}
     shm_size: 16gb
+    ports:
+      - "${VLM_HTTP_PORT:-8021}:8000"
     expose:
       - "8000"
     environment:
@@ -228,6 +238,9 @@ services:
   audio:
     image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us}:${AUDIO_TAG:-1.5.0}
     shm_size: 2gb
+    ports:
+      - "${AUDIO_GRPC_PORT:-8022}:50051"
+      - "${AUDIO_HTTP_PORT:-8023}:9000"
     expose:
       - "50051" # grpc
       - "9000"  # http

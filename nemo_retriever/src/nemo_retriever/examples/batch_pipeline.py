@@ -25,8 +25,9 @@ from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
-from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
+from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+from nemo_retriever.utils.input_files import resolve_input_patterns
 
 logger = logging.getLogger(__name__)
 
@@ -191,8 +192,6 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
 
     Creates an empty table with the expected schema if it does not exist yet.
     """
-    from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
-
     Path(uri).mkdir(parents=True, exist_ok=True)
 
     db = _lancedb().connect(uri)
@@ -204,9 +203,29 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
 
     import pyarrow as pa  # type: ignore
 
-    schema = lancedb_schema(2048)
+    schema = lancedb_schema()
     empty = pa.table({f.name: [] for f in schema}, schema=schema)
     db.create_table(table_name, data=empty, schema=schema, mode="create")
+
+
+def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
+    s = str(golden_key)
+    if "_" not in s:
+        return s, ""
+    doc, page = s.rsplit("_", 1)
+    return doc, page
+
+
+def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
+
+    source_id = hit.get("source_id")
+    page_number = hit.get("page_number")
+    if not source_id or page_number is None:
+        return None, float(hit.get("_distance")) if "_distance" in hit else None
+
+    key = f"{Path(str(source_id)).stem}_{page_number}"
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
+    return key, dist
 
 
 @app.command()
@@ -519,18 +538,10 @@ def main(
             embed_gpus_per_actor = 0.0
 
         input_path = Path(input_path)
-        if input_path.is_file():
-            file_patterns = [str(input_path)]
-        elif input_path.is_dir():
-            ext_map = {
-                "txt": ["*.txt"],
-                "html": ["*.html"],
-                "doc": ["*.docx", "*.pptx"],
-            }
-            exts = ext_map.get(input_type, ["*.pdf"])
-            file_patterns = [str(input_path / e) for e in exts]
-        else:
-            raise typer.BadParameter(f"Path does not exist: {input_path}")
+        try:
+            file_patterns = resolve_input_patterns(input_path, input_type)
+        except FileNotFoundError as exc:
+            raise typer.BadParameter(str(exc)) from exc
 
         ingestor = create_ingestor(
             run_mode="batch",
@@ -553,17 +564,6 @@ def main(
                         embed_granularity=embed_granularity,
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
         elif input_type == "html":
             ingestor = (
@@ -577,17 +577,6 @@ def main(
                         text_elements_modality=text_elements_modality,
                         structured_elements_modality=structured_elements_modality,
                         embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -643,17 +632,6 @@ def main(
                             "embed_batch_size": int(embed_batch_size),
                             "embed_cpus_per_actor": float(embed_cpus_per_actor),
                         },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
                     )
                 )
             )
@@ -712,17 +690,6 @@ def main(
                         },
                     )
                 )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
-                )
             )
 
         logger.info("Running extraction...")
@@ -739,8 +706,11 @@ def main(
             .materialize()
         )
 
-        if hasattr(ingestor, "_create_lancedb_index"):
-            ingestor._create_lancedb_index()
+        # if hasattr(ingestor, "_create_lancedb_index"):
+        #     ingestor._create_lancedb_index()
+        from nemo_retriever.vector_store.lancedb_store import handle_lancedb
+
+        handle_lancedb(ingest_results.take_all(), lancedb_uri, LANCEDB_TABLE, hybrid=hybrid, mode="overwrite")
 
         ingest_elapsed_s = time.perf_counter() - ingest_start
         rows_processed = _count_materialized_rows(ingest_results)
