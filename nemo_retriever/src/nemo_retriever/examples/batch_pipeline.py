@@ -25,7 +25,6 @@ from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
-from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 from nemo_retriever.utils.remote_auth import resolve_remote_api_key
@@ -731,17 +730,7 @@ def main(
         if enable_text_chunk:
             ingestor = ingestor.split(_text_chunk_params)
 
-        ingestor = ingestor.embed(embed_params).vdb_upload(
-            VdbUploadParams(
-                lancedb={
-                    "lancedb_uri": lancedb_uri,
-                    "table_name": LANCEDB_TABLE,
-                    "overwrite": True,
-                    "create_index": True,
-                    "hybrid": hybrid,
-                }
-            )
-        )
+        ingestor = ingestor.embed(embed_params)
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()
