@@ -108,6 +108,13 @@ def _post_with_retries(
     raise RuntimeError(f"Failed to get a successful response after {max_retries} retries.")
 
 
+def _mime_from_b64(b64: str) -> str:
+    """Detect MIME type from the first bytes of a base64-encoded image."""
+    if b64.startswith("/9j"):  # JPEG magic bytes FF D8 FF
+        return "image/jpeg"
+    return "image/png"
+
+
 def invoke_image_inference_batches(
     *,
     invoke_url: str,
@@ -145,7 +152,7 @@ def invoke_image_inference_batches(
         inputs = [
             {
                 "type": "image_url",
-                "url": f"data:image/png;base64,{b64}",
+                "url": f"data:{_mime_from_b64(b64)};base64,{b64}",
             }
             for b64 in image_b64_list[start:end]
         ]
