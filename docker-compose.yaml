@@ -210,7 +210,7 @@ services:
       - nemotron-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.6.0}
+    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl}:${VLM_TAG:-1.5.0}
     shm_size: 16gb
     ports:
       - "${VLM_HTTP_PORT:-8021}:8000"
