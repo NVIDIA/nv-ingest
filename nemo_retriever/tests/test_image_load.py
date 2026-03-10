@@ -12,14 +12,16 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytest
-from PIL import Image
 
-from nemo_retriever.image.load import (
+PIL = pytest.importorskip("PIL", reason="Pillow is required for image tests")
+from PIL import Image  # noqa: E402
+
+from nemo_retriever.image.load import (  # noqa: E402
     SUPPORTED_IMAGE_EXTENSIONS,
     image_bytes_to_pages_df,
     image_file_to_pages_df,
 )
-from nemo_retriever.image.ray_data import ImageLoadActor
+from nemo_retriever.image.ray_data import ImageLoadActor  # noqa: E402
 
 # -- Helpers ------------------------------------------------------------------
 
