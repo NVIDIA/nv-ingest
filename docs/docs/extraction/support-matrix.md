@@ -16,7 +16,7 @@ The core pipeline features include the following:
 - nemotron-page-elements-v3 — Detects and classifies images on a page as a table, chart or infographic.
 - nemotron-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
 - nemotron-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
-- nemoretriever-ocr-v1 — Image OCR model to detect and extract text from images.
+- nemotron-ocr-v1 — Image OCR model to detect and extract text from images.
 - retrieval — Enables embedding and indexing into Milvus.
 
 Advanced features require additional GPU support and disk space. 
