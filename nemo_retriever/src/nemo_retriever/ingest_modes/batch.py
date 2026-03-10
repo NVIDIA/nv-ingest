@@ -589,6 +589,27 @@ class BatchIngestor(Ingestor):
 
         return self
 
+    def split(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Re-chunk the ``text`` column by token count (post-extraction transform).
+
+        Adds a ``map_batches(TextChunkActor, ...)`` stage to the Ray Dataset so
+        already-extracted text is re-chunked before embedding.
+        """
+        from nemo_retriever.txt.ray_data import TextChunkActor
+
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._tasks.append(("split", resolved.model_dump(mode="python")))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            TextChunkActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            fn_constructor_kwargs={"params": resolved},
+        )
+        return self
+
     def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
         """
         Configure txt-only pipeline: read_binary_files -> TxtSplitActor (bytes -> chunk rows).

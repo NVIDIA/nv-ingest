@@ -481,6 +481,24 @@ def main(
             "(used when --table-output-format=markdown)."
         ),
     ),
+    text_chunk: bool = typer.Option(
+        False,
+        "--text-chunk",
+        help=(
+            "Re-chunk extracted page text by token count before embedding. "
+            "Uses --text-chunk-max-tokens and --text-chunk-overlap-tokens (defaults: 1024, 150)."
+        ),
+    ),
+    text_chunk_max_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-max-tokens",
+        help="Max tokens per text chunk (default: 1024). Implies --text-chunk.",
+    ),
+    text_chunk_overlap_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-overlap-tokens",
+        help="Token overlap between consecutive text chunks (default: 150). Implies --text-chunk.",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
@@ -528,188 +546,129 @@ def main(
         )
 
         if input_type == "txt":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            ingestor = ingestor.files(file_patterns).extract_txt(
+                TextChunkParams(
+                    max_tokens=text_chunk_max_tokens or 1024,
+                    overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
                 )
             )
         elif input_type == "html":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        embed_granularity=embed_granularity,
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            ingestor = ingestor.files(file_patterns).extract_html(
+                TextChunkParams(
+                    max_tokens=text_chunk_max_tokens or 1024,
+                    overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
                 )
             )
         elif input_type == "doc":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            ingestor = ingestor.files(file_patterns).extract(
+                ExtractParams(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
+                    inference_batch_size=page_elements_batch_size,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                        "pdf_extract_workers": pdf_extract_tasks,
+                        "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
+                        "pdf_split_batch_size": pdf_split_batch_size,
+                        "pdf_extract_batch_size": pdf_extract_batch_size,
+                        "page_elements_batch_size": page_elements_batch_size,
+                        "page_elements_workers": page_elements_actors,
+                        "detect_workers": ocr_actors,
+                        "detect_batch_size": ocr_batch_size,
+                        "ocr_inference_batch_size": ocr_batch_size,
+                        "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                        "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                        "gpu_page_elements": page_elements_gpus_per_actor,
+                        "gpu_ocr": ocr_gpus_per_actor,
+                        "gpu_embed": embed_gpus_per_actor,
+                        "nemotron_parse_workers": nemotron_parse_actors,
+                        "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
+                        "nemotron_parse_batch_size": nemotron_parse_batch_size,
+                    },
                 )
             )
         else:
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(
-                    ExtractParams(
-                        extract_text=True,
-                        extract_tables=True,
-                        extract_charts=True,
-                        extract_infographics=False,
-                        use_graphic_elements=use_graphic_elements,
-                        graphic_elements_invoke_url=graphic_elements_invoke_url,
-                        inference_batch_size=page_elements_batch_size,
-                        use_table_structure=use_table_structure,
-                        table_output_format=table_output_format,
-                        table_structure_invoke_url=table_structure_invoke_url,
-                        page_elements_invoke_url=page_elements_invoke_url,
-                        ocr_invoke_url=ocr_invoke_url,
-                        batch_tuning={
-                            "debug_run_id": str(runtime_metrics_prefix or "unknown"),
-                            "pdf_extract_workers": pdf_extract_tasks,
-                            "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
-                            "pdf_split_batch_size": pdf_split_batch_size,
-                            "pdf_extract_batch_size": pdf_extract_batch_size,
-                            "page_elements_batch_size": page_elements_batch_size,
-                            "inference_batch_size": page_elements_batch_size,
-                            "page_elements_workers": page_elements_actors,
-                            "detect_workers": ocr_actors,
-                            "detect_batch_size": ocr_batch_size,
-                            "ocr_inference_batch_size": ocr_batch_size,
-                            "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
-                            "ocr_cpus_per_actor": ocr_cpus_per_actor,
-                            "gpu_page_elements": page_elements_gpus_per_actor,
-                            "gpu_ocr": ocr_gpus_per_actor,
-                            "gpu_embed": embed_gpus_per_actor,
-                            "nemotron_parse_workers": nemotron_parse_actors,
-                            "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
-                            "nemotron_parse_batch_size": nemotron_parse_batch_size,
-                        },
-                    )
-                )
-                .embed(
-                    EmbedParams(
-                        model_name=str(embed_model_name),
-                        embed_invoke_url=embed_invoke_url,
-                        embed_modality=embed_modality,
-                        text_elements_modality=text_elements_modality,
-                        structured_elements_modality=structured_elements_modality,
-                        batch_tuning={
-                            "embed_workers": embed_actors,
-                            "embed_batch_size": int(embed_batch_size),
-                            "embed_cpus_per_actor": float(embed_cpus_per_actor),
-                        },
-                    )
-                )
-                .vdb_upload(
-                    VdbUploadParams(
-                        lancedb={
-                            "lancedb_uri": lancedb_uri,
-                            "table_name": LANCEDB_TABLE,
-                            "overwrite": True,
-                            "create_index": True,
-                            "hybrid": hybrid,
-                        }
-                    )
+            ingestor = ingestor.files(file_patterns).extract(
+                ExtractParams(
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=False,
+                    use_graphic_elements=use_graphic_elements,
+                    graphic_elements_invoke_url=graphic_elements_invoke_url,
+                    inference_batch_size=page_elements_batch_size,
+                    use_table_structure=use_table_structure,
+                    table_output_format=table_output_format,
+                    table_structure_invoke_url=table_structure_invoke_url,
+                    page_elements_invoke_url=page_elements_invoke_url,
+                    ocr_invoke_url=ocr_invoke_url,
+                    batch_tuning={
+                        "debug_run_id": str(runtime_metrics_prefix or "unknown"),
+                        "pdf_extract_workers": pdf_extract_tasks,
+                        "pdf_extract_num_cpus": pdf_extract_cpus_per_task,
+                        "pdf_split_batch_size": pdf_split_batch_size,
+                        "pdf_extract_batch_size": pdf_extract_batch_size,
+                        "page_elements_batch_size": page_elements_batch_size,
+                        "inference_batch_size": page_elements_batch_size,
+                        "page_elements_workers": page_elements_actors,
+                        "detect_workers": ocr_actors,
+                        "detect_batch_size": ocr_batch_size,
+                        "ocr_inference_batch_size": ocr_batch_size,
+                        "page_elements_cpus_per_actor": page_elements_cpus_per_actor,
+                        "ocr_cpus_per_actor": ocr_cpus_per_actor,
+                        "gpu_page_elements": page_elements_gpus_per_actor,
+                        "gpu_ocr": ocr_gpus_per_actor,
+                        "gpu_embed": embed_gpus_per_actor,
+                        "nemotron_parse_workers": nemotron_parse_actors,
+                        "gpu_nemotron_parse": nemotron_parse_gpus_per_actor,
+                        "nemotron_parse_batch_size": nemotron_parse_batch_size,
+                    },
                 )
             )
+
+        enable_text_chunk = text_chunk or text_chunk_max_tokens is not None or text_chunk_overlap_tokens is not None
+        if enable_text_chunk:
+            ingestor = ingestor.split(
+                TextChunkParams(
+                    max_tokens=text_chunk_max_tokens or 1024,
+                    overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
+                )
+            )
+
+        ingestor = ingestor.embed(
+            EmbedParams(
+                model_name=str(embed_model_name),
+                embed_invoke_url=embed_invoke_url,
+                embed_modality=embed_modality,
+                text_elements_modality=text_elements_modality,
+                structured_elements_modality=structured_elements_modality,
+                embed_granularity=embed_granularity,
+                batch_tuning={
+                    "embed_workers": embed_actors,
+                    "embed_batch_size": int(embed_batch_size),
+                    "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                },
+            )
+        ).vdb_upload(
+            VdbUploadParams(
+                lancedb={
+                    "lancedb_uri": lancedb_uri,
+                    "table_name": LANCEDB_TABLE,
+                    "overwrite": True,
+                    "create_index": True,
+                    "hybrid": hybrid,
+                }
+            )
+        )
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()

@@ -1197,6 +1197,21 @@ class InProcessIngestor(Ingestor):
 
         return self
 
+    def split(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
+        """
+        Re-chunk the ``text`` column by token count (post-extraction transform).
+
+        Appends :func:`~nemo_retriever.txt.split.split_df` as a GPU-category
+        task so it runs in sequence after extraction and before embedding.
+        """
+        from nemo_retriever.txt.split import split_df
+
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        split_kwargs = resolved.model_dump(mode="python")
+        split_kwargs.pop("encoding", None)
+        self._tasks.append((split_df, split_kwargs))
+        return self
+
     def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
         """
         Configure txt ingestion: tokenizer-based chunking only (no PDF extraction).
