@@ -261,7 +261,7 @@ def table_structure_ocr_page_elements(
         _np_rgb_to_b64_png,
         _parse_ocr_result,
     )
-    from nemo_retriever.util.table_and_chart import join_table_structure_and_ocr_output
+    from nemo_retriever.utils.table_and_chart import join_table_structure_and_ocr_output
 
     retry = remote_retry or RemoteRetryParams(
         remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),

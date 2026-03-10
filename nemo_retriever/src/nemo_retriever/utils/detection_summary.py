@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Tuple
 
 
@@ -171,3 +172,25 @@ def print_detection_summary(summary: Optional[Dict[str, Any]]) -> None:
     else:
         for label, count in by_label.items():
             print(f"    {label}: {count}")
+
+
+def write_detection_summary(path: Path, summary: Optional[Dict[str, Any]]) -> None:
+    """Write a detection summary dict to a JSON file."""
+    target = Path(path).expanduser().resolve()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = summary if summary is not None else {"error": "Detection summary unavailable."}
+    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
+    """Print pages-per-second throughput to stdout."""
+    if ingest_elapsed_s <= 0:
+        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
+        return
+    if processed_pages is None:
+        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
+        return
+
+    pps = processed_pages / ingest_elapsed_s
+    print(f"Pages processed: {processed_pages}")
+    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
