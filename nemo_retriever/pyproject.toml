@@ -40,8 +40,10 @@ dependencies = [
   "pydantic>=2.8.0",
   "typer>=0.12.0",
   "rich>=13.7.0",
-  "pillow>=12.0.0",
+  "pillow==12.1.1",
   "numpy>=1.26.0",
+  "nltk==3.9.3",
+  "urllib3==2.6.3",
   "debugpy>=1.8.0",
   "python-multipart>=0.0.9",
   # Versions 4.54.0-4.55.x have a flash attention bug; exclude that range.
@@ -62,9 +64,14 @@ dependencies = [
   "albumentations==2.0.8",
   "scikit-learn>=1.6.0",
   "open-clip-torch==3.2.0",
+  "nvidia-ml-py",
 ]
 
+
 [project.optional-dependencies]
+svg = [
+  "cairosvg>=2.7.0",
+]
 asr = [
   # Local ASR (Parakeet nvidia/parakeet-ctc-1.1b): transformers>=5 required by model.
   "transformers>=5.0.0",
@@ -107,7 +114,7 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.setuptools.packages.find]

@@ -23,14 +23,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime, timezone
 from io import BytesIO
 from collections.abc import Callable, Iterator
-from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 
 import pandas as pd
 from nemo_retriever.model import _DEFAULT_EMBED_MODEL
 from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3, NemotronParseV12
-from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+from nemo_retriever.chart.chart_detection import graphic_elements_ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.ocr.ocr import _crop_b64_image_by_norm_bbox, nemotron_parse_page_elements, ocr_page_elements
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
@@ -60,18 +59,14 @@ from ..params import TextChunkParams
 from ..params import VdbUploadParams
 from ..pdf.extract import pdf_extraction
 from ..pdf.split import _split_pdf_to_single_page_bytes, pdf_path_to_pages_df
+from ..utils.remote_auth import resolve_remote_api_key
 from ..txt import txt_file_to_chunks_df
 from ..html import html_file_to_chunks_df
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
 
 
-def _coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
-    if params is None:
-        return model_cls(**kwargs)
-    if kwargs:
-        return params.model_copy(update=kwargs)  # type: ignore[return-value]
-    return params
+from nemo_retriever.params.utils import coerce_params as _coerce_params
 
 
 def _combine_text_with_content(row, text_column, content_columns):
@@ -190,6 +185,7 @@ def explode_content_to_rows(
         if isinstance(page_text, str) and page_text.strip():
             page_row = _deep_copy_row(row_dict)
             page_row["_embed_modality"] = text_mod
+            page_row["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 page_row["_image_b64"] = page_image_b64
             new_rows.append(page_row)
@@ -209,6 +205,7 @@ def explode_content_to_rows(
                 content_row = _deep_copy_row(row_dict)
                 content_row[text_column] = t.strip()
                 content_row["_embed_modality"] = struct_mod
+                content_row["_content_type"] = col
                 if struct_mod in IMAGE_MODALITIES and page_image_b64:
                     bbox = item.get("bbox_xyxy_norm")
                     if bbox and len(bbox) == 4:
@@ -225,6 +222,7 @@ def explode_content_to_rows(
         if not exploded_any:
             preserved = _deep_copy_row(row_dict)
             preserved["_embed_modality"] = text_mod
+            preserved["_content_type"] = "text"
             if text_mod in IMAGE_MODALITIES:
                 preserved["_image_b64"] = page_image_b64
             new_rows.append(preserved)
@@ -285,6 +283,7 @@ def _embed_group(
     group_modality: str,
     model: Any,
     endpoint: Optional[str],
+    api_key: Optional[str],
     text_column: str,
     inference_batch_size: int,
     output_column: str,
@@ -334,7 +333,8 @@ def _embed_group(
         embed_modality=group_modality,
     )
 
-    task_config: Dict[str, Any] = {
+    task_config = {
+        "api_key": api_key,
         "embedder": _embed,
         "multimodal_embedder": _multimodal_embedder,
         "endpoint_url": endpoint,
@@ -357,6 +357,7 @@ def embed_text_main_text_embed(
     model_name: Optional[str] = None,
     embedding_endpoint: Optional[str] = None,
     embed_invoke_url: Optional[str] = None,
+    api_key: Optional[str] = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
     output_column: str = "text_embeddings_1b_v2",
@@ -418,6 +419,7 @@ def embed_text_main_text_embed(
                 group_modality=modalities[0],
                 model=model,
                 endpoint=_endpoint,
+                api_key=api_key,
                 text_column=text_column,
                 inference_batch_size=inference_batch_size,
                 output_column=output_column,
@@ -436,6 +438,7 @@ def embed_text_main_text_embed(
                     group_modality=mod,
                     model=model,
                     endpoint=_endpoint,
+                    api_key=api_key,
                     text_column=text_column,
                     inference_batch_size=inference_batch_size,
                     output_column=output_column,
@@ -637,67 +640,12 @@ def save_dataframe_to_disk_json(df: Any, *, output_directory: str) -> Any:
     return df
 
 
-def _extract_embedding_from_row(
-    row: Any,
-    *,
-    embedding_column: str = "text_embeddings_1b_v2",
-    embedding_key: str = "embedding",
-) -> Optional[List[float]]:
-    """
-    Extract an embedding vector from a row (namedtuple or pd.Series).
-
-    Supports:
-    - `metadata.embedding` (preferred if present)
-    - `embedding_column` payloads like `{"embedding": [...], ...}` (from `embed_text_1b_v2`)
-    """
-    meta = getattr(row, "metadata", None)
-    if isinstance(meta, dict):
-        emb = meta.get("embedding")
-        if isinstance(emb, list) and emb:
-            return emb  # type: ignore[return-value]
-
-    payload = getattr(row, embedding_column, None)
-    if isinstance(payload, dict):
-        emb = payload.get(embedding_key)
-        if isinstance(emb, list) and emb:
-            return emb  # type: ignore[return-value]
-    return None
-
-
-def _extract_source_path_and_page(row: Any) -> Tuple[str, int]:
-    """
-    Best-effort extract of source path and page number for LanceDB row metadata.
-    """
-    path = ""
-    page = -1
-
-    v = getattr(row, "path", None)
-    if isinstance(v, str) and v.strip():
-        path = v.strip()
-
-    v = getattr(row, "page_number", None)
-    try:
-        if v is not None:
-            page = int(v)
-    except Exception:
-        pass
-
-    meta = getattr(row, "metadata", None)
-    if isinstance(meta, dict):
-        sp = meta.get("source_path")
-        if isinstance(sp, str) and sp.strip():
-            path = sp.strip()
-        # Some schemas store page under content metadata; support if present.
-        cm = meta.get("content_metadata")
-        if isinstance(cm, dict) and page == -1:
-            h = cm.get("hierarchy")
-            if isinstance(h, dict) and "page" in h:
-                try:
-                    page = int(h.get("page"))
-                except Exception:
-                    pass
-
-    return path, page
+from nemo_retriever.ingest_modes.lancedb_utils import (
+    build_lancedb_rows,
+    create_or_append_lancedb_table,
+    infer_vector_dim,
+    lancedb_schema,
+)
 
 
 def upload_embeddings_to_lancedb_inprocess(
@@ -747,112 +695,32 @@ def upload_embeddings_to_lancedb_inprocess(
     if not isinstance(df, pd.DataFrame):
         raise TypeError(f"upload_embeddings_to_lancedb_inprocess expects pandas.DataFrame, got {type(df)!r}")
 
-    rows: List[Dict[str, Any]] = []
-    for r in df.itertuples(index=False):
-        emb = _extract_embedding_from_row(r, embedding_column=str(embedding_column), embedding_key=str(embedding_key))
-        if emb is None:
-            continue
-
-        path, page_number = _extract_source_path_and_page(r)
-        p = Path(path) if path else None
-        filename = p.name if p is not None else ""
-        pdf_basename = p.stem if p is not None else ""
-        pdf_page = f"{pdf_basename}_{page_number}" if (pdf_basename and page_number >= 0) else ""
-        source_id = path or filename or pdf_basename
-
-        # Provide fields compatible with `nemo_retriever.recall.core` which expects LanceDB hits
-        # to include JSON-encoded `metadata` and `source` strings.
-        metadata_obj: Dict[str, Any] = {"page_number": int(page_number) if page_number is not None else -1}
-        if pdf_page:
-            metadata_obj["pdf_page"] = pdf_page
-        # Persist per-page detection counters for end-of-run summaries.
-        # Mirrors batch.py so LanceDB-based summary reads also work.
-        pe_num = getattr(r, "page_elements_v3_num_detections", None)
-        if pe_num is not None:
-            try:
-                metadata_obj["page_elements_v3_num_detections"] = int(pe_num)
-            except Exception:
-                pass
-        pe_counts = getattr(r, "page_elements_v3_counts_by_label", None)
-        if isinstance(pe_counts, dict):
-            metadata_obj["page_elements_v3_counts_by_label"] = {
-                str(k): int(v) for k, v in pe_counts.items() if isinstance(k, str) and v is not None
-            }
-        for ocr_col in ("table", "chart", "infographic"):
-            entries = getattr(r, ocr_col, None)
-            if isinstance(entries, list):
-                metadata_obj[f"ocr_{ocr_col}_detections"] = int(len(entries))
-        source_obj: Dict[str, Any] = {"source_id": str(path)}
-
-        row_out: Dict[str, Any] = {
-            "vector": emb,
-            "pdf_page": pdf_page,
-            "filename": filename,
-            "pdf_basename": pdf_basename,
-            "page_number": int(page_number) if page_number is not None else -1,
-            "source_id": str(source_id),
-            "path": str(path),
-            "metadata": json.dumps(metadata_obj, ensure_ascii=False),
-            "source": json.dumps(source_obj, ensure_ascii=False),
-        }
-
-        if include_text:
-            t = getattr(r, text_column, None)
-            row_out["text"] = str(t) if isinstance(t, str) else ""
-        else:
-            # Still include the column for compatibility with the recall script's `.select(["text",...])`.
-            row_out["text"] = ""
-
-        rows.append(row_out)
+    rows = build_lancedb_rows(
+        df,
+        embedding_column=str(embedding_column),
+        embedding_key=str(embedding_key),
+        text_column=str(text_column),
+        include_text=bool(include_text),
+    )
 
     if not rows:
         print("No embeddings found to upload to LanceDB (no rows had embeddings).")
         return df
 
-    # Infer vector dim from first row.
-    dim = 0
-    for rr in rows:
-        v = rr.get("vector")
-        if isinstance(v, list) and v:
-            dim = int(len(v))
-            break
+    dim = infer_vector_dim(rows)
     if dim <= 0:
         raise ValueError("Failed to infer embedding dimension from DataFrame rows.")
 
     try:
         import lancedb  # type: ignore
-        import pyarrow as pa  # type: ignore
     except Exception as e:
         raise RuntimeError(
             "LanceDB upload requested but dependencies are missing. Install `lancedb` and `pyarrow`."
         ) from e
 
     db = lancedb.connect(uri=str(lancedb_uri))
-
-    fields = [
-        pa.field("vector", pa.list_(pa.float32(), dim)),
-        pa.field("pdf_page", pa.string()),
-        pa.field("filename", pa.string()),
-        pa.field("pdf_basename", pa.string()),
-        pa.field("page_number", pa.int32()),
-        pa.field("source_id", pa.string()),
-        pa.field("path", pa.string()),
-        # Compatibility columns expected by `nemo_retriever.recall.core`:
-        pa.field("text", pa.string()),
-        pa.field("metadata", pa.string()),
-        pa.field("source", pa.string()),
-    ]
-    schema = pa.schema(fields)
-
-    # Overwrite vs append.
-    if overwrite:
-        table = db.create_table(str(table_name), data=list(rows), schema=schema, mode="overwrite")
-    else:
-        try:
-            table = db.open_table(str(table_name))
-            table.add(list(rows))
-        except Exception:
-            table = db.create_table(str(table_name), data=list(rows), schema=schema, mode="create")
+    schema = lancedb_schema(dim)
+    table = create_or_append_lancedb_table(db, str(table_name), rows, schema, overwrite=overwrite)
 
     if create_index:
         # LanceDB IVF-based indexes train k-means with K=num_partitions. K must be < N vectors.
@@ -1046,105 +914,16 @@ def _process_chunk_cpu(chunk_df: pd.DataFrame, cpu_tasks: list) -> pd.DataFrame:
 
 
 def _collect_summary_from_df(df: pd.DataFrame) -> dict:
-    """Compute detection summary from a result DataFrame.
+    """Compute detection summary from a result DataFrame."""
+    from nemo_retriever.utils.detection_summary import collect_detection_summary_from_df
 
-    Mirrors the batch pipeline's ``_collect_detection_summary`` but reads
-    directly from the in-memory DataFrame instead of LanceDB.  Rows are
-    deduplicated by ``(path, page_number)`` so exploded content rows don't
-    inflate counts.
-    """
-    per_page: dict[tuple, dict] = {}
-
-    for _, row in df.iterrows():
-        row_dict = row.to_dict()
-
-        path = str(row_dict.get("path") or row_dict.get("source_id") or "")
-        page_number = -1
-        try:
-            page_number = int(row_dict.get("page_number", -1))
-        except (TypeError, ValueError):
-            pass
-
-        key = (path, page_number)
-
-        meta = row_dict.get("metadata")
-        if isinstance(meta, str):
-            try:
-                meta = json.loads(meta)
-            except Exception:
-                meta = {}
-        if not isinstance(meta, dict):
-            meta = {}
-
-        entry = per_page.setdefault(
-            key,
-            {
-                "pe": 0,
-                "ocr_table": 0,
-                "ocr_chart": 0,
-                "ocr_infographic": 0,
-                "pe_by_label": defaultdict(int),
-            },
-        )
-
-        # Check metadata first, then fall back to direct DataFrame columns.
-        # The batch pipeline stores these inside the metadata JSON, but the
-        # inprocess pipeline keeps them as top-level DataFrame columns.
-        try:
-            pe = int(
-                meta.get("page_elements_v3_num_detections") or row_dict.get("page_elements_v3_num_detections") or 0
-            )
-        except (TypeError, ValueError):
-            pe = 0
-        entry["pe"] = max(entry["pe"], pe)
-
-        for field, meta_key, col_key in [
-            ("ocr_table", "ocr_table_detections", "table"),
-            ("ocr_chart", "ocr_chart_detections", "chart"),
-            ("ocr_infographic", "ocr_infographic_detections", "infographic"),
-        ]:
-            try:
-                val = int(meta.get(meta_key, 0) or 0)
-            except (TypeError, ValueError):
-                val = 0
-            # Fall back to counting direct list columns (e.g. row["table"]).
-            if val == 0:
-                col_val = row_dict.get(col_key)
-                if isinstance(col_val, list):
-                    val = len(col_val)
-            entry[field] = max(entry[field], val)
-
-        label_counts = meta.get("page_elements_v3_counts_by_label") or row_dict.get("page_elements_v3_counts_by_label")
-        if isinstance(label_counts, dict):
-            for label, count in label_counts.items():
-                try:
-                    c = int(count or 0)
-                except (TypeError, ValueError):
-                    c = 0
-                entry["pe_by_label"][str(label)] = max(entry["pe_by_label"][str(label)], c)
-
-    pe_by_label_totals: dict[str, int] = defaultdict(int)
-    pe_total = ocr_table_total = ocr_chart_total = ocr_infographic_total = 0
-    for e in per_page.values():
-        pe_total += e["pe"]
-        ocr_table_total += e["ocr_table"]
-        ocr_chart_total += e["ocr_chart"]
-        ocr_infographic_total += e["ocr_infographic"]
-        for label, count in e["pe_by_label"].items():
-            pe_by_label_totals[label] += count
-
-    return {
-        "pages_seen": len(per_page),
-        "page_elements_v3_total_detections": pe_total,
-        "page_elements_v3_counts_by_label": dict(sorted(pe_by_label_totals.items())),
-        "ocr_table_total_detections": ocr_table_total,
-        "ocr_chart_total_detections": ocr_chart_total,
-        "ocr_infographic_total_detections": ocr_infographic_total,
-    }
+    return collect_detection_summary_from_df(df)
 
 
 def _print_ingest_summary(results: list, elapsed_s: float) -> None:
     """Print end-of-ingest summary matching batch pipeline output format."""
+    from nemo_retriever.utils.detection_summary import print_detection_summary
+
     dfs = [r for r in results if isinstance(r, pd.DataFrame) and not r.empty]
     if not dfs:
         print(f"\nIngest time: {elapsed_s:.2f}s (no documents processed)")
@@ -1152,20 +931,7 @@ def _print_ingest_summary(results: list, elapsed_s: float) -> None:
 
     combined = pd.concat(dfs, ignore_index=True) if len(dfs) > 1 else dfs[0]
     summary = _collect_summary_from_df(combined)
-
-    print("\nDetection summary (deduped by source/page_number):")
-    print(f"  Pages seen: {summary['pages_seen']}")
-    print(f"  PageElements v3 total detections: {summary['page_elements_v3_total_detections']}")
-    print(f"  OCR table detections: {summary['ocr_table_total_detections']}")
-    print(f"  OCR chart detections: {summary['ocr_chart_total_detections']}")
-    print(f"  OCR infographic detections: {summary['ocr_infographic_total_detections']}")
-    print("  PageElements v3 counts by label:")
-    by_label = summary.get("page_elements_v3_counts_by_label", {})
-    if not by_label:
-        print("    (none)")
-    else:
-        for label, count in by_label.items():
-            print(f"    {label}: {count}")
+    print_detection_summary(summary)
 
     pages = summary["pages_seen"]
     if elapsed_s > 0 and pages > 0:
@@ -1189,8 +955,8 @@ class InProcessIngestor(Ingestor):
         # Builder-style configuration recorded for later execution (TBD).
         self._tasks: List[tuple[Callable[..., Any], dict[str, Any]]] = []
 
-        # Pipeline type: "pdf" (extract), "txt" (extract_txt), or "html" (extract_html). Loader dispatch in ingest().
-        self._pipeline_type: Literal["pdf", "txt", "html"] = "pdf"
+        # Pipeline type: "pdf" (extract), "txt" (extract_txt), "html" (extract_html), or "image" (extract_image_files).
+        self._pipeline_type: Literal["pdf", "txt", "html", "image"] = "pdf"
         self._extract_txt_kwargs: Dict[str, Any] = {}
         self._extract_html_kwargs: Dict[str, Any] = {}
 
@@ -1239,6 +1005,19 @@ class InProcessIngestor(Ingestor):
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = resolved.model_dump(mode="python")
         batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
         nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
@@ -1250,8 +1029,8 @@ class InProcessIngestor(Ingestor):
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
-        # the caller explicitly disables it.
-        if "extract_page_as_image" not in extract_kwargs:
+        # the caller explicitly set it to False.
+        if extract_kwargs.get("extract_page_as_image") is None:
             if any(
                 extract_kwargs.get(k) is True
                 for k in ("extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics")
@@ -1259,6 +1038,23 @@ class InProcessIngestor(Ingestor):
                 extract_kwargs["extract_page_as_image"] = True
         self._pipeline_type = "pdf"
         self._tasks.append((pdf_extraction, extract_kwargs))
+
+        self._append_detection_tasks(kwargs, use_nemotron_parse_only=use_nemotron_parse_only)
+
+        return self
+
+    def _append_detection_tasks(
+        self,
+        kwargs: dict[str, Any],
+        *,
+        use_nemotron_parse_only: bool = False,
+    ) -> None:
+        """Append page-element detection, OCR, table/chart/infographic tasks.
+
+        Shared by ``extract()`` (PDF) and ``extract_image_files()`` (standalone images).
+        """
+        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
+        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
 
         # Common, optional knobs shared by our detect_* helpers.
         detect_passthrough_keys = {
@@ -1337,6 +1133,40 @@ class InProcessIngestor(Ingestor):
                     )
                 )
 
+            use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
+
+            # When use_graphic_elements is True, charts go through the
+            # combined graphic-elements + OCR stage instead of OCR-only.
+            if use_graphic_elements and kwargs.get("extract_charts") is True:
+                print("Adding graphic-elements+OCR extraction task")
+                ge_invoke_url = kwargs.get("graphic_elements_invoke_url", "")
+                ocr_invoke_url = kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
+                ocr_model_dir = (
+                    kwargs.get("ocr_model_dir")
+                    or os.environ.get("RETRIEVER_NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_MODEL_DIR", "").strip()
+                    or os.environ.get("NEMOTRON_OCR_V1_MODEL_DIR", "").strip()
+                )
+
+                ge_ocr_kwargs: dict[str, Any] = {}
+                if ge_invoke_url:
+                    ge_ocr_kwargs["graphic_elements_invoke_url"] = ge_invoke_url
+                    ge_ocr_kwargs["graphic_elements_model"] = None
+                else:
+                    from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+                    ge_ocr_kwargs["graphic_elements_model"] = NemotronGraphicElementsV1()
+
+                if ocr_invoke_url:
+                    ge_ocr_kwargs["ocr_invoke_url"] = ocr_invoke_url
+                    ge_ocr_kwargs["ocr_model"] = None
+                else:
+                    ocr_model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
+                    ge_ocr_kwargs["ocr_model"] = ocr_model
+
+                ge_ocr_kwargs.update(_stage_remote_kwargs("ocr"))
+                self._tasks.append((graphic_elements_ocr_page_elements, ge_ocr_kwargs))
+
             use_table_structure = bool(kwargs.get("use_table_structure", False))
             from nemo_retriever.application.pipeline.build_plan import validate_table_structure_flags
 
@@ -1377,12 +1207,15 @@ class InProcessIngestor(Ingestor):
                 self._tasks.append((table_structure_ocr_page_elements, ts_ocr_kwargs))
 
             # OCR-based extraction for tables/charts/infographics.
-            # When use_table_structure is True, tables are handled above;
-            # charts/infographics still go through OCR.
+            # When use_graphic_elements is True, charts are handled above;
+            # when use_table_structure is True, tables are handled above.
             ocr_flags = {}
+            method = kwargs.get("method", "pdfium")
+            if method in ("pdfium_hybrid", "ocr") and kwargs.get("extract_text") is True:
+                ocr_flags["extract_text"] = True
             if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
-            if kwargs.get("extract_charts") is True:
+            if kwargs.get("extract_charts") is True and not use_graphic_elements:
                 ocr_flags["extract_charts"] = True
             if kwargs.get("extract_infographics") is True:
                 ocr_flags["extract_infographics"] = True
@@ -1403,6 +1236,37 @@ class InProcessIngestor(Ingestor):
                     model = NemotronOCRV1(model_dir=str(ocr_model_dir)) if ocr_model_dir else NemotronOCRV1()
                     self._tasks.append((ocr_page_elements, {"model": model, **ocr_flags}))
 
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "InProcessIngestor":
+        """
+        Configure image ingestion: standalone image -> page DataFrame -> detection/OCR.
+
+        Use with .files("*.png").extract_image_files(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_image_files().
+        """
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+        kwargs = resolved.model_dump(mode="python")
+        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
+        nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(batch_tuning.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        use_nemotron_parse_only = (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
+        self._pipeline_type = "image"
+        self._append_detection_tasks(kwargs, use_nemotron_parse_only=use_nemotron_parse_only)
         return self
 
     def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1463,6 +1327,8 @@ class InProcessIngestor(Ingestor):
         embedding instead of the local HF model.
         """
         resolved = _coerce_params(params, EmbedParams, kwargs)
+        if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         embed_modality = resolved.embed_modality
         embed_granularity = resolved.embed_granularity
 
@@ -1489,14 +1355,9 @@ class InProcessIngestor(Ingestor):
                 )
             )
 
-        embed_kwargs = {
-            **resolved.model_dump(
-                mode="python", exclude={"runtime", "batch_tuning", "fused_tuning"}, exclude_none=True
-            ),
-            **resolved.runtime.model_dump(mode="python", exclude_none=True),
-        }
-        if "embedding_endpoint" not in embed_kwargs and embed_kwargs.get("embed_invoke_url"):
-            embed_kwargs["embedding_endpoint"] = embed_kwargs.get("embed_invoke_url")
+        from nemo_retriever.params.utils import build_embed_kwargs
+
+        embed_kwargs = build_embed_kwargs(resolved)
 
         # Ensure embed_modality is forwarded to the embedding function.
         embed_kwargs["embed_modality"] = embed_modality
@@ -1518,6 +1379,7 @@ class InProcessIngestor(Ingestor):
         model_name_raw = embed_kwargs.pop("model_name", None)
 
         from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 
         model_id = resolve_embed_model(model_name_raw)
         embed_kwargs.setdefault("input_type", "passage")
@@ -1537,10 +1399,10 @@ class InProcessIngestor(Ingestor):
             if embed_use_vllm:
                 embedder_kwargs.update(
                     use_vllm=True,
-                    gpu_memory_utilization=float(kwargs.get("gpu_memory_utilization", 0.45)),
-                    enforce_eager=bool(kwargs.get("enforce_eager", False)),
-                    compile_cache_dir=kwargs.get("compile_cache_dir"),
-                    dimensions=kwargs.get("dimensions"),
+                    gpu_memory_utilization=float(embed_kwargs.get("gpu_memory_utilization", 0.45)),
+                    enforce_eager=bool(embed_kwargs.get("enforce_eager", False)),
+                    compile_cache_dir=embed_kwargs.get("compile_cache_dir"),
+                    dimensions=embed_kwargs.get("dimensions"),
                 )
             else:
                 embedder_kwargs.update(
@@ -1898,6 +1760,13 @@ class InProcessIngestor(Ingestor):
 
             def _loader(p: str) -> pd.DataFrame:
                 return html_file_to_chunks_df(p, params=HtmlChunkParams(**self._extract_html_kwargs))
+
+        elif self._pipeline_type == "image":
+
+            def _loader(p: str) -> pd.DataFrame:
+                from nemo_retriever.image.load import image_file_to_pages_df
+
+                return image_file_to_pages_df(p)
 
         elif self._pipeline_type == "audio":
 

@@ -6,7 +6,7 @@ to find, contextualize, and extract text, tables, charts and infographics that y
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 NeMo Retriever Library enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and infographics), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever Library can optionally manage computation of embeddings for the extracted content, 

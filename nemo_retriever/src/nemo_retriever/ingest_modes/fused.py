@@ -16,6 +16,9 @@ from typing import Any, Dict
 
 import ray.data as rd
 
+from nemo_retriever.chart.chart_detection import (
+    graphic_elements_ocr_page_elements,
+)
 from nemo_retriever.ocr import ocr_page_elements
 from nemo_retriever.page_elements import detect_page_elements_v3
 from nemo_retriever.table.table_detection import table_structure_ocr_page_elements
@@ -38,6 +41,7 @@ def _assert_no_remote_endpoints(kwargs: Dict[str, Any], *, context: str) -> None
         "page_elements_invoke_url",
         "ocr_invoke_url",
         "table_structure_invoke_url",
+        "graphic_elements_invoke_url",
         "embedding_endpoint",
         "embed_invoke_url",
     )
@@ -55,10 +59,9 @@ class _FusedModelActor:
     def __init__(self, **kwargs: Any) -> None:
         _assert_no_remote_endpoints(dict(kwargs), context="actor init")
 
+        from nemo_retriever.model import resolve_embed_model
         from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import (
-            LlamaNemotronEmbed1BV2Embedder,
-        )
+        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 
         self._detect_kwargs = {
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
@@ -74,8 +77,11 @@ class _FusedModelActor:
             self._use_table_structure,
             str(kwargs.get("table_output_format", "pseudo_markdown")),
         )
+        self._extract_text = bool(kwargs.get("extract_text", False))
+        self._method = str(kwargs.get("method", "pdfium"))
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
+        self._use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
         self._embed_granularity = str(kwargs.get("embed_granularity", "element"))
         self._embed_modality = str(kwargs.get("embed_modality", "text"))
         self._embed_kwargs = {
@@ -95,11 +101,14 @@ class _FusedModelActor:
         max_length = int(kwargs.get("max_length", 8192))
         model_name_raw = kwargs.get("model_name")
         embed_use_vllm = bool(kwargs.get("embed_use_vllm", False))
-        from nemo_retriever.model import resolve_embed_model
-
         resolved_model_id = resolve_embed_model(model_name_raw)
 
         self._page_elements_model = NemotronPageElementsV3()
+        self._ge_model = None
+        if self._use_graphic_elements and self._extract_charts:
+            from nemo_retriever.model.local import NemotronGraphicElementsV1
+
+            self._ge_model = NemotronGraphicElementsV1()
         self._ocr_model = NemotronOCRV1()
 
         self._table_structure_model = None
@@ -107,7 +116,6 @@ class _FusedModelActor:
             from nemo_retriever.model.local import NemotronTableStructureV1
 
             self._table_structure_model = NemotronTableStructureV1()
-
         embedder_kwargs: dict[str, Any] = {"model_id": resolved_model_id}
         if embed_use_vllm:
             embedder_kwargs.update(
@@ -133,6 +141,19 @@ class _FusedModelActor:
             **self._detect_kwargs,
         )
 
+        # Determine if OCR should extract text for scanned pages.
+        ocr_extract_text = self._extract_text and self._method in ("pdfium_hybrid", "ocr")
+
+        # Charts: combined graphic-elements + OCR stage (like table-structure + OCR).
+        ocr_extract_charts = self._extract_charts
+        if self._use_graphic_elements and self._extract_charts:
+            detected = graphic_elements_ocr_page_elements(
+                detected,
+                graphic_elements_model=self._ge_model,
+                ocr_model=self._ocr_model,
+            )
+            ocr_extract_charts = False  # Charts already handled.
+
         if self._extract_tables and self._use_table_structure:
             # Tables go through combined table-structure + OCR stage.
             detected = table_structure_ocr_page_elements(
@@ -144,19 +165,20 @@ class _FusedModelActor:
             ocred = ocr_page_elements(
                 detected,
                 model=self._ocr_model,
+                extract_text=ocr_extract_text,
                 extract_tables=False,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
             )
         else:
             ocred = ocr_page_elements(
                 detected,
                 model=self._ocr_model,
+                extract_text=ocr_extract_text,
                 extract_tables=self._extract_tables,
-                extract_charts=self._extract_charts,
+                extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
             )
-
         if self._embed_granularity == "page":
             prepared = collapse_content_to_page_rows(
                 ocred, text_column=str(self._embed_kwargs["text_column"]), modality=self._embed_modality
@@ -170,6 +192,10 @@ class _FusedModelActor:
 class FusedIngestor(BatchIngestor):
     RUN_MODE = "fused"
     _fused_extract_flags: Dict[str, Any] = {}
+
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
+        """Fused mode does not yet support extract_image_files."""
+        raise NotImplementedError("Fused mode does not yet support extract_image_files")
 
     def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
         """
@@ -198,11 +224,14 @@ class FusedIngestor(BatchIngestor):
 
         self._tasks.append(("extract", dict(kwargs)))
         self._fused_extract_flags = {
+            "extract_text": bool(kwargs.get("extract_text", False)),
+            "method": str(kwargs.get("method", "pdfium")),
             "extract_tables": bool(kwargs.get("extract_tables", False)),
             "use_table_structure": bool(kwargs.get("use_table_structure", False)),
             "table_output_format": str(kwargs.get("table_output_format", "pseudo_markdown")),
             "extract_charts": bool(kwargs.get("extract_charts", False)),
             "extract_infographics": bool(kwargs.get("extract_infographics", False)),
+            "use_graphic_elements": bool(kwargs.get("use_graphic_elements", False)),
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
         }
 

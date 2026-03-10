@@ -140,7 +140,7 @@ def main(config=None, log_path: str = "test_results") -> int:
             "ground_truth_dir": ground_truth_dir,
             "vdb_backend": vdb_backend,
             "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
-            "nv_ranker_model_name": "nvidia/llama-3.2-nv-rerankqa-1b-v2",
+            "nv_ranker_model_name": "nvidia/llama-nemotron-rerank-1b-v2",
         }
         if vdb_backend == "lancedb":
             evaluation_params["table_path"] = lancedb_path

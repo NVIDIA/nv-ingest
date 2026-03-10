@@ -4,12 +4,12 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -170,25 +170,14 @@ def _embed_queries_local_hf(
     batch_size: int,
     model_name: Optional[str] = None,
 ) -> List[List[float]]:
-    # Lazy import: only load torch/HF when needed.
-    from nemo_retriever.model import is_vl_embed_model, resolve_embed_model
+    from nemo_retriever.model import create_local_embedder, is_vl_embed_model
 
-    model_id = resolve_embed_model(model_name)
+    embedder = create_local_embedder(model_name, device=device, hf_cache_dir=cache_dir)
 
     if is_vl_embed_model(model_name):
-        from nemo_retriever.model.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
-
-        embedder = LlamaNemotronEmbedVL1BV2Embedder(device=device, hf_cache_dir=cache_dir, model_id=model_id)
-        # VL model handles query formatting internally via encode_queries().
         vecs = embedder.embed_queries(queries, batch_size=int(batch_size))
     else:
-        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
-
-        embedder = LlamaNemotronEmbed1BV2Embedder(
-            device=device, hf_cache_dir=cache_dir, normalize=True, model_id=model_id
-        )
         vecs = embedder.embed(["query: " + q for q in queries], batch_size=int(batch_size))
-    # Ensure list-of-list floats.
     return vecs.detach().to("cpu").tolist()
 
 
@@ -257,7 +246,7 @@ def _search_lancedb(
                 .text(text)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source"])
+                .select(["text", "metadata", "source", "page_number"])
                 .limit(top_k)
                 .rerank(RRFReranker())
                 .to_list()
@@ -267,7 +256,7 @@ def _search_lancedb(
                 table.search(q, vector_column_name=vector_column_name)
                 .nprobes(effective_nprobes)
                 .refine_factor(refine_factor)
-                .select(["text", "metadata", "source", "_distance"])
+                .select(["text", "metadata", "source", "page_number", "_distance"])
                 .limit(top_k)
                 .to_list()
             )
@@ -281,12 +270,13 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     for hits in raw_hits:
         keys: List[str] = []
         for h in hits:
-            res = json.loads(h["metadata"])
-            source = json.loads(h["source"])
+            page_number = h["page_number"]
+            source = h["source"]
             # Prefer explicit `pdf_page` column; fall back to derived form.
-            if res.get("page_number") is not None and source.get("source_id"):
-                filename = Path(source["source_id"]).stem
-                keys.append(filename + "_" + str(res["page_number"]))
+            # if res.get("page_number") is not None and source.get("source_id"):
+            if page_number is not None and source:
+                filename = Path(source).stem
+                keys.append(f"{filename}_{str(page_number)}")
             else:
                 logger.warning(
                     "Skipping hit with missing page_number or source_id: metadata=%s source=%s",
@@ -328,6 +318,37 @@ def _is_hit(golden_key: str, retrieved: List[str], k: int, *, match_mode: str) -
 def is_hit_at_k(golden_key: str, retrieved: Sequence[str], k: int, *, match_mode: str) -> bool:
     """Public wrapper for top-k hit checks across match modes."""
     return _is_hit(str(golden_key), list(retrieved), int(k), match_mode=str(match_mode))
+
+
+def gold_to_doc_page(golden_key: str) -> tuple[str, str]:
+    """Split a golden key like ``"docname_page"`` into ``(doc, page)``."""
+    s = str(golden_key)
+    if "_" not in s:
+        return s, ""
+    doc, page = s.rsplit("_", 1)
+    return doc, page
+
+
+def hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
+    """Extract ``(pdf_page key, distance)`` from a single LanceDB hit dict.
+
+    Supports both ``_distance`` and ``_score`` fields for compatibility across
+    LanceDB query types (vector vs hybrid).
+    """
+    try:
+        res = json.loads(hit.get("metadata", "{}"))
+        source = json.loads(hit.get("source", "{}"))
+    except Exception:
+        return None, None
+
+    source_id = source.get("source_id")
+    page_number = res.get("page_number")
+    if not source_id or page_number is None:
+        return None, float(hit.get("_distance")) if "_distance" in hit else None
+
+    key = f"{Path(str(source_id)).stem}_{page_number}"
+    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
+    return key, dist
 
 
 def _recall_at_k(gold: List[str], retrieved: List[List[str]], k: int, *, match_mode: str) -> float:

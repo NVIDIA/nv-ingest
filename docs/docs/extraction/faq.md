@@ -4,7 +4,7 @@ This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retri
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 
@@ -29,7 +29,7 @@ For more information, refer to [Data Upload](data-store.md).
 
 ## How would I process unstructured images?
 
-For images that `nemoretriever-page-elements-v3` does not classify as tables, charts, or infographics,
+For images that `nemotron-page-elements-v3` does not classify as tables, charts, or infographics,
 you can use our VLM caption task to create a dense caption of the detected image. 
 That caption is then be embedded along with the rest of your content. 
 For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
@@ -57,17 +57,11 @@ You can set those directly in `docker-compose.yaml`, or in an [environment varia
 
 ### Library Mode
 
-For production environments, you should use the provided Helm charts. For [library mode](quickstart-library-mode.md), you should set the environment variable `NVIDIA_API_KEY`. This is because the NeMo Retriever containers and the NeMo Retriever services running inside them do not have access to the environment variables on the host machine where you run the `docker compose` command. Setting the variables in the `.env` file ensures that they are passed into the containers and available to the services that need them.
+For production environments, you should use the provided Helm charts. For [library mode](quickstart-library-mode.md), you should set the environment variable `NVIDIA_API_KEY`. This happens because the NeMo Retriever Library containers—and the services running inside them—don’t have access to the environment variables of the host machine where the `docker compose` command is executed. Setting the variables in the `.env` file ensures that they are passed into the containers and available to the services that need them.
 
 For advanced scenarios, you might want to use library mode with self-hosted NIM instances. 
 You can set custom endpoints for each NIM. 
 For examples of `*_ENDPOINT` variables, refer to [NeMo-Retriever/docker-compose.yaml](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docker-compose.yaml).
-
-
-
-
-
-
 
 ## What parameters or settings can I adjust to optimize extraction from my documents or data? 
 
