@@ -462,7 +462,7 @@ ingestor = ingestor.extract(...).ingest()
 ### Backward Compatibility
 
 **V1 clients continue to work:**
-- Still route to `/v1/submit_job` and `/v1/fetch_job` (see [HTTP API Reference](#http-api-reference) for all V1/V2 paths)
+- Still route to `/v1/submit_job` and `/v1/fetch_job` (refer to the [HTTP API Reference](#http-api-reference) for all V1/V2 paths)
 - No changes required
 - No splitting occurs
 
@@ -526,7 +526,7 @@ WARNING: Client requested split_page_count=1000; clamped to 128
 
 ### Key Files
 
-**Server Implementation (this repo: `nv_ingest`, see [NeMo-Retriever](https://github.com/NVIDIA/NeMo-Retriever.git) for client):**
+**Server Implementation (this repo: `nv_ingest`, refer to the [NeMo-Retriever](https://github.com/NVIDIA/NeMo-Retriever.git) for client):**
 - `src/nv_ingest/api/v2/ingest.py` - V2 endpoints
 - `src/nv_ingest/framework/util/service/impl/ingest/redis_ingest_service.py` - Redis state management
 
