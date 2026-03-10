@@ -92,6 +92,11 @@ def main(
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
     ),
+    method: str = typer.Option(
+        "pdfium",
+        "--method",
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
+    ),
     nemotron_parse_actors: float = typer.Option(
         0.0,
         "--nemotron-parse-actors",
@@ -243,7 +248,7 @@ def main(
             ingestor.files(file_patterns)
             .extract(
                 ExtractParams(
-                    method="pdfium",
+                    method=method,
                     extract_text=True,
                     extract_tables=True,
                     extract_charts=True,
@@ -288,7 +293,7 @@ def main(
             ingestor.files(file_patterns)
             .extract(
                 ExtractParams(
-                    method="pdfium",
+                    method=method,
                     extract_text=True,
                     extract_tables=True,
                     extract_charts=True,
