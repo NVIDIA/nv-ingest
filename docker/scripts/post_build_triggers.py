@@ -1,15 +1,74 @@
 import os
+import random
+import time
+
 from transformers import AutoTokenizer
 
+try:
+    from nemo_retriever.utils.hf_model_registry import get_hf_revision
+except ModuleNotFoundError:
+    # Fallback for Docker build stages where nemo_retriever isn't installed yet.
+    _REVISIONS = {
+        "meta-llama/Llama-3.2-1B": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
+        "intfloat/e5-large-unsupervised": "15af9288f69a6291f37bfb89b47e71abc747b206",
+    }
+
+    def get_hf_revision(model_id, *, strict=True):  # type: ignore[misc]
+        revision = _REVISIONS.get(model_id)
+        if revision is not None:
+            return revision
+        msg = (
+            f"No pinned HuggingFace revision for model '{model_id}'. "
+            "Add an entry to _REVISIONS in post_build_triggers.py (and "
+            "HF_MODEL_REVISIONS in hf_model_registry.py) to pin it."
+        )
+        if strict:
+            raise ValueError(msg)
+        print(f"WARNING: {msg} Falling back to the default (main) branch.")
+        return None
+
+
+MAX_RETRIES = 5
+
+
+def download_tokenizer(model_name, save_path, token=None):
+    os.makedirs(save_path, exist_ok=True)
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name, revision=get_hf_revision(model_name), token=token)
+            tokenizer.save_pretrained(save_path)
+            return
+        except Exception as e:
+            if attempt < MAX_RETRIES - 1:
+                delay = random.uniform(0, min(60, 2 * (2**attempt)))
+                print(f"Download failed (attempt {attempt + 1}/{MAX_RETRIES}), retrying in {delay:.0f}s: {e}")
+                time.sleep(delay)
+            else:
+                print(f"Failed to download {model_name} after {MAX_RETRIES} attempts: {e}")
+                print("Tokenizer will be downloaded at runtime if needed.")
+
+
+HF_TOKEN_FILE = "/run/secrets/hf_token"
+
+token = None
+if os.path.exists(HF_TOKEN_FILE):
+    with open(HF_TOKEN_FILE, "r") as f:
+        token = f.read().strip()
+    if token:
+        print(f"Using HF token from secret file: {HF_TOKEN_FILE}")
+if not token:
+    token = os.getenv("HF_ACCESS_TOKEN")
+    if token:
+        print("Using HF token from HF_ACCESS_TOKEN environment variable")
+    else:
+        print("No HF token provided (some gated models may not be accessible)")
+
+model_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
+
 if os.getenv("DOWNLOAD_LLAMA_TOKENIZER") == "True":
-    tokenizer_path = os.path.join(os.environ.get("MODEL_PREDOWNLOAD_PATH"), "llama-3.2-1b/tokenizer/")
-    os.makedirs(tokenizer_path)
-
-    tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-1B", token=os.getenv("HF_ACCESS_TOKEN"))
-    tokenizer.save_pretrained(tokenizer_path)
+    tokenizer_path = os.path.join(model_path, "llama-3.2-1b/tokenizer/")
+    download_tokenizer("meta-llama/Llama-3.2-1B", tokenizer_path, token)
 else:
-    tokenizer_path = os.path.join(os.environ.get("MODEL_PREDOWNLOAD_PATH"), "e5-large-unsupervised/tokenizer/")
-    os.makedirs(tokenizer_path)
-
-    tokenizer = AutoTokenizer.from_pretrained("intfloat/e5-large-unsupervised")
-    tokenizer.save_pretrained(tokenizer_path)
+    tokenizer_path = os.path.join(model_path, "e5-large-unsupervised/tokenizer/")
+    download_tokenizer("intfloat/e5-large-unsupervised", tokenizer_path, token)

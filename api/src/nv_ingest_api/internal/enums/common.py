@@ -52,6 +52,8 @@ class ContentDescriptionEnum(str, Enum):
         Description for image extracted from PDF document.
     PDF_INFOGRAPHIC : str
         Description for structured infographic extracted from PDF document.
+    PDF_PAGE_IMAGE : str
+        Description for a full-page image rendered from a PDF document.
     PDF_TABLE : str
         Description for structured table extracted from PDF document.
     PDF_TEXT : str
@@ -70,6 +72,7 @@ class ContentDescriptionEnum(str, Enum):
     PDF_CHART: str = "Structured chart extracted from PDF document."
     PDF_IMAGE: str = "Image extracted from PDF document."
     PDF_INFOGRAPHIC: str = "Structured infographic extracted from PDF document."
+    PDF_PAGE_IMAGE: str = "Full-page image rendered from a PDF document."
     PDF_TABLE: str = "Structured table extracted from PDF document."
     PDF_TEXT: str = "Unstructured text from PDF document."
     PPTX_IMAGE: str = "Image extracted from PPTX presentation."
@@ -94,6 +97,8 @@ class ContentTypeEnum(str, Enum):
         Represents image content.
     INFO_MSG : str
         Represents an informational message.
+    PAGE_IMAGE : str
+        Represents a full-page image rendered from a document.
     STRUCTURED : str
         Represents structured content.
     TEXT : str
@@ -111,6 +116,7 @@ class ContentTypeEnum(str, Enum):
     INFOGRAPHIC: str = "infographic"
     INFO_MSG: str = "info_message"
     NONE: str = "none"
+    PAGE_IMAGE: str = "page_image"
     STRUCTURED: str = "structured"
     TABLE: str = "table"
     TEXT: str = "text"
@@ -151,6 +157,14 @@ class DocumentTypeEnum(str, Enum):
         MP3 audio format.
     WAV: str
         WAV audio format.
+    MP4: str
+        MP4 video format.
+    MOV: str
+        MOV video format.
+    AVI: str
+        AVI video format.
+    MKV: str
+        MKV video format.
     """
 
     BMP: str = "bmp"
@@ -166,6 +180,10 @@ class DocumentTypeEnum(str, Enum):
     MD: str = "text"
     MP3: str = "mp3"
     WAV: str = "wav"
+    MP4: str = "mp4"
+    MOV: str = "mov"
+    AVI: str = "avi"
+    MKV: str = "mkv"
     UNKNOWN: str = "unknown"
 
 
@@ -380,6 +398,40 @@ class StatusEnum(str, Enum):
     SUCCESS: str = "success"
 
 
+class PipelinePhase(int, Enum):
+    """
+    The logical phase of a pipeline stage.
+
+    Attributes
+    ----------
+    PRE_PROCESSING : int
+        Pre-processing phase.
+    EXTRACTION : int
+        Extraction phase.
+    POST_PROCESSING : int
+        Post-processing phase.
+    MUTATION : int
+        Mutation phase.
+    TRANSFORM : int
+        Transform phase.
+    RESPONSE : int
+        Response phase.
+    TELEMETRY : int
+        Telemetry phase.
+    DRAIN : int
+        Drain phase.
+    """
+
+    PRE_PROCESSING = 0
+    EXTRACTION = 1
+    POST_PROCESSING = 2
+    MUTATION = 3
+    TRANSFORM = 4
+    RESPONSE = 5
+    TELEMETRY = 6
+    DRAIN = 7
+
+
 class TableFormatEnum(str, Enum):
     """
     Enum for representing table formats.
@@ -440,6 +492,8 @@ class TaskTypeEnum(str, Enum):
         Represents a task for extracting chart data.
     INFOGRAPHIC_DATA_EXTRACT : str
         Represents a task for extracting infographic data.
+    UDF : str
+        Represents a user-defined function task.
     """
 
     AUDIO_DATA_EXTRACT: str = "audio_data_extract"
@@ -450,10 +504,12 @@ class TaskTypeEnum(str, Enum):
     EXTRACT: str = "extract"
     FILTER: str = "filter"
     INFOGRAPHIC_DATA_EXTRACT: str = "infographic_data_extract"
+    OCR_DATA_EXTRACT: str = "ocr_data_extract"
     SPLIT: str = "split"
     STORE_EMBEDDING: str = "store_embedding"
     STORE: str = "store"
     TABLE_DATA_EXTRACT: str = "table_data_extract"
+    UDF: str = "udf"
     VDB_UPLOAD: str = "vdb_upload"
 
 

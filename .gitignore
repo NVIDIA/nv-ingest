@@ -131,6 +131,7 @@ celerybeat-schedule
 
 # Environments
 .env
+.helm-env
 .venv
 env/
 venv/
@@ -180,14 +181,12 @@ tags
 # End of https://www.gitignore.io/api/vim,c++,cmake,python,synology
 
 ./build
-.conda-bld
 .Dockerfile
 .tmp
 *.dirlock
 *.engine
 *.lock
 /build*/
-/conda-build/
 dask-worker-space
 data/*
 docs/source/_lib
@@ -201,8 +200,7 @@ triton_models/cached
 triton_models/deplot
 triton_models/paddle
 
-# Explicitly ignore .vscode/. Shared settings should go in morpheus.code-workspace
-# and user settings will go in .vscode/
+# Explicitly ignore .vscode/
 .vscode/
 
 # Ignore user-defined clangd settings
@@ -220,8 +218,35 @@ processed_docs
 # Ignore devcontainer volumes
 .volumes
 
-# Ignore conda build output
-conda/output_conda_channel
 
 # Ignore generate docs site
 docs/site
+
+# Ignore "private_local" scripts that users might have in their local copy of nv-ingest they don't want to commit
+scripts/private_local/
+
+# Test results should go to artifacts directory managed by nv-ingest-harness
+test_results/
+sweep_results/
+artifacts/
+nemo_retriever/artifacts/
+
+# Ignore cursor rules
+.cursor
+tools/private_local/*
+
+# LanceDB artifacts
+lancedb_*/
+tools/harness/lancedb/
+
+# Harness history database
+history.db
+history.db-shm
+history.db-wal
+
+
+lancedb/
+outputs/
+models/
+
+nemo_retriever/run_results/

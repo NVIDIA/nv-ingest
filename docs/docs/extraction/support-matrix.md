@@ -1,43 +1,77 @@
-# Support Matrix for NeMo Retriever Extraction
+# Support Matrix for NeMo Retriever Library
 
-Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
+Before you begin using [NeMo Retriever Library](overview.md), ensure that you have the hardware for your use case.
 
+!!! note
 
-## Hardware
-
-| GPU    | Family      | Memory | Minimum GPUs |
-|--------|-------------|--------|--------------|
-| H100   | SXM or PCIe | 80GB   | 1            |
-| A100   | SXM or PCIe | 80GB   | 1            |
-| A10G   | —           | 24GB   | 1            |
-| L40S   | —           | 48GB   | 1            |
+    This library is the NeMo Retriever Library.
 
 
-The core pipeline requires approximately 150GB disk space. 
-To run the core pipeline and all optional features, you need approximately 210GB disk space.
+## Core and Advanced Pipeline Features
+
+The NeMo Retriever Library core pipeline features run on a single A10G or better GPU. 
+The core pipeline features include the following:
+
+- llama3.2-nv-embedqa-1b-v2 — Embedding model for converting text chunks into vectors.
+- nemotron-page-elements-v3 — Detects and classifies images on a page as a table, chart or infographic.
+- nemotron-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
+- nemotron-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
+- nemoretriever-ocr-v1 — Image OCR model to detect and extract text from images.
+- retrieval — Enables embedding and indexing into Milvus.
+
+Advanced features require additional GPU support and disk space. 
+This includes the following:
+
+- Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md).
+- Advanced visual parsing — Use [nemotron-parse](https://docs.nvidia.com/nim/vision-language-models/latest/examples/nemotron-parse/overview.html), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing ](nemoretriever-parse.md).
+- git — Use [nemotron-nano-12b-v2-vl](https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard) for experimental image captioning of unstructured images. 
+    
+    !!! note
+    
+        While nemotron-nano-12b-v2-vl is the default VLM, you can configure and use other vision language models for image captioning based on your specific use case requirements. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images).
+
+- Reranker — Use [llama-nemotron-rerank-1b-v2](https://build.nvidia.com/nvidia/llama-nemotron-rerank-1b-v2) for improved retrieval accuracy.
 
 
-## Advanced Feature Support
 
-Some advanced features, such as VLM integrations and audio extraction, require additional GPU support and disk space. 
-For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
+## Hardware Requirements
+
+NeMo Retriever Library supports the following GPU hardware.
+
+- [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
+- [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
+- [H200 NVL](https://www.nvidia.com/en-us/data-center/h200/)
+- [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
+- [A100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/a100/)
+- [A10G Tensor Core GPU](https://aws.amazon.com/ec2/instance-types/g5/)
+- [L40S](https://www.nvidia.com/en-us/data-center/l40s/)
 
 
-### VLM Integrations
+The following are the hardware requirements to run NeMo Retriever Library.
 
-- **nemoretriever-parse VLM NIM** — NeMo Retriever is compatible with [nemoretriever-parse VLM NIM](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. To integrate this NIM into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Nemo Retriever parse requires ~16GB additional disk space.
-- **Llama3.2 Vision VLM NIMs** — NeMo Retriever is compatible with the [Llama3.2 VLM NIMs](https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct/modelcard) for image captioning capabilities. To integrate these NIM into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Image captioning requires ~16GB additional disk space.
+|Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB     | A10G          | L40S   |
+|----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|---------------|---------------|--------|
+| GPU            | Memory                    | 96GB          | 180GB         | 141GB         | 80GB        | 80GB        | 40GB          | 24GB          | 48GB   |
+| Core Features  | Total GPUs                | 1             | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
+| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB        | ~150GB        | ~150GB |
+| Audio          | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
+| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB         | ~37GB         | ~37GB  |
+| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported | Not supported | 1           | 1           | 1             | 1             | 1      |
+| nemotron-parse | Additional Disk Space     | Not supported | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB         | ~16GB         | ~16GB  |
+| VLM            | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | Not supported | Not supported | 1      |
+| VLM            | Additional Disk Space     | ~16GB         | ~16GB         | ~16GB         | ~16GB       | ~16GB       | Not supported | Not supported | ~16GB  |
+| Reranker       | With Core Pipeline        | Yes           | Yes           | Yes           | Yes         | Yes         | No*           | No*           | No*    |
+| Reranker       | Standalone (recall only)  | Yes           | Yes           | Yes           | Yes         | Yes         | Yes           | Yes           | Yes    |
 
-
-### Audio Extraction (Early Access)
-
-- **RIVA NIM** — NeMo Retriever can retrieve across audio files by using the [RIVA NIMs](https://docs.nvidia.com/nim/riva/asr/latest/overview.html). To integrate this capability into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Audio extraction requires ~37GB additional disk space.
+\* GPUs with less than 80GB VRAM cannot run the reranker concurrently with the core pipeline. 
+To perform recall testing with the reranker on these GPUs, shut down the core pipeline NIM microservices 
+and run only the embedder, reranker, and your vector database.
 
 
 
 ## Related Topics
 
 - [Prerequisites](prerequisites.md)
-- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
-- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
-- [Deploy With Helm](helm.md)
+- [Release Notes](releasenotes-nv-ingest.md)
+- [NVIDIA NIM for Vision Language Models Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html)
+- [NVIDIA NVIDIA Riva Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix/support-matrix.html)

@@ -4,19 +4,31 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Dict, Tuple, Optional, Iterable, List
+from functools import partial
+from typing import Any, Dict, Tuple, Optional, Iterable, List, Callable, Sequence
+from urllib.parse import urlparse
 
+import glom
 import pandas as pd
-from openai import OpenAI
 
-from nv_ingest_api.internal.enums.common import ContentTypeEnum, StatusEnum, TaskTypeEnum
-from nv_ingest_api.internal.schemas.meta.metadata_schema import (
-    InfoMessageMetadataSchema,
-)
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
-from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest_api.util.nim import infer_microservice
+
 
 logger = logging.getLogger(__name__)
+
+# Reduce SDK HTTP logging verbosity so request/response logs are not emitted
+logging.getLogger("httpx").setLevel(logging.ERROR)
+logging.getLogger("httpcore").setLevel(logging.ERROR)
+
+
+MULTI_MODAL_MODELS = [
+    "llama-3.2-nemoretriever-1b-vlm-embed-v1",
+    "nvidia/llama-nemotron-embed-vl-1b-v2",
+]
+
+EmbeddingCallable = Callable[[Sequence[str]], Sequence[Sequence[float]]]
 
 
 # ------------------------------------------------------------------------------
@@ -33,6 +45,8 @@ def _make_async_request(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> list:
     """
     Interacts directly with the NIM embedding service to calculate embeddings for a batch of prompts.
@@ -69,34 +83,36 @@ def _make_async_request(
     response = {}
 
     try:
-        client = OpenAI(
-            api_key=api_key,
-            base_url=embedding_nim_endpoint,
+        # Normalize API key to avoid sending an empty bearer token via SDK internals
+        _token = (api_key or "").strip()
+        _api_key = _token if _token else "<no key provided>"
+
+        resp = infer_microservice(
+            prompts,
+            embedding_model,
+            embedding_endpoint=embedding_nim_endpoint,
+            nvidia_api_key=_api_key,
+            input_type=input_type,
+            truncate=truncate,
+            batch_size=8191,
+            grpc="http" not in urlparse(embedding_nim_endpoint).scheme,
+            input_names=["text"],
+            output_names=["embeddings"],
+            dtypes=["BYTES"],
         )
 
-        resp = client.embeddings.create(
-            input=prompts,
-            model=embedding_model,
-            encoding_format=encoding_format,
-            extra_body={"input_type": input_type, "truncate": truncate},
-        )
-
-        response["embedding"] = resp.data
+        response["embedding"] = resp
         response["info_msg"] = None
 
     except Exception as err:
-        info_msg = {
-            "task": TaskTypeEnum.EMBED.value,
-            "status": StatusEnum.ERROR.value,
-            "message": f"Embedding error: {err}",
-            "filter": filter_errors,
-        }
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
+        # Truncate error message to prevent memory blowup from large text content
+        err_str = str(err)
+        if len(err_str) > 500:
+            truncated_err = err_str[:200] + "... [truncated to prevent memory blowup] ..." + err_str[-100:]
+        else:
+            truncated_err = err_str
 
-        response["embedding"] = [None] * len(prompts)
-        response["info_msg"] = validated_info_msg
-
-        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
+        raise RuntimeError(f"Embedding error occurred: {truncated_err}") from err
 
     return response
 
@@ -110,6 +126,8 @@ def _async_request_handler(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> List[dict]:
     """
     Gathers calculated embedding results from the NIM embedding service concurrently.
@@ -138,6 +156,9 @@ def _async_request_handler(
     List[dict]
         A list of response dictionaries from the embedding service.
     """
+    if modalities is None:
+        modalities = [None] * len(prompts)
+
     with ThreadPoolExecutor() as executor:
         futures = [
             executor.submit(
@@ -150,8 +171,10 @@ def _async_request_handler(
                 input_type=input_type,
                 truncate=truncate,
                 filter_errors=filter_errors,
+                modalities=modality_batch,
+                dimensions=dimensions,
             )
-            for prompt_batch in prompts
+            for prompt_batch, modality_batch in zip(prompts, modalities)
         ]
         results = [future.result() for future in futures]
 
@@ -167,6 +190,8 @@ def _async_runner(
     input_type: str,
     truncate: str,
     filter_errors: bool,
+    modalities: Optional[List[str]] = None,
+    dimensions: Optional[int] = None,
 ) -> dict:
     """
     Concurrently launches all NIM embedding requests and flattens the results.
@@ -204,6 +229,8 @@ def _async_runner(
         input_type,
         truncate,
         filter_errors,
+        modalities=modalities,
+        dimensions=dimensions,
     )
 
     flat_results = {"embeddings": [], "info_msgs": []}
@@ -223,6 +250,50 @@ def _async_runner(
 
 
 # ------------------------------------------------------------------------------
+# Local embedding hook (callable)
+# ------------------------------------------------------------------------------
+
+
+def _callable_runner(
+    prompts: List[List[str]],
+    *,
+    embedder: EmbeddingCallable,
+    batch_size: int,
+) -> dict:
+    """
+    Runs embeddings via a provided callable, returning the same shape as `_async_runner`.
+
+    Parameters
+    ----------
+    prompts:
+        A list of prompt batches (List[List[str]]).
+    embedder:
+        Callable that takes a sequence of strings and returns a sequence of embedding vectors.
+    batch_size:
+        Local batch size; used to sub-batch each provided prompt batch if needed.
+    """
+    flat_embeddings: List[Optional[Sequence[float]]] = []
+    flat_info_msgs: List[Optional[dict]] = []
+
+    for prompt_batch in prompts:
+        if not prompt_batch:
+            continue
+        for i in range(0, len(prompt_batch), max(1, int(batch_size))):
+            chunk = prompt_batch[i : i + max(1, int(batch_size))]
+            vecs = embedder(chunk)
+            vecs_list = list(vecs)
+            if len(vecs_list) != len(chunk):
+                raise ValueError(
+                    "Local embedder returned a mismatched number of embeddings "
+                    f"(got={len(vecs_list)} expected={len(chunk)})"
+                )
+            flat_embeddings.extend(vecs_list)
+            flat_info_msgs.extend([None] * len(vecs_list))
+
+    return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
+
+
+# ------------------------------------------------------------------------------
 # Pandas UDFs for Content Extraction
 # ------------------------------------------------------------------------------
 
@@ -230,50 +301,108 @@ def _async_runner(
 def _add_embeddings(row, embeddings, info_msgs):
     """
     Updates a DataFrame row with embedding data and associated error info.
+    Ensures the 'embedding' field is always present, even if None.
 
     Parameters
     ----------
     row : pandas.Series
         A row of the DataFrame.
-    embeddings : list
-        List of embeddings corresponding to DataFrame rows.
-    info_msgs : list
-        List of info message dictionaries corresponding to DataFrame rows.
+    embeddings : dict
+        Dictionary mapping row indices to embeddings.
+    info_msgs : dict
+        Dictionary mapping row indices to info message dicts.
 
     Returns
     -------
     pandas.Series
-        The updated row with embedding and info message metadata added.
+        The updated row with 'embedding', 'info_message_metadata', and
+        '_contains_embeddings' appropriately set.
     """
-    row["metadata"]["embedding"] = embeddings[row.name]
-    if info_msgs[row.name] is not None:
-        row["metadata"]["info_message_metadata"] = info_msgs[row.name]
+    embedding = embeddings.get(row.name, None)
+    info_msg = info_msgs.get(row.name, None)
+
+    # Always set embedding, even if None
+    row["metadata"]["embedding"] = embedding
+
+    if info_msg:
+        row["metadata"]["info_message_metadata"] = info_msg
         row["document_type"] = ContentTypeEnum.INFO_MSG
         row["_contains_embeddings"] = False
     else:
-        row["_contains_embeddings"] = True
+        row["_contains_embeddings"] = embedding is not None
 
     return row
 
 
-def _get_pandas_text_content(row):
+def _add_custom_embeddings(row, embeddings, result_target_field):
     """
-    Extracts text content from a DataFrame row.
+    Updates a DataFrame row with embedding data and associated error info
+    based on a user supplied custom content field.
 
     Parameters
     ----------
     row : pandas.Series
-        A row containing the 'content' key.
+        A row of the DataFrame.
+    embeddings : dict
+        Dictionary mapping row indices to embeddings.
+    result_target_field: str
+        The field in custom_content to output the embeddings to
+
+    Returns
+    -------
+    pandas.Series
+        The updated row
+    """
+    embedding = embeddings.get(row.name, None)
+
+    if embedding is not None:
+        row["metadata"] = glom.assign(row["metadata"], "custom_content." + result_target_field, embedding, missing=dict)
+
+    return row
+
+
+def _format_image_input_string(image_b64: Optional[str]) -> str:
+    if not image_b64:
+        return
+    # Detect format from base64 magic bytes: JPEG starts with /9j/, PNG starts with iVBORw
+    mime_type = "image/jpeg" if image_b64.startswith("/9j/") else "image/png"
+    return f"data:{mime_type};base64,{image_b64}"
+
+
+def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optional[str]) -> str:
+    if (not text) or (not text.strip()) or (not image_b64):
+        return
+    return f"{text.strip()} {_format_image_input_string(image_b64)}"
+
+
+def _get_pandas_text_content(row, modality="text"):
+    """
+    Extracts text content from a DataFrame row's metadata.
+
+    Parameters
+    ----------
+    row : dict
+        The metadata dictionary containing 'content' and optionally 'text_metadata.source_image'.
 
     Returns
     -------
     str
-        The text content from the row.
+        The text content, image content, or combined text+image content based on modality.
     """
-    return row["content"]
+    if modality == "text":
+        content = row.get("content")
+    elif modality == "image":
+        source_image = row.get("text_metadata", {}).get("source_image")
+        content = _format_image_input_string(source_image)
+    elif modality == "text_image":
+        text = row.get("content")
+        source_image = row.get("text_metadata", {}).get("source_image")
+        content = _format_text_image_pair_input_string(text, source_image)
+
+    return content
 
 
-def _get_pandas_table_content(row):
+def _get_pandas_table_content(row, modality="text"):
     """
     Extracts table/chart content from a DataFrame row.
 
@@ -287,10 +416,22 @@ def _get_pandas_table_content(row):
     str
         The table/chart content from the row.
     """
-    return row["table_metadata"]["table_content"]
+    if modality == "text":
+        content = row.get("table_metadata", {}).get("table_content")
+    elif modality == "image":
+        content = _format_image_input_string(row.get("content"))
+    elif modality == "text_image":
+        text = row.get("table_metadata", {}).get("table_content")
+        image = row.get("content")
+        if text:
+            content = _format_text_image_pair_input_string(text, image)
+        else:
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
+
+    return content
 
 
-def _get_pandas_image_content(row):
+def _get_pandas_image_content(row, modality="text"):
     """
     Extracts image caption content from a DataFrame row.
 
@@ -304,7 +445,141 @@ def _get_pandas_image_content(row):
     str
         The image caption from the row.
     """
-    return row["image_metadata"]["caption"]
+    subtype = row.get("content_metadata", {}).get("subtype")
+    if modality == "text":
+        if subtype == "page_image":
+            content = row.get("image_metadata", {}).get("text")
+        else:
+            content = row.get("image_metadata", {}).get("caption")
+    elif modality == "image":
+        content = _format_image_input_string(row.get("content"))
+    elif modality == "text_image":
+        if subtype == "page_image":
+            text = row.get("image_metadata", {}).get("text")
+        else:
+            text = row.get("image_metadata", {}).get("caption")
+        image = row.get("content")
+        if text:
+            content = _format_text_image_pair_input_string(text, image)
+        else:
+            content = _format_image_input_string(image)  # Fallback to image only if text is empty
+
+    if subtype == "page_image":
+        # A workaround to save memory for full page images.
+        row["content"] = ""
+
+    return content
+
+
+def _get_pandas_audio_content(row, modality="text"):
+    """
+    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
+    """
+    return row.get("audio_metadata", {}).get("audio_transcript")
+
+
+def _get_pandas_custom_content(row, custom_content_field):
+    custom_content = row.get("custom_content", {})
+    content = glom.glom(custom_content, custom_content_field, default=None)
+    if content is None:
+        logger.warning(f"Custom content field: {custom_content_field} not found")
+        return None
+
+    try:
+        return str(content)
+    except (TypeError, ValueError):
+        logger.warning(f"Cannot convert custom content field: {custom_content_field} to string")
+        return None
+
+
+def _cleanup_source_images(row):
+    """
+    Removes source_image from text_metadata to reduce metadata size.
+
+    The source_image field is used during embedding for text_image modality
+    but should be removed afterward to avoid exceeding storage limits
+    (e.g., Milvus JSON field 64KB limit).
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A DataFrame row containing 'metadata'.
+
+    Returns
+    -------
+    pandas.Series
+        The row with source_image removed from text_metadata.
+    """
+    text_metadata = row.get("metadata", {}).get("text_metadata")
+    if text_metadata and "source_image" in text_metadata:
+        del text_metadata["source_image"]
+    return row
+
+
+def _aggregate_page_content(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Aggregates text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries.
+
+    For each page, collects text from:
+    - TEXT elements: content field
+    - STRUCTURED elements (tables/charts): table_metadata.table_content field
+
+    The aggregated text is stored in image_metadata.text for PAGE_IMAGE entries,
+    enabling text_image modality embedding with full page context.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame containing extracted content with metadata.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with PAGE_IMAGE entries updated to include aggregated page text.
+    """
+    # Build mapping of page_number -> list of text content
+    page_text_map: Dict[int, List[str]] = {}
+
+    for _, row in df.iterrows():
+        metadata = row.get("metadata", {})
+        content_metadata = metadata.get("content_metadata", {})
+        content_type = content_metadata.get("type")
+        page_number = content_metadata.get("page_number")
+
+        if page_number is None:
+            continue
+
+        if page_number not in page_text_map:
+            page_text_map[page_number] = []
+
+        # Collect text from TEXT elements
+        if content_type == ContentTypeEnum.TEXT.value:
+            text_content = metadata.get("content")
+            if text_content and isinstance(text_content, str) and text_content.strip():
+                page_text_map[page_number].append(text_content.strip())
+
+        # Collect text from STRUCTURED elements (tables, charts)
+        elif content_type == ContentTypeEnum.STRUCTURED.value:
+            table_content = metadata.get("table_metadata", {}).get("table_content")
+            if table_content and isinstance(table_content, str) and table_content.strip():
+                page_text_map[page_number].append(table_content.strip())
+
+    # Apply aggregated text to PAGE_IMAGE entries
+    for idx, row in df.iterrows():
+        metadata = row.get("metadata", {})
+        content_metadata = metadata.get("content_metadata", {})
+
+        if (
+            content_metadata.get("type") == ContentTypeEnum.IMAGE.value
+            and content_metadata.get("subtype") == ContentTypeEnum.PAGE_IMAGE.value
+        ):
+            page_number = content_metadata.get("page_number")
+            if page_number in page_text_map and page_text_map[page_number]:
+                aggregated_text = "\n\n".join(page_text_map[page_number])
+                image_metadata = metadata.get("image_metadata", {})
+                image_metadata["text"] = aggregated_text
+
+    return df
 
 
 # ------------------------------------------------------------------------------
@@ -352,13 +627,6 @@ def _generate_batches(prompts: List[str], batch_size: int = 100) -> List[str]:
     return [batch for batch in _batch_generator(prompts, batch_size)]
 
 
-def _get_pandas_audio_content(row):
-    """
-    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
-    """
-    return row["audio_metadata"]["audio_transcript"]
-
-
 # ------------------------------------------------------------------------------
 # DataFrame Concatenation Utility
 # ------------------------------------------------------------------------------
@@ -401,6 +669,23 @@ def _concatenate_extractions_pandas(
 # ------------------------------------------------------------------------------
 
 
+def does_model_support_multimodal_embeddings(model: str) -> bool:
+    """
+    Checks if a given model supports multi-modal embeddings.
+
+    Parameters
+    ----------
+    model : str
+        The name of the model.
+
+    Returns
+    -------
+    bool
+        True if the model supports multi-modal embeddings, False otherwise.
+    """
+    return model in MULTI_MODAL_MODELS
+
+
 def transform_create_text_embeddings_internal(
     df_transform_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
@@ -408,8 +693,11 @@ def transform_create_text_embeddings_internal(
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Generates text embeddings for supported content types (TEXT, STRUCTURED, IMAGE)
+    Generates text embeddings for supported content types (TEXT, STRUCTURED, IMAGE, AUDIO)
     from a pandas DataFrame using asynchronous requests.
+
+    This function ensures that even if the extracted content is empty or None,
+    the embedding field is explicitly created and set to None.
 
     Parameters
     ----------
@@ -417,8 +705,8 @@ def transform_create_text_embeddings_internal(
         The DataFrame containing content for embedding extraction.
     task_config : Dict[str, Any]
         Dictionary containing task properties (e.g., filter error flag).
-    transform_config : Any
-        Validated configuration for text embedding extraction (EmbedExtractionsSchema).
+    transform_config : TextEmbeddingSchema, optional
+        Validated configuration for text embedding extraction.
     execution_trace_log : Optional[Dict], optional
         Optional trace information for debugging or logging (default is None).
 
@@ -429,24 +717,65 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
+    api_key = task_config.get("api_key") or transform_config.api_key
+    endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
+    model_name = task_config.get("model_name") or transform_config.embedding_model
+    custom_content_field = task_config.get("custom_content_field") or transform_config.custom_content_field
+    dimensions = task_config.get("dimensions") or transform_config.dimensions
 
-    # Retrieve configuration values with fallback to transform_config defaults.
-    api_key: str = task_config.get("api_key") or transform_config.api_key
-    endpoint_url: str = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
-    model_name: str = task_config.get("model_name") or transform_config.embedding_model
+    endpoint_url = endpoint_url.strip() if isinstance(endpoint_url, str) else endpoint_url
+    if isinstance(endpoint_url, str) and not endpoint_url:
+        endpoint_url = None
+
+    embedder: Optional[EmbeddingCallable] = task_config.get("embedder")
+    local_batch_size = int(task_config.get("local_batch_size") or transform_config.batch_size or 4)
 
     if execution_trace_log is None:
         execution_trace_log = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
-    # TODO(Devin)
     if df_transform_ledger.empty:
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
-    embedding_dataframes = []
-    content_masks = []  # List of pandas boolean Series
+    # Determine if page content aggregation should be enabled
+    image_elements_modality = task_config.get("image_elements_modality") or transform_config.image_elements_modality
 
-    # Define pandas content extractors for supported content types.
+    # Check if user explicitly set the aggregation flag
+    explicit_aggregate_setting = task_config.get("image_elements_aggregate_page_content")
+    image_elements_aggregate_page_content = (
+        explicit_aggregate_setting
+        if explicit_aggregate_setting is not None
+        else transform_config.image_elements_aggregate_page_content
+    )
+
+    # Auto-enable aggregation when using text_image modality with PAGE_IMAGE entries
+    # Only auto-enable if user hasn't explicitly set the flag
+    if explicit_aggregate_setting is None and not image_elements_aggregate_page_content:
+        if image_elements_modality == "text_image":
+            # Check if PAGE_IMAGE entries exist
+            def _has_page_images(df):
+                for _, row in df.iterrows():
+                    metadata = row.get("metadata", {})
+                    content_metadata = metadata.get("content_metadata", {})
+                    if (
+                        content_metadata.get("type") == ContentTypeEnum.IMAGE.value
+                        and content_metadata.get("subtype") == ContentTypeEnum.PAGE_IMAGE.value
+                    ):
+                        return True
+                return False
+
+            if _has_page_images(df_transform_ledger):
+                image_elements_aggregate_page_content = True
+                logger.debug("Auto-enabled page content aggregation for text_image modality with PAGE_IMAGE entries")
+
+    # Aggregate text content from TEXT and STRUCTURED elements into PAGE_IMAGE entries
+    if image_elements_aggregate_page_content:
+        df_transform_ledger = _aggregate_page_content(df_transform_ledger)
+        logger.debug("Aggregated page content into PAGE_IMAGE entries for text_image embedding")
+
+    embedding_dataframes = []
+    content_masks = []
+
     pandas_content_extractor = {
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
@@ -454,50 +783,180 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
+    task_type_to_modality = {
+        ContentTypeEnum.TEXT: task_config.get("text_elements_modality") or transform_config.text_elements_modality,
+        ContentTypeEnum.STRUCTURED: (
+            task_config.get("structured_elements_modality") or transform_config.structured_elements_modality
+        ),
+        ContentTypeEnum.IMAGE: task_config.get("image_elements_modality") or transform_config.image_elements_modality,
+        ContentTypeEnum.AUDIO: task_config.get("audio_elements_modality") or transform_config.audio_elements_modality,
+        ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
+    }
 
-    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
+    # Determine which content types to embed
+    # When aggregating page content, automatically skip TEXT and STRUCTURED unless explicitly set
+    def _get_embed_flag(content_type: ContentTypeEnum) -> bool:
+        flag_map = {
+            ContentTypeEnum.TEXT: task_config.get("embed_text_elements"),
+            ContentTypeEnum.STRUCTURED: task_config.get("embed_structured_elements"),
+            ContentTypeEnum.IMAGE: task_config.get("embed_image_elements"),
+            ContentTypeEnum.AUDIO: task_config.get("embed_audio_elements"),
+        }
+        default_map = {
+            ContentTypeEnum.TEXT: transform_config.embed_text_elements,
+            ContentTypeEnum.STRUCTURED: transform_config.embed_structured_elements,
+            ContentTypeEnum.IMAGE: transform_config.embed_image_elements,
+            ContentTypeEnum.AUDIO: transform_config.embed_audio_elements,
+        }
+        task_flag = flag_map.get(content_type)
+        if task_flag is not None:
+            return task_flag
+        # When aggregating page content, skip TEXT and STRUCTURED by default
+        # since their content is already included in PAGE_IMAGE entries
+        if image_elements_aggregate_page_content and content_type in (
+            ContentTypeEnum.TEXT,
+            ContentTypeEnum.STRUCTURED,
+        ):
+            return False
+        return default_map.get(content_type, True)
 
     def _content_type_getter(row):
         return row["content_metadata"]["type"]
 
-    # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
-            logger.debug(f"Skipping unsupported content type: {content_type}")
+            logger.warning(f"Skipping text_embedding generation for unsupported content type: {content_type}")
             continue
 
+        # Check if this content type should be embedded
+        if not _get_embed_flag(content_type):
+            logger.debug(f"Skipping embedding for content type {content_type} (disabled by configuration)")
+            continue
+
+        # Get rows matching the content type
         content_mask = df_transform_ledger["metadata"].apply(_content_type_getter) == content_type.value
         if not content_mask.any():
             continue
 
-        # Extract content from metadata and filter out rows with empty content.
-        extracted_content = df_transform_ledger.loc[content_mask, "metadata"].apply(content_getter)
-        non_empty_mask = extracted_content.notna() & (extracted_content.str.strip() != "")
-        final_mask = content_mask & non_empty_mask
-        if not final_mask.any():
-            continue
+        # Always include all content_mask rows and prepare them
+        df_content = df_transform_ledger.loc[content_mask].copy().reset_index(drop=True)
 
-        df_content = df_transform_ledger.loc[final_mask].copy().reset_index(drop=True)
-        filtered_content = df_content["metadata"].apply(content_getter)
-        filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size=transform_config.batch_size)
-        content_embeddings = _async_runner(
-            filtered_content_batches,
-            api_key,
-            endpoint_url,
-            model_name,
-            transform_config.encoding_format,
-            transform_config.input_type,
-            transform_config.truncate,
-            False,
+        # Extract content and normalize empty or non-str to None
+        extracted_content = (
+            df_content["metadata"]
+            .apply(partial(content_getter, modality=task_type_to_modality[content_type]))
+            .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
         )
-        # Apply the embeddings (and any error info) to each row.
-        df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
-            _add_embeddings, **content_embeddings, axis=1
-        )[["metadata", "document_type", "_contains_embeddings"]]
-        df_content["_content"] = filtered_content
+        df_content["_content"] = extracted_content
+
+        # Prepare batches for only valid (non-None) content
+        valid_content_mask = df_content["_content"].notna()
+        if valid_content_mask.any():
+            filtered_content_list = df_content.loc[valid_content_mask, "_content"].tolist()
+            filtered_content_batches = _generate_batches(filtered_content_list, batch_size=transform_config.batch_size)
+
+            if model_name in MULTI_MODAL_MODELS:
+                modality_list = [task_type_to_modality[content_type]] * len(filtered_content_list)
+                modality_batches = _generate_batches(modality_list, batch_size=transform_config.batch_size)
+            else:
+                modality_batches = None
+
+            if callable(embedder):
+                content_embeddings = _callable_runner(
+                    filtered_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            elif endpoint_url:
+                content_embeddings = _async_runner(
+                    filtered_content_batches,
+                    api_key,
+                    endpoint_url,
+                    model_name,
+                    transform_config.encoding_format,
+                    transform_config.input_type,
+                    transform_config.truncate,
+                    False,
+                    modalities=modality_batches,
+                    dimensions=dimensions,
+                )
+            else:
+                raise ValueError(
+                    "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
+                    "and no local embedder was provided in task_config['embedder']."
+                )
+            # Build a simple row index -> embedding map
+            embeddings_dict = dict(
+                zip(df_content.loc[valid_content_mask].index, content_embeddings.get("embeddings", []))
+            )
+            info_msgs_dict = dict(
+                zip(df_content.loc[valid_content_mask].index, content_embeddings.get("info_msgs", []))
+            )
+        else:
+            embeddings_dict = {}
+            info_msgs_dict = {}
+
+        # Apply embeddings or None to all rows
+        df_content = df_content.apply(_add_embeddings, embeddings=embeddings_dict, info_msgs=info_msgs_dict, axis=1)
 
         embedding_dataframes.append(df_content)
-        content_masks.append(final_mask)
+        content_masks.append(content_mask)
 
     combined_df = _concatenate_extractions_pandas(df_transform_ledger, embedding_dataframes, content_masks)
+
+    # Embed custom content
+    if custom_content_field is not None:
+        result_target_field = task_config.get("result_target_field") or custom_content_field + "_embedding"
+
+        extracted_custom_content = (
+            combined_df["metadata"]
+            .apply(partial(_get_pandas_custom_content, custom_content_field=custom_content_field))
+            .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
+        )
+
+        valid_custom_content_mask = extracted_custom_content.notna()
+        if valid_custom_content_mask.any():
+            custom_content_list = extracted_custom_content[valid_custom_content_mask].to_list()
+            custom_content_batches = _generate_batches(custom_content_list, batch_size=transform_config.batch_size)
+
+            if callable(embedder):
+                custom_content_embeddings = _callable_runner(
+                    custom_content_batches,
+                    embedder=embedder,
+                    batch_size=local_batch_size,
+                )
+            elif endpoint_url:
+                custom_content_embeddings = _async_runner(
+                    custom_content_batches,
+                    api_key,
+                    endpoint_url,
+                    model_name,
+                    transform_config.encoding_format,
+                    transform_config.input_type,
+                    transform_config.truncate,
+                    False,
+                    dimensions=dimensions,
+                )
+            else:
+                raise ValueError(
+                    "No embedding endpoint configured (endpoint_url/embedding_nim_endpoint are empty) "
+                    "and no local embedder was provided in task_config['embedder']."
+                )
+            custom_embeddings_dict = dict(
+                zip(
+                    extracted_custom_content.loc[valid_custom_content_mask].index,
+                    custom_content_embeddings.get("embeddings", []),
+                )
+            )
+        else:
+            custom_embeddings_dict = {}
+
+        combined_df = combined_df.apply(
+            _add_custom_embeddings, embeddings=custom_embeddings_dict, result_target_field=result_target_field, axis=1
+        )
+
+    # Clean up source_image from text_metadata to avoid exceeding Milvus JSON field limits.
+    # The source_image is only needed during embedding and can be safely removed afterward.
+    combined_df = combined_df.apply(_cleanup_source_images, axis=1)
+
     return combined_df, {"trace_info": execution_trace_log}

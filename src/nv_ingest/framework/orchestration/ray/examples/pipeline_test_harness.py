@@ -29,8 +29,8 @@ from nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import (
     MessageBrokerTaskSourceStage,
     MessageBrokerTaskSourceConfig,
-    start_simple_message_broker,
 )
+from nv_ingest.framework.orchestration.process.dependent_services import start_simple_message_broker
 from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import ImageStorageStage
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
@@ -63,7 +63,7 @@ def get_nim_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # Create configuration instances for the source and sink stages.
     source_config = MessageBrokerTaskSourceConfig(
         broker_client=simple_config,
-        task_queue="morpheus_task_queue",
+        task_queue="ingest_task_queue",
         poll_interval=0.1,
     )
     sink_config = MessageBrokerTaskSinkConfig(
@@ -147,15 +147,16 @@ if __name__ == "__main__":
     os.environ["YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT"] = "127.0.0.1:8004"
     os.environ["YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT"] = "http://localhost:8003/v1/infer"
     os.environ["YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL"] = "http"
-    os.environ["PADDLE_GRPC_ENDPOINT"] = "localhost:8010"
-    os.environ["PADDLE_INFER_PROTOCOL"] = "grpc"
-    os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
+    os.environ["OCR_GRPC_ENDPOINT"] = "localhost:8010"
+    os.environ["OCR_INFER_PROTOCOL"] = "grpc"
+    os.environ["OCR_MODEL_NAME"] = "paddle"
+    os.environ["NEMOTRON_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
-    os.environ["VLM_CAPTION_MODEL_NAME"] = "meta/llama-3.2-11b-vision-instruct"
+    os.environ["VLM_CAPTION_MODEL_NAME"] = "nvidia/nemotron-nano-12b-v2-vl"
     logger.info("Environment variables set.")
 
     image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    image_caption_model_name = "meta/llama-3.2-11b-vision-instruct"
+    model_name = "nvidia/nemotron-nano-12b-v2-vl"
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     (
         yolox_table_structure_grpc,
@@ -169,23 +170,23 @@ if __name__ == "__main__":
         yolox_graphic_elements_auth,
         yolox_graphic_elements_protocol,
     ) = get_nim_service("yolox_graphic_elements")
-    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
-        get_nim_service("nemoretriever_parse")
+    nemotron_parse_grpc, nemotron_parse_http, nemotron_parse_auth, nemotron_parse_protocol = get_nim_service(
+        "nemotron_parse"
     )
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
-    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+    model_name = os.environ.get("NEMOTRON_PARSE_MODEL_NAME", "nvidia/nemotron-parse")
     pdf_extractor_config = {
         "pdfium_config": {
             "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
         },
-        "nemoretriever_parse_config": {
-            "auth_token": nemoretriever_parse_auth,
-            "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
-            "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
-            "nemoretriever_parse_model_name": model_name,
+        "nemotron_parse_config": {
+            "auth_token": nemotron_parse_auth,
+            "nemotron_parse_endpoints": (nemotron_parse_grpc, nemotron_parse_http),
+            "nemotron_parse_infer_protocol": nemotron_parse_protocol,
+            "nemotron_parse_model_name": model_name,
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
         },
@@ -201,8 +202,8 @@ if __name__ == "__main__":
         "endpoint_config": {
             "yolox_endpoints": (yolox_graphic_elements_grpc, yolox_graphic_elements_http),
             "yolox_infer_protocol": yolox_graphic_elements_protocol,
-            "paddle_endpoints": (paddle_grpc, paddle_http),
-            "paddle_infer_protocol": paddle_protocol,
+            "ocr_endpoints": (ocr_grpc, ocr_http),
+            "ocr_infer_protocol": ocr_protocol,
             "auth_token": yolox_auth,
         }
     }
@@ -210,15 +211,15 @@ if __name__ == "__main__":
         "endpoint_config": {
             "yolox_endpoints": (yolox_table_structure_grpc, yolox_table_structure_http),
             "yolox_infer_protocol": yolox_table_structure_protocol,
-            "paddle_endpoints": (paddle_grpc, paddle_http),
-            "paddle_infer_protocol": paddle_protocol,
+            "ocr_endpoints": (ocr_grpc, ocr_http),
+            "ocr_infer_protocol": ocr_protocol,
             "auth_token": yolox_auth,
         }
     }
     text_embedding_config = {
         "api_key": yolox_auth,
         "embedding_nim_endpoint": "http://localhost:8012/v1",
-        "embedding_model": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+        "embedding_model": "nvidia/llama-nemotron-embed-1b-v2",
     }
     image_extraction_config = {
         "yolox_endpoints": (yolox_grpc, yolox_http),
@@ -228,7 +229,7 @@ if __name__ == "__main__":
     image_caption_config = {
         "api_key": yolox_auth,
         "endpoint_url": image_caption_endpoint_url,
-        "image_caption_model_name": image_caption_model_name,
+        "model_name": model_name,
         "prompt": "Caption the content of this image:",
     }
     logger.info("Service configuration retrieved from get_nim_service and environment variables.")

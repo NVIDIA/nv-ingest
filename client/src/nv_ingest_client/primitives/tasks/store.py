@@ -7,39 +7,14 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict
-from typing import Literal
+from typing import Dict, Literal, Optional
 
-from pydantic import BaseModel
-from pydantic import model_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-_DEFAULT_STORE_METHOD = "minio"
-
-
-class StoreEmbedTaskSchema(BaseModel):
-
-    class Config:
-        extra = "allow"
-
-
-class StoreTaskSchema(BaseModel):
-    store_method: str = None
-
-    @model_validator(mode="before")
-    @classmethod
-    def set_default_store_method(cls, values):
-        store_method = values.get("store_method")
-
-        if store_method is None:
-            values["store_method"] = _DEFAULT_STORE_METHOD
-        return values
-
-    class Config:
-        extra = "allow"
 
 
 class StoreTask(Task):
@@ -47,15 +22,13 @@ class StoreTask(Task):
     Object for image storage task.
     """
 
-    _Type_Content_Type = Literal["image",]
-
-    _Type_Store_Method = Literal["minio",]
-
     def __init__(
         self,
         structured: bool = True,
         images: bool = False,
-        store_method: _Type_Store_Method = None,
+        storage_uri: Optional[str] = None,
+        storage_options: Optional[dict] = None,
+        public_base_url: Optional[str] = None,
         params: dict = None,
         **extra_params,
     ) -> None:
@@ -64,10 +37,29 @@ class StoreTask(Task):
         """
         super().__init__()
 
-        self._structured = structured
-        self._images = images
-        self._store_method = store_method or "minio"
-        self._params = params
+        # Handle None params by converting to empty dict for backward compatibility
+        if params is None:
+            params = {}
+
+        # Merge extra_params into params for API schema compatibility
+        merged_params = {**params, **extra_params}
+
+        # Use the API schema for validation
+        validated_data = IngestTaskStoreSchema(
+            structured=structured,
+            images=images,
+            storage_uri=storage_uri,
+            storage_options=storage_options or {},
+            public_base_url=public_base_url,
+            params=merged_params,
+        )
+
+        self._structured = validated_data.structured
+        self._images = validated_data.images
+        self._storage_uri = validated_data.storage_uri
+        self._storage_options = validated_data.storage_options
+        self._public_base_url = validated_data.public_base_url
+        self._params = validated_data.params
         self._extra_params = extra_params
 
     def __str__(self) -> str:
@@ -78,7 +70,8 @@ class StoreTask(Task):
         info += "Store Task:\n"
         info += f"  store structured types: {self._structured}\n"
         info += f"  store image types: {self._images}\n"
-        info += f"  store method: {self._store_method}\n"
+        info += f"  storage uri: {self._storage_uri}\n"
+        info += f"  public base url: {self._public_base_url}\n"
         for key, value in self._extra_params.items():
             info += f"  {key}: {value}\n"
         for key, value in self._params.items():
@@ -91,9 +84,11 @@ class StoreTask(Task):
         """
 
         task_properties = {
-            "method": self._store_method,
             "structured": self._structured,
             "images": self._images,
+            "storage_uri": self._storage_uri,
+            "storage_options": self._storage_options,
+            "public_base_url": self._public_base_url,
             "params": self._params,
             **self._extra_params,
         }
@@ -116,7 +111,17 @@ class StoreEmbedTask(Task):
         """
         super().__init__()
 
-        self._params = params or {}
+        # Handle None params by converting to empty dict for backward compatibility
+        if params is None:
+            params = {}
+
+        # Merge extra_params into params for API schema compatibility
+        merged_params = {**params, **extra_params}
+
+        # Use the API schema for validation
+        validated_data = IngestTaskStoreEmbedSchema(params=merged_params)
+
+        self._params = validated_data.params
         self._extra_params = extra_params
 
     def __str__(self) -> str:

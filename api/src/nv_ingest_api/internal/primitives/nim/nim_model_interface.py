@@ -3,7 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Any
+from typing import Dict
 from typing import Optional
+from typing import Tuple
 
 
 logger = logging.getLogger(__name__)
@@ -79,3 +82,45 @@ class ModelInterface:
             The name of the model interface.
         """
         raise NotImplementedError("Subclasses should implement this method")
+
+    def coalesce_requests_to_batch(self, requests, protocol: str, **kwargs) -> Tuple[Any, Dict[str, Any]]:
+        """
+        Takes a list of InferenceRequest objects and combines them into a single
+        formatted batch ready for inference.
+
+        THIS METHOD IS REQUIRED FOR DYNAMIC BATCHING SUPPORT.
+
+        Parameters
+        ----------
+        requests : List[InferenceRequest]
+            A list of InferenceRequest namedtuples collected for the batch.
+            Each tuple contains the data, dimensions, and other context for a single item.
+        protocol : str
+            The inference protocol, either "grpc" or "http".
+        **kwargs : Any
+            Additional keyword arguments passed from the original request.
+
+        Returns
+        -------
+        Tuple[Any, Dict[str, Any]]
+            A tuple containing the single formatted batch and its scratch-pad data.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} does not support dynamic batching "
+            "because `coalesce_requests_to_batch` is not implemented."
+        )
+
+    def does_item_fit_in_batch(self, current_batch, next_request, memory_budget_bytes: int) -> bool:
+        """
+        Checks if adding another request to the current batch would exceed the memory budget.
+
+        This is a model-specific calculation. The default implementation always
+        returns True, effectively ignoring the memory budget. Interfaces for models
+        that require memory management (like padded image models) must override this.
+
+        Returns
+        -------
+        bool
+            True if the item fits within the budget, False otherwise.
+        """
+        return True

@@ -137,11 +137,14 @@ def test_init_with_job_specs(job_spec_fixture):
     assert job_spec_fixture in batch_job_spec._file_type_to_job_spec["pdf"]
 
 
-def test_init_with_files(mocker, job_spec_fixture):
-    mocker.patch("nv_ingest_client.util.util.generate_matching_files", return_value=["file1.pdf"])
+def test_init_with_files(mocker, job_spec_fixture, tmp_path):
+    temp_pdf = tmp_path / "file1.pdf"
+    temp_pdf.write_text("Mock PDF content")  # Write some mock content
+
+    mocker.patch("nv_ingest_client.util.util.generate_matching_files", return_value=[str(temp_pdf)])
     mocker.patch("nv_ingest_client.util.util.create_job_specs_for_batch", return_value=[job_spec_fixture])
 
-    batch_job_spec = BatchJobSpec(["file1.pdf"])
+    batch_job_spec = BatchJobSpec([str(temp_pdf)])
 
     # Verify that the files were processed and job specs were created
     assert "pdf" in batch_job_spec._file_type_to_job_spec

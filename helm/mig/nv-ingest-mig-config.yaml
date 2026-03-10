@@ -18,7 +18,7 @@ data:
         - devices: [1]
           mig-enabled: true
           mig-devices:
-            "7g.80gb": 1
+            "1g.20gb": 4
         - devices: [2]
           mig-enabled: true
           mig-devices:

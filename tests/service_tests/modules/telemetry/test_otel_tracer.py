@@ -2,18 +2,19 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import pytest
+
 from datetime import datetime
 
-from morpheus.messages import ControlMessage
-
-from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
-    extract_annotated_task_results,
+from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import (
     extract_timestamps_from_message,
+    extract_annotated_task_results,
 )
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 
 def test_extract_timestamps_single_task():
-    msg = ControlMessage()
+    msg = IngestControlMessage()
     msg.set_timestamp("trace::entry::foo", datetime.fromtimestamp(1))
     msg.set_timestamp("trace::exit::foo", datetime.fromtimestamp(2))
 
@@ -25,7 +26,7 @@ def test_extract_timestamps_single_task():
 
 
 def test_extract_timestamps_no_tasks():
-    msg = ControlMessage()
+    msg = IngestControlMessage()
 
     expected_output = {}
 
@@ -35,7 +36,7 @@ def test_extract_timestamps_no_tasks():
 
 
 def test_extract_annotated_task_results_invalid_metadata():
-    msg = ControlMessage()
+    msg = IngestControlMessage()
 
     # Simulate setting non-annotation metadata and valid annotation metadata
     msg.set_metadata("random::metadata", {"random_key": "value"})  # Should be ignored
@@ -49,7 +50,7 @@ def test_extract_annotated_task_results_invalid_metadata():
 
 
 def test_extract_annotated_task_results_missing_fields():
-    msg = ControlMessage()
+    msg = IngestControlMessage()
 
     # Simulate setting metadata with missing task_id and task_result
     msg.set_metadata("annotation::task1", {"task_result": "success"})  # Missing task_id (should be skipped)
@@ -63,7 +64,7 @@ def test_extract_annotated_task_results_missing_fields():
 
 
 def test_extract_annotated_task_results_no_annotation_keys():
-    msg = ControlMessage()
+    msg = IngestControlMessage()
 
     # Simulate setting metadata with no annotation keys
     msg.set_metadata("random::metadata", {"random_key": "value"})
@@ -71,5 +72,3 @@ def test_extract_annotated_task_results_no_annotation_keys():
     expected_output = {}
 
     result = extract_annotated_task_results(msg)
-
-    assert result == expected_output

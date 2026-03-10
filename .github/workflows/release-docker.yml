@@ -1,0 +1,72 @@
+name: Release - Docker
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 25.4.0)'
+        required: true
+        type: string
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+
+jobs:
+  determine-version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version from branch or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            # Extract from branch name (release/X.Y.Z -> X.Y.Z)
+            VERSION="${GITHUB_REF#refs/heads/release/}"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION"
+
+  build-and-publish:
+    name: Build & Publish Multi-platform Docker Image
+    needs: determine-version
+    runs-on: linux-large-disk
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref || github.ref }}
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+        with:
+          use-qemu: 'true'
+          platforms: 'linux/amd64,linux/arm64'
+
+      - name: Login to NGC
+        uses: ./.github/actions/docker-login-ngc
+        with:
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and Push Multi-platform Image
+        run: |
+          docker buildx create --use
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --push \
+            --target runtime \
+            --build-arg HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }} \
+            --build-arg DOWNLOAD_LLAMA_TOKENIZER=True \
+            --build-arg GIT_COMMIT=${GITHUB_SHA} \
+            -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }} \
+            .
+
+      - name: Summary
+        run: |
+          echo "Published Docker image: ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }}"

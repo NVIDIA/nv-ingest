@@ -1,6 +1,9 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=78.1.1", "wheel>=0.46.2"]
 build-backend = "setuptools.build_meta"
+
+[tool.uv]
+managed = true
 
 [project]
 name = "nv-ingest-api"
@@ -17,9 +20,21 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "backoff==2.2.1",
     "pandas>=2.0",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
+    "fsspec>=2025.5.1",
+    "universal_pathlib>=0.2.6",
+    "ffmpeg-python==0.2.0",
+    "tritonclient",
+    "glom",
+    "pypdfium2==4.30.0",
+]
+
+[project.optional-dependencies]
+test = [
+    "moviepy==2.2.1",
 ]
 
 [project.urls]

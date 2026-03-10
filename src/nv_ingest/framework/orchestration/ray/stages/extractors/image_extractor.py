@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -15,6 +16,9 @@ from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExt
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+from nv_ingest_api.util.logging.sanitize import sanitize_for_logging
+
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
 
@@ -30,18 +34,19 @@ class ImageExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted primitives DataFrame.
     """
 
-    def __init__(self, config: ImageExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         try:
             self.validated_config = config
-            logger.info("ImageExtractorStage configuration validated successfully.")
+            self._logger.info("ImageExtractorStage configuration validated successfully.")
         except Exception as e:
-            logger.exception(f"Error validating Image Extractor config: {e}")
+            self._logger.exception(f"Error validating Image Extractor config: {e}")
             raise
 
-    @traceable("image_extraction")
+    @nv_ingest_node_failure_try_except()
+    @traceable()
+    @udf_intercept_hook()
     @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(png|jpeg|jpg|tiff|bmp)$"})])
-    @nv_ingest_node_failure_try_except(annotation_id="image_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting primitives from images.
@@ -64,7 +69,7 @@ class ImageExtractorStage(RayActorStage):
 
             # Remove the "extract" task from the message to obtain task-specific configuration.
             task_config = remove_task_by_type(control_message, "extract")
-            logger.debug("Extracted task config: %s", task_config)
+            logger.debug("Extracted task config: %s", sanitize_for_logging(task_config))
 
             # Perform image primitives extraction.
             new_df, extraction_info = extract_primitives_from_image_internal(

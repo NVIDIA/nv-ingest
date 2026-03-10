@@ -9,7 +9,7 @@ import pandas as pd
 # Import the module under test
 import nv_ingest_api.internal.extract.audio.audio_extraction as module_under_test
 from nv_ingest_api.internal.extract.audio.audio_extraction import (
-    _update_audio_metadata,
+    _extract_from_audio,
     extract_text_from_audio_internal,
     ContentTypeEnum,
 )
@@ -25,7 +25,16 @@ class TestAudioExtraction(unittest.TestCase):
         """Set up common test fixtures."""
         # Create a mock audio client
         self.mock_audio_client = Mock()
-        self.mock_audio_client.infer = Mock(return_value="This is a transcribed audio content")
+
+        self.mock_audio_client.infer = Mock(
+            return_value=(
+                [
+                    {"text": "This is a", "start": 0, "end": 5},
+                    {"text": "transcribed audio content", "start": 5, "end": 10},
+                ],
+                "This is a transcribed audio content",
+            )
+        )
 
         # Common trace info
         self.trace_info = {"request_id": "test-request-123", "timestamp": "2025-03-10T12:00:00Z"}
@@ -54,7 +63,7 @@ class TestAudioExtraction(unittest.TestCase):
         }
 
     @patch(f"{MODULE_UNDER_TEST}.validate_schema")
-    def test_update_audio_metadata_valid(self, mock_validate_schema):
+    def test_extract_from_audio_metadata_valid(self, mock_validate_schema):
         """Test _update_audio_metadata with valid audio content."""
         # Configure mocks
         mock_validate_schema.side_effect = lambda data, schema: Mock(model_dump=lambda: data)
@@ -63,11 +72,11 @@ class TestAudioExtraction(unittest.TestCase):
         row = pd.Series({"metadata": self.valid_audio_metadata.copy()})
 
         # Call the function
-        result = _update_audio_metadata(row, self.mock_audio_client, self.trace_info)
+        result = _extract_from_audio(row, self.mock_audio_client, self.trace_info)
 
         # Verify results
-        self.assertIn("audio_metadata", result)
-        self.assertEqual(result["audio_metadata"]["audio_transcript"], "This is a transcribed audio content")
+        self.assertIn("audio_metadata", result[0][1])
+        self.assertEqual(result[0][1]["audio_metadata"]["audio_transcript"], "This is a transcribed audio content")
 
         # Verify the mock was called correctly
         self.mock_audio_client.infer.assert_called_once_with(
@@ -80,16 +89,42 @@ class TestAudioExtraction(unittest.TestCase):
         # Verify validate_schema was called twice (for audio metadata and metadata)
         self.assertEqual(mock_validate_schema.call_count, 2)
 
-        # Verify document_type was updated
-        self.assertEqual(row["document_type"], ContentTypeEnum.AUDIO)
+    @patch(f"{MODULE_UNDER_TEST}.validate_schema")
+    def test_extract_from_audio_metadata_valid_segment(self, mock_validate_schema):
+        """Test _update_audio_metadata with valid audio content."""
+        # Configure mocks
+        mock_validate_schema.side_effect = lambda data, schema: Mock(model_dump=lambda: data)
 
-    def test_update_audio_metadata_non_audio(self):
+        # Create a sample row with valid audio metadata
+        row = pd.Series({"metadata": self.valid_audio_metadata.copy()})
+
+        # Call the function
+        result = _extract_from_audio(row, self.mock_audio_client, self.trace_info, segment_audio=True)
+
+        # Verify results
+        self.assertIn("audio_metadata", result[0][1])
+        self.assertIn("audio_metadata", result[1][1])
+        self.assertEqual(result[0][1]["audio_metadata"]["audio_transcript"], "This is a")
+        self.assertEqual(result[1][1]["audio_metadata"]["audio_transcript"], "transcribed audio content")
+
+        # Verify the mock was called correctly
+        self.mock_audio_client.infer.assert_called_once_with(
+            "base64encodedaudiocontent",
+            model_name="parakeet",
+            trace_info=self.trace_info,
+            stage_name="audio_extraction",
+        )
+
+        # Verify validate_schema was called twice (for audio metadata and metadata)
+        self.assertEqual(mock_validate_schema.call_count, 4)
+
+    def test_extract_from_audio_non_audio(self):
         """Test _update_audio_metadata with non-audio content."""
         # Create a sample row with non-audio metadata
         row = pd.Series({"metadata": self.non_audio_metadata.copy()})
 
         # Call the function
-        result = _update_audio_metadata(row, self.mock_audio_client, self.trace_info)
+        result = _extract_from_audio(row, self.mock_audio_client, self.trace_info)
 
         # The 'content' key is popped from metadata in the function
         # so we need to compare with that in mind
@@ -97,19 +132,19 @@ class TestAudioExtraction(unittest.TestCase):
         expected_content = expected.pop("content")
 
         # Verify that the metadata was returned appropriately
-        self.assertEqual(result, expected)
+        self.assertEqual(result, [[expected]])
         self.assertEqual(expected_content, "base64encodedcontent")
 
         # Verify the mock was not called
         self.mock_audio_client.infer.assert_not_called()
 
-    def test_update_audio_metadata_empty_content(self):
+    def test_extract_from_audio_empty_content(self):
         """Test _update_audio_metadata with empty audio content."""
         # Create a sample row with empty content metadata
         row = pd.Series({"metadata": self.empty_content_metadata.copy()})
 
         # Call the function
-        result = _update_audio_metadata(row, self.mock_audio_client, self.trace_info)
+        result = _extract_from_audio(row, self.mock_audio_client, self.trace_info)
 
         # The 'content' key is popped from metadata in the function
         # so we need to compare with that in mind
@@ -117,28 +152,28 @@ class TestAudioExtraction(unittest.TestCase):
         expected_content = expected.pop("content")
 
         # Verify that the metadata was returned as expected
-        self.assertEqual(result, expected)
+        self.assertEqual(result, [[expected]])
         self.assertEqual(expected_content, "")
 
         # Verify the mock was not called
         self.mock_audio_client.infer.assert_not_called()
 
-    def test_update_audio_metadata_missing_metadata(self):
+    def test_extract_from_audio_missing_metadata(self):
         """Test _update_audio_metadata with missing metadata."""
         # Create a sample row without metadata
         row = pd.Series({"other_field": "value"})
 
         # Call the function and check for exception
         with self.assertRaises(ValueError) as context:
-            _update_audio_metadata(row, self.mock_audio_client, self.trace_info)
+            _extract_from_audio(row, self.mock_audio_client, self.trace_info)
 
         # The unified_exception_handler decorator appears to modify the error message format
-        self.assertEqual(str(context.exception), "_update_audio_metadata: error: Row does not contain 'metadata'.")
+        self.assertEqual(str(context.exception), "_extract_from_audio: error: Row does not contain 'metadata'.")
 
     @patch(f"{MODULE_UNDER_TEST}.create_audio_inference_client")
-    @patch(f"{MODULE_UNDER_TEST}._update_audio_metadata")
+    @patch(f"{MODULE_UNDER_TEST}._extract_from_audio")
     @patch("pandas.DataFrame.apply")
-    def test_extract_text_from_audio_internal(self, mock_df_apply, mock_update_audio_metadata, mock_create_client):
+    def test_extract_text_from_audio_internal(self, mock_df_apply, mock_extract_from_audio, mock_create_client):
         """Test extract_text_from_audio_internal with various inputs."""
         # Setup test data
         mock_create_client.return_value = self.mock_audio_client
@@ -148,11 +183,11 @@ class TestAudioExtraction(unittest.TestCase):
             if isinstance(row, pd.Series) and "metadata" in row:
                 metadata = row["metadata"]
                 if metadata.get("content_metadata", {}).get("type") == ContentTypeEnum.AUDIO:
-                    return {"audio_metadata": {"audio_transcript": "Test transcript"}}
+                    return [[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]
                 return metadata
-            return {}
+            return []
 
-        mock_update_audio_metadata.side_effect = update_metadata_side_effect
+        mock_extract_from_audio.side_effect = update_metadata_side_effect
 
         # Create test DataFrame
         df = pd.DataFrame(
@@ -171,6 +206,7 @@ class TestAudioExtraction(unittest.TestCase):
         audio_extraction_config.function_id = "audio-function"
         audio_extraction_config.use_ssl = False
         audio_extraction_config.ssl_cert = None
+        audio_extraction_config.segment_audio = False
 
         extraction_config = Mock()
         extraction_config.audio_extraction_config = audio_extraction_config
@@ -188,7 +224,9 @@ class TestAudioExtraction(unittest.TestCase):
         )
 
         # Configure the DataFrame.apply mock
-        mock_df_apply.return_value = pd.Series([{"audio_metadata": {"audio_transcript": "Test transcript"}}])
+        mock_df_apply.return_value = pd.Series(
+            [[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]]
+        )
 
         # Call the function
         result_df, trace_info = extract_text_from_audio_internal(
@@ -196,7 +234,7 @@ class TestAudioExtraction(unittest.TestCase):
         )
 
         # Verify results
-        self.assertEqual(len(result_df), 3)  # Should have same number of rows
+        self.assertEqual(len(result_df), 1)  # Should have same number of rows
 
         # Verify create_audio_inference_client was called with correct params
         mock_create_client.assert_called_once_with(
@@ -207,11 +245,6 @@ class TestAudioExtraction(unittest.TestCase):
             use_ssl=False,
             ssl_cert=None,
         )
-
-        # When we mock pandas.DataFrame.apply, the _update_audio_metadata function
-        # doesn't get called directly by the DataFrame.apply method anymore
-        # Verify the mock was created correctly, but don't check call count
-        self.assertIsNotNone(mock_update_audio_metadata)
 
     @patch(f"{MODULE_UNDER_TEST}.create_audio_inference_client")
     @patch("pandas.DataFrame.apply")
@@ -231,6 +264,7 @@ class TestAudioExtraction(unittest.TestCase):
         audio_extraction_config.function_id = "default-function"
         audio_extraction_config.use_ssl = False
         audio_extraction_config.ssl_cert = None
+        audio_extraction_config.segment_audio = False
 
         extraction_config = Mock()
         extraction_config.audio_extraction_config = audio_extraction_config
@@ -246,6 +280,7 @@ class TestAudioExtraction(unittest.TestCase):
                     "function_id": "custom-function",
                     "use_ssl": True,
                     "ssl_cert": "custom-cert",
+                    "segment_audio": True,
                 }
             }
         }
@@ -323,7 +358,9 @@ class TestAudioExtraction(unittest.TestCase):
         task_config = {"params": {"extract_audio_params": {}}}
 
         # Configure the DataFrame.apply mock
-        mock_df_apply.return_value = pd.Series([{"audio_metadata": {"audio_transcript": "Test transcript"}}])
+        mock_df_apply.return_value = pd.Series(
+            [[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]]
+        )
 
         # Call the function with no trace_info
         result_df, trace_info = extract_text_from_audio_internal(df.copy(), task_config, extraction_config, None)

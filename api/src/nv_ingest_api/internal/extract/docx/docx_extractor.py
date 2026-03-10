@@ -7,14 +7,17 @@ import base64
 import functools
 import io
 import logging
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, Tuple
 
 import pandas as pd
 from pydantic import BaseModel
 
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import python_docx
+from nv_ingest_api.internal.extract.pdf.engines.pdfium import pdfium_extractor
+from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import convert_stream_with_libreoffice
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
+
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +109,7 @@ def _decode_and_extract_from_docx(
     doc_bytes: bytes = base64.b64decode(base64_content)
     doc_stream: io.BytesIO = io.BytesIO(doc_bytes)
 
+    extract_method = task_config.get("method", "python_docx")
     extract_params: Dict[str, Any] = task_config.get("params", {})
 
     # Extract required boolean flags from params.
@@ -125,17 +129,40 @@ def _decode_and_extract_from_docx(
     if execution_trace_log is not None:
         extract_params["trace_info"] = execution_trace_log
 
-    # extraction_func: Callable = _get_extraction_function(extract_method, default)
-    extracted_data: Any = python_docx(
-        docx_stream=doc_stream,
-        extract_text=extract_text,
-        extract_images=extract_images,
-        extract_infographics=extract_infographics,
-        extract_tables=extract_tables,
-        extract_charts=extract_charts,
-        extraction_config=extract_params,
-        execution_trace_log=None,
-    )
+    if extract_method == "render_as_pdf":
+        pdf_stream = convert_stream_with_libreoffice(doc_stream, "docx", "pdf")
+
+        pdf_extract_method = extract_params.get("pdf_extract_method", "pdfium")
+        pdf_extractor_config = extract_params.copy()
+        pdf_extractor_config["extract_method"] = pdf_extract_method
+        if getattr(extraction_config, "pdfium_config", None) is not None:
+            pdf_extractor_config["pdfium_config"] = extraction_config.pdfium_config
+
+        extracted_data: Any = pdfium_extractor(
+            pdf_stream=pdf_stream,
+            extract_text=extract_text,
+            extract_images=extract_images,
+            extract_infographics=extract_infographics,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            extract_page_as_image=False,
+            extractor_config=pdf_extractor_config,
+            execution_trace_log=None,
+        )
+
+    elif extract_method == "python_docx":
+        extracted_data: Any = python_docx(
+            docx_stream=doc_stream,
+            extract_text=extract_text,
+            extract_images=extract_images,
+            extract_infographics=extract_infographics,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            extraction_config=extract_params,
+            execution_trace_log=None,
+        )
+    else:
+        raise ValueError(f"Unsupported DOCX extraction method: {extract_method}")
 
     return extracted_data
 
@@ -146,7 +173,7 @@ def extract_primitives_from_docx_internal(
     task_config: Union[Dict[str, Any], BaseModel],
     extraction_config: DocxExtractorSchema,
     execution_trace_log: Optional[Dict[str, Any]] = None,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, Union[Dict, None]]:
     """
     Processes a pandas DataFrame containing DOCX files encoded in base64, extracting text from
     each document and replacing the original content with the extracted text.
@@ -202,4 +229,4 @@ def extract_primitives_from_docx_internal(
     else:
         extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-    return extracted_df
+    return extracted_df, {}

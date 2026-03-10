@@ -4,10 +4,16 @@ Splitting, also known as chunking, breaks large documents or text into smaller, 
 After chunking, only the most relevant pieces of information are retrieved for a given query. 
 Chunking also prevents text from exceeding the context window of the embedding model.
 
-There are two ways that NV Ingest chunks text:
+There are two ways that the retriever pipeline chunks text:
 
 - By using the `text_depth` parameter in the `extraction` task.
 - Token-based splitting by using the `split` task.
+
+
+!!! warning
+
+    NeMo Retriever Library is designed to process language and language-length strings. If you submit a document that contains extremely long, or non-language text strings, such as a DNA sequence, errors or unexpected results occur.
+
 
 
 ## Extraction Text Depth
@@ -65,7 +71,8 @@ To use a different tokenizer, such as `intfloat/e5-large-unsupervised`, you can 
 ingestor = ingestor.split(
     tokenizer="intfloat/e5-large-unsupervised",
     chunk_size=1024,
-    chunk_overlap=150
+    chunk_overlap=150,
+    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"}
 )
 ```
 
@@ -77,7 +84,7 @@ The following table contains the `split` parameters.
 | ------ | ----------- | -------- |
 | `tokenizer` | HuggingFace Tokenizer identifier or path. | `meta-llama/Llama-3.2-1B`|
 | `chunk_size` | Maximum number of tokens per chunk.  | `1024` |
-| `chunk_size` | Number of tokens to overlap between chunks.  | `150` |
+| `chunk_overlap` | Number of tokens to overlap between chunks.  | `150` |
 | `params` | A sub-dictionary that can contain `split_source_types` and `hf_access_token` | `{}` |
 | `hf_access_token` | Your Hugging Face access token. | — |
 | `split_source_types` | The source types to split on (only splits on text by default). | — |
@@ -86,17 +93,19 @@ The following table contains the `split` parameters.
 
 ### Pre-download the Tokenizer
 
-When the NV Ingest container is built, it pre-downloads a default tokenizer,  
-so that it doesn't have to download the tokenizer at runtime. 
-
-By default, the NV Ingest container downloads the `intfloat/e5-large-unsupervised` tokenizer,
-which is not gated, and does not require any special permissions.
-
-You can use the `meta-llama/Llama-3.2-1B` tokenizer instead, 
-but this is a gated model, and requires special permissions.
-To pre-download the `meta-llama/Llama-3.2-1B` tokenizer, you must do the following:
+By default, the NeMo Retriever Library container comes with the `meta-llama/Llama-3.2-1B` tokenizer pre-downloaded 
+so that it doesn't have to download a tokenizer at runtime.
+If you are building the container yourself and want to pre-download this model, do the following:
 
 - Review the [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B).
 - [Request access](https://huggingface.co/meta-llama/Llama-3.2-1B).
+- Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `True`
 - Set the `HF_ACCESS_TOKEN` environment variable to your HuggingFace access token.
-- Set the `DOWNLOAD_LLAMA_TOKENIZER` environment variable to `true`.
+
+
+
+## Related Topics
+
+- [Use the Python API](python-api-reference.md)
+- [NeMo Retriever Library V2 API Guide](v2-api-guide.md)
+- [Environment Variables](environment-variables.md)

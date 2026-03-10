@@ -37,22 +37,19 @@ else
     usage
 fi
 
+NV_INGEST_VERSION_OVERRIDE="${VERSION_SUFFIX}"
+export NV_INGEST_VERSION_OVERRIDE
+
 # Set library-specific variables and paths
 if [[ "$LIBRARY" == "api" ]]; then
-    NV_INGEST_VERSION_OVERRIDE="${VERSION_SUFFIX}"
-    export NV_INGEST_VERSION_OVERRIDE
     SETUP_PATH="$SCRIPT_DIR/../../api/pyproject.toml"
     (cd "$(dirname "$SETUP_PATH")" && python -m build)
 elif [[ "$LIBRARY" == "client" ]]; then
-    NV_INGEST_VERSION_OVERRIDE="${VERSION_SUFFIX}"
-    export NV_INGEST_VERSION_OVERRIDE
     SETUP_PATH="$SCRIPT_DIR/../../client/pyproject.toml"
     (cd "$(dirname "$SETUP_PATH")" && python -m build)
 elif [[ "$LIBRARY" == "service" ]]; then
-    NV_INGEST_SERVICE_VERSION_OVERRIDE="${VERSION_SUFFIX}"
-    export NV_INGEST_SERVICE_VERSION_OVERRIDE
-    SETUP_PATH="$SCRIPT_DIR/../../setup.py"
-    (cd "$(dirname "$SETUP_PATH")" && python setup.py sdist bdist_wheel)
+    SETUP_PATH="$SCRIPT_DIR/../../src/pyproject.toml"
+    (cd "$(dirname "$SETUP_PATH")" && python -m build)
 else
     echo "Invalid library: $LIBRARY"
     usage

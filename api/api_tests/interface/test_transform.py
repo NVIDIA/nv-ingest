@@ -10,7 +10,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 
-from .. import get_git_root, find_root_by_pattern
+from .. import get_project_root, find_root_by_pattern
 from nv_ingest_api.interface.transform import (
     transform_text_create_embeddings,
     transform_text_split_and_tokenize,
@@ -380,9 +380,9 @@ def test_transform_image_create_vlm_caption_parameterized(input_mode):
     # Locate the image file using environment variable or fallback.
     image_file = os.getenv("INGEST_IMAGE_FILE")
     if not image_file:
-        git_root = get_git_root(__file__)
-        if git_root:
-            candidate = os.path.join(git_root, "data", "chart.png")
+        project_root = get_project_root(__file__)
+        if project_root:
+            candidate = os.path.join(project_root, "data", "chart.png")
             if os.path.exists(candidate):
                 image_file = candidate
         if not image_file:

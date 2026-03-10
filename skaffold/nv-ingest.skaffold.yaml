@@ -44,22 +44,6 @@ deploy:
 manifests:
   helm:
     releases:
-      # - name: morpheus-sdk-client
-      #   chartPath: ./helm-nv/morpheus-sdk-client
-      #   valuesFiles:
-      #     - ./helm-nv/morpheus-sdk-client/values.yaml
-      #   namespace: morpheus
-      #   createNamespace: true
-      #   recreatePods: true
-      #   skipTests: true
-      # - name: morpheus-ai-engine
-      #   chartPath: ./helm-nv/morpheus-ai-engine
-      #   valuesFiles:
-      #     - ./helm-nv/morpheus-ai-engine/values.yaml
-      #   namespace: morpheus
-      #   createNamespace: true
-      #   recreatePods: true
-      #   skipTests: true
       - name: nv-ingest
         chartPath: ./helm
         # pass the just-built-by-skaffold image URI through to the Helm chart

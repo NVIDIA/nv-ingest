@@ -37,15 +37,36 @@ class SourceMetadataSchema(BaseModelNoExt):
     """
 
     source_name: str
+    """The name of the source file."""
+
     source_id: str
+    """The ID of the source file."""
+
     source_location: str = ""
+    """The URL, URI, or pointer to the storage location of the source file."""
+
     source_type: Union[DocumentTypeEnum, str]
+    """The type of the source file, such as pdf, docx, pptx, or txt."""
+
     collection_id: str = ""
+    """The ID of the collection in which the source is contained."""
+
     date_created: str = datetime.now().isoformat()
+    """The date the source was created."""
+
     last_modified: str = datetime.now().isoformat()
+    """The date the source was last modified."""
+
     summary: str = ""
+    """A summary of the source."""
+
     partition_id: int = -1
+    """The offset of this data fragment within a larger set of fragments."""
+
     access_level: Union[AccessLevelEnum, int] = AccessLevelEnum.UNKNOWN
+    """The role-based access control for the source."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
     @field_validator("date_created", "last_modified")
     @classmethod
@@ -93,31 +114,88 @@ class ContentMetadataSchema(BaseModelNoExt):
     """
 
     type: ContentTypeEnum
+    """The type of the content. Text, Image, Structured, Table, or Chart."""
+
     description: str = ""
+    """A text description of the content object."""
+
     page_number: int = -1
+    """The page number of the content in the source."""
+
     hierarchy: ContentHierarchySchema = ContentHierarchySchema()
+    """The location or order of the content within the source."""
+
     subtype: Union[ContentTypeEnum, str] = ""
+    """The type of the content for structured data types, such as table or chart."""
+
+    start_time: int = -1
+    """The timestamp of the start of a piece of audio content."""
+
+    end_time: int = -1
+    """The timestamp of the end of a piece of audio content."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class TextMetadataSchema(BaseModelNoExt):
+    """
+    The schema for the extracted text content.
+    """
+
     text_type: TextTypeEnum
+    """The type of the text, such as header or body."""
+
     summary: str = ""
+    """An abbreviated summary of the content."""
+
     keywords: Union[str, List[str], Dict] = ""
-    language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
+    """Keywords, named entities, or other phrases."""
+
+    language: LanguageEnum = LanguageEnum.EN  # default to Unknown? Maybe do some kind of heuristic check
+    """The language of the content."""
+
     text_location: tuple = (0, 0, 0, 0)
-    text_location_max_dimensions: tuple = (0, 0, 0, 0)
+    """The bounding box of the text, in the format (x1,y1,x2,y2)."""
+
+    text_location_max_dimensions: tuple = (0, 0)
+    """The maximum dimensions of the bounding box of the text, in the format (x_max,y_max)."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class ImageMetadataSchema(BaseModelNoExt):
+    """
+    The schema for the extracted image content.
+    """
+
     image_type: Union[DocumentTypeEnum, str]
+    """The type of the image, such as structured, natural, hybrid, and others."""
+
     structured_image_type: ContentTypeEnum = ContentTypeEnum.NONE
+    """The type of the content for structured data types, such as bar chart, pie chart, and others."""
+
     caption: str = ""
+    """A caption or subheading associated with the image."""
+
     text: str = ""
+    """Extracted text from a structured chart."""
+
     image_location: tuple = (0, 0, 0, 0)
+    """The bounding box of the image, in the format (x1,y1,x2,y2)."""
+
     image_location_max_dimensions: tuple = (0, 0)
+    """The maximum dimensions of the bounding box of the image, in the format (x_max,y_max)."""
+
     uploaded_image_url: str = ""
+    """A mirror of source_metadata.source_location."""
+
     width: int = 0
+    """The width of the image."""
+
     height: int = 0
+    """The height of the image."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
     @field_validator("image_type")
     def validate_image_type(cls, v):
@@ -134,28 +212,79 @@ class ImageMetadataSchema(BaseModelNoExt):
 
 
 class TableMetadataSchema(BaseModelNoExt):
+    """
+    The schema for the extracted table content.
+    """
+
     caption: str = ""
+    """The caption for the table."""
+
     table_format: TableFormatEnum
+    """
+    The format of the table.  One of Structured (dataframe / lists of rows and columns), or serialized as markdown,
+    html, latex, simple (cells separated as spaces).
+    """
+
     table_content: str = ""
+    """Extracted text content, formatted according to table_metadata.table_format."""
+
     table_content_format: Union[TableFormatEnum, str] = ""
+
     table_location: tuple = (0, 0, 0, 0)
+    """The bounding box of the table, in the format (x1,y1,x2,y2)."""
+
     table_location_max_dimensions: tuple = (0, 0)
+    """The maximum dimensions of the bounding box of the table, in the format (x_max,y_max)."""
+
     uploaded_image_uri: str = ""
+    """A mirror of source_metadata.source_location."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class ChartMetadataSchema(BaseModelNoExt):
+    """
+    The schema for table content extracted from charts.
+    """
+
     caption: str = ""
+    """The caption for the chart."""
+
     table_format: TableFormatEnum
+    """
+    The format of the table.  One of Structured (dataframe / lists of rows and columns), or serialized as markdown,
+    html, latex, simple (cells separated as spaces).
+    """
+
     table_content: str = ""
+    """Extracted text content, formatted according to chart_metadata.table_format."""
+
     table_content_format: Union[TableFormatEnum, str] = ""
+
     table_location: tuple = (0, 0, 0, 0)
+    """The bounding box of the chart, in the format (x1,y1,x2,y2)."""
+
     table_location_max_dimensions: tuple = (0, 0)
+    """The maximum dimensions of the bounding box of the chart, in the format (x_max,y_max)."""
+
     uploaded_image_uri: str = ""
+    """A mirror of source_metadata.source_location."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class AudioMetadataSchema(BaseModelNoExt):
+    """
+    The schema for extracted audio content.
+    """
+
     audio_transcript: str = ""
+    """A transcript of the audio content."""
+
     audio_type: str = ""
+    """The type or format of the audio, such as mp3, wav."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 # TODO consider deprecating this in favor of info msg...
@@ -164,6 +293,7 @@ class ErrorMetadataSchema(BaseModelNoExt):
     status: StatusEnum
     source_id: str = ""
     error_msg: str
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class InfoMessageMetadataSchema(BaseModelNoExt):
@@ -171,24 +301,67 @@ class InfoMessageMetadataSchema(BaseModelNoExt):
     status: StatusEnum
     message: str
     filter: bool
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 # Main metadata schema
 class MetadataSchema(BaseModelNoExt):
+    """
+    The primary container schema for extraction results.
+    """
+
     content: str = ""
+    """The actual textual content extracted from the source."""
+
     content_url: str = ""
+    """A URL that points to the location of the content, if applicable."""
+
     embedding: Optional[List[float]] = None
+    """An optional numerical vector representation (embedding) of the content."""
+
     source_metadata: Optional[SourceMetadataSchema] = None
+    """Metadata about the original source of the content."""
+
     content_metadata: Optional[ContentMetadataSchema] = None
+    """General metadata about the extracted content itself."""
+
     audio_metadata: Optional[AudioMetadataSchema] = None
+    """Specific metadata for audio content. Automatically set to None if content_metadata.type is not AUDIO."""
+
     text_metadata: Optional[TextMetadataSchema] = None
+    """Specific metadata for text content. Automatically set to None if content_metadata.type is not TEXT."""
+
     image_metadata: Optional[ImageMetadataSchema] = None
+    """Specific metadata for image content. Automatically set to None if content_metadata.type is not IMAGE."""
+
     table_metadata: Optional[TableMetadataSchema] = None
+    """Specific metadata for tabular content. Automatically set to None if content_metadata.type is not STRUCTURED."""
+
     chart_metadata: Optional[ChartMetadataSchema] = None
+    """Specific metadata for chart content. Automatically set to None if content_metadata.type is not STRUCTURED."""
+
     error_metadata: Optional[ErrorMetadataSchema] = None
+    """Metadata that describes any errors encountered during processing."""
+
     info_message_metadata: Optional[InfoMessageMetadataSchema] = None
+    """Informational messages related to the processing."""
+
     debug_metadata: Optional[Dict[str, Any]] = None
+    """A dictionary for storing any arbitrary debug information."""
+
     raise_on_failure: bool = False
+    """If True, indicates that processing should halt on failure."""
+
+    total_pages: Optional[int] = None
+    """Total number of pages in the source document (V2 API)."""
+
+    original_source_id: Optional[str] = None
+    """The original source identifier before any splitting or chunking (V2 API)."""
+
+    original_source_name: Optional[str] = None
+    """The original source name before any splitting or chunking (V2 API)."""
+
+    custom_content: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="before")
     @classmethod

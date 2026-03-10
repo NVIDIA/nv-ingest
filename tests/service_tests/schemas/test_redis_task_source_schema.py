@@ -17,7 +17,7 @@ def test_redis_task_source_schema_defaults():
     assert isinstance(
         schema.broker_client, MessageBrokerClientSchema
     ), "redis_client should be an instance of RedisClientSchema."
-    assert schema.task_queue == "morpheus_task_queue", "Default value for task_queue should be 'morpheus_task_queue'."
+    assert schema.task_queue == "ingest_task_queue", "Default value for task_queue should be 'ingest_task_queue'."
     assert schema.progress_engines == 6, "Default value for progress_engines should be 6."
 
 

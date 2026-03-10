@@ -5,24 +5,30 @@
 
 import functools
 import inspect
+import logging
 import string
 from datetime import datetime
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
-def traceable(trace_name=None):
+def traceable(trace_name: Optional[str] = None):
     """
     A decorator that adds entry and exit trace timestamps to a IngestControlMessage's metadata
     based on the presence of a 'config::add_trace_tagging' flag.
 
     This decorator checks if the 'config::add_trace_tagging' flag is set to True in the
     message's metadata. If so, it records the entry and exit timestamps of the function
-    execution, using either a provided custom trace name or the function's name by default.
+    execution, using either a provided custom trace name, auto-detected stage name from
+    self.stage_name, or the function's name as fallback.
 
     Parameters
     ----------
     trace_name : str, optional
-        A custom name for the trace entries in the message metadata. If not provided, the
-        function's name is used by default.
+        A custom name for the trace entries in the message metadata. If not provided,
+        attempts to use self.stage_name from the decorated method's instance,
+        falling back to the function's name if neither is available.
 
     Returns
     -------
@@ -41,26 +47,48 @@ def traceable(trace_name=None):
     - 'trace::entry::<trace_name>': The timestamp marking the function's entry.
     - 'trace::exit::<trace_name>': The timestamp marking the function's exit.
 
-    Example
-    -------
-    Applying the decorator without a custom trace name:
+    Examples
+    --------
+    Automatic stage name detection (recommended):
+
+    >>> @traceable()  # Uses self.stage_name automatically
+    ... def process_message(self, message):
+    ...     pass
+
+    Explicit trace name (override):
+
+    >>> @traceable("custom_trace")
+    ... def process_message(self, message):
+    ...     pass
+
+    Function without instance (uses function name):
 
     >>> @traceable()
     ... def process_message(message):
     ...     pass
-
-    Applying the decorator with a custom trace name on a class method:
-
-    >>> class Processor:
-    ...     @traceable(trace_name="CustomTrace")
-    ...     def process(self, message):
-    ...         pass
     """
 
     def decorator_trace_tagging(func):
         @functools.wraps(func)
         def wrapper_trace_tagging(*args, **kwargs):
             ts_fetched = datetime.now()
+
+            # Determine the trace name to use
+            resolved_trace_name = trace_name
+
+            # If no explicit trace_name provided, try to get it from self.stage_name
+            if resolved_trace_name is None and len(args) >= 1:
+                stage_instance = args[0]  # 'self' in method calls
+                if hasattr(stage_instance, "stage_name") and stage_instance.stage_name:
+                    resolved_trace_name = stage_instance.stage_name
+                    logger.debug(f"Using auto-detected trace name: '{resolved_trace_name}'")
+                else:
+                    resolved_trace_name = func.__name__
+                    logger.debug(f"Using function name as trace name: '{resolved_trace_name}'")
+            elif resolved_trace_name is None:
+                resolved_trace_name = func.__name__
+                logger.debug(f"Using function name as trace name: '{resolved_trace_name}'")
+
             # Determine which argument is the message.
             if hasattr(args[0], "has_metadata"):
                 message = args[0]
@@ -73,7 +101,7 @@ def traceable(trace_name=None):
                 message.get_metadata("config::add_trace_tagging") is True
             )
 
-            trace_prefix = trace_name if trace_name else func.__name__
+            trace_prefix = resolved_trace_name
 
             if do_trace_tagging:
                 ts_send = message.get_timestamp("latency::ts_send")
@@ -199,3 +227,62 @@ def traceable_func(trace_name=None, dedupe=True):
         return wrapper_inject_trace_info
 
     return decorator_inject_trace_info
+
+
+def set_trace_timestamps_with_parent_context(control_message, execution_trace_log: dict, parent_name: str, logger=None):
+    """
+    Set trace timestamps on a control message with proper parent-child context.
+
+    This utility function processes trace timestamps from an execution_trace_log and
+    ensures that child traces are properly namespaced under their parent context.
+    This resolves OpenTelemetry span hierarchy issues where child spans cannot
+    find their expected parent contexts.
+
+    Parameters
+    ----------
+    control_message : IngestControlMessage
+        The control message to set timestamps on
+    execution_trace_log : dict
+        Dictionary of trace keys to timestamp values from internal operations
+    parent_name : str
+        The parent stage name to use as context for child traces
+    logger : logging.Logger, optional
+        Logger for debug output of key transformations
+
+    Examples
+    --------
+    Basic usage in a stage:
+
+    >>> execution_trace_log = {"trace::entry::yolox_inference": ts1, "trace::exit::yolox_inference": ts2}
+    >>> set_trace_timestamps_with_parent_context(
+    ...     control_message, execution_trace_log, "pdf_extractor", logger
+    ... )
+
+    This transforms:
+    - trace::entry::yolox_inference -> trace::entry::pdf_extractor::yolox_inference
+    - trace::exit::yolox_inference  -> trace::exit::pdf_extractor::yolox_inference
+    """
+    if not execution_trace_log:
+        return
+
+    for key, ts in execution_trace_log.items():
+        enhanced_key = key
+
+        # Check if this is a child trace that needs parent context
+        if key.startswith("trace::") and "::" in key:
+            # Parse the trace key to extract the base trace name
+            parts = key.split("::")
+            if len(parts) >= 3:  # e.g., ["trace", "entry", "yolox_inference"]
+                trace_type = parts[1]  # "entry" or "exit"
+                child_name = "::".join(parts[2:])  # everything after trace::entry:: or trace::exit::
+
+                # Only rewrite if it doesn't already include the parent context
+                if not child_name.startswith(f"{parent_name}::"):
+                    # Rewrite to include parent context: trace::entry::pdf_extractor::yolox_inference
+                    enhanced_key = f"trace::{trace_type}::{parent_name}::{child_name}"
+
+                    if logger:
+                        logger.debug(f"Enhanced trace key: {key} -> {enhanced_key}")
+
+        # Set the timestamp with the (possibly enhanced) key
+        control_message.set_timestamp(enhanced_key, ts)

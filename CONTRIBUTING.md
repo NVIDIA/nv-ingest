@@ -14,7 +14,6 @@ External contributions will be welcome soon, and they are greatly appreciated! E
      - [traceable](#traceable---srcnv_ingestutiltracingtaggingpy)
      - [nv_ingest_node_failure_context_manager](#nv_ingest_node_failure_context_manager---srcnv_ingestutilexception_handlersdecoratorspy)
      - [filter_by_task](#filter_by_task---srcnv_ingestutilflow_controlfilter_by_taskpy)
-     - [cm_skip_processing_if_failed](#cm_skip_processing_if_failed---morpheusutilscontrol_message_utilspy)
    - [Adding a New Stage or Module](#adding-a-new-stage-or-module)
    - [Common Practices for Writing Unit Tests](#common-practices-for-writing-unit-tests)
      - [General Guidelines](#general-guidelines)
@@ -55,9 +54,7 @@ External contributions will be welcome soon, and they are greatly appreciated! E
 ```bash
 DATASET_ROOT=[path to your dataset root]
 MODULE_NAME=[]
-MORPHEUS_ROOT=[path to your Morpheus root]
 NV_INGEST_ROOT=[path to your NV-Ingest root]
-git clone https://github.com/nv-morpheus/Morpheus.git $MORPHEUS_ROOT
 git clone https://github.com/NVIDIA/nv-ingest.git $NV_INGEST_ROOT
 cd $NV_INGEST_ROOT
 ```
@@ -91,7 +88,7 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 ### Workflow
 
 1. **NV-Ingest Foundation**: Built on top
-   of [NVIDIA Morpheus](https://github.com/nv-morpheus/Morpheus/blob/branch-24.10/docs/source/developer_guide/architecture.md).
+   of [RAY](https://docs.ray.io/en/latest/serve/architecture.html).
 
 2. **Pipeline Structure**: Designed around a pipeline that processes individual jobs within an asynchronous execution
    graph. Each job is processed by a series of stages or task handlers.
@@ -140,19 +137,20 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 
 ### Updating Dependencies
 
-- Dependencies are managed via 'Conda' and 'Pip'.
-- Dependencies are stored in .yml files
-    1. **Service Dependencies** 'conda/environments/nv_ingest_environment.yml' file.
-    2. **Client Dependencies** 'conda/environments/nv_ingest_client_environment.yml' file.
+- Dependencies are managed with `uv` and project-local `pyproject.toml` files.
+- Dependencies are stored in package definitions:
+    1. **Service Dependencies** `src/pyproject.toml`.
+    2. **Client Dependencies** `client/pyproject.toml`.
 
 - To update dependencies:
-  - Create a clean environment using the relevant .yml file.
-  - Update the dependencies using 'Conda' or 'Pip' and validate the changes.
-  - Update the .yml file by exporting the updated environment.
+  - Create a clean environment using `uv venv`.
+  - Update dependencies in the relevant `pyproject.toml` and validate the changes.
+  - Recreate the environment and install via `uv pip`.
     - For example:
       ```bash
-      conda env export --name nv_ingest_runtime --no-builds > conda/environment/nv_ingest_environment.yml
-      conda env export --name nv_ingest_client --no-builds > conda/environment/nv_ingest_client_environment.yml
+      uv venv .venv
+      source .venv/bin/activate
+      uv pip install -e ./src -e ./client -e ./api
       ```
 
 ### Common Processing Patterns

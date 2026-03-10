@@ -5,6 +5,10 @@ metadata:
   name: {{ include "nv-ingest.fullname" . }}
   labels:
     {{- include "nv-ingest.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7670"
+    prometheus.io/path: "/v1/metrics"
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -17,6 +21,9 @@ spec:
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7670"
+        prometheus.io/path: "/v1/metrics"
       {{- end }}
       labels:
         {{- include "nv-ingest.labels" . | nindent 8 }}
@@ -31,18 +38,6 @@ spec:
       serviceAccountName: {{ include "nv-ingest.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-
-      initContainers:
-        - name: verify-tmpdir-permissions
-          image: busybox
-          command:
-            - "sh"
-            - "-c"
-            - "mkdir -p /scratch/.cache /scratch/tmp && chown -R {{ .Values.nemo.userID }}:{{ .Values.nemo.groupID }} /scratch"
-          volumeMounts:
-            - name: ephemeral
-              subPath: scratch
-              mountPath: /scratch
 
       containers:
         - name: {{ .Chart.Name }}
@@ -74,13 +69,6 @@ spec:
             - name: TMPDIR
               value: /scratch/tmp
 
-            {{- if .Values.envVars.INGEST_LOG_LEVEL }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.envVars.INGEST_LOG_LEVEL }}"
-            {{- else }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            {{- end }}
             - name: CONSOLE_LOG_LEVEL
               value: "{{ .Values.logLevel }}"
             - name: LOG_LEVEL
@@ -91,6 +79,21 @@ spec:
             - name: "{{ $k }}"
               value: "{{ $v }}"
             {{- end }}
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_nano_12b_v2_vl") (eq .Values.nimOperator.nemotron_nano_12b_v2_vl.enabled true) }}
+            - name: VLM_CAPTION_ENDPOINT
+              value: "http://nemotron-nano-12b-v2-vl:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "nemotron_parse") (eq .Values.nimOperator.nemotron_parse.enabled true) }}
+            - name: NEMOTRON_PARSE_HTTP_ENDPOINT
+              value: "http://nemotron-parse:8000/v1/chat/completions"
+            {{- end }}
+
+            {{- if and (hasKey .Values "nimOperator") (hasKey .Values.nimOperator "audio") (eq .Values.nimOperator.audio.enabled true) }}
+            - name: AUDIO_GRPC_ENDPOINT
+              value: "audio:50051"
             {{- end }}
 
             # OpenTelemetry
@@ -136,11 +139,11 @@ spec:
               protocol: TCP
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
-            - toYaml .Values.livenessProbe | nindent 12
+            {{- toYaml (omit .Values.livenessProbe "enabled") | nindent 12 }}
           {{- end }}
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
-            - toYaml .Values.readinessProbe | nindent 12
+            {{- toYaml (omit .Values.readinessProbe "enabled") | nindent 12 }}
           {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

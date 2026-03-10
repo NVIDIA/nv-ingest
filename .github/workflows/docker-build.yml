@@ -7,22 +7,20 @@ on:
       - opened
       - synchronize
       - reopened
-  push:
-    branches:
-      - main
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: linux-large-disk
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Get current date (yyyy.mm.dd)
         run: echo "CURRENT_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -32,13 +30,28 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       # Build the Docker image using the Dockerfile
+      # Github does not allowing access secrets on pull requests. Therefore for this action we use the open source ubuntu
+      # base image and not the one hosted in nvcr.io
+      - name: Create HF token file
+        run: |
+          mkdir -p ./scripts/private_local
+          echo "${{ secrets.HF_ACCESS_TOKEN }}" > ./scripts/private_local/hf_token.txt
+
       - name: Build Docker image
         run: |
-          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t nv-ingest:latest .
+          SECRET_ARG=""
+          if [ -s ./scripts/private_local/hf_token.txt ]; then
+            SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
+          fi
+          DOCKER_BUILDKIT=1 docker build --target test --build-arg GIT_COMMIT=${GITHUB_SHA} --build-arg BASE_IMG=ubuntu --build-arg BASE_IMG_TAG=jammy-20250415.1 --build-arg DOWNLOAD_LLAMA_TOKENIZER=True $SECRET_ARG -t nv-ingest:latest .
+
+      - name: Cleanup HF token file
+        if: always()
+        run: rm -f ./scripts/private_local/hf_token.txt
 
       - name: Run Pytest inside Docker container
         run: |
-          docker run nv-ingest:latest pytest -rs -m "not integration" --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests
+          docker run nv-ingest:latest bash -lc "python -m pip install --disable-pip-version-check 'pymilvus[milvus_lite]' && pytest -rs -m 'not integration' --cov nv_ingest --cov nv_ingest_client --cov nv_ingest_api --cov-report term --cov-report xml:coverage.xml tests/service_tests client/client_tests api/api_tests"
 
       - name: Upload test report
         uses: actions/upload-artifact@v4

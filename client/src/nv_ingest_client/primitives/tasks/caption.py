@@ -8,23 +8,12 @@
 
 import logging
 from typing import Dict
-from typing import Optional
 
-from pydantic import ConfigDict, BaseModel
 
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class CaptionTaskSchema(BaseModel):
-    api_key: Optional[str] = None
-    endpoint_url: Optional[str] = None
-    prompt: Optional[str] = None
-    model_name: Optional[str] = None
-
-    model_config = ConfigDict(extra="forbid")
-    model_config["protected_namespaces"] = ()
 
 
 class CaptionTask(Task):
@@ -33,14 +22,31 @@ class CaptionTask(Task):
         api_key: str = None,
         endpoint_url: str = None,
         prompt: str = None,
+        system_prompt: str = None,
         model_name: str = None,
+        context_text_max_chars: int = None,
+        temperature: float = None,
     ) -> None:
         super().__init__()
 
-        self._api_key = api_key
-        self._endpoint_url = endpoint_url
-        self._prompt = prompt
-        self._model_name = model_name
+        # Use the API schema for validation
+        validated_data = IngestTaskCaptionSchema(
+            api_key=api_key,
+            endpoint_url=endpoint_url,
+            prompt=prompt,
+            system_prompt=system_prompt,
+            model_name=model_name,
+            context_text_max_chars=context_text_max_chars,
+            temperature=temperature,
+        )
+
+        self._api_key = validated_data.api_key
+        self._endpoint_url = validated_data.endpoint_url
+        self._prompt = validated_data.prompt
+        self._system_prompt = validated_data.system_prompt
+        self._model_name = validated_data.model_name
+        self._context_text_max_chars = validated_data.context_text_max_chars
+        self._temperature = validated_data.temperature
 
     def __str__(self) -> str:
         """
@@ -55,8 +61,14 @@ class CaptionTask(Task):
             info += f"  endpoint_url: {self._endpoint_url}\n"
         if self._prompt:
             info += f"  prompt: {self._prompt}\n"
+        if self._system_prompt:
+            info += f"  system_prompt: {self._system_prompt}\n"
         if self._model_name:
             info += f"  model_name: {self._model_name}\n"
+        if self._context_text_max_chars:
+            info += f"  context_text_max_chars: {self._context_text_max_chars}\n"
+        if self._temperature is not None:
+            info += f"  temperature: {self._temperature}\n"
 
         return info
 
@@ -75,7 +87,16 @@ class CaptionTask(Task):
         if self._prompt:
             task_properties["prompt"] = self._prompt
 
+        if self._system_prompt:
+            task_properties["system_prompt"] = self._system_prompt
+
         if self._model_name:
             task_properties["model_name"] = self._model_name
+
+        if self._context_text_max_chars:
+            task_properties["context_text_max_chars"] = self._context_text_max_chars
+
+        if self._temperature is not None:
+            task_properties["temperature"] = self._temperature
 
         return {"type": "caption", "task_properties": task_properties}

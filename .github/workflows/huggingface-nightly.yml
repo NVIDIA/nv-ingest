@@ -1,0 +1,257 @@
+name: huggingface-nightly-build-and-publish
+
+on:
+  schedule:
+    # Nightly at 03:17 UTC
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      upload_to:
+        description: "Where to upload (none/testpypi/pypi)"
+        required: true
+        default: "testpypi"
+        type: choice
+        options:
+          - none
+          - testpypi
+          - pypi
+      skip_existing:
+        description: "Skip already-uploaded versions"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo:
+          - id: nemotron-page-elements-v3
+            url: https://huggingface.co/nvidia/nemotron-page-elements-v3
+            project_subdir: ""
+          - id: nemotron-table-structure-v1
+            url: https://huggingface.co/nvidia/nemotron-table-structure-v1
+            project_subdir: ""
+          - id: nemotron-graphic-elements-v1
+            url: https://huggingface.co/nvidia/nemotron-graphic-elements-v1
+            project_subdir: ""
+          - id: llama-nemotron-embed-1b-v2
+            url: https://huggingface.co/nvidia/llama-nemotron-embed-1b-v2
+            # Repo layout matches nemotron-ocr-v1: Python project is nested under a same-named subdir.
+            project_subdir: llama-nemotron-embed-1b-v2
+          - id: llama-nemotron-rerank-1b-v2
+            url: https://huggingface.co/nvidia/llama-nemotron-rerank-1b-v2
+            project_subdir: ""
+
+    steps:
+      - name: Checkout orchestrator repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install git-lfs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
+
+      - name: Decide upload target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Default for scheduled runs: testpypi
+          upload_to="testpypi"
+          skip_existing="true"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            upload_to="${{ inputs.upload_to }}"
+            skip_existing="${{ inputs.skip_existing }}"
+          fi
+          echo "upload_to=${upload_to}" >> "$GITHUB_OUTPUT"
+          echo "skip_existing=${skip_existing}" >> "$GITHUB_OUTPUT"
+
+      - name: Build (and maybe upload)
+        env:
+          TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upload_flag=""
+          repo_url="https://test.pypi.org/legacy/"
+          token_env="TEST_PYPI_API_TOKEN"
+          if [[ "${{ steps.target.outputs.upload_to }}" == "none" ]]; then
+            upload_flag=""
+          else
+            upload_flag="--upload"
+          fi
+          if [[ "${{ steps.target.outputs.upload_to }}" == "pypi" ]]; then
+            repo_url="https://upload.pypi.org/legacy/"
+            token_env="PYPI_API_TOKEN"
+          fi
+
+          skip_existing_flag=""
+          if [[ "${{ steps.target.outputs.skip_existing }}" == "true" ]]; then
+            skip_existing_flag="--skip-existing"
+          fi
+
+          python ci/scripts/nightly_build_publish.py \
+            --repo-id "${{ matrix.repo.id }}" \
+            --repo-url "${{ matrix.repo.url }}" \
+            --work-dir ".work" \
+            --dist-dir "dist-out" \
+            --project-subdir "${{ matrix.repo.project_subdir }}" \
+            ${upload_flag} \
+            --repository-url "${repo_url}" \
+            --token-env "${token_env}" \
+            ${skip_existing_flag}
+
+      - name: Upload build artifacts (GH Actions)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.repo.id }}
+          path: dist-out/${{ matrix.repo.id }}/*
+
+  build_ocr_cuda:
+    # nemotron-ocr-v1 needs nvcc/CUDA headers to build its extension.
+    # Build with Python 3.12 to match upstream package constraints and
+    # avoid producing an extension for the wrong Python ABI.
+    runs-on: ubuntu-latest
+    container:
+      # Build extension with CUDA 13 toolchain (nvcc/headers from devel image).
+      image: nvidia/cuda:13.0.0-devel-ubuntu24.04
+    steps:
+      - name: Install system deps (git, lfs, build tools)
+        shell: bash
+        run: |
+          set -euo pipefail
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates \
+            git \
+            git-lfs \
+            build-essential \
+            ninja-build \
+            python3 \
+            python3-venv \
+            python3-pip
+          git lfs install
+
+      - name: Checkout orchestrator repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Decide upload target
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Default for scheduled runs: testpypi
+          upload_to="testpypi"
+          skip_existing="true"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            upload_to="${{ inputs.upload_to }}"
+            skip_existing="${{ inputs.skip_existing }}"
+          fi
+          echo "upload_to=${upload_to}" >> "$GITHUB_OUTPUT"
+          echo "skip_existing=${skip_existing}" >> "$GITHUB_OUTPUT"
+
+      - name: Build nemotron-ocr-v1 (and maybe upload)
+        env:
+          TEST_PYPI_API_TOKEN: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+          CUDA_HOME: /usr/local/cuda
+          BUILD_CPP_EXTENSION: "1"
+          BUILD_CPP_FORCE: "1"
+          TORCH_CUDA_ARCH_LIST: "8.0;8.6;8.9;9.0;10.0;12.0+PTX"
+          PIP_EXTRA_INDEX_URL: "https://download.pytorch.org/whl/cu130"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          upload_flag=""
+          repo_url="https://test.pypi.org/legacy/"
+          token_env="TEST_PYPI_API_TOKEN"
+          if [[ "${{ steps.target.outputs.upload_to }}" == "none" ]]; then
+            upload_flag=""
+          else
+            upload_flag="--upload"
+          fi
+          if [[ "${{ steps.target.outputs.upload_to }}" == "pypi" ]]; then
+            repo_url="https://upload.pypi.org/legacy/"
+            token_env="PYPI_API_TOKEN"
+          fi
+
+          skip_existing_flag=""
+          if [[ "${{ steps.target.outputs.skip_existing }}" == "true" ]]; then
+            skip_existing_flag="--skip-existing"
+          fi
+
+          python --version
+          python ci/scripts/nightly_build_publish.py \
+            --repo-id "nemotron-ocr-v1" \
+            --repo-url "https://huggingface.co/nvidia/nemotron-ocr-v1" \
+            --work-dir ".work" \
+            --dist-dir "dist-out" \
+            --project-subdir "nemotron-ocr" \
+            --build-no-isolation \
+            --venv-pip-install "hatchling" \
+            --venv-pip-install "setuptools>=68" \
+            --venv-pip-install "torch==2.9.1" \
+            --venv-pip-install "torchvision==0.24.1" \
+            --build-env "BUILD_CPP_EXTENSION=1" \
+            --build-env "BUILD_CPP_FORCE=1" \
+            ${upload_flag} \
+            --repository-url "${repo_url}" \
+            --token-env "${token_env}" \
+            ${skip_existing_flag}
+
+          python - <<'PY'
+          import sys
+          import zipfile
+          from pathlib import Path
+
+          wheels = sorted(Path("dist-out/nemotron-ocr-v1").glob("*.whl"))
+          if not wheels:
+              raise SystemExit("No wheel found in dist-out/nemotron-ocr-v1")
+
+          py_tag = f"cpython-{sys.version_info.major}{sys.version_info.minor}"
+          matches = []
+          for wheel in wheels:
+              with zipfile.ZipFile(wheel) as zf:
+                  names = zf.namelist()
+              for name in names:
+                  if "nemotron_ocr_cpp/_nemotron_ocr_cpp." in name:
+                      matches.append((wheel.name, name))
+
+          if not matches:
+              raise SystemExit("Built wheel is missing nemotron_ocr_cpp extension artifact")
+
+          if not any(py_tag in ext for _, ext in matches):
+              formatted = "\n".join(f"{w}: {ext}" for w, ext in matches)
+              raise SystemExit(
+                  f"Built extension ABI does not match runner Python ({py_tag}). Found:\n{formatted}"
+              )
+          print("Verified nemotron_ocr_cpp extension ABI:", py_tag)
+          PY
+
+      - name: Upload build artifacts (GH Actions)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-nemotron-ocr-v1
+          path: dist-out/nemotron-ocr-v1/*

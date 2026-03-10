@@ -201,6 +201,8 @@ def construct_image_metadata_from_base64(
     page_count: int,
     source_metadata: Dict[str, Any],
     base_unified_metadata: Dict[str, Any],
+    subtype: None | ContentTypeEnum | str = "",
+    text: str = "",
 ) -> List[Any]:
     """
     Extracts image data from a base64-encoded image string, decodes the image to get
@@ -252,6 +254,7 @@ def construct_image_metadata_from_base64(
             "line": -1,
             "span": -1,
         },
+        "subtype": subtype or "",
     }
 
     # Construct image metadata
@@ -259,7 +262,7 @@ def construct_image_metadata_from_base64(
         "image_type": DocumentTypeEnum.PNG,
         "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",
-        "text": "",
+        "text": text,
         "image_location": bbox,
         "image_location_max_dimensions": (width, height),
         "height": height,
@@ -359,6 +362,45 @@ def construct_image_metadata_from_pdf_image(
     return [ContentTypeEnum.IMAGE, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
+def _construct_text_image_primitive(
+    cropped_image: CroppedImageWithContent,
+    page_idx: int,
+    page_count: int,
+    source_metadata: Dict,
+    base_unified_metadata: Dict,
+) -> List[Any]:
+    """Constructs an 'image' primitive for a detected text block, intended for downstream OCR."""
+    content_metadata = {
+        "type": ContentTypeEnum.TEXT,
+        "description": ContentDescriptionEnum.PDF_TEXT,
+        "page_number": page_idx,
+        "hierarchy": {
+            "page_count": page_count,
+            "page": page_idx,
+        },
+        "subtype": cropped_image.type_string,
+    }
+
+    text_metadata = {
+        "text_type": "page",
+        "text_location": cropped_image.bbox,
+        "text_location_max_dimensions": (cropped_image.max_width, cropped_image.max_height),
+    }
+
+    unified_metadata = base_unified_metadata.copy()
+    unified_metadata.update(
+        {
+            "content": cropped_image.image,  # The base64 image of the text block
+            "source_metadata": source_metadata,
+            "content_metadata": content_metadata,
+            "text_metadata": text_metadata,
+        }
+    )
+
+    validated_metadata = validate_metadata(unified_metadata)
+    return [ContentTypeEnum.TEXT, validated_metadata.model_dump(), str(uuid.uuid4())]
+
+
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_page_element_metadata(
@@ -395,6 +437,11 @@ def construct_page_element_metadata(
     |                                | source_location          |            |   |
     +--------------------------------+--------------------------+------------+---+
     """
+    text_types = {"paragraph", "title", "header_footer"}
+    if structured_image.type_string in text_types:
+        return _construct_text_image_primitive(
+            structured_image, page_idx, page_count, source_metadata, base_unified_metadata
+        )
 
     if structured_image.type_string in ("table",):
         content = structured_image.image

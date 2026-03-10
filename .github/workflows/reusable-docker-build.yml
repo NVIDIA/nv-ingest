@@ -1,0 +1,227 @@
+name: Reusable Docker Build
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        description: 'Target platform (e.g., linux/amd64, linux/arm64)'
+        required: true
+        type: string
+      target:
+        description: 'Dockerfile target to build'
+        required: false
+        type: string
+        default: 'runtime'
+      push:
+        description: 'Push image to registry'
+        required: false
+        type: boolean
+        default: false
+      tags:
+        description: 'Docker image tag(s), comma-separated'
+        required: true
+        type: string
+      base-image:
+        description: 'Base image name (build arg BASE_IMG)'
+        required: false
+        type: string
+        default: 'ubuntu'
+      base-image-tag:
+        description: 'Base image tag (build arg BASE_IMG_TAG)'
+        required: false
+        type: string
+        default: 'jammy-20250415.1'
+      runner:
+        description: 'GitHub runner to use'
+        required: false
+        type: string
+        default: 'ubuntu-latest'
+      use-qemu:
+        description: 'Enable QEMU emulation (for cross-arch builds)'
+        required: false
+        type: boolean
+        default: false
+      download-llama-tokenizer:
+        description: 'Set Docker build arg DOWNLOAD_LLAMA_TOKENIZER'
+        required: false
+        type: boolean
+        default: true
+      export-image-artifact:
+        description: 'Save the built image and upload as a workflow artifact (for use in later jobs)'
+        required: false
+        type: boolean
+        default: false
+      image-artifact-name:
+        description: 'Artifact name to upload the image tarball under'
+        required: false
+        type: string
+        default: 'docker-image'
+    secrets:
+      HF_ACCESS_TOKEN:
+        required: false
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        if: ${{ inputs.use-qemu }}
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create HF token file (optional)
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
+      - name: Build Docker image
+        run: |
+          set -euo pipefail
+
+          TAGS="${{ inputs.tags }}"
+          TAG_ARGS=""
+
+          sanitize_image_ref() {
+            local ref="$1"
+            local after_slash="${ref##*/}"
+
+            # Only sanitize the *tag* portion (after the last ':', and only if
+            # that ':' occurs after the last '/'). This avoids breaking
+            # registries with ports like "registry:5000/repo:tag".
+            if [[ "$after_slash" == *:* ]]; then
+              local name="${ref%:*}"
+              local tag="${ref##*:}"
+
+              # Docker tags must match [A-Za-z0-9_][A-Za-z0-9_.-]{0,127}
+              # Replace common offenders (like '/' from refs/heads/...) with '-'.
+              local safe_tag="${tag//\//-}"
+              safe_tag="${safe_tag// /-}"
+              safe_tag="${safe_tag//:/-}"
+              safe_tag="${safe_tag//[^A-Za-z0-9_.-]/-}"
+              safe_tag="${safe_tag#[-.]}" # strip leading '-' or '.'
+              safe_tag="${safe_tag:0:128}"
+
+              if [[ -z "$safe_tag" ]]; then
+                safe_tag="sha-${GITHUB_SHA}"
+                safe_tag="${safe_tag:0:128}"
+              fi
+
+              printf '%s:%s' "$name" "$safe_tag"
+              return 0
+            fi
+
+            printf '%s' "$ref"
+          }
+
+          IFS=',' read -ra TAG_ARR <<< "$TAGS"
+          for t in "${TAG_ARR[@]}"; do
+            t="$(echo "$t" | xargs)"
+            if [ -n "$t" ]; then
+              t="$(sanitize_image_ref "$t")"
+              TAG_ARGS="$TAG_ARGS -t $t"
+            fi
+          done
+
+          SECRET_ARG=""
+          if [ -f ./scripts/private_local/hf_token.txt ] && [ -s ./scripts/private_local/hf_token.txt ]; then
+            SECRET_ARG="--secret id=hf_token,src=./scripts/private_local/hf_token.txt"
+          fi
+
+          OUTPUT_FLAG="--load"
+          if [ "${{ inputs.push }}" = "true" ]; then
+            OUTPUT_FLAG="--push"
+          fi
+
+          DOWNLOAD_LLAMA="True"
+          if [ "${{ inputs.download-llama-tokenizer }}" != "true" ]; then
+            DOWNLOAD_LLAMA="False"
+          fi
+
+          docker buildx build \
+            --platform "${{ inputs.platform }}" \
+            $OUTPUT_FLAG \
+            --target "${{ inputs.target }}" \
+            --build-arg GIT_COMMIT=${GITHUB_SHA} \
+            --build-arg BASE_IMG="${{ inputs.base-image }}" \
+            --build-arg BASE_IMG_TAG="${{ inputs.base-image-tag }}" \
+            --build-arg DOWNLOAD_LLAMA_TOKENIZER=$DOWNLOAD_LLAMA \
+            $SECRET_ARG \
+            $TAG_ARGS \
+            .
+
+      - name: Save built image to tarball
+        if: ${{ inputs.export-image-artifact && inputs.push == false }}
+        run: |
+          set -euo pipefail
+
+          TAGS="${{ inputs.tags }}"
+
+          sanitize_image_ref() {
+            local ref="$1"
+            local after_slash="${ref##*/}"
+
+            # Only sanitize the *tag* portion (after the last ':', and only if
+            # that ':' occurs after the last '/'). This avoids breaking
+            # registries with ports like "registry:5000/repo:tag".
+            if [[ "$after_slash" == *:* ]]; then
+              local name="${ref%:*}"
+              local tag="${ref##*:}"
+
+              local safe_tag="${tag//\//-}"
+              safe_tag="${safe_tag// /-}"
+              safe_tag="${safe_tag//:/-}"
+              safe_tag="${safe_tag//[^A-Za-z0-9_.-]/-}"
+              safe_tag="${safe_tag#[-.]}" # strip leading '-' or '.'
+              safe_tag="${safe_tag:0:128}"
+
+              if [[ -z "$safe_tag" ]]; then
+                safe_tag="sha-${GITHUB_SHA}"
+                safe_tag="${safe_tag:0:128}"
+              fi
+
+              printf '%s:%s' "$name" "$safe_tag"
+              return 0
+            fi
+
+            printf '%s' "$ref"
+          }
+
+          IFS=',' read -ra TAG_ARR <<< "$TAGS"
+          IMAGE=""
+          for t in "${TAG_ARR[@]}"; do
+            t="$(echo "$t" | xargs)"
+            if [ -n "$t" ]; then
+              IMAGE="$(sanitize_image_ref "$t")"
+              break
+            fi
+          done
+
+          if [ -z "$IMAGE" ]; then
+            echo "Error: no image tag found to save (inputs.tags was empty)"
+            exit 1
+          fi
+
+          echo "Saving image: $IMAGE"
+          docker save "$IMAGE" | gzip -1 > docker-image.tar.gz
+          ls -lh docker-image.tar.gz
+
+      - name: Upload built image artifact
+        if: ${{ inputs.export-image-artifact && inputs.push == false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.image-artifact-name }}
+          path: docker-image.tar.gz
+          if-no-files-found: error
+
+      - name: Cleanup HF token file
+        if: always()
+        run: rm -f ./scripts/private_local/hf_token.txt

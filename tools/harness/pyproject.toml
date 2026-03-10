@@ -1,0 +1,47 @@
+[project]
+name = "nv-ingest-harness"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1.8",
+    "docker>=7.1.0",
+    "pyyaml>=6.0",
+    "requests>=2.32.5",
+    "pynvml>=11.5.0",
+    "nv-ingest",
+    "nv-ingest-api",
+    "nv-ingest-client",
+    "milvus-lite==2.4.12",
+    "pypdfium2>=4.30.0,<5.0.0",
+    "nemotron-page-elements-v3>=0.dev0",
+    "nemotron-graphic-elements-v1>=0.dev0",
+    "nemotron-table-structure-v1>=0.dev0",
+    "nemotron-ocr>=0.dev0",
+]
+
+[project.scripts]
+nv-ingest-harness-run = "nv_ingest_harness.cli.run:main"
+nv-ingest-harness-sweep = "nv_ingest_harness.cli.sweep:main"
+nv-ingest-harness-ingest = "nv_ingest_harness.cli.ingest:main"
+nv-ingest-harness-nightly = "nv_ingest_harness.cli.nightly:main"
+nv-ingest-harness-compare = "nv_ingest_harness.cli.compare:main"
+nv-ingest-harness-stats = "nv_ingest_harness.cli.stats:main"
+
+[tool.uv]
+package = true
+
+[tool.uv.sources]
+nv-ingest = { path = "../../src", editable = true }
+nv-ingest-api = { path = "../../api/", editable = true }
+nv-ingest-client = { path = "../../client/", editable = true }
+nemotron-page-elements-v3 = { index = "test-pypi" }
+nemotron-graphic-elements-v1 = { index = "test-pypi" }
+nemotron-table-structure-v1 = { index = "test-pypi" }
+nemotron-ocr = { index = "test-pypi" }
+
+[[tool.uv.index]]
+name = "test-pypi"
+url = "https://test.pypi.org/simple/"
+explicit = true

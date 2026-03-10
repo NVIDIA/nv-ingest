@@ -35,11 +35,10 @@ def test_image_config_schema_valid_single_service():
 
 
 def test_image_config_schema_invalid_both_services_empty():
-    # Test invalid data with both gRPC and HTTP services empty
-    with pytest.raises(ValidationError) as exc_info:
-        ImageConfigSchema(yolox_endpoints=(None, None))
-    errors = exc_info.value.errors()
-    assert any("Both gRPC and HTTP services cannot be empty" in error["msg"] for error in errors)
+    # Empty endpoints are valid for local inference mode.
+    config = ImageConfigSchema(yolox_endpoints=(None, None))
+    assert config.yolox_endpoints == (None, None)
+    assert config.yolox_infer_protocol == "local"
 
 
 def test_image_config_schema_empty_service_strings():
@@ -106,8 +105,8 @@ def test_image_extractor_schema_invalid_n_workers():
 
 
 def test_image_extractor_schema_invalid_nested_config():
-    # Test invalid nested image_extraction_config
-    with pytest.raises(ValidationError) as exc_info:
-        ImageExtractorSchema(image_extraction_config={"auth_token": "token123", "yolox_endpoints": (None, None)})
-    errors = exc_info.value.errors()
-    assert any("Both gRPC and HTTP services cannot be empty" in error["msg"] for error in errors)
+    # Nested config also supports local mode when endpoints are omitted.
+    config = ImageExtractorSchema(image_extraction_config={"auth_token": "token123", "yolox_endpoints": (None, None)})
+    assert config.image_extraction_config is not None
+    assert config.image_extraction_config.yolox_endpoints == (None, None)
+    assert config.image_extraction_config.yolox_infer_protocol == "local"

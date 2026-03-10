@@ -10,7 +10,7 @@ from typing import List
 import pandas as pd
 import pytest
 
-from .. import get_git_root, find_root_by_pattern
+from .. import get_project_root, find_root_by_pattern
 from nv_ingest_api.interface.utility import (
     read_file_as_base64,
     create_source_metadata,
@@ -66,9 +66,9 @@ def test_create_source_metadata():
 )
 def test_read_file_as_base64(file_key, rel_path):
     # Try to locate the git repository root based on the current file.
-    git_root = get_git_root(__file__)
-    if git_root:
-        full_path = os.path.join(git_root, rel_path.lstrip("./"))
+    project_root = get_project_root(__file__)
+    if project_root:
+        full_path = os.path.join(project_root, rel_path.lstrip("./"))
     else:
         # Fallback: use find_root_by_pattern to locate a directory containing the file.
         found_root = find_root_by_pattern(rel_path)
@@ -109,13 +109,13 @@ def test_build_dataframe_from_files():
     source_ids: List[str] = []
     document_types: List[str] = []
 
-    # Try to determine the git root.
-    git_root = get_git_root(__file__)
+    # Try to determine the project root.
+    project_root = get_project_root(__file__)
 
     for doc_type, rel_path in supported_files:
-        # Determine the full file path based on the git root or fallback.
-        if git_root:
-            full_path = os.path.join(git_root, rel_path.lstrip("./"))
+        # Determine the full file path based on the project root or fallback.
+        if project_root:
+            full_path = os.path.join(project_root, rel_path.lstrip("./"))
         else:
             found_root = find_root_by_pattern(rel_path)
             if found_root:
@@ -145,15 +145,14 @@ def test_build_dataframe_from_files():
 
 
 # ------------------------------------------------------------------------------
-# Test get_git_root
+# Test get_project_root
 # ------------------------------------------------------------------------------
-def test_get_git_root():
-    git_root = get_git_root(__file__)
-    if git_root is None:
-        pytest.skip("Not in a git repository; get_git_root returned None.")
-    assert isinstance(git_root, str)
+def test_get_project_root():
+    project_root = get_project_root(__file__)
+    if project_root is None:
+        pytest.skip("Not in a project repository; get_project_root returned None.")
+    assert isinstance(project_root, str)
     # Check that the .git directory exists at the root.
-    assert os.path.isdir(os.path.join(git_root, ".git"))
 
 
 # ------------------------------------------------------------------------------
@@ -162,8 +161,8 @@ def test_get_git_root():
 def test_find_root_by_pattern():
     # We'll use a pattern we expect exists: "data/multimodal_test.pdf"
     pattern = os.path.join("data", "multimodal_test.pdf")
-    git_root = get_git_root(__file__)
-    start_dir = git_root if git_root is not None else os.getcwd()
+    project_root = get_project_root(__file__)
+    start_dir = project_root if project_root is not None else os.getcwd()
     found_root = find_root_by_pattern(pattern, start_dir=start_dir)
     assert found_root is not None, "find_root_by_pattern returned None."
     candidate = os.path.join(found_root, pattern)

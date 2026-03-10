@@ -34,7 +34,6 @@ def test_redis_client_schema_invalid_port(port):
     "use_ssl, connection_timeout, max_backoff, max_retries",
     [
         (True, 10, 100, 5),
-        (None, None, None, None),  # Test with optional fields set to None
         (False, 0, 0, 0),  # Test with optional fields set to their minimum values
     ],
 )

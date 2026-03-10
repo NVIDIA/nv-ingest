@@ -57,14 +57,15 @@ def extract_primitives_from_pdf(
     adobe_client_secret: Optional[str] = None,
     # LLama
     llama_api_key: Optional[str] = None,
+    # Parameter shared by PDFium and Nemotron Parse:
+    auth_token: Optional[str] = None,
     # PDFium-specific parameters:
-    yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
-    # Nemoretriver Parse parameters:
-    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
-    nemoretriever_parse_protocol: str = "http",
-    nemoretriever_parse_model_name: str = None,
+    # Nemotron Parse-specific parameters:
+    nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemotron_parse_protocol: str = "http",
+    nemotron_parse_model_name: str = None,
     # UnstructuredIO parameters:
     unstructured_io_api_key: Optional[str] = None,
     # Tika-specific parameter:
@@ -74,13 +75,14 @@ def extract_primitives_from_pdf(
     Extract text, images, tables, charts, and infographics from PDF documents.
 
     This function serves as a unified interface for PDF primitive extraction, supporting multiple
-    extraction engines (pdfium, adobe, llama, nemoretriever_parse, unstructured_io, and tika).
+    extraction engines (pdfium, adobe, llama, nemotron_parse, unstructured_io, and tika).
     It processes a DataFrame containing base64-encoded PDF data and returns a new DataFrame
     with structured information about the extracted elements.
 
-    The function uses a decorator pattern to dynamically validate configuration parameters
-    and invoke the appropriate extraction pipeline. This design allows for flexible
-    engine-specific configuration while maintaining a consistent interface.
+    The function uses a decorator pattern (`extraction_interface_relay_constructor`) that
+    validates parameters against the method-specific Pydantic schema (e.g. PDFiumConfigSchema
+    for pdfium, NemotronParseConfigSchema for nemotron_parse) and passes only schema-defined
+    keys into the backend.
 
     Parameters
     ----------
@@ -102,7 +104,7 @@ def extract_primitives_from_pdf(
         - "pdfium" : PDFium-based extraction (default)
         - "adobe" : Adobe PDF Services API
         - "llama" : LlamaParse extraction
-        - "nemoretriever_parse" : NVIDIA NemoRetriever Parse
+        - "nemotron_parse" : NVIDIA Nemotron Parse
         - "unstructured_io" : Unstructured.io extraction
         - "tika" : Apache Tika extraction
 
@@ -137,8 +139,10 @@ def extract_primitives_from_pdf(
     llama_api_key : str, optional
         API key for LlamaParse service. Required when extract_method="llama".
 
-    yolox_auth_token : str, optional
-        Authentication token for YOLOX inference services.
+    auth_token : str, optional
+        Authentication token for method-specific services. Used for pdfium (YOLOX/page-elements
+        and related NVIDIA CV APIs) and for nemotron_parse (NVIDIA API). Required when using
+        NVIDIA-hosted endpoints (e.g. ai.api.nvidia.com, integrate.api.nvidia.com).
 
     yolox_endpoints : tuple of (str, str), optional
         A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
@@ -147,15 +151,15 @@ def extract_primitives_from_pdf(
     yolox_infer_protocol : str, default "http"
         Protocol to use for YOLOX inference. Options: "http" or "grpc".
 
-    nemoretriever_parse_endpoints : tuple of (str, str), optional
-        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
-        Required when extract_method="nemoretriever_parse".
+    nemotron_parse_endpoints : tuple of (str, str), optional
+        A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
+        Required when extract_method="nemotron_parse".
 
-    nemoretriever_parse_protocol : str, default "http"
-        Protocol to use for NemoRetriever Parse. Options: "http" or "grpc".
+    nemotron_parse_protocol : str, default "http"
+        Protocol to use for Nemotron Parse. Options: "http" or "grpc".
 
-    nemoretriever_parse_model_name : str, optional
-        Model name for NemoRetriever Parse. Default is "nvidia/nemoretriever-parse".
+    nemotron_parse_model_name : str, optional
+        Model name for Nemotron Parse. Default is "nvidia/nemotron-parse".
 
     unstructured_io_api_key : str, optional
         API key for Unstructured.io services. Required when extract_method="unstructured_io".
@@ -186,16 +190,15 @@ def extract_primitives_from_pdf(
 
     Notes
     -----
-    The function uses a decorator pattern through `extraction_interface_relay_constructor`
-    which dynamically processes the parameters and validates them against the appropriate
-    configuration schema. The actual extraction work is delegated to the
-    `extract_primitives_from_pdf_internal` function.
+    The decorator validates parameters against the schema for the chosen ``extract_method`` (e.g. PDFiumConfigSchema
+    for pdfium) and passes the resulting config to `extract_primitives_from_pdf_internal`. Only parameters that exist
+    as fields on that schema are passed through.
 
     For each extraction method, specific parameters are required:
-    - pdfium: yolox_endpoints
+    - pdfium: yolox_endpoints; auth_token for NVIDIA-hosted YOLOX (e.g. page-elements)
     - adobe: adobe_client_id, adobe_client_secret
     - llama: llama_api_key
-    - nemoretriever_parse: nemoretriever_parse_endpoints
+    - nemotron_parse: nemotron_parse_endpoints; auth_token for NVIDIA API
     - unstructured_io: unstructured_io_api_key
     - tika: tika_server_url
 
@@ -239,7 +242,7 @@ def extract_primitives_from_pdf_pdfium(
     extract_charts: bool = True,
     extract_infographics: bool = True,
     text_depth: str = "page",
-    yolox_auth_token: Optional[str] = None,
+    auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
 ) -> pd.DataFrame:
@@ -275,8 +278,9 @@ def extract_primitives_from_pdf_pdfium(
         Whether to extract infographics
     text_depth : str, default "page"
         Level of text granularity (page, block, paragraph, line)
-    yolox_auth_token : str, optional
-        Authentication token for YOLOX inference services
+    auth_token : str, optional
+        Authentication token for YOLOX inference services (NVIDIA CV APIs, e.g. page-elements).
+        Passed into the pdfium config schema; required for NVIDIA-hosted endpoints.
     yolox_endpoints : tuple of (str, str), optional
         Tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services
     yolox_infer_protocol : str, default "http"
@@ -296,13 +300,13 @@ def extract_primitives_from_pdf_pdfium(
         extract_charts=extract_charts,
         extract_infographics=extract_infographics,
         text_depth=text_depth,
-        yolox_auth_token=yolox_auth_token,
+        auth_token=auth_token,
         yolox_endpoints=yolox_endpoints,
         yolox_infer_protocol=yolox_infer_protocol,
     )
 
 
-def extract_primitives_from_pdf_nemoretriever_parse(
+def extract_primitives_from_pdf_nemotron_parse(
     df_extraction_ledger: pd.DataFrame,
     *,
     extract_text: bool = True,
@@ -311,18 +315,18 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     extract_charts: bool = True,
     extract_infographics: bool = True,
     text_depth: str = "page",
-    yolox_auth_token: Optional[str] = None,
+    auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
-    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
-    nemoretriever_parse_protocol: str = "http",
-    nemoretriever_parse_model_name: Optional[str] = None,
+    nemotron_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemotron_parse_protocol: str = "http",
+    nemotron_parse_model_name: Optional[str] = None,
 ) -> pd.DataFrame:
     """
-    Extract primitives from PDF documents using the NemoRetriever Parse extraction method.
+    Extract primitives from PDF documents using the Nemotron Parse extraction method.
 
     This function serves as a specialized wrapper around the general extract_primitives_from_pdf
-    function, pre-configured to use NemoRetriever Parse as the extraction engine. It processes
+    function, pre-configured to use Nemotron Parse as the extraction engine. It processes
     PDF documents to extract various content types including text, images, tables, charts, and
     infographics, returning the results in a structured DataFrame.
 
@@ -369,9 +373,9 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         - "paragraph" : Text extracted at paragraph level (semantic units)
         - "line" : Text extracted at line level (finest granularity)
 
-    yolox_auth_token : Optional[str], default None
-        Authentication token for YOLOX inference services used for image processing.
-        Required if the YOLOX services need authentication.
+    auth_token : Optional[str], default None
+        Authentication token used for both YOLOX inference (image processing) and Nemotron
+        Parse (NVIDIA API). Required when using NVIDIA-hosted endpoints.
 
     yolox_endpoints : Optional[Tuple[Optional[str], Optional[str]]], default None
         A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
@@ -384,20 +388,20 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         - "http" : Use HTTP protocol for YOLOX inference services
         - "grpc" : Use gRPC protocol for YOLOX inference services
 
-    nemoretriever_parse_endpoints : Optional[Tuple[str, str]], default None
-        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
+    nemotron_parse_endpoints : Optional[Tuple[str, str]], default None
+        A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
         Format: (grpc_endpoint, http_endpoint)
         Example: (None, "http://localhost:8015/v1/chat/completions")
         Required for this extraction method.
 
-    nemoretriever_parse_protocol : str, default "http"
-        Protocol to use for NemoRetriever Parse. Options:
-        - "http" : Use HTTP protocol for NemoRetriever Parse services
-        - "grpc" : Use gRPC protocol for NemoRetriever Parse services
+    nemotron_parse_protocol : str, default "http"
+        Protocol to use for Nemotron Parse. Options:
+        - "http" : Use HTTP protocol for Nemotron Parse services
+        - "grpc" : Use gRPC protocol for Nemotron Parse services
 
-    nemoretriever_parse_model_name : Optional[str], default None
-        Model name for NemoRetriever Parse.
-        Default is typically "nvidia/nemoretriever-parse" if None is provided.
+    nemotron_parse_model_name : Optional[str], default None
+        Model name for Nemotron Parse.
+        Default is typically "nvidia/nemotron-parse" if None is provided.
 
     Returns
     -------
@@ -414,7 +418,7 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     Raises
     ------
     ValueError
-        If `nemoretriever_parse_endpoints` is None or empty
+        If `nemotron_parse_endpoints` is None or empty
         If the input DataFrame does not have the required structure
 
     KeyError
@@ -441,10 +445,10 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     >>>     "metadata": [{"content_metadata": {"type": "document"}}]
     >>> })
     >>>
-    >>> # Extract primitives using NemoRetriever Parse
-    >>> result_df = extract_primitives_from_pdf_nemoretriever_parse(
+    >>> # Extract primitives using Nemotron Parse
+    >>> result_df = extract_primitives_from_pdf_nemotron_parse(
     >>>     df_extraction_ledger=df,
-    >>>     nemoretriever_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
+    >>>     nemotron_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
     >>> )
     >>>
     >>> # Display the types of extracted elements
@@ -452,16 +456,16 @@ def extract_primitives_from_pdf_nemoretriever_parse(
 
     Notes
     -----
-    - NemoRetriever Parse excels at extracting structured data like tables from PDFs
-    - For optimal results, ensure both NemoRetriever Parse and YOLOX services are
+    - Nemotron Parse excels at extracting structured data like tables from PDFs
+    - For optimal results, ensure both Nemotron Parse and YOLOX services are
       properly configured and accessible
     - The extraction quality may vary depending on the complexity and quality of the input PDF
     - This function wraps the more general `extract_primitives_from_pdf` function with
-      pre-configured parameters for NemoRetriever Parse extraction
+      pre-configured parameters for Nemotron Parse extraction
     """
     return extract_primitives_from_pdf(
         df_extraction_ledger=df_extraction_ledger,
-        extract_method="nemoretriever_parse",
+        extract_method="nemotron_parse",
         extract_text=extract_text,
         extract_images=extract_images,
         extract_tables=extract_tables,
@@ -469,11 +473,11 @@ def extract_primitives_from_pdf_nemoretriever_parse(
         extract_infographics=extract_infographics,
         text_depth=text_depth,
         yolox_endpoints=yolox_endpoints,
-        yolox_auth_token=yolox_auth_token,
+        auth_token=auth_token,
         yolox_infer_protocol=yolox_infer_protocol,
-        nemoretriever_parse_endpoints=nemoretriever_parse_endpoints,
-        nemoretriever_parse_protocol=nemoretriever_parse_protocol,
-        nemoretriever_parse_model_name=nemoretriever_parse_model_name,
+        nemotron_parse_endpoints=nemotron_parse_endpoints,
+        nemotron_parse_protocol=nemotron_parse_protocol,
+        nemotron_parse_model_name=nemotron_parse_model_name,
     )
 
 
@@ -564,6 +568,7 @@ def extract_primitives_from_audio(
 def extract_primitives_from_pptx(
     *,
     df_ledger: pd.DataFrame,
+    extract_method: str = "python_pptx",
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -620,6 +625,7 @@ def extract_primitives_from_pptx(
     and the extraction configuration.
     """
     task_config: Dict[str, Any] = {
+        "method": extract_method,
         "params": {
             "extract_text": extract_text,
             "extract_images": extract_images,
@@ -651,6 +657,7 @@ def extract_primitives_from_pptx(
 def extract_primitives_from_docx(
     *,
     df_ledger: pd.DataFrame,
+    extract_method: str = "python_docx",
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -704,6 +711,7 @@ def extract_primitives_from_docx(
     """
     # Build the task configuration with parameters and DOCX-specific extraction settings.
     task_config: Dict[str, Any] = {
+        "method": extract_method,
         "params": {
             "extract_text": extract_text,
             "extract_images": extract_images,
@@ -781,9 +789,9 @@ def extract_chart_data_from_image(
     *,
     df_ledger: pd.DataFrame,
     yolox_endpoints: Tuple[str, str],
-    paddle_endpoints: Tuple[str, str],
+    ocr_endpoints: Tuple[str, str],
     yolox_protocol: str = "grpc",
-    paddle_protocol: str = "grpc",
+    ocr_protocol: str = "grpc",
     auth_token: str = "",
 ) -> DataFrame:
     """
@@ -795,12 +803,12 @@ def extract_chart_data_from_image(
         DataFrame containing metadata required for chart extraction.
     yolox_endpoints : Tuple[str, str]
         YOLOX inference server endpoints.
-    paddle_endpoints : Tuple[str, str]
-        PaddleOCR inference server endpoints.
+    ocr_endpoints : Tuple[str, str]
+        OCR inference server endpoints.
     yolox_protocol : str, optional
         Protocol for YOLOX inference (default "grpc").
-    paddle_protocol : str, optional
-        Protocol for PaddleOCR inference (default "grpc").
+    ocr_protocol : str, optional
+        Protocol for OCR inference (default "grpc").
     auth_token : str, optional
         Authentication token for inference services.
     execution_trace_log : list, optional
@@ -821,9 +829,9 @@ def extract_chart_data_from_image(
         **{
             "endpoint_config": {
                 "yolox_endpoints": yolox_endpoints,
-                "paddle_endpoints": paddle_endpoints,
+                "ocr_endpoints": ocr_endpoints,
                 "yolox_infer_protocol": yolox_protocol,
-                "paddle_infer_protocol": paddle_protocol,
+                "ocr_infer_protocol": ocr_protocol,
                 "auth_token": auth_token,
             }
         }
@@ -844,9 +852,9 @@ def extract_table_data_from_image(
     *,
     df_ledger: pd.DataFrame,
     yolox_endpoints: Optional[Tuple[str, str]] = None,
-    paddle_endpoints: Optional[Tuple[str, str]] = None,
+    ocr_endpoints: Optional[Tuple[str, str]] = None,
     yolox_protocol: Optional[str] = None,
-    paddle_protocol: Optional[str] = None,
+    ocr_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
 ) -> pd.DataFrame:
     """
@@ -858,12 +866,13 @@ def extract_table_data_from_image(
         DataFrame containing metadata required for chart extraction.
     yolox_endpoints : Optional[Tuple[str, str]], default=None
         YOLOX inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
-    paddle_endpoints : Optional[Tuple[str, str]], default=None
-        PaddleOCR inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
+    ocr_endpoints : Optional[Tuple[str, str]], default=None
+        OCR inference server endpoints. If None, the default defined in
+        ChartExtractorConfigSchema is used.
     yolox_protocol : Optional[str], default=None
         Protocol for YOLOX inference. If None, the default defined in ChartExtractorConfigSchema is used.
-    paddle_protocol : Optional[str], default=None
-        Protocol for PaddleOCR inference. If None, the default defined in ChartExtractorConfigSchema is used.
+    ocr_protocol : Optional[str], default=None
+        Protocol for OCR inference. If None, the default defined in ChartExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
         Authentication token for inference services. If None, the default defined in ChartExtractorConfigSchema is used.
 
@@ -882,9 +891,9 @@ def extract_table_data_from_image(
     config_kwargs = {
         "endpoint_config": {
             "yolox_endpoints": yolox_endpoints,
-            "paddle_endpoints": paddle_endpoints,
+            "ocr_endpoints": ocr_endpoints,
             "yolox_infer_protocol": yolox_protocol,
-            "paddle_infer_protocol": paddle_protocol,
+            "ocr_infer_protocol": ocr_protocol,
             "auth_token": auth_token,
         }
     }
@@ -907,15 +916,15 @@ def extract_table_data_from_image(
 def extract_infographic_data_from_image(
     *,
     df_ledger: pd.DataFrame,
-    paddle_endpoints: Optional[Tuple[str, str]] = None,
-    paddle_protocol: Optional[str] = None,
+    ocr_endpoints: Optional[Tuple[str, str]] = None,
+    ocr_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
 ) -> pd.DataFrame:
     """
     Extract infographic data from a DataFrame using the configured infographic extraction pipeline.
 
     This function creates a task configuration for infographic extraction, builds the extraction
-    configuration from the provided PaddleOCR endpoints, protocol, and authentication token (or uses
+    configuration from the provided OCR endpoints, protocol, and authentication token (or uses
     the default values from InfographicExtractorConfigSchema if None), and then calls the internal
     extraction function to process the DataFrame. The unified exception handler decorator ensures
     that any errors are appropriately logged and managed.
@@ -924,14 +933,14 @@ def extract_infographic_data_from_image(
     ----------
     df_extraction_ledger : pd.DataFrame
         DataFrame containing the images and associated metadata from which infographic data is to be extracted.
-    paddle_endpoints : Optional[Tuple[str, str]], default=None
-        A tuple of PaddleOCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
+    ocr_endpoints : Optional[Tuple[str, str]], default=None
+        A tuple of OCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
         If None, the default endpoints from InfographicExtractorConfigSchema are used.
-    paddle_protocol : Optional[str], default=None
-        The protocol (e.g., "grpc" or "http") for PaddleOCR inference.
+    ocr_protocol : Optional[str], default=None
+        The protocol (e.g., "grpc" or "http") for OCR inference.
         If None, the default protocol from InfographicExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
-        The authentication token required for secure access to PaddleOCR inference services.
+        The authentication token required for secure access to OCR inference services.
         If None, the default value from InfographicExtractorConfigSchema is used.
 
     Returns
@@ -951,8 +960,8 @@ def extract_infographic_data_from_image(
     extractor_config_kwargs = {
         "endpoint_config": InfographicExtractorConfigSchema(
             **{
-                "paddle_endpoints": paddle_endpoints,
-                "paddle_infer_protocol": paddle_protocol,
+                "ocr_endpoints": ocr_endpoints,
+                "ocr_infer_protocol": ocr_protocol,
                 "auth_token": auth_token,
             }
         )

@@ -5,71 +5,15 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict, Any, Type
+from typing import Any
+from typing import Dict
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class EmbedTaskSchema(BaseModel):
-    """
-    Schema for embed task configuration.
-
-    This schema contains configuration details for an embedding task,
-    including the endpoint URL, model name, API key, and error filtering flag.
-
-    Attributes
-    ----------
-    endpoint_url : Optional[str]
-        URL of the embedding endpoint. Default is None.
-    model_name : Optional[str]
-        Name of the embedding model. Default is None.
-    api_key : Optional[str]
-        API key for authentication with the embedding service. Default is None.
-    filter_errors : bool
-        Flag to indicate whether errors should be filtered. Default is False.
-    """
-
-    endpoint_url: Optional[str] = None
-    model_name: Optional[str] = None
-    api_key: Optional[str] = None
-    filter_errors: bool = False
-
-    @model_validator(mode="before")
-    def handle_deprecated_fields(cls: Type["EmbedTaskSchema"], values: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Handle deprecated fields before model validation.
-
-        This validator checks for the presence of deprecated keys ('text' and 'tables')
-        in the input dictionary and removes them. Warnings are issued if these keys are found.
-
-        Parameters
-        ----------
-        values : Dict[str, Any]
-            Input dictionary of model values.
-
-        Returns
-        -------
-        Dict[str, Any]
-            The updated dictionary with deprecated fields removed.
-        """
-        if "text" in values:
-            logger.warning(
-                "'text' parameter is deprecated and will be ignored. Future versions will remove this argument."
-            )
-            values.pop("text")
-        if "tables" in values:
-            logger.warning(
-                "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
-            )
-            values.pop("tables")
-        return values
-
-    model_config = ConfigDict(extra="forbid")
 
 
 class EmbedTask(Task):
@@ -88,6 +32,18 @@ class EmbedTask(Task):
         text: Optional[bool] = None,
         tables: Optional[bool] = None,
         filter_errors: bool = False,
+        embed_text_elements: Optional[bool] = None,
+        embed_structured_elements: Optional[bool] = None,
+        embed_image_elements: Optional[bool] = None,
+        embed_audio_elements: Optional[bool] = None,
+        text_elements_modality: Optional[str] = None,
+        image_elements_modality: Optional[str] = None,
+        image_elements_aggregate_page_content: Optional[bool] = None,
+        structured_elements_modality: Optional[str] = None,
+        audio_elements_modality: Optional[str] = None,
+        custom_content_field: Optional[str] = None,
+        result_target_field: Optional[str] = None,
+        dimensions: Optional[int] = None,
     ) -> None:
         """
         Initialize the EmbedTask configuration.
@@ -118,10 +74,42 @@ class EmbedTask(Task):
                 "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
             )
 
-        self._endpoint_url: Optional[str] = endpoint_url
-        self._model_name: Optional[str] = model_name
-        self._api_key: Optional[str] = api_key
-        self._filter_errors: bool = filter_errors
+        # Use the API schema for validation
+        validated_data = IngestTaskEmbedSchema(
+            endpoint_url=endpoint_url,
+            model_name=model_name,
+            api_key=api_key,
+            filter_errors=filter_errors,
+            embed_text_elements=embed_text_elements,
+            embed_structured_elements=embed_structured_elements,
+            embed_image_elements=embed_image_elements,
+            embed_audio_elements=embed_audio_elements,
+            text_elements_modality=text_elements_modality,
+            image_elements_modality=image_elements_modality,
+            image_elements_aggregate_page_content=image_elements_aggregate_page_content,
+            structured_elements_modality=structured_elements_modality,
+            audio_elements_modality=audio_elements_modality,
+            custom_content_field=custom_content_field,
+            result_target_field=result_target_field,
+            dimensions=dimensions,
+        )
+
+        self._endpoint_url = validated_data.endpoint_url
+        self._model_name = validated_data.model_name
+        self._api_key = validated_data.api_key
+        self._filter_errors = validated_data.filter_errors
+        self._embed_text_elements = validated_data.embed_text_elements
+        self._embed_structured_elements = validated_data.embed_structured_elements
+        self._embed_image_elements = validated_data.embed_image_elements
+        self._embed_audio_elements = validated_data.embed_audio_elements
+        self._text_elements_modality = validated_data.text_elements_modality
+        self._image_elements_modality = validated_data.image_elements_modality
+        self._image_elements_aggregate_page_content = validated_data.image_elements_aggregate_page_content
+        self._structured_elements_modality = validated_data.structured_elements_modality
+        self._audio_elements_modality = validated_data.audio_elements_modality
+        self._custom_content_field = validated_data.custom_content_field
+        self._result_target_field = validated_data.result_target_field
+        self._dimensions = validated_data.dimensions
 
     def __str__(self) -> str:
         """
@@ -142,6 +130,30 @@ class EmbedTask(Task):
         if self._api_key:
             info += "  api_key: [redacted]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
+        if self._embed_text_elements is not None:
+            info += f"  embed_text_elements: {self._embed_text_elements}\n"
+        if self._embed_structured_elements is not None:
+            info += f"  embed_structured_elements: {self._embed_structured_elements}\n"
+        if self._embed_image_elements is not None:
+            info += f"  embed_image_elements: {self._embed_image_elements}\n"
+        if self._embed_audio_elements is not None:
+            info += f"  embed_audio_elements: {self._embed_audio_elements}\n"
+        if self._text_elements_modality:
+            info += f"  text_elements_modality: {self._text_elements_modality}\n"
+        if self._image_elements_modality:
+            info += f"  image_elements_modality: {self._image_elements_modality}\n"
+        if self._image_elements_aggregate_page_content:
+            info += f"  image_elements_aggregate_page_content: {self._image_elements_aggregate_page_content}\n"
+        if self._structured_elements_modality:
+            info += f"  structured_elements_modality: {self._structured_elements_modality}\n"
+        if self._audio_elements_modality:
+            info += f"  audio_elements_modality: {self._audio_elements_modality}\n"
+        if self._custom_content_field:
+            info += f"  custom_content_field: {self._custom_content_field}\n"
+        if self._result_target_field:
+            info += f"  result_target_field: {self.result_target_field}\n"
+        if self._dimensions:
+            info += f"  dimensions: {self._dimensions}\n"
         return info
 
     def to_dict(self) -> Dict[str, Any]:
@@ -164,5 +176,41 @@ class EmbedTask(Task):
 
         if self._api_key:
             task_properties["api_key"] = self._api_key
+
+        if self._embed_text_elements is not None:
+            task_properties["embed_text_elements"] = self._embed_text_elements
+
+        if self._embed_structured_elements is not None:
+            task_properties["embed_structured_elements"] = self._embed_structured_elements
+
+        if self._embed_image_elements is not None:
+            task_properties["embed_image_elements"] = self._embed_image_elements
+
+        if self._embed_audio_elements is not None:
+            task_properties["embed_audio_elements"] = self._embed_audio_elements
+
+        if self._text_elements_modality:
+            task_properties["text_elements_modality"] = self._text_elements_modality
+
+        if self._image_elements_modality:
+            task_properties["image_elements_modality"] = self._image_elements_modality
+
+        if self._image_elements_aggregate_page_content:
+            task_properties["image_elements_aggregate_page_content"] = self._image_elements_aggregate_page_content
+
+        if self._structured_elements_modality:
+            task_properties["structured_elements_modality"] = self._structured_elements_modality
+
+        if self._audio_elements_modality:
+            task_properties["audio_elements_modality"] = self._audio_elements_modality
+
+        if self._custom_content_field:
+            task_properties["custom_content_field"] = self._custom_content_field
+
+        if self._result_target_field:
+            task_properties["result_target_field"] = self._result_target_field
+
+        if self._dimensions:
+            task_properties["dimensions"] = self._dimensions
 
         return {"type": "embed", "task_properties": task_properties}

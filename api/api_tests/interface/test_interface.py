@@ -133,7 +133,7 @@ class TestTransformImageCreateVlmCaption(unittest.TestCase):
         self.assertEqual(config.api_key, "test_api_key")
         self.assertEqual(config.prompt, "Describe this image")
         self.assertEqual(config.endpoint_url, "test_endpoint")
-        self.assertEqual(config.image_caption_model_name, "test_model")
+        self.assertEqual(config.model_name, "test_model")
 
     @patch("nv_ingest_api.interface.transform.build_dataframe_from_files")
     @patch("nv_ingest_api.interface.transform.transform_image_create_vlm_caption_internal")

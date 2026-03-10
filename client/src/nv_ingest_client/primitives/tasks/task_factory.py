@@ -8,17 +8,15 @@ from typing import Dict
 from typing import Type
 from typing import Union
 
-from .caption import CaptionTask
-from .dedup import DedupTask
-from .embed import EmbedTask
-from .extract import ExtractTask
-from .filter import FilterTask
-from .split import SplitTask
-from .store import StoreEmbedTask
-from .store import StoreTask
-from .task_base import Task
-from .task_base import TaskType
-from .task_base import is_valid_task_type
+from nv_ingest_client.primitives.tasks.task_base import Task, TaskType, is_valid_task_type
+from nv_ingest_client.primitives.tasks.caption import CaptionTask
+from nv_ingest_client.primitives.tasks.dedup import DedupTask
+from nv_ingest_client.primitives.tasks.embed import EmbedTask
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
+from nv_ingest_client.primitives.tasks.filter import FilterTask
+from nv_ingest_client.primitives.tasks.split import SplitTask
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTask, StoreTask
+from nv_ingest_client.primitives.tasks.udf import UDFTask
 
 
 class TaskUnimplemented(Task):
@@ -42,6 +40,7 @@ _TASK_MAP: Dict[TaskType, Callable] = {
     TaskType.STORE_EMBEDDING: StoreEmbedTask,
     TaskType.STORE: StoreTask,
     TaskType.TRANSFORM: TaskUnimplemented,
+    TaskType.UDF: UDFTask,
 }
 
 

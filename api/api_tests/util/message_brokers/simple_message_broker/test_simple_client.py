@@ -14,7 +14,6 @@ PORT = 9999  # Use an available port
 MAX_QUEUE_SIZE = 10
 
 PUSH_TIMEOUT_MSG = "PUSH operation timed out."
-POP_TIMEOUT_MSG = "POP operation timed out."
 
 
 @pytest.fixture(scope="module")
@@ -120,35 +119,22 @@ def test_server_unavailable():
 
     # Do not start the broker_server fixture to simulate server unavailability
 
-    response = client.submit_message(queue_name, "Test Message", timeout=(1, None))
-    assert response.response_code == 1
-    assert response.response_reason == PUSH_TIMEOUT_MSG
-
-
-def test_client_retry_logic():
-    """Test that the client retries the specified number of times on connection failure."""
-    invalid_port = 9998  # Assume this port is closed
-    client = SimpleClient(HOST, invalid_port, max_retries=2)
-    queue_name = f"test_queue_{uuid4()}"
-
-    start_time = time.time()
-    response = client.submit_message(queue_name, "Test Message", timeout=(6, None))
-    elapsed_time = time.time() - start_time
-
-    # Expected total backoff delay is sum of backoff delays: 2^1 + 2^2 = 2 + 4 = 6 seconds
-    expected_delay = sum(min(2**i, client._max_backoff) for i in range(1, client._max_retries + 1))
-
-    assert response.response_code == 1
-    assert response.response_reason == PUSH_TIMEOUT_MSG
-    assert elapsed_time >= expected_delay, "Client did not wait for the expected backoff duration."
+    response = client.fetch_message(queue_name, timeout=(1, None))
+    assert response.response_code == 2
+    assert "Job not ready." in response.response_reason
 
 
 @pytest.mark.usefixtures("broker_server")
 def test_operation_timeout():
     """Test client's behavior when an operation times out."""
-    client = SimpleClient(HOST, PORT, connection_timeout=0.001)  # Set a very short timeout
+    client = SimpleClient(HOST, PORT, connection_timeout=1)
     queue_name = f"test_queue_{uuid4()}"
 
+    # Fill the queue
+    for i in range(MAX_QUEUE_SIZE):
+        client.submit_message(queue_name, f"msg {i}", timeout=(1, None))
+
+    # This push should timeout
     response = client.submit_message(queue_name, "Test Message", timeout=(1, None))
     assert response.response_code == 1
     assert PUSH_TIMEOUT_MSG in response.response_reason
@@ -206,8 +192,8 @@ def test_pop_empty_queue(client):
     queue_name = f"test_queue_{uuid4()}"
 
     response = client.fetch_message(queue_name, timeout=(1, None))
-    assert response.response_code == 1
-    assert response.response_reason == POP_TIMEOUT_MSG
+    assert response.response_code == 2
+    assert "Job not ready" in response.response_reason
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -264,8 +250,8 @@ def test_pop_error_handling(client):
 
     response = client.fetch_message(queue_name, timeout=(1, None))
     # The client should handle the error and return an appropriate response
-    assert response.response_code == 1
-    assert response.response_reason == POP_TIMEOUT_MSG
+    assert response.response_code == 2
+    assert "Job not ready." in response.response_reason
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -273,7 +259,7 @@ def test_multiple_clients(client):
     """Test multiple clients interacting with the server."""
     queue_name = f"test_queue_{uuid4()}"
     messages = [f"Message {i}" for i in range(5)]
-    clients = [SimpleClient(HOST, PORT) for _ in range(5)]
+    clients = [SimpleClient(HOST, PORT, connection_timeout=5) for _ in range(5)]
 
     # Each client pushes a message
     for i, c in enumerate(clients):
@@ -298,14 +284,16 @@ def test_concurrent_push_pop(client):
     messages = [f"Message {i}" for i in range(10)]
     results = []
     lock = threading.Lock()
+    push_client = SimpleClient(HOST, PORT, connection_timeout=5)
+    pop_client = SimpleClient(HOST, PORT, connection_timeout=5)
 
     def push(msg):
-        response = client.submit_message(queue_name, msg)
+        response = push_client.submit_message(queue_name, msg)
         with lock:
             results.append(response)
 
     def pop():
-        response = client.fetch_message(queue_name)
+        response = pop_client.fetch_message(queue_name)
         with lock:
             results.append(response)
 

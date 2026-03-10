@@ -1,0 +1,71 @@
+name: Documentation Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build Documentation
+    runs-on: linux-large-disk
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+
+      - name: Build Documentation Docker Image
+        run: |
+          docker build \
+            --target docs \
+            --build-arg GIT_COMMIT=${GITHUB_SHA} \
+            -t nv-ingest-docs:latest \
+            .
+
+      - name: Run Documentation Build Container
+        run: |
+          CONTAINER_ID=$(docker run -d nv-ingest-docs:latest)
+          echo "CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_ENV
+
+      - name: Wait for documentation generation
+        run: docker wait $CONTAINER_ID
+
+      - name: Copy generated docs from container
+        run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
+
+      - name: Clean up container
+        run: docker rm $CONTAINER_ID
+
+      - name: Upload Site Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./generated-site
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

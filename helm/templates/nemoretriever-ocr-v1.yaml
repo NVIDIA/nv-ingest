@@ -1,0 +1,41 @@
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.nemoretriever_ocr_v1.enabled true) -}}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nemoretriever-ocr-v1
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}:{{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}"
+      pullSecret: "{{ index .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets 0 }}"
+      authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
+  storage:
+    pvc:
+      create: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.nemoretriever_ocr_v1.storage.pvc.volumeAccessMode }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nemoretriever-ocr-v1
+spec:
+  image:
+    repository: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.repository }}
+    tag: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.tag }}
+    pullPolicy: {{ .Values.nimOperator.nemoretriever_ocr_v1.image.pullPolicy }}
+    pullSecrets: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.nemoretriever_ocr_v1.authSecret }}
+  storage:
+    nimCache:
+      name: nemoretriever-ocr-v1
+  replicas: {{ .Values.nimOperator.nemoretriever_ocr_v1.replicas }}
+  nodeSelector: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.nodeSelector | nindent 4 }}
+  resources: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.resources | nindent 4 }}
+  tolerations: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.tolerations | nindent 4 }}
+  expose: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.expose | nindent 4 }}
+  env: {{ toYaml .Values.nimOperator.nemoretriever_ocr_v1.env | nindent 4 }}
+{{- end }}
