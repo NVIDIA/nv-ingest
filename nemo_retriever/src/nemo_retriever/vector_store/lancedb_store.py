@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple  # noqa: F401
 from datetime import timedelta
 
-
 from nv_ingest_client.util.vdb.lancedb import LanceDB
 import pandas as pd
 import lancedb
