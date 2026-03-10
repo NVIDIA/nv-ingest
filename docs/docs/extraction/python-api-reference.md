@@ -4,7 +4,7 @@ The [NeMo Retriever Library](overview.md) Python API provides a simple and flexi
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 !!! tip
 
