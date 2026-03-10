@@ -8,7 +8,7 @@ and operate on a well-defined DataFrame payload and metadata structure.
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 To add user-defined stages to your pipeline, you need the following:
@@ -21,7 +21,7 @@ To add user-defined stages to your pipeline, you need the following:
 
 - **A DataFrame payload** — The `control_message.payload` field must be a [pandas.DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html). For more information, refer to [Create a DataFrame Payload](#create-a-dataframe-payload).
 
-- **Valid metadata** — The `metadata` field must conform to the [NeMo Retriever metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
+- **Valid metadata** — The `metadata` field must conform to the [NeMo Retriever Library metadata schema](content-metadata.md). For more information, refer to [Update and Validate Metadata](#update-and-validate-metadata).
 
 
 
@@ -160,7 +160,7 @@ When the pipeline runs it does the following:
 ## Update and Validate Metadata
 
 The `metadata` column in each row is a dictionary (JSON object), 
-and must conform to the [NeMo Retriever metadata schema](content-metadata.md). 
+and must conform to the [NeMo Retriever Library metadata schema](content-metadata.md). 
 
 After you change any metadata, you can validate it by using the `validate_metadata` function 
 as demonstrated in the following code example.
