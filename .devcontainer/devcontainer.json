@@ -42,7 +42,7 @@
       "MINIO_BUCKET": "${MINIO_BUCKET:-nv-ingest}",
       "NGC_API_KEY": "${NGC_API_KEY:-ngcapikey}",
       "NVIDIA_API_KEY": "${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
-      "OCR_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-ocr-v1",
+      "OCR_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v1",
       "OCR_INFER_PROTOCOL": "http",
       "YOLOX_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-page-elements-v3",
       "YOLOX_INFER_PROTOCOL": "http",
