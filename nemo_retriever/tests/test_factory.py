@@ -44,9 +44,17 @@ def test_create_runmode_ingestor_batch_and_fused(monkeypatch: pytest.MonkeyPatch
 
     assert isinstance(batch, batch_class)
     assert isinstance(fused, fused_class)
-    expected_kwargs = {"documents": ["doc.pdf"], "ray_address": "ray://cluster", "ray_log_to_driver": False}
-    assert batch.kwargs == expected_kwargs
-    assert fused.kwargs == expected_kwargs
+    assert batch.kwargs == {
+        "documents": ["doc.pdf"],
+        "ray_address": "ray://cluster",
+        "ray_log_to_driver": False,
+        "debug": False,
+    }
+    assert fused.kwargs == {
+        "documents": ["doc.pdf"],
+        "ray_address": "ray://cluster",
+        "ray_log_to_driver": False,
+    }
 
 
 def test_create_runmode_ingestor_online(monkeypatch: pytest.MonkeyPatch) -> None:

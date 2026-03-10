@@ -30,13 +30,13 @@ logger = logging.getLogger(__name__)
 class ClientConfigSchema:
     def __init__(self):
         self.embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-        self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
+        self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-nemotron-embed-1b-v2")
         self.nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
         self.nv_ranker_nim_endpoint: str = os.getenv(
             "RERANKER_NIM_ENDPOINT",
             "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking",
         )
-        self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
+        self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NIM_MODEL_NAME", "nvidia/llama-nemotron-rerank-1b-v2")
         self.minio_bucket_name: str = os.getenv("MINIO_BUCKET", "nv-ingest")
 
 

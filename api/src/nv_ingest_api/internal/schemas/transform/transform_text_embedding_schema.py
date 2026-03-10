@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 class TextEmbeddingSchema(BaseModel):
     api_key: str = Field(default="", repr=False)
     batch_size: int = Field(default=4)
-    embedding_model: str = Field(default="nvidia/llama-3.2-nv-embedqa-1b-v2")
+    embedding_model: str = Field(default="nvidia/llama-nemotron-embed-1b-v2")
     # When null/empty, callers may choose to run a local embedding backend instead of a remote endpoint.
     # Keep the historical default so existing configs continue to work unchanged.
     embedding_nim_endpoint: Optional[str] = Field(default="http://embedding:8000/v1")

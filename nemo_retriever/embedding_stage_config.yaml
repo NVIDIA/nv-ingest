@@ -15,7 +15,7 @@ api_key: ""  # e.g. $NGC_API_KEY or $NVIDIA_API_KEY
 # via `nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder`.
 embedding_nim_endpoint: null
 # embedding_nim_endpoint: "http://localhost:8012/v1"
-embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+embedding_model: "nvidia/llama-nemotron-embed-1b-v2"
 
 # Request formatting
 encoding_format: "float"   # usually "float"
