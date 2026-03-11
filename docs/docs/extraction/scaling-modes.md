@@ -7,7 +7,7 @@ This guide covers how resource scaling modes work across stages in [NeMo Retriev
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 
@@ -102,4 +102,4 @@ Open `docker-compose.yaml` and locate:
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Troubleshooting](troubleshooting.md)
+- [Troubleshooting](troubleshoot.md)

@@ -673,11 +673,15 @@ def bo10k_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFr
     return df.reset_index(drop=True)
 
 
-def jp20_load_ground_truth(ground_truth_dir: Optional[str] = None) -> pd.DataFrame:
+def jp20_load_ground_truth(
+    ground_truth_dir: Optional[str] = None,
+    dataset_dir: Optional[str] = None,
+) -> pd.DataFrame:
     """Load bo10k ground truth filtered to jp20 documents."""
     df = bo10k_load_ground_truth(ground_truth_dir=ground_truth_dir)
 
-    dataset_dir = os.environ.get("JP20_DATASET_DIR") or os.path.join(get_repo_root(), "data", "jp20")
+    if dataset_dir is None:
+        dataset_dir = os.environ.get("JP20_DATASET_DIR") or os.path.join(get_repo_root(), "data", "jp20")
     jp20_pdfs = {os.path.splitext(name)[0] for name in os.listdir(dataset_dir) if name.lower().endswith(".pdf")}
     filtered = df[df["pdf"].isin(jp20_pdfs)].reset_index(drop=True)
 
@@ -729,14 +733,19 @@ def jp20_recall(
     gpu_search: bool = False,
     nv_ranker: bool = False,
     ground_truth_dir: Optional[str] = None,
+    dataset_dir: Optional[str] = None,
     nv_ranker_endpoint: Optional[str] = None,
     nv_ranker_model_name: Optional[str] = None,
     vdb_backend: str = "milvus",
     table_path: Optional[str] = None,
 ) -> Dict[int, float]:
     """Evaluate recall@k for jp20 dataset (bo10k subset)."""
+
+    def loader(gt_dir):
+        return jp20_load_ground_truth(gt_dir, dataset_dir=dataset_dir)
+
     return evaluate_recall_orchestrator(
-        loader_func=jp20_load_ground_truth,
+        loader_func=loader,
         scorer_func=get_recall_scores,
         collection_name=collection_name,
         hostname=hostname,

@@ -4,7 +4,7 @@ Before you begin using [NeMo Retriever Library](overview.md), ensure that you ha
 
 !!! note
 
-    This library is the NeMo Retriever Library.
+    NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
 
 ## Core and Advanced Pipeline Features
@@ -16,15 +16,15 @@ The core pipeline features include the following:
 - nemotron-page-elements-v3 — Detects and classifies images on a page as a table, chart or infographic.
 - nemotron-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
 - nemotron-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
-- nemoretriever-ocr-v1 — Image OCR model to detect and extract text from images.
+- nemotron-ocr-v1 — Image OCR model to detect and extract text from images.
 - retrieval — Enables embedding and indexing into Milvus.
 
 Advanced features require additional GPU support and disk space. 
 This includes the following:
 
 - Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md).
-- Advanced visual parsing — Use [nemotron-parse](https://docs.nvidia.com/nim/vision-language-models/latest/examples/nemotron-parse/overview.html), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing ](nemoretriever-parse.md).
-- git — Use [nemotron-nano-12b-v2-vl](https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard) for experimental image captioning of unstructured images. 
+- Advanced visual parsing — Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse/modelcard), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing ](nemoretriever-parse.md).
+- VLM — Use [nemotron-nano-12b-v2-vl](https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard) for experimental image captioning of unstructured images. 
     
     !!! note
     

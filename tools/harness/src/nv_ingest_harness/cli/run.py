@@ -63,9 +63,11 @@ def run_datasets(
             print("Failed to start services")
             return 1
 
-        # Wait for readiness
-        if not service_manager.check_readiness(first_config.readiness_timeout):
-            print("Services failed to become ready")
+        # Wait for readiness (skip Milvus check when using LanceDB)
+        print("Checking service readiness...")
+        check_milvus = first_config.vdb_backend == "milvus"
+        if not service_manager.check_readiness(first_config.readiness_timeout, check_milvus=check_milvus):
+            print("Services failed to become ready (see above for which services were not ready)")
             service_manager.stop()
             return 1
 
@@ -120,7 +122,7 @@ def run_datasets(
 
             # Default to local reranker if not explicitly configured
             if not os.environ.get("RERANKER_NIM_ENDPOINT"):
-                os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8020/v1/ranking"
+                os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8015/v1/ranking"
 
             # Set collection_name from dataset if not set
             if case == "recall" and not config.collection_name:
