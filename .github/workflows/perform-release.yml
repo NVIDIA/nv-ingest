@@ -3,6 +3,16 @@ name: Perform Release
 on:
   workflow_dispatch:
     inputs:
+      source-branch:
+        description: '*** SOURCE BRANCH *** — Branch to build artifacts from (leave empty to use the branch selected above)'
+        required: false
+        type: string
+        default: ''
+      version:
+        description: 'Override release version (leave empty to derive from source branch name)'
+        required: false
+        type: string
+        default: ''
       dry-run:
         description: 'Build and validate artifacts without publishing'
         required: false
@@ -18,7 +28,7 @@ on:
           - dev
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -26,18 +36,34 @@ jobs:
     name: Determine Release Version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.resolve.outputs.version }}
+      source-ref: ${{ steps.resolve.outputs.source_ref }}
     steps:
-      - name: Extract version from branch name
-        id: version
+      - name: Resolve source branch and version
+        id: resolve
         run: |
-          VERSION="${{ github.ref_name }}"
+          if [ -n "${{ inputs.source-branch }}" ]; then
+            SOURCE_REF="${{ inputs.source-branch }}"
+          else
+            SOURCE_REF="${{ github.ref_name }}"
+          fi
+          echo "source_ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Using explicit version: $VERSION"
+          else
+            VERSION="$SOURCE_REF"
+            echo "Derived version from source branch: $VERSION"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
           echo "### Release Configuration" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Version | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Source Branch | \`$SOURCE_REF\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | \`${{ inputs.dry-run }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Release Type | \`${{ inputs.release-type }}\` |" >> $GITHUB_STEP_SUMMARY
 
@@ -53,7 +79,7 @@ jobs:
     with:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: ${{ inputs.release-type }}
-      source-ref: ${{ github.ref_name }}
+      source-ref: ${{ needs.determine-version.outputs.source-ref }}
       runner: linux-large-disk
 
   nvingest-docker-build:
@@ -66,7 +92,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Docker Buildx
         uses: ./.github/actions/setup-docker-buildx
@@ -102,7 +128,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
           fetch-depth: 0
 
       - name: Setup Docker Buildx
@@ -134,7 +160,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -212,7 +238,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Docker Buildx
         uses: ./.github/actions/setup-docker-buildx
@@ -253,7 +279,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
           fetch-depth: 0
 
       - name: Setup Docker Buildx
@@ -297,7 +323,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -358,6 +384,31 @@ jobs:
             --name nv-ingest \
             --version "${{ needs.determine-version.outputs.version }}"
 
+  # ── Tag Release ───────────────────────────────────────────────────────
+  tag-release:
+    name: Tag Release
+    if: ${{ !inputs.dry-run }}
+    needs:
+      - determine-version
+      - pypi-publish
+      - nvingest-docker-publish
+      - retriever-docker-publish
+      - helm-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "### Git Tag" >> $GITHUB_STEP_SUMMARY
+          echo "Created and pushed tag: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+
   # ── Announcement ─────────────────────────────────────────────────────
   announce:
     name: Release Announcement
@@ -372,6 +423,7 @@ jobs:
       - retriever-docker-publish
       - helm-build
       - helm-publish
+      - tag-release
     runs-on: ubuntu-latest
     steps:
       - name: Generate Slack announcement
@@ -379,7 +431,7 @@ jobs:
           VERSION: ${{ needs.determine-version.outputs.version }}
           DRY_RUN: ${{ inputs.dry-run }}
           RELEASE_TYPE: ${{ inputs.release-type }}
-          BASE_BRANCH: ${{ github.ref_name }}
+          SOURCE_BRANCH: ${{ needs.determine-version.outputs.source-ref }}
           PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
           PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
           NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
@@ -388,6 +440,7 @@ jobs:
           RETRIEVER_PUBLISH_RESULT: ${{ needs.retriever-docker-publish.result }}
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
+          TAG_RESULT: ${{ needs.tag-release.result }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-build.outputs.image }}
           RETRIEVER_IMAGE: ${{ needs.retriever-docker-build.outputs.image }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -421,7 +474,7 @@ jobs:
           MSG="${HEADER}"
           MSG+="\n"
           MSG+="\n*Version:* \`${VERSION}\`"
-          MSG+="\n*Branch:* \`${BASE_BRANCH}\`"
+          MSG+="\n*Source Branch:* \`${SOURCE_BRANCH}\`"
           MSG+="\n*Release Type:* \`${RELEASE_TYPE}\`"
           MSG+="\n"
           MSG+="\n*Artifacts:*"
@@ -471,6 +524,15 @@ jobs:
             MSG+="\n$(status_emoji "$HELM_BUILD_RESULT") *Helm Chart* — Build: ${HELM_BUILD_RESULT}"
           else
             MSG+="\n$(status_emoji "$HELM_PUBLISH_RESULT") *Helm Chart* — Publish blocked (other build failed)"
+          fi
+
+          # — Git Tag —
+          if [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n:fast_forward: *Git Tag* — Skipped (dry run)"
+          elif [ "$TAG_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *Git Tag* — \`${VERSION}\`"
+          else
+            MSG+="\n$(status_emoji "$TAG_RESULT") *Git Tag* — ${TAG_RESULT}"
           fi
 
           MSG+="\n"
