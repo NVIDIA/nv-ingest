@@ -10,6 +10,8 @@ You’ll set up a CUDA 13–compatible environment, install the library and its 
 
 ## Prerequisites
 
+> **Warning:** The `online` and `fused` run modes are experimental and not fully supported. They may be incomplete, unstable, or subject to breaking changes. Use `batch` or `inprocess` modes for production workloads.
+
 Before you start, make sure your system meets the following requirements:
 
 - The host is running CUDA 13.x so that `libcudart.so.13` is available.
