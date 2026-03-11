@@ -606,7 +606,9 @@ done
 
         return 0
 
-    def check_readiness(self, timeout_s: int, check_milvus: bool = True, check_embedding: bool = True) -> bool:
+    def check_readiness(
+        self, timeout_s: int, check_milvus: bool = True, check_embedding: bool = True, verbose: bool = True
+    ) -> bool:
         """
         Check readiness by polling HTTP endpoint.
 
@@ -614,47 +616,75 @@ done
             timeout_s: Timeout in seconds
             check_milvus: If True, also check Milvus health endpoint
             check_embedding: If True, also check embedding service health endpoint
+            verbose: If True, print waiting message and per-service readiness status
 
         Returns:
             True if ready, False on timeout
         """
         url = self.get_service_url("health")
         deadline = time.time() + timeout_s
+        hostname = getattr(self.config, "hostname", "localhost")
+        last_status_time = 0.0
+        status_interval = 10.0  # print status every 10s when verbose
+
+        if verbose:
+            print(f"Waiting for services to become ready (timeout: {timeout_s}s)...")
 
         while time.time() < deadline:
+            now = time.time()
+            main_ready = False
+            milvus_ready = not check_milvus
+            embedding_ready = not check_embedding
+
             try:
-                # Check main service health
                 with urllib.request.urlopen(url, timeout=5) as resp:
-                    if resp.status == 200:
-                        all_services_ready = True
-
-                        # If Milvus check is enabled, verify it's also ready
-                        if check_milvus:
-                            hostname = getattr(self.config, "hostname", "localhost")
-                            milvus_url = f"http://{hostname}:9091/healthz"
-                            try:
-                                with urllib.request.urlopen(milvus_url, timeout=5) as milvus_resp:
-                                    if milvus_resp.status != 200:
-                                        all_services_ready = False
-                            except Exception:
-                                all_services_ready = False
-
-                        # If embedding check is enabled, verify it's also ready
-                        if check_embedding:
-                            hostname = getattr(self.config, "hostname", "localhost")
-                            embedding_url = f"http://{hostname}:8012/v1/health/ready"
-                            try:
-                                with urllib.request.urlopen(embedding_url, timeout=5) as embedding_resp:
-                                    if embedding_resp.status != 200:
-                                        all_services_ready = False
-                            except Exception:
-                                all_services_ready = False
-
-                        if all_services_ready:
-                            return True
+                    main_ready = resp.status == 200
             except Exception:
                 pass
+
+            if main_ready and check_milvus:
+                milvus_url = f"http://{hostname}:9091/healthz"
+                try:
+                    with urllib.request.urlopen(milvus_url, timeout=5) as milvus_resp:
+                        milvus_ready = milvus_resp.status == 200
+                except Exception:
+                    pass
+
+            if main_ready and check_embedding:
+                embedding_url = f"http://{hostname}:8012/v1/health/ready"
+                try:
+                    with urllib.request.urlopen(embedding_url, timeout=5) as embedding_resp:
+                        embedding_ready = embedding_resp.status == 200
+                except Exception:
+                    pass
+
+            all_services_ready = main_ready and milvus_ready and embedding_ready
+            if all_services_ready:
+                if verbose:
+                    print("All services ready.")
+                return True
+
+            if verbose and (now - last_status_time >= status_interval or last_status_time == 0):
+                last_status_time = now
+                parts = [f"main (7670): {'ready' if main_ready else 'not ready'}"]
+                if main_ready:
+                    if check_milvus:
+                        parts.append(f"milvus (9091): {'ready' if milvus_ready else 'not ready'}")
+                    if check_embedding:
+                        parts.append(f"embedding (8012): {'ready' if embedding_ready else 'not ready'}")
+                print("  " + " | ".join(parts))
+
             time.sleep(3)
+
+        if verbose:
+            parts = []
+            if not main_ready:
+                parts.append("main (7670)")
+            if main_ready and check_milvus and not milvus_ready:
+                parts.append("milvus (9091)")
+            if main_ready and check_embedding and not embedding_ready:
+                parts.append("embedding (8012)")
+            print(f"Readiness timeout. Not ready: {', '.join(parts) or 'unknown'}")
         return False
 
     def get_service_url(self, service: str = "api") -> str:
