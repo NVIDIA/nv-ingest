@@ -64,8 +64,8 @@ class RedisIngestService(IngestServiceMeta):
             redis_task_queue: str = os.getenv("REDIS_INGEST_TASK_QUEUE", "ingest_task_queue")
 
             fetch_mode: "FetchMode" = get_fetch_mode_from_env()
-            result_data_ttl: int = int(os.getenv("RESULT_DATA_TTL_SECONDS", "3600"))
-            state_ttl: int = int(os.getenv("STATE_TTL_SECONDS", "7200"))
+            result_data_ttl: int = int(os.getenv("RESULT_DATA_TTL_SECONDS", "172800"))
+            state_ttl: int = int(os.getenv("STATE_TTL_SECONDS", "172800"))
 
             cache_config: Dict[str, Any] = {
                 "directory": os.getenv("FETCH_CACHE_DIR", "./.fetch_cache"),
