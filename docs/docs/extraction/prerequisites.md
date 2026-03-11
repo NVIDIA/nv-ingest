@@ -11,6 +11,7 @@ Before you begin using [NeMo Retriever Library](overview.md), ensure the followi
 ## Software Requirements
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
+- **Python 3.12 or later** (required for NeMo Retriever Library packages; see note below)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 - [Docker Buildx](https://docs.docker.com/build/concepts/overview/#buildx) `>= 0.17` (Compose 2.40+ enforces this)
@@ -21,7 +22,7 @@ Before you begin using [NeMo Retriever Library](overview.md), ensure the followi
 
 !!! note
 
-    You install Python later.
+    Install **Python 3.12 or later** before creating your environment. Using Python 3.10 or 3.11 will cause dependency resolution failures when installing NeMo Retriever Library packages.
 
 
 
