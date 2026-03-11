@@ -1,0 +1,69 @@
+nv\_ingest\_api.internal.extract.pdf.engines package
+====================================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.extract.pdf.engines.pdf_helpers
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.pdf.engines.adobe module
+---------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.adobe
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.extract.pdf.engines.llama module
+---------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.llama
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.extract.pdf.engines.nemotron\_parse module
+-------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.nemotron_parse
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.extract.pdf.engines.pdfium module
+----------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.pdfium
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.extract.pdf.engines.tika module
+--------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.tika
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_api.internal.extract.pdf.engines.unstructured\_io module
+--------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines.unstructured_io
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.pdf.engines
+   :members:
+   :show-inheritance:
+   :undoc-members:

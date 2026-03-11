@@ -1,0 +1,737 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest.framework.orchestration.ray.stages package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest/nv_ingest.framework.orchestration.ray.stages';</script>
+
+    <link rel="icon" href="../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest.framework.orchestration.ray.stages.extractors package" href="nv_ingest.framework.orchestration.ray.stages.extractors.html" />
+    <link rel="prev" title="nv_ingest.framework.orchestration.ray.primitives package" href="nv_ingest.framework.orchestration.ray.primitives.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest.html">nv_ingest package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest.framework.html">nv_ingest.framework package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4 current active"><a class="reference internal" href="nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.html" class="nav-link">nv_ingest package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.html" class="nav-link">nv_ingest.framework package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.orchestration.html" class="nav-link">nv_ingest.framework.orchestration package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest.framework.orchestration.ray.html" class="nav-link">nv_ingest.framework.orchestration.ray package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.orchestration.ray.stages package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-framework-orchestration-ray-stages-package">
+<h1>nv_ingest.framework.orchestration.ray.stages package<a class="headerlink" href="#nv-ingest-framework-orchestration-ray-stages-package" title="Link to this heading">#</a></h1>
+<section id="subpackages">
+<h2>Subpackages<a class="headerlink" href="#subpackages" title="Link to this heading">#</a></h2>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html">nv_ingest.framework.orchestration.ray.stages.extractors package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.ocr_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor">nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.extractors.html#module-nv_ingest.framework.orchestration.ray.stages.extractors">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.injectors.html">nv_ingest.framework.orchestration.ray.stages.injectors package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.injectors.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.injectors.html#module-nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector">nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.injectors.html#module-nv_ingest.framework.orchestration.ray.stages.injectors">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html">nv_ingest.framework.orchestration.ray.stages.meta package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base">nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base.RayActorEdge"><code class="docutils literal notranslate"><span class="pre">RayActorEdge</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base.RayActorEdge.get_stats"><code class="docutils literal notranslate"><span class="pre">get_stats()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base.RayActorEdge.read"><code class="docutils literal notranslate"><span class="pre">read()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base.RayActorEdge.write"><code class="docutils literal notranslate"><span class="pre">write()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base">nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base.RayActorSinkStage"><code class="docutils literal notranslate"><span class="pre">RayActorSinkStage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base.RayActorSinkStage.set_output_queue"><code class="docutils literal notranslate"><span class="pre">set_output_queue()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base">nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base.RayActorSourceStage"><code class="docutils literal notranslate"><span class="pre">RayActorSourceStage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base.RayActorSourceStage.on_data"><code class="docutils literal notranslate"><span class="pre">on_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base.RayActorSourceStage.pause"><code class="docutils literal notranslate"><span class="pre">pause()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base.RayActorSourceStage.resume"><code class="docutils literal notranslate"><span class="pre">resume()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base.RayActorSourceStage.set_input_queue"><code class="docutils literal notranslate"><span class="pre">set_input_queue()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base">nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage"><code class="docutils literal notranslate"><span class="pre">RayActorStage</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.config"><code class="docutils literal notranslate"><span class="pre">config</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.stage_name"><code class="docutils literal notranslate"><span class="pre">stage_name</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._input_queue"><code class="docutils literal notranslate"><span class="pre">_input_queue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._output_queue"><code class="docutils literal notranslate"><span class="pre">_output_queue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._running"><code class="docutils literal notranslate"><span class="pre">_running</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._active_processing"><code class="docutils literal notranslate"><span class="pre">_active_processing</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.stats"><code class="docutils literal notranslate"><span class="pre">stats</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.start_time"><code class="docutils literal notranslate"><span class="pre">start_time</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._last_processed_count"><code class="docutils literal notranslate"><span class="pre">_last_processed_count</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._last_stats_time"><code class="docutils literal notranslate"><span class="pre">_last_stats_time</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._processing_thread"><code class="docutils literal notranslate"><span class="pre">_processing_thread</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._shutting_down"><code class="docutils literal notranslate"><span class="pre">_shutting_down</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage._lock"><code class="docutils literal notranslate"><span class="pre">_lock</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.get_stats"><code class="docutils literal notranslate"><span class="pre">get_stats()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.is_shutdown_complete"><code class="docutils literal notranslate"><span class="pre">is_shutdown_complete()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.on_data"><code class="docutils literal notranslate"><span class="pre">on_data()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.set_input_queue"><code class="docutils literal notranslate"><span class="pre">set_input_queue()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.set_output_queue"><code class="docutils literal notranslate"><span class="pre">set_output_queue()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.start"><code class="docutils literal notranslate"><span class="pre">start()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.RayActorStage.stop"><code class="docutils literal notranslate"><span class="pre">stop()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base.setup_stdout_logging"><code class="docutils literal notranslate"><span class="pre">setup_stdout_logging()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta.udf_parallel_helper">nv_ingest.framework.orchestration.ray.stages.meta.udf_parallel_helper module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.meta.html#module-nv_ingest.framework.orchestration.ray.stages.meta">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.mutate.html">nv_ingest.framework.orchestration.ray.stages.mutate package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.mutate.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.mutate.html#module-nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup">nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.mutate.html#module-nv_ingest.framework.orchestration.ray.stages.mutate.image_filter">nv_ingest.framework.orchestration.ray.stages.mutate.image_filter module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.mutate.html#module-nv_ingest.framework.orchestration.ray.stages.mutate">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html">nv_ingest.framework.orchestration.ray.stages.sinks package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#module-nv_ingest.framework.orchestration.ray.stages.sinks.default_drain">nv_ingest.framework.orchestration.ray.stages.sinks.default_drain module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#module-nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink">nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig"><code class="docutils literal notranslate"><span class="pre">BaseBrokerClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig.connection_timeout"><code class="docutils literal notranslate"><span class="pre">connection_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig.host"><code class="docutils literal notranslate"><span class="pre">host</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig.max_backoff"><code class="docutils literal notranslate"><span class="pre">max_backoff</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig.max_retries"><code class="docutils literal notranslate"><span class="pre">max_retries</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BaseBrokerClientConfig.port"><code class="docutils literal notranslate"><span class="pre">port</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BrokerParamsRedis"><code class="docutils literal notranslate"><span class="pre">BrokerParamsRedis</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BrokerParamsRedis.db"><code class="docutils literal notranslate"><span class="pre">db</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.BrokerParamsRedis.use_ssl"><code class="docutils literal notranslate"><span class="pre">use_ssl</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.MessageBrokerTaskSinkConfig"><code class="docutils literal notranslate"><span class="pre">MessageBrokerTaskSinkConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.MessageBrokerTaskSinkConfig.broker_client"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.MessageBrokerTaskSinkConfig.poll_interval"><code class="docutils literal notranslate"><span class="pre">poll_interval</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#id0"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#id1"><code class="docutils literal notranslate"><span class="pre">poll_interval</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.RedisClientConfig"><code class="docutils literal notranslate"><span class="pre">RedisClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.RedisClientConfig.broker_params"><code class="docutils literal notranslate"><span class="pre">broker_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.RedisClientConfig.client_type"><code class="docutils literal notranslate"><span class="pre">client_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.SimpleClientConfig"><code class="docutils literal notranslate"><span class="pre">SimpleClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.SimpleClientConfig.broker_params"><code class="docutils literal notranslate"><span class="pre">broker_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.SimpleClientConfig.client_type"><code class="docutils literal notranslate"><span class="pre">client_type</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sinks.html#module-nv_ingest.framework.orchestration.ray.stages.sinks">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html">nv_ingest.framework.orchestration.ray.stages.sources package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#module-nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source">nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig"><code class="docutils literal notranslate"><span class="pre">BaseBrokerClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig.connection_timeout"><code class="docutils literal notranslate"><span class="pre">connection_timeout</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig.host"><code class="docutils literal notranslate"><span class="pre">host</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig.max_backoff"><code class="docutils literal notranslate"><span class="pre">max_backoff</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig.max_retries"><code class="docutils literal notranslate"><span class="pre">max_retries</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BaseBrokerClientConfig.port"><code class="docutils literal notranslate"><span class="pre">port</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BrokerParamsRedis"><code class="docutils literal notranslate"><span class="pre">BrokerParamsRedis</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BrokerParamsRedis.db"><code class="docutils literal notranslate"><span class="pre">db</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.BrokerParamsRedis.use_ssl"><code class="docutils literal notranslate"><span class="pre">use_ssl</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.MessageBrokerTaskSourceConfig"><code class="docutils literal notranslate"><span class="pre">MessageBrokerTaskSourceConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.MessageBrokerTaskSourceConfig.broker_client"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.MessageBrokerTaskSourceConfig.task_queue"><code class="docutils literal notranslate"><span class="pre">task_queue</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.MessageBrokerTaskSourceConfig.poll_interval"><code class="docutils literal notranslate"><span class="pre">poll_interval</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#id0"><code class="docutils literal notranslate"><span class="pre">broker_client</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#id1"><code class="docutils literal notranslate"><span class="pre">poll_interval</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#id2"><code class="docutils literal notranslate"><span class="pre">task_queue</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.RedisClientConfig"><code class="docutils literal notranslate"><span class="pre">RedisClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.RedisClientConfig.broker_params"><code class="docutils literal notranslate"><span class="pre">broker_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.RedisClientConfig.client_type"><code class="docutils literal notranslate"><span class="pre">client_type</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.SimpleClientConfig"><code class="docutils literal notranslate"><span class="pre">SimpleClientConfig</span></code></a><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.SimpleClientConfig.broker_params"><code class="docutils literal notranslate"><span class="pre">broker_params</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.SimpleClientConfig.client_type"><code class="docutils literal notranslate"><span class="pre">client_type</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.sources.html#module-nv_ingest.framework.orchestration.ray.stages.sources">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.storage.html">nv_ingest.framework.orchestration.ray.stages.storage package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.storage.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.storage.html#nv-ingest-framework-orchestration-ray-stages-storage-image-storage-module">nv_ingest.framework.orchestration.ray.stages.storage.image_storage module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.storage.html#module-nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings">nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.storage.html#module-nv_ingest.framework.orchestration.ray.stages.storage">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html">nv_ingest.framework.orchestration.ray.stages.telemetry package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#module-nv_ingest.framework.orchestration.ray.stages.telemetry.job_counter">nv_ingest.framework.orchestration.ray.stages.telemetry.job_counter module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#module-nv_ingest.framework.orchestration.ray.stages.telemetry.otel_meter">nv_ingest.framework.orchestration.ray.stages.telemetry.otel_meter module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#module-nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer">nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer.create_span_with_timestamps"><code class="docutils literal notranslate"><span class="pre">create_span_with_timestamps()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer.extract_annotated_task_results"><code class="docutils literal notranslate"><span class="pre">extract_annotated_task_results()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer.extract_timestamps_from_message"><code class="docutils literal notranslate"><span class="pre">extract_timestamps_from_message()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer.uuid_to_trace_id"><code class="docutils literal notranslate"><span class="pre">uuid_to_trace_id()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.telemetry.html#module-nv_ingest.framework.orchestration.ray.stages.telemetry">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html">nv_ingest.framework.orchestration.ray.stages.transforms package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#module-nv_ingest.framework.orchestration.ray.stages.transforms.image_caption">nv_ingest.framework.orchestration.ray.stages.transforms.image_caption module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#nv-ingest-framework-orchestration-ray-stages-transforms-text-embed-module">nv_ingest.framework.orchestration.ray.stages.transforms.text_embed module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#module-nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter">nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter.text_splitter_fn"><code class="docutils literal notranslate"><span class="pre">text_splitter_fn()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.transforms.html#module-nv_ingest.framework.orchestration.ray.stages.transforms">Module contents</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.utility.html">nv_ingest.framework.orchestration.ray.stages.utility package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.utility.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.utility.html#module-nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor">nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="nv_ingest.framework.orchestration.ray.stages.utility.html#module-nv_ingest.framework.orchestration.ray.stages.utility">Module contents</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="module-nv_ingest.framework.orchestration.ray.stages">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest.framework.orchestration.ray.stages" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest.framework.orchestration.ray.primitives.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest.framework.orchestration.ray.primitives package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest.framework.orchestration.ray.stages.extractors.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest.framework.orchestration.ray.stages.extractors package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#subpackages">Subpackages</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest.framework.orchestration.ray.stages">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

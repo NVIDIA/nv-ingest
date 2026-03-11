@@ -1,0 +1,37 @@
+nv\_ingest\_client.client package
+=================================
+
+Submodules
+----------
+
+nv\_ingest\_client.client.client module
+---------------------------------------
+
+.. automodule:: nv_ingest_client.client.client
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_client.client.ingest\_job\_handler module
+-----------------------------------------------------
+
+.. automodule:: nv_ingest_client.client.ingest_job_handler
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_client.client.interface module
+------------------------------------------
+
+.. automodule:: nv_ingest_client.client.interface
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_client.client
+   :members:
+   :show-inheritance:
+   :undoc-members:

@@ -1,0 +1,29 @@
+nv\_ingest.framework.orchestration.ray.stages.sinks package
+===========================================================
+
+Submodules
+----------
+
+nv\_ingest.framework.orchestration.ray.stages.sinks.default\_drain module
+-------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.ray.stages.sinks.default_drain
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.framework.orchestration.ray.stages.sinks.message\_broker\_task\_sink module
+--------------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.orchestration.ray.stages.sinks
+   :members:
+   :show-inheritance:
+   :undoc-members:
