@@ -1,4 +1,5 @@
 name: Perform Release
+run-name: "Perform Release ${{ inputs.version || inputs.source-branch || github.ref_name }}${{ inputs.dry-run == true && ' (dry run)' || '' }}"
 
 on:
   workflow_dispatch:
@@ -29,7 +30,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   determine-version:
@@ -102,6 +102,15 @@ jobs:
         run: |
           echo "image=${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
 
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
       - name: Build image (validate)
         uses: docker/build-push-action@v5
         with:
@@ -111,46 +120,12 @@ jobs:
           target: runtime
           platforms: linux/amd64
           build-args: |
-            HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }}
             DOWNLOAD_LLAMA_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-to: type=gha,scope=nvingest,mode=max
           cache-from: type=gha,scope=nvingest
-
-  retriever-docker-build:
-    name: Build nemo-retriever Docker Image
-    needs: determine-version
-    runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.meta.outputs.image }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.determine-version.outputs.source-ref }}
-          fetch-depth: 0
-
-      - name: Setup Docker Buildx
-        uses: ./.github/actions/setup-docker-buildx
-
-      - name: Set image metadata
-        id: meta
-        run: |
-          IMAGE="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/nemo-retriever"
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
-
-      - name: Build image (validate)
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./nemo_retriever/Dockerfile
-          push: false
-          load: true
-          platforms: linux/amd64
-          tags: ${{ steps.meta.outputs.image }}:${{ needs.determine-version.outputs.version }}
-          cache-to: type=gha,scope=retriever,mode=max
-          cache-from: type=gha,scope=retriever
 
   helm-build:
     name: Build Helm Chart
@@ -216,7 +191,6 @@ jobs:
     needs:
       - pypi-build
       - nvingest-docker-build
-      - retriever-docker-build
       - helm-build
     uses: ./.github/workflows/reusable-pypi-publish.yml
     secrets:
@@ -231,7 +205,6 @@ jobs:
       - determine-version
       - pypi-build
       - nvingest-docker-build
-      - retriever-docker-build
       - helm-build
     runs-on: linux-large-disk
     steps:
@@ -251,6 +224,15 @@ jobs:
         with:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
       - name: Build and push multi-platform image
         uses: docker/build-push-action@v5
         with:
@@ -259,53 +241,11 @@ jobs:
           target: runtime
           platforms: linux/amd64,linux/arm64
           build-args: |
-            HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }}
             DOWNLOAD_LLAMA_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
           tags: ${{ needs.nvingest-docker-build.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-from: type=gha,scope=nvingest
-
-  retriever-docker-publish:
-    name: Publish nemo-retriever Docker Image
-    if: ${{ !inputs.dry-run }}
-    needs:
-      - determine-version
-      - pypi-build
-      - nvingest-docker-build
-      - retriever-docker-build
-      - helm-build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.determine-version.outputs.source-ref }}
-          fetch-depth: 0
-
-      - name: Setup Docker Buildx
-        uses: ./.github/actions/setup-docker-buildx
-        with:
-          use-qemu: 'true'
-          platforms: 'linux/amd64,linux/arm64'
-
-      - name: Login to GHCR
-        uses: docker/login-action@v2
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push multi-platform image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./nemo_retriever/Dockerfile
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ needs.retriever-docker-build.outputs.image }}:${{ needs.determine-version.outputs.version }}
-            ${{ needs.retriever-docker-build.outputs.image }}:latest
-          cache-from: type=gha,scope=retriever
 
   helm-publish:
     name: Publish Helm Chart
@@ -314,7 +254,6 @@ jobs:
       - determine-version
       - pypi-build
       - nvingest-docker-build
-      - retriever-docker-build
       - helm-build
     runs-on: ubuntu-latest
     env:
@@ -392,7 +331,6 @@ jobs:
       - determine-version
       - pypi-publish
       - nvingest-docker-publish
-      - retriever-docker-publish
       - helm-publish
     runs-on: ubuntu-latest
     steps:
@@ -419,8 +357,6 @@ jobs:
       - pypi-publish
       - nvingest-docker-build
       - nvingest-docker-publish
-      - retriever-docker-build
-      - retriever-docker-publish
       - helm-build
       - helm-publish
       - tag-release
@@ -436,13 +372,10 @@ jobs:
           PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
           NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
           NVINGEST_PUBLISH_RESULT: ${{ needs.nvingest-docker-publish.result }}
-          RETRIEVER_BUILD_RESULT: ${{ needs.retriever-docker-build.result }}
-          RETRIEVER_PUBLISH_RESULT: ${{ needs.retriever-docker-publish.result }}
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
           TAG_RESULT: ${{ needs.tag-release.result }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-build.outputs.image }}
-          RETRIEVER_IMAGE: ${{ needs.retriever-docker-build.outputs.image }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           status_emoji() {
@@ -456,7 +389,7 @@ jobs:
           }
 
           ALL_BUILDS_OK="true"
-          for r in "$PYPI_BUILD_RESULT" "$NVINGEST_BUILD_RESULT" "$RETRIEVER_BUILD_RESULT" "$HELM_BUILD_RESULT"; do
+          for r in "$PYPI_BUILD_RESULT" "$NVINGEST_BUILD_RESULT" "$HELM_BUILD_RESULT"; do
             if [ "$r" != "success" ]; then
               ALL_BUILDS_OK="false"
               break
@@ -500,18 +433,6 @@ jobs:
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Build: ${NVINGEST_BUILD_RESULT}"
           else
             MSG+="\n$(status_emoji "$NVINGEST_PUBLISH_RESULT") *nv-ingest Docker* — Publish blocked (other build failed)"
-          fi
-
-          # — nemo-retriever Docker —
-          RETRIEVER_TAG="${RETRIEVER_IMAGE}:${VERSION}"
-          if [ "$DRY_RUN" = "true" ]; then
-            MSG+="\n$(status_emoji "$RETRIEVER_BUILD_RESULT") *nemo-retriever Docker* — Built and validated (not pushed)"
-          elif [ "$RETRIEVER_PUBLISH_RESULT" = "success" ]; then
-            MSG+="\n:white_check_mark: *nemo-retriever Docker* — \`${RETRIEVER_TAG}\`"
-          elif [ "$RETRIEVER_BUILD_RESULT" != "success" ]; then
-            MSG+="\n$(status_emoji "$RETRIEVER_BUILD_RESULT") *nemo-retriever Docker* — Build: ${RETRIEVER_BUILD_RESULT}"
-          else
-            MSG+="\n$(status_emoji "$RETRIEVER_PUBLISH_RESULT") *nemo-retriever Docker* — Publish blocked (other build failed)"
           fi
 
           # — Helm Chart —
