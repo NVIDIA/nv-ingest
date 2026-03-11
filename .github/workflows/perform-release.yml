@@ -1,0 +1,295 @@
+name: Perform Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Build and validate artifacts without publishing'
+        required: false
+        type: boolean
+        default: false
+      release-type:
+        description: 'Release type for PyPI packages'
+        required: false
+        type: choice
+        default: 'release'
+        options:
+          - release
+          - dev
+      skip-nvingest-docker:
+        description: 'Skip nv-ingest Docker image build/publish'
+        required: false
+        type: boolean
+        default: false
+      skip-retriever-docker:
+        description: 'Skip nemo-retriever Docker image build/publish'
+        required: false
+        type: boolean
+        default: false
+      skip-pypi:
+        description: 'Skip PyPI wheel build/publish'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  determine-version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version from branch name
+        id: version
+        run: |
+          VERSION="${{ github.ref_name }}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "### Release Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | \`${{ inputs.dry-run }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release Type | \`${{ inputs.release-type }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip PyPI | \`${{ inputs.skip-pypi }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip nv-ingest Docker | \`${{ inputs.skip-nvingest-docker }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Skip Retriever Docker | \`${{ inputs.skip-retriever-docker }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ── PyPI Wheels ──────────────────────────────────────────────────────
+  pypi-build:
+    name: Build Python Wheels
+    if: ${{ !inputs.skip-pypi }}
+    needs: determine-version
+    uses: ./.github/workflows/reusable-pypi-build.yml
+    with:
+      version: ${{ needs.determine-version.outputs.version }}
+      release-type: ${{ inputs.release-type }}
+      source-ref: ${{ github.ref_name }}
+      runner: linux-large-disk
+
+  pypi-publish:
+    name: Publish Python Wheels
+    if: ${{ !inputs.skip-pypi && !inputs.dry-run }}
+    needs:
+      - determine-version
+      - pypi-build
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+  # ── nv-ingest Docker Image ──────────────────────────────────────────
+  nvingest-docker:
+    name: Build nv-ingest Docker Image
+    if: ${{ !inputs.skip-nvingest-docker }}
+    needs: determine-version
+    runs-on: linux-large-disk
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+        with:
+          use-qemu: ${{ inputs.dry-run && 'false' || 'true' }}
+          platforms: ${{ inputs.dry-run && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+
+      - name: Login to NGC
+        if: ${{ !inputs.dry-run }}
+        uses: ./.github/actions/docker-login-ngc
+        with:
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          echo "image=${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
+
+      - name: Build Docker image
+        run: |
+          docker buildx create --use
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            PUSH_FLAG="--load"
+            PLATFORM="linux/amd64"
+          else
+            PUSH_FLAG="--push"
+            PLATFORM="linux/amd64,linux/arm64"
+          fi
+          docker buildx build \
+            --platform "$PLATFORM" \
+            $PUSH_FLAG \
+            --target runtime \
+            --build-arg HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }} \
+            --build-arg DOWNLOAD_LLAMA_TOKENIZER=True \
+            --build-arg GIT_COMMIT=${GITHUB_SHA} \
+            -t ${{ steps.meta.outputs.image }} \
+            .
+
+  # ── nemo-retriever Docker Image ─────────────────────────────────────
+  retriever-docker:
+    name: Build nemo-retriever Docker Image
+    if: ${{ !inputs.skip-retriever-docker }}
+    needs: determine-version
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+        with:
+          use-qemu: ${{ inputs.dry-run && 'false' || 'true' }}
+          platforms: ${{ inputs.dry-run && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
+
+      - name: Login to GHCR
+        if: ${{ !inputs.dry-run }}
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          IMAGE="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/nemo-retriever"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        if: ${{ !inputs.dry-run }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./nemo_retriever/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ needs.determine-version.outputs.version }}
+            ${{ steps.meta.outputs.image }}:latest
+
+      - name: Build (dry run)
+        if: ${{ inputs.dry-run }}
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./nemo_retriever/Dockerfile
+          push: false
+          load: true
+          platforms: linux/amd64
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ needs.determine-version.outputs.version }}
+
+  # ── Announcement ─────────────────────────────────────────────────────
+  announce:
+    name: Release Announcement
+    if: always()
+    needs:
+      - determine-version
+      - pypi-build
+      - pypi-publish
+      - nvingest-docker
+      - retriever-docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Slack announcement
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          RELEASE_TYPE: ${{ inputs.release-type }}
+          BASE_BRANCH: ${{ github.ref_name }}
+          PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
+          PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
+          NVINGEST_DOCKER_RESULT: ${{ needs.nvingest-docker.result }}
+          RETRIEVER_DOCKER_RESULT: ${{ needs.retriever-docker.result }}
+          NVINGEST_IMAGE: ${{ needs.nvingest-docker.outputs.image }}
+          RETRIEVER_IMAGE: ${{ needs.retriever-docker.outputs.image }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          status_emoji() {
+            case "$1" in
+              success)   echo ":white_check_mark:" ;;
+              failure)   echo ":x:" ;;
+              skipped)   echo ":fast_forward:" ;;
+              cancelled) echo ":no_entry:" ;;
+              *)         echo ":grey_question:" ;;
+            esac
+          }
+
+          if [ "$DRY_RUN" = "true" ]; then
+            HEADER=":test_tube: *Release ${VERSION} — DRY RUN Complete* :test_tube:"
+          else
+            HEADER=":rocket: *Release ${VERSION} Published* :rocket:"
+          fi
+
+          MSG="${HEADER}"
+          MSG+="\n"
+          MSG+="\n*Version:* \`${VERSION}\`"
+          MSG+="\n*Branch:* \`${BASE_BRANCH}\`"
+          MSG+="\n*Release Type:* \`${RELEASE_TYPE}\`"
+          MSG+="\n"
+          MSG+="\n*Artifacts:*"
+
+          # — PyPI —
+          if [ "$PYPI_BUILD_RESULT" != "skipped" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              MSG+="\n$(status_emoji "$PYPI_BUILD_RESULT") *PyPI Wheels* — Built and validated (not published)"
+            elif [ "$PYPI_PUBLISH_RESULT" = "success" ]; then
+              MSG+="\n:white_check_mark: *PyPI Wheels* — Published to Artifactory"
+            else
+              MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish: ${PYPI_PUBLISH_RESULT}"
+            fi
+            MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
+          else
+            MSG+="\n:fast_forward: *PyPI Wheels* — Skipped"
+          fi
+
+          # — nv-ingest Docker —
+          if [ "$NVINGEST_DOCKER_RESULT" != "skipped" ]; then
+            if [ "$DRY_RUN" = "true" ]; then
+              MSG+="\n$(status_emoji "$NVINGEST_DOCKER_RESULT") *nv-ingest Docker* — Built and validated (not pushed)"
+            else
+              MSG+="\n$(status_emoji "$NVINGEST_DOCKER_RESULT") *nv-ingest Docker* — \`${NVINGEST_IMAGE}\`"
+            fi
+          else
+            MSG+="\n:fast_forward: *nv-ingest Docker* — Skipped"
+          fi
+
+          # — nemo-retriever Docker —
+          if [ "$RETRIEVER_DOCKER_RESULT" != "skipped" ]; then
+            RETRIEVER_TAG="${RETRIEVER_IMAGE}:${VERSION}"
+            if [ "$DRY_RUN" = "true" ]; then
+              MSG+="\n$(status_emoji "$RETRIEVER_DOCKER_RESULT") *nemo-retriever Docker* — Built and validated (not pushed)"
+            else
+              MSG+="\n$(status_emoji "$RETRIEVER_DOCKER_RESULT") *nemo-retriever Docker* — \`${RETRIEVER_TAG}\`"
+            fi
+          else
+            MSG+="\n:fast_forward: *nemo-retriever Docker* — Skipped"
+          fi
+
+          MSG+="\n"
+          MSG+="\n<${RUN_URL}|:github: View Workflow Run>"
+
+          echo "========================================="
+          echo "  Slack-ready announcement (copy below)"
+          echo "========================================="
+          echo -e "$MSG"
+          echo "========================================="
+
+          echo "### :mega: Slack Announcement" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo -e "$MSG" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
