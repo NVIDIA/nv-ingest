@@ -437,12 +437,20 @@ def main(
             "(used when --table-output-format=markdown)."
         ),
     ),
-    reranker: Optional[str] = typer.Option(
-        "nvidia/llama-nemotron-rerank-1b-v2",
+    reranker: bool = typer.Option(
+        False,
         "--reranker",
-        help="HuggingFace model ID for local reranking "
-        "(e.g. 'nvidia/llama-nemotron-rerank-1b-v2'). Set to None to "
+        help="Enable local reranking with the specified HuggingFace model "
+        "(e.g. 'nvidia/llama-nemotron-rerank-1b-v2'). Set to False to "
         "skip reranking (default).",
+    ),
+    reranker_model_name: Optional[str] = typer.Option(
+        "nvidia/llama-nemotron-rerank-1b-v2",
+        "--reranker-model-name",
+        help=(
+            "Reranker model name for HuggingFaceReranker. "
+            "Required if --reranker is enabled. Ignored if --reranker is False."
+        ),
     ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
@@ -733,7 +741,7 @@ def main(
             ks=(1, 5, 10),
             hybrid=hybrid,
             match_mode=recall_match_mode,
-            reranker=reranker,
+            reranker=reranker_model_name if reranker else None,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
