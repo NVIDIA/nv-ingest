@@ -20,18 +20,31 @@ The `Ingestor` class provides an interface for building, managing, and running d
 
 The following table describes methods of the `Ingestor` class.
 
-| Method         | Description                       |
-|----------------|-----------------------------------|
-| `caption`      | Extract captions from images within the document. |
-| `embed`        | Generate embeddings from extracted content. |
-| `extract`      | Add an extraction task (text, tables, charts, infographics). |
-| `files`        | Add document paths for processing. |
-| `ingest`       | Submit jobs and retrieve results synchronously. |
-| `load`         | Ensure files are locally accessible (downloads if needed). |
-| `save_to_disk` | Save ingestion results to disk instead of memory. |
-| `store`        | Persist extracted images/structured renderings to an fsspec-compatible backend. |
-| `split`        | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `vdb_upload`   | Push extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+| Method             | Description                                                                 |
+|--------------------|-----------------------------------------------------------------------------|
+| `all_tasks`        | Add a default set of tasks (extract, dedup, filter, split, embed, store_embed). |
+| `buffers`          | Add in-memory BytesIO buffers for processing (name, BytesIO pairs).          |
+| `caption`          | Extract captions from images within the document.                           |
+| `cancelled_jobs`   | Return the count of jobs in the CANCELLED state.                             |
+| `completed_jobs`   | Return the count of jobs in the COMPLETED state.                             |
+| `dedup`            | Add a deduplication task (e.g. bbox dedup for structured + image extraction). |
+| `embed`            | Generate embeddings from extracted content.                                  |
+| `extract`          | Add an extraction task (text, tables, charts, infographics).                 |
+| `failed_jobs`      | Return the count of jobs in the FAILED state.                                |
+| `files`            | Add document paths for processing.                                           |
+| `filter`           | Add a filter task (e.g. by size/aspect ratio).                              |
+| `get_status`       | Return a per-document status dict (for use with async ingestion).           |
+| `ingest`           | Submit jobs and retrieve results synchronously.                              |
+| `ingest_async`     | Submit jobs asynchronously; returns a Future that completes when done.       |
+| `load`             | Ensure files are locally accessible (downloads if needed).                     |
+| `pdf_split_config` | Configure V2 PDF splitting (e.g. pages per chunk). Refer to [V2 API Guide](v2-api-guide.md). |
+| `remaining_jobs`   | Return the count of jobs not yet in a terminal state.                       |
+| `save_to_disk`     | Save ingestion results to disk instead of memory.                             |
+| `store`            | Persist extracted images/structured renderings to an fsspec-compatible backend. |
+| `store_embed`      | Add a store-embed task.                                                      |
+| `split`            | Split documents into smaller sections. Refer to [Split Documents](chunking.md).  |
+| `udf`              | Add a user-defined function (UDF) task.                                      |
+| `vdb_upload`       | Push extraction results to Milvus vector database. Refer to [Data Upload](data-store.md). |
 
 
 ### Extract Method Options
@@ -59,9 +72,11 @@ The caption task can call a vision-language model (VLM) with the following optio
 
 - `prompt` (string): User prompt for captioning. Defaults to `"Caption the content of this image:"`.
 - `reasoning` (boolean): Enable reasoning mode. `True` enables reasoning, `False` disables it. Defaults to `None` (service default, typically disabled).
+- `context_text_max_chars` (int, optional): Maximum number of characters of page text to include as context for the VLM. Omit or `None` for service default.
+- `temperature` (float, optional): Sampling temperature for the VLM (e.g. 0.0–1.0). Omit or `None` for service default.
 
 !!! note
-    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` per the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
+    The `reasoning` parameter maps to the VLM's system prompt: `reasoning=True` sets the system prompt to `"/think"`, and `reasoning=False` sets it to `"/no_think"` according to the [Nemotron Nano 12B v2 VL model card] (https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard).
 
 Example:
 ```python
@@ -86,6 +101,31 @@ ingestor = (
 For large document batches, you can enable a progress bar by setting `show_progress` to true.
 Use the following code.
 
+### ingest() parameters and return values
+
+`ingest()` supports the following parameters:
+
+| Parameter               | Type    | Default | Description |
+|-------------------------|---------|---------|-------------|
+| `show_progress`         | bool    | `False` | Show a progress bar. |
+| `return_failures`        | bool    | `False` | If `True`, return a tuple `(results, failures)`. |
+| `return_traces`          | bool    | `False` | If `True`, return trace metrics (timing per stage) with results. |
+| `save_to_disk`           | bool    | `False` | If `True`, save results to disk and return `LazyLoadedList` proxies (uses `save_to_disk()` config if already set). |
+| `timeout`                | int     | `100`   | Timeout in seconds for job processing. |
+| `max_job_retries`        | int     | `None`  | Maximum retries per job. |
+| `verbose`                | bool    | `False` | Enable verbose logging. |
+| `enable_telemetry`       | bool    | `None`  | Enable or disable telemetry collection. |
+| `show_telemetry`         | bool    | `None`  | Print telemetry summary after ingest (env: `NV_INGEST_CLIENT_SHOW_TELEMETRY`). |
+| `include_parent_trace_ids` | bool  | `False` | If `True`, also return parent job trace IDs (V2 API). |
+
+The return value depends on the following flags:
+
+- **Default:** `list` of results.
+- **`return_failures=True`:** `(results, failures)`.
+- **`return_traces=True`:** `(results, traces)`.
+- **`return_failures=True` and `return_traces=True`:** `(results, failures, traces)`.
+- With `include_parent_trace_ids=True`, an additional element (parent trace IDs) is appended to the tuple when applicable.
+
 ```python
 # Return only successes
 results = ingestor.ingest(show_progress=True)
@@ -108,6 +148,14 @@ print(f"{len(results)} successful docs; {len(failures)} failures")
 
 if failures:
     print("Failures:", failures[:1])
+```
+
+To also obtain trace metrics (timing per stage), use `return_traces=True`:
+
+```python
+# Return results and traces
+results, traces = ingestor.ingest(show_progress=True, return_traces=True)
+# Or with failures: results, failures, traces = ingestor.ingest(return_failures=True, return_traces=True)
 ```
 
 When you use the `vdb_upload` method, uploads are performed after ingestion completes.
@@ -137,6 +185,33 @@ if failures:
     print("Failures:", failures[:1])
 ```
 
+## Async ingestion and job status
+
+Use `ingest_async()` to submit jobs without blocking. It returns a `concurrent.futures.Future` that completes when all jobs (and any VDB upload) have finished. The future's result has the same shape as `ingest()` depending on `return_failures` and `return_traces`.
+
+```python
+future = ingestor.ingest_async(return_failures=True)
+results, failures = future.result()
+```
+
+After calling `ingest_async()`, you can poll progress with:
+
+- **`get_status()`** — Returns a dict mapping document identifier to status string: `"pending"`, `"submitted"`, `"processing"`, `"completed"`, `"failed"`, `"cancelled"`, or `"unknown"`.
+- **`completed_jobs()`** — Count of jobs in the COMPLETED state.
+- **`failed_jobs()`** — Count of jobs in the FAILED state.
+- **`cancelled_jobs()`** — Count of jobs in the CANCELLED state.
+- **`remaining_jobs()`** — Count of jobs not yet in a terminal state.
+
+Example:
+
+```python
+future = ingestor.ingest_async()
+while not future.done():
+    status = ingestor.get_status()
+    print(ingestor.completed_jobs(), "completed,", ingestor.remaining_jobs(), "remaining")
+    time.sleep(2)
+results = future.result()
+```
 
 
 ## Quick Start: Extracting PDFs
@@ -174,9 +249,18 @@ for doc in result:
     print(doc)
 ```
 
+### Add in-memory buffers
+
+Use `buffers()` to process in-memory data (e.g. `BytesIO` objects) instead of file paths. Pass a single `(name, BytesIO)` tuple or a list of such tuples.
+
+```python
+from io import BytesIO
+ingestor = Ingestor().buffers(("doc1.pdf", pdf_bytes)).extract().ingest()
+```
+
 ### Extract Specific Elements from PDFs
 
-By default, the `extract` method extracts all supported content types.
+By default, the `extract` method extracts text, tables, charts, and images. Infographic extraction is **not** enabled by default (`extract_infographics=False`); set `extract_infographics=True` to include it.
 You can customize the extraction behavior by using the following code.
 
 ```python
@@ -287,7 +371,15 @@ The `save_to_disk` method configures the extraction pipeline to write the output
 
 ### Basic Usage: Save to a Directory
 
-To save results to disk, simply chain the `save_to_disk` method to your ingestion task.
+To save results to disk, chain the `save_to_disk` method to your ingestion task.
+You can pass an optional `compression` argument (default `"gzip"`) to compress JSONL files; set `compression=None` to disable compression.
+
+| Parameter           | Type  | Default | Description |
+|---------------------|-------|---------|-------------|
+| `output_directory`  | str   | `None`  | Directory for result files. Defaults to env `NV_INGEST_CLIENT_SAVE_TO_DISK_OUTPUT_DIRECTORY` or a temporary directory. |
+| `cleanup`           | bool  | `True`  | If `True`, remove the output directory when exiting the context manager. |
+| `compression`       | str   | `"gzip"`| Compression for JSONL files. Use `"gzip"` or `None` to disable. Compressed files use a `.gz` suffix. |
+
 By using `save_to_disk` the `ingest` method returns a list of `LazyLoadedList` objects,
 which are memory-efficient proxies that read from the result files on disk.
 
@@ -430,6 +522,8 @@ The caption task can call a VLM with optional prompt and system prompt overrides
 
 - `caption_prompt` (user prompt): defaults to `"Caption the content of this image:"`.
 - `caption_system_prompt` (system prompt): defaults to `"/no_think"` (reasoning off). Set to `"/think"` to enable reasoning per the Nemotron Nano 12B v2 VL model card.
+- `context_text_max_chars` (int, optional): Maximum characters of page text to include as context for the VLM.
+- `temperature` (float, optional): Sampling temperature for the VLM.
 
 Example:
 ```python

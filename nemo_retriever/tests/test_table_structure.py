@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from nemo_retriever.util.table_and_chart import join_table_structure_and_ocr_output
+from nemo_retriever.utils.table_and_chart import join_table_structure_and_ocr_output
 
 
 def _can_import(mod: str) -> bool:
