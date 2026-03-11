@@ -21,6 +21,7 @@
   <a href="#model-architecture">Architecture</a> •
   <a href="#synthetic-training-data-generation-for-nemo-retriever">Synthetic Data</a> •
   <a href="#nemo-retrievers-agentic-retrieval-pipeline">Agentic Pipeline</a> •
+  <a href="#usage">Usage</a> •
   <a href="#performance">Performance</a> •
   <a href="#acknowledgement">Acknowledgement</a>
 </p>
@@ -83,6 +84,26 @@ Finally, the agent calls a `final_results` tool to output the most relevant docu
 Agentic workflows are notoriously slow. Initially, we used a Model Context Protocol (MCP) server to connect the retriever and the agent, but this architecture imposed a heavy "performance tax." The overhead of managing separate processes, loading GPU-resident embeddings for every run, and handling network latency created significant bottlenecks and frequent server freezes. To resolve this, we replaced the MCP server with a thread-safe singleton retriever that lives in-process.
 
 By loading the model and corpus once and protecting access with a reentrant lock, we achieved safe, shared GPU access without network serialization overhead. This single change eliminated deployment errors and dramatically improved both GPU utilization and experiment throughput.
+
+<a id="usage"></a>
+## 🚀 Usage
+To reproduce our results on BRIGHT, follow the [installation instructions](https://github.com/NVIDIA/NeMo-Retriever/tree/main/retrieval-bench), then run the following command:
+
+```bash
+retrieval-bench evaluate agentic-retrieval \
+        --dataset-name bright/biology \
+        --backend llama-embed-nemotron-reasoning-3b \
+        --llm-model openai/aws/anthropic/claude-opus-4-5 \
+        --num-concurrent 1
+```
+You can specify BRIGHT task names via `--dataset-name`. By default, the pipeline reads `OPENAI_API_KEY` and `OPENAI_BASE_URL` from environment variables; override these via `--pipeline-args`:
+```bash
+retrieval-bench evaluate agentic-retrieval \
+  --dataset-name bright/biology \
+  --backend llama-nv-embed-reasoning-3b \
+  --llm-model your-llm-model \
+  --pipeline-args '{"api_key":"os.environ/MY_KEY","base_url":"os.environ/MY_URL"}'
+```
 
 <a id="performance"></a>
 ## 📊 Performance
