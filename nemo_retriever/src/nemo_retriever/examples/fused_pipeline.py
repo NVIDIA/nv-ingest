@@ -174,10 +174,6 @@ def main(
         "--embed-granularity",
         help="Embedding granularity: 'element' (one row per table/chart/text) or 'page' (one row per page).",
     ),
-    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
-    refine_factor: int = typer.Option(
-        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
-    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file)
     try:
@@ -299,8 +295,6 @@ def main(
             embedding_model="nvidia/llama-nemotron-embed-1b-v2",
             top_k=10,
             ks=(1, 5, 10),
-            nprobes=nprobes,
-            refine_factor=refine_factor,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)

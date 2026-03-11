@@ -364,7 +364,7 @@ def _apply_final_score_filter(
     return filtered
 
 
-def _apply_container_wbf(
+def _fuse_overlapping_same_class_boxes(
     dets: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """Apply the container-internal WBF step (iou=0.1, biggest, max) using
@@ -831,7 +831,7 @@ def detect_page_elements_v3(
                 label_names=label_names,
             )
             # Apply container-internal WBF (iou=0.1, biggest, max) to fuse near-duplicates
-            per_image_dets = [_apply_container_wbf(dets) for dets in per_image_dets]
+            per_image_dets = [_fuse_overlapping_same_class_boxes(dets) for dets in per_image_dets]
             # Apply v3 postprocessing (box fusion, title matching, expansion, overlap removal)
             per_image_dets = [_apply_page_elements_v3_postprocess(dets) for dets in per_image_dets]
             # Apply per-class final score filtering AFTER WBF (matches NIM pipeline ordering)

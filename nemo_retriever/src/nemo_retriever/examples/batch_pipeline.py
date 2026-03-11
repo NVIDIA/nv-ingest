@@ -446,10 +446,6 @@ def main(
         "--use-graphic-elements",
         help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
     ),
-    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
-    refine_factor: int = typer.Option(
-        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
-    ),
     use_table_structure: bool = typer.Option(
         False,
         "--use-table-structure",
@@ -777,8 +773,6 @@ def main(
             ks=(1, 5, 10),
             hybrid=hybrid,
             match_mode=recall_match_mode,
-            nprobes=nprobes,
-            refine_factor=refine_factor,
         )
 
         # Capture recall only times.

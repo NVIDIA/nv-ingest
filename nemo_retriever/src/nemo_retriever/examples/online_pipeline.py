@@ -80,10 +80,6 @@ def main(
         "--no-recall-details",
         help="Do not print per-query retrieval details.",
     ),
-    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
-    refine_factor: int = typer.Option(
-        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
-    ),
 ) -> None:
     if run_mode not in ("inprocess", "online"):
         raise typer.BadParameter("run_mode must be 'inprocess' or 'online'")
@@ -203,8 +199,6 @@ def main(
         embedding_model="nvidia/llama-nemotron-embed-1b-v2",
         top_k=10,
         ks=(1, 5, 10),
-        nprobes=nprobes,
-        refine_factor=refine_factor,
     )
 
     _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)

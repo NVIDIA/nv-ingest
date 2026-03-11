@@ -131,10 +131,6 @@ def recall_with_main(
         min=1,
         help="Batch size for local HF embedding inference.",
     ),
-    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
-    refine_factor: int = typer.Option(
-        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
-    ),
 ) -> None:
     query_csv = _resolve_query_csv(Path(query_csv))
 
@@ -159,8 +155,6 @@ def recall_with_main(
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),
-        nprobes=nprobes,
-        refine_factor=refine_factor,
     )
 
     print("Reading and normalizing query CSV...")
@@ -258,10 +252,6 @@ def run(
         help="Batch size for local HF embedding inference.",
     ),
     print_hits: bool = typer.Option(True, "--print-hits/--no-print-hits", help="Print top-k hits per query."),
-    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
-    refine_factor: int = typer.Option(
-        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
-    ),
 ) -> None:
     """
     Reads a query CSV, embeds each query, searches LanceDB, prints top-k results, and prints recall@1/@5/@10.
@@ -292,8 +282,6 @@ def run(
         local_hf_device=_coerce_endpoint_str(local_hf_device),
         local_hf_cache_dir=(str(local_hf_cache_dir) if local_hf_cache_dir is not None else None),
         local_hf_batch_size=int(local_hf_batch_size),
-        nprobes=nprobes,
-        refine_factor=refine_factor,
     )
 
     df_query, gold, raw_hits, retrieved_keys, metrics = retrieve_and_score(
