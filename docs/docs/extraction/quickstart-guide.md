@@ -82,6 +82,12 @@ h. Run the command `docker ps`. You should see output similar to the following. 
 
     ```
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
+    ...
+    ```
+
+To run the NeMo Retriever Library Python client from your host machine, **Python 3.12 or later is required**. Create a virtual environment and install the client packages:
+
+```shell
 uv venv --python 3.12 nv-ingest-dev
 source nv-ingest-dev/bin/activate
 uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
@@ -89,7 +95,7 @@ uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
 
 !!! tip
 
-    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nemo_retriever` in the result. You can do this before any pip or python command that you run.
+    To confirm that you have activated your virtual environment, run `which pip` and `which python`, and confirm that you see `nemo_retriever` or your venv path in the result. You can do this before any pip or python command that you run.
 
 
 !!! note
@@ -459,7 +465,7 @@ docker compose \
 
 ## Specify MIG slices for NIM models
 
-When you deploy NeMo Retriever Library with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NeMo Retriever Library NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/NeMo-Retriever/main/helm/README.md%E2%80%8B).​
+When you deploy NeMo Retriever Library with NIM models on MIG‑enabled GPUs, MIG device slices are requested and scheduled through the `values.yaml` file for the corresponding NIM microservice. For IBM Content-Aware Storage (CAS) deployments, this allows NeMo Retriever Library NIM pods to land only on nodes that expose the desired MIG profiles [raw.githubusercontent](https://raw.githubusercontent.com/NVIDIA/NeMo-Retriever/main/helm/README.md).​
 
 To target a specific MIG profile—for example, a 3g.20gb slice on an A100, which is a hardware-partitioned virtual GPU instance that gives your workload a fixed mid-sized share of the A100’s compute plus 20 GB of dedicated GPU memory and behaves like a smaller independent GPU—for a given NIM, configure the `resources` and `nodeSelector` under that NIM’s values path in `values.yaml`.
 
