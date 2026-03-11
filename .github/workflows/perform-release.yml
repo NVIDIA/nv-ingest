@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-docker:
+        description: '⛔ SKIP Docker — disable Docker build and publish entirely'
+        required: false
+        type: boolean
+        default: false
       skip-helm-chart:
         description: '⛔ SKIP Helm chart — disable Helm build and publish entirely'
         required: false
@@ -89,6 +94,7 @@ jobs:
 
   nvingest-docker-build:
     name: Build nv-ingest Docker Image
+    if: ${{ !inputs.skip-docker }}
     needs: determine-version
     runs-on: linux-large-disk
     outputs:
@@ -223,7 +229,7 @@ jobs:
 
   nvingest-docker-publish:
     name: Publish nv-ingest Docker Image
-    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    if: ${{ !inputs.dry-run && !inputs.skip-docker && !cancelled() && !failure() }}
     needs:
       - determine-version
       - nvingest-docker-build
@@ -319,8 +325,8 @@ jobs:
           NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           python ci/scripts/release_helm_chart.py \
-            --org nvidian \
-            --team nemo-llm \
+            --org ${{ secrets.NGC_ORG }} \
+            --team ${{ secrets.NGC_TEAM }} \
             --name nv-ingest \
             --version "${{ needs.determine-version.outputs.version }}"
 
@@ -389,6 +395,7 @@ jobs:
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
           TAG_RESULT: ${{ needs.tag-release.result }}
+          SKIP_DOCKER: ${{ inputs.skip-docker }}
           SKIP_HELM: ${{ inputs.skip-helm-chart }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -440,7 +447,9 @@ jobs:
           MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
 
           # — nv-ingest Docker —
-          if [ "$DRY_RUN" = "true" ]; then
+          if [ "$SKIP_DOCKER" = "true" ]; then
+            MSG+="\n:fast_forward: *nv-ingest Docker* — Disabled (skip-docker)"
+          elif [ "$DRY_RUN" = "true" ]; then
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Built and validated (not pushed)"
           elif [ "$NVINGEST_PUBLISH_RESULT" = "success" ]; then
             MSG+="\n:white_check_mark: *nv-ingest Docker* — \`${NVINGEST_IMAGE}\`"
