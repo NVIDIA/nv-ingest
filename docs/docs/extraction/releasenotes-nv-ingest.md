@@ -29,7 +29,7 @@ This release contains the following key changes:
 - The `meta-llama/Llama-3.2-1B` tokenizer is now pre-downloaded so that you can run token-based splitting without making a network request. For details, refer to [Split Documents](chunking.md).
 - For scanned PDFs, added specialized extraction strategies. For details, refer to [PDF Extraction Strategies](python-api-reference.md#pdf-extraction-strategies).
 - Added support for [LanceDB](https://lancedb.com/). For details, refer to [Upload to a Custom Data Store](data-store.md).
-- The V2 API is now available and is the default processing pipeline. The response format remains backwards-compatible. You can enable the v2 API by using `message_client_kwargs={"api_version": "v2"}`.For details, refer to [API Reference](api-docs).
+- The V2 API is now available and is the default processing pipeline. The response format remains backwards-compatible. You can enable the v2 API by using `message_client_kwargs={"api_version": "v2"}`. For details, refer to [V2 API Guide](v2-api-guide.md).
 - Large PDFs are now automatically split into chunks and processed in parallel, delivering faster ingestion for long documents. For details, refer to [PDF Pre-Splitting](v2-api-guide.md).
 - Issues maintaining extraction quality while processing very large files are now resolved with the V2 API. For details, refer to [V2 API Guide](v2-api-guide.md).
 - Updated the embedding task to support embedding on custom content fields like the results of summarization functions. For details, refer to [Use the Python API](python-api-reference.md).
@@ -60,7 +60,7 @@ The following are the known issues that are fixed in this version:
 
 The following are the known issues for NeMo Retriever Library:
 
-- Advanced visual parsing is not supported on RTX Pro 6000, B200, or H200 NVL. For details, refer to [Advanced Visual Parsing](advanced-visual-parsing.md) and [Support Matrix](support-matrix.md).
+- Advanced visual parsing is not supported on RTX Pro 6000, B200, or H200 NVL. For details, refer to [Advanced Visual Parsing](nemoretriever-parse.md) and [Support Matrix](support-matrix.md).
 - The Page Elements NIM (`nemoretriever-page-elements-v3:1.7.0`) may intermittently fail during inference under high-concurrency workloads. This happens when Triton’s dynamic batching combines requests that exceed the model’s maximum batch size, a situation more commonly seen in multi-GPU setups or large ingestion runs. In these cases, extraction fails for the impacted documents. A correction is planned for `nemoretriever-page-elements-v3:1.7.1`.
 
 
