@@ -19,6 +19,11 @@ on:
         required: false
         type: boolean
         default: false
+      skip-helm-chart:
+        description: '⛔ SKIP Helm chart — disable Helm build and publish entirely'
+        required: false
+        type: boolean
+        default: true
       release-type:
         description: 'Release type for PyPI packages'
         required: false
@@ -100,7 +105,13 @@ jobs:
       - name: Set image metadata
         id: meta
         run: |
-          echo "image=${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
+          if [ -z "$DOCKER_REGISTRY" ]; then
+            echo "::error::DOCKER_REGISTRY secret is not set"
+            exit 1
+          fi
+          echo "image=${DOCKER_REGISTRY}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
 
       - name: Create HF token file
         env:
@@ -129,6 +140,7 @@ jobs:
 
   helm-build:
     name: Build Helm Chart
+    if: ${{ !inputs.skip-helm-chart }}
     needs: determine-version
     runs-on: ubuntu-latest
     steps:
@@ -187,7 +199,7 @@ jobs:
 
   pypi-publish:
     name: Publish Python Wheels
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
     needs:
       - pypi-build
       - nvingest-docker-build
@@ -200,13 +212,15 @@ jobs:
 
   nvingest-docker-publish:
     name: Publish nv-ingest Docker Image
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
     needs:
       - determine-version
       - pypi-build
       - nvingest-docker-build
       - helm-build
     runs-on: linux-large-disk
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -223,6 +237,19 @@ jobs:
         uses: ./.github/actions/docker-login-ngc
         with:
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          if [ -z "$DOCKER_REGISTRY" ]; then
+            echo "::error::DOCKER_REGISTRY secret is not set"
+            exit 1
+          fi
+          IMAGE="${DOCKER_REGISTRY}/nv-ingest:${{ needs.determine-version.outputs.version }}"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${IMAGE}"
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
 
       - name: Create HF token file
         env:
@@ -243,13 +270,13 @@ jobs:
           build-args: |
             DOWNLOAD_LLAMA_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
-          tags: ${{ needs.nvingest-docker-build.outputs.image }}
+          tags: ${{ steps.meta.outputs.image }}
           secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-from: type=gha,scope=nvingest
 
   helm-publish:
     name: Publish Helm Chart
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !inputs.dry-run && !inputs.skip-helm-chart && !cancelled() && !failure() }}
     needs:
       - determine-version
       - pypi-build
@@ -258,6 +285,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NGC_CLI_ORG: ${{ secrets.NGC_ORG }}
+      NGC_CLI_TEAM: ${{ secrets.NGC_TEAM }}
+      NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -274,22 +304,10 @@ jobs:
             | tar xz -C /usr/local/bin helm-docs
 
       - name: Install NGC CLI
-        run: |
-          curl -sSL "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.55.0/files/ngccli_linux.zip" -o /tmp/ngccli.zip
-          unzip -q /tmp/ngccli.zip -d /tmp
-          sudo mv /tmp/ngc-cli/ngc /usr/local/bin/ngc
-          sudo chmod +x /usr/local/bin/ngc
+        run: pip install ngcsdk
 
-      - name: Configure and verify NGC CLI
-        run: |
-          ngc config set <<EOF
-          $NGC_CLI_API_KEY
-          json
-          nvidian
-          nemo-llm
-          EOF
-          echo "NGC CLI configured. Verifying authentication..."
-          ngc config current
+      - name: Verify NGC CLI
+        run: ngc --version
 
       - name: Update Helm README
         run: helm/update_helm_readme.sh
@@ -326,7 +344,7 @@ jobs:
   # ── Tag Release ───────────────────────────────────────────────────────
   tag-release:
     name: Tag Release
-    if: ${{ !inputs.dry-run }}
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
     needs:
       - determine-version
       - pypi-publish
@@ -375,7 +393,8 @@ jobs:
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
           TAG_RESULT: ${{ needs.tag-release.result }}
-          NVINGEST_IMAGE: ${{ needs.nvingest-docker-build.outputs.image }}
+          SKIP_HELM: ${{ inputs.skip-helm-chart }}
+          NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           status_emoji() {
@@ -390,7 +409,7 @@ jobs:
 
           ALL_BUILDS_OK="true"
           for r in "$PYPI_BUILD_RESULT" "$NVINGEST_BUILD_RESULT" "$HELM_BUILD_RESULT"; do
-            if [ "$r" != "success" ]; then
+            if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
               ALL_BUILDS_OK="false"
               break
             fi
@@ -437,7 +456,9 @@ jobs:
 
           # — Helm Chart —
           HELM_REF="nvidian/nemo-llm/nv-ingest:${VERSION}"
-          if [ "$DRY_RUN" = "true" ]; then
+          if [ "$SKIP_HELM" = "true" ]; then
+            MSG+="\n:fast_forward: *Helm Chart* — Disabled (skip-helm-chart)"
+          elif [ "$DRY_RUN" = "true" ]; then
             MSG+="\n$(status_emoji "$HELM_BUILD_RESULT") *Helm Chart* — Built and validated (not published)"
           elif [ "$HELM_PUBLISH_RESULT" = "success" ]; then
             MSG+="\n:white_check_mark: *Helm Chart* — \`${HELM_REF}\` (NGC)"
