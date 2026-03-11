@@ -1,0 +1,989 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.framework.orchestration.process.execution &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../../../../../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/framework/orchestration/process/execution';</script>
+
+    <link rel="icon" href="../../../../../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../search.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.orchestration.process.execution</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.framework.orchestration.process.execution</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Low-level pipeline execution functions.</span>
+
+<span class="sd">This module contains the core pipeline execution functions that are shared</span>
+<span class="sd">between different execution strategies, extracted to avoid circular imports.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">signal</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ctypes</span><span class="w"> </span><span class="kn">import</span> <span class="n">CDLL</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">TextIO</span><span class="p">,</span> <span class="n">Any</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ray</span><span class="w"> </span><span class="kn">import</span> <span class="n">LoggingConfig</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.framework.orchestration.process.dependent_services</span><span class="w"> </span><span class="kn">import</span> <span class="n">start_simple_message_broker</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.framework.orchestration.process.termination</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">kill_pipeline_process_group</span> <span class="k">as</span> <span class="n">_kill_pipeline_process_group</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.pipeline.ingest_pipeline</span><span class="w"> </span><span class="kn">import</span> <span class="n">IngestPipelineBuilder</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.pipeline.pipeline_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">PipelineConfigSchema</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.pipeline.config.replica_resolver</span><span class="w"> </span><span class="kn">import</span> <span class="n">resolve_static_replicas</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.string_processing.configuration</span><span class="w"> </span><span class="kn">import</span> <span class="n">pretty_print_pipeline_config</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_safe_log</span><span class="p">(</span><span class="n">level</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Best-effort logging that won&#39;t crash during interpreter shutdown.</span>
+
+<span class="sd">    Attempts to emit via the module logger, but if logging handlers/streams</span>
+<span class="sd">    have already been closed (common in atexit during CI/pytest teardown),</span>
+<span class="sd">    falls back to writing to sys.__stderr__ and never raises.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
+        <span class="k">return</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Use the original un-captured stderr if available</span>
+        <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sys</span><span class="p">,</span> <span class="s2">&quot;__stderr__&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">sys</span><span class="o">.</span><span class="n">__stderr__</span><span class="p">:</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">__stderr__</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">msg</span> <span class="o">+</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">sys</span><span class="o">.</span><span class="n">__stderr__</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+        <span class="c1"># Last resort: swallow any error to avoid noisy shutdowns</span>
+        <span class="k">pass</span>
+
+
+<div class="viewcode-block" id="str_to_bool">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.str_to_bool">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">str_to_bool</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert string to boolean value.&quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">value</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;on&quot;</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="redirect_os_fds">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.redirect_os_fds">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">redirect_os_fds</span><span class="p">(</span><span class="n">stdout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextIO</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">stderr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextIO</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Redirect OS-level stdout (fd=1) and stderr (fd=2) to the given file-like objects,</span>
+<span class="sd">    or to /dev/null if not provided.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    stdout : Optional[TextIO]</span>
+<span class="sd">        Stream to receive OS-level stdout. If None, redirected to /dev/null.</span>
+<span class="sd">    stderr : Optional[TextIO]</span>
+<span class="sd">        Stream to receive OS-level stderr. If None, redirected to /dev/null.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+    <span class="c1"># Get file descriptors for stdout and stderr, or use /dev/null</span>
+    <span class="n">stdout_fd</span> <span class="o">=</span> <span class="n">stdout</span><span class="o">.</span><span class="n">fileno</span><span class="p">()</span> <span class="k">if</span> <span class="n">stdout</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">O_WRONLY</span><span class="p">)</span>
+    <span class="n">stderr_fd</span> <span class="o">=</span> <span class="n">stderr</span><span class="o">.</span><span class="n">fileno</span><span class="p">()</span> <span class="k">if</span> <span class="n">stderr</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">devnull</span><span class="p">,</span> <span class="n">os</span><span class="o">.</span><span class="n">O_WRONLY</span><span class="p">)</span>
+
+    <span class="c1"># Redirect OS-level file descriptors</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">dup2</span><span class="p">(</span><span class="n">stdout_fd</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># Redirect stdout (fd=1)</span>
+    <span class="n">os</span><span class="o">.</span><span class="n">dup2</span><span class="p">(</span><span class="n">stderr_fd</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># Redirect stderr (fd=2)</span></div>
+
+
+
+<div class="viewcode-block" id="set_pdeathsig">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.set_pdeathsig">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">set_pdeathsig</span><span class="p">(</span><span class="n">sig</span><span class="o">=</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Set parent death signal to kill child when parent dies.&quot;&quot;&quot;</span>
+    <span class="n">libc</span> <span class="o">=</span> <span class="n">CDLL</span><span class="p">(</span><span class="s2">&quot;libc.so.6&quot;</span><span class="p">)</span>
+    <span class="n">libc</span><span class="o">.</span><span class="n">prctl</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">sig</span><span class="p">)</span>  <span class="c1"># PR_SET_PDEATHSIG = 1</span></div>
+
+
+
+<div class="viewcode-block" id="build_logging_config_from_env">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.build_logging_config_from_env">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">build_logging_config_from_env</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">LoggingConfig</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build Ray LoggingConfig from environment variables.</span>
+<span class="sd">    Package-level preset (sets all defaults):</span>
+<span class="sd">    - INGEST_RAY_LOG_LEVEL: PRODUCTION, DEVELOPMENT, DEBUG. Default: DEVELOPMENT</span>
+<span class="sd">    Individual environment variables (override preset defaults):</span>
+<span class="sd">    - RAY_LOGGING_LEVEL: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL). Default: INFO</span>
+<span class="sd">    - RAY_LOGGING_ENCODING: Log encoding format (TEXT, JSON). Default: TEXT</span>
+<span class="sd">    - RAY_LOGGING_ADDITIONAL_ATTRS: Comma-separated list of additional standard logger attributes</span>
+<span class="sd">    - RAY_DEDUP_LOGS: Enable/disable log deduplication (0/1). Default: 1 (enabled)</span>
+<span class="sd">    - RAY_LOG_TO_DRIVER: Enable/disable logging to driver (true/false). Default: true</span>
+<span class="sd">    - RAY_LOGGING_ROTATE_BYTES: Maximum log file size before rotation (bytes). Default: 1GB</span>
+<span class="sd">    - RAY_LOGGING_ROTATE_BACKUP_COUNT: Number of backup log files to keep. Default: 19</span>
+<span class="sd">    - RAY_DISABLE_IMPORT_WARNING: Disable Ray import warnings (0/1). Default: 0</span>
+<span class="sd">    - RAY_USAGE_STATS_ENABLED: Enable/disable usage stats collection (0/1). Default: 1</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Apply package-level preset defaults first</span>
+    <span class="n">preset_level</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;INGEST_RAY_LOG_LEVEL&quot;</span><span class="p">,</span> <span class="s2">&quot;DEVELOPMENT&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+    <span class="c1"># Define preset configurations</span>
+    <span class="n">presets</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;PRODUCTION&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;RAY_LOGGING_LEVEL&quot;</span><span class="p">:</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ENCODING&quot;</span><span class="p">:</span> <span class="s2">&quot;TEXT&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ADDITIONAL_ATTRS&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>  <span class="c1"># false</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">:</span> <span class="s2">&quot;1073741824&quot;</span><span class="p">,</span>  <span class="c1"># 1GB</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">:</span> <span class="s2">&quot;9&quot;</span><span class="p">,</span>  <span class="c1"># 10GB total</span>
+            <span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;DEVELOPMENT&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;RAY_LOGGING_LEVEL&quot;</span><span class="p">:</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ENCODING&quot;</span><span class="p">:</span> <span class="s2">&quot;TEXT&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ADDITIONAL_ATTRS&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>  <span class="c1"># false</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">:</span> <span class="s2">&quot;1073741824&quot;</span><span class="p">,</span>  <span class="c1"># 1GB</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">:</span> <span class="s2">&quot;19&quot;</span><span class="p">,</span>  <span class="c1"># 20GB total</span>
+            <span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;DEBUG&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;RAY_LOGGING_LEVEL&quot;</span><span class="p">:</span> <span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ENCODING&quot;</span><span class="p">:</span> <span class="s2">&quot;JSON&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOGGING_ADDITIONAL_ATTRS&quot;</span><span class="p">:</span> <span class="s2">&quot;name,funcName,lineno&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>  <span class="c1"># false</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">:</span> <span class="s2">&quot;536870912&quot;</span><span class="p">,</span>  <span class="c1"># 512MB</span>
+            <span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">:</span> <span class="s2">&quot;39&quot;</span><span class="p">,</span>  <span class="c1"># 20GB total</span>
+            <span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">:</span> <span class="s2">&quot;0&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">:</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Validate preset level</span>
+    <span class="k">if</span> <span class="n">preset_level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">presets</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Invalid INGEST_RAY_LOG_LEVEL &#39;</span><span class="si">{</span><span class="n">preset_level</span><span class="si">}</span><span class="s2">&#39;, using DEVELOPMENT. &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;Valid presets: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">presets</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+        <span class="n">preset_level</span> <span class="o">=</span> <span class="s2">&quot;DEVELOPMENT&quot;</span>
+
+    <span class="c1"># Apply preset defaults (only if env var not already set)</span>
+    <span class="n">preset_config</span> <span class="o">=</span> <span class="n">presets</span><span class="p">[</span><span class="n">preset_level</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">default_value</span> <span class="ow">in</span> <span class="n">preset_config</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">key</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">default_value</span>
+
+    <span class="c1"># For PRODUCTION mode, also suppress nv-ingest module INFO logs</span>
+    <span class="k">if</span> <span class="n">preset_level</span> <span class="o">==</span> <span class="s2">&quot;PRODUCTION&quot;</span><span class="p">:</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;nv_ingest&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+        <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;nv_ingest_api&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">WARNING</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Applied Ray logging preset: </span><span class="si">{</span><span class="n">preset_level</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Get log level from environment, default to INFO</span>
+    <span class="n">log_level</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOGGING_LEVEL&quot;</span><span class="p">,</span> <span class="s2">&quot;INFO&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+    <span class="c1"># Validate log level</span>
+    <span class="n">valid_levels</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;DEBUG&quot;</span><span class="p">,</span> <span class="s2">&quot;INFO&quot;</span><span class="p">,</span> <span class="s2">&quot;WARNING&quot;</span><span class="p">,</span> <span class="s2">&quot;ERROR&quot;</span><span class="p">,</span> <span class="s2">&quot;CRITICAL&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">log_level</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_levels</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid RAY_LOGGING_LEVEL &#39;</span><span class="si">{</span><span class="n">log_level</span><span class="si">}</span><span class="s2">&#39;, using INFO. Valid levels: </span><span class="si">{</span><span class="n">valid_levels</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">log_level</span> <span class="o">=</span> <span class="s2">&quot;INFO&quot;</span>
+
+    <span class="c1"># Get encoding format from environment, default to TEXT</span>
+    <span class="n">encoding</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOGGING_ENCODING&quot;</span><span class="p">,</span> <span class="s2">&quot;TEXT&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span>
+
+    <span class="c1"># Validate encoding</span>
+    <span class="n">valid_encodings</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;TEXT&quot;</span><span class="p">,</span> <span class="s2">&quot;JSON&quot;</span><span class="p">]</span>
+    <span class="k">if</span> <span class="n">encoding</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_encodings</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid RAY_LOGGING_ENCODING &#39;</span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">&#39;, using TEXT. Valid encodings: </span><span class="si">{</span><span class="n">valid_encodings</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">encoding</span> <span class="o">=</span> <span class="s2">&quot;TEXT&quot;</span>
+
+    <span class="c1"># Get additional standard logger attributes</span>
+    <span class="n">additional_attrs_str</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOGGING_ADDITIONAL_ATTRS&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="n">additional_log_standard_attrs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">if</span> <span class="n">additional_attrs_str</span><span class="p">:</span>
+        <span class="n">additional_log_standard_attrs</span> <span class="o">=</span> <span class="p">[</span><span class="n">attr</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span> <span class="k">for</span> <span class="n">attr</span> <span class="ow">in</span> <span class="n">additional_attrs_str</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;,&quot;</span><span class="p">)</span> <span class="k">if</span> <span class="n">attr</span><span class="o">.</span><span class="n">strip</span><span class="p">()]</span>
+
+    <span class="c1"># Set log deduplication environment variable if specified</span>
+    <span class="n">dedup_logs</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">dedup_logs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_DEDUP_LOGS&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">dedup_logs</span><span class="p">)</span>
+
+    <span class="c1"># Set log to driver environment variable if specified</span>
+    <span class="n">log_to_driver</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">log_to_driver</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_LOG_TO_DRIVER&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">log_to_driver</span><span class="p">)</span>
+
+    <span class="c1"># Configure log rotation settings</span>
+    <span class="n">rotate_bytes</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">,</span> <span class="s2">&quot;1073741824&quot;</span><span class="p">)</span>  <span class="c1"># Default: 1GB per file</span>
+    <span class="k">if</span> <span class="n">rotate_bytes</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">rotate_bytes_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rotate_bytes</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">rotate_bytes_int</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid RAY_LOGGING_ROTATE_BYTES &#39;</span><span class="si">{</span><span class="n">rotate_bytes</span><span class="si">}</span><span class="s2">&#39;, using default (1GB)&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BYTES&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;1073741824&quot;</span>
+
+    <span class="n">rotate_backup_count</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">,</span> <span class="s2">&quot;19&quot;</span><span class="p">)</span>  <span class="c1"># Default: 19 backups (20GB Max)</span>
+    <span class="k">if</span> <span class="n">rotate_backup_count</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">backup_count_int</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">rotate_backup_count</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">backup_count_int</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid RAY_LOGGING_ROTATE_BACKUP_COUNT &#39;</span><span class="si">{</span><span class="n">rotate_backup_count</span><span class="si">}</span><span class="s2">&#39;, using default (19)&quot;</span><span class="p">)</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_LOGGING_ROTATE_BACKUP_COUNT&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;19&quot;</span>
+
+    <span class="c1"># Configure Ray internal logging verbosity</span>
+    <span class="n">disable_import_warning</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">,</span> <span class="s2">&quot;0&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">disable_import_warning</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_DISABLE_IMPORT_WARNING&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">disable_import_warning</span><span class="p">)</span>
+
+    <span class="c1"># Configure usage stats collection</span>
+    <span class="n">usage_stats_enabled</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">usage_stats_enabled</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="p">[</span><span class="s2">&quot;RAY_USAGE_STATS_ENABLED&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">usage_stats_enabled</span><span class="p">)</span>
+
+    <span class="c1"># Create LoggingConfig with validated parameters</span>
+    <span class="n">logging_config</span> <span class="o">=</span> <span class="n">LoggingConfig</span><span class="p">(</span>
+        <span class="n">encoding</span><span class="o">=</span><span class="n">encoding</span><span class="p">,</span>
+        <span class="n">log_level</span><span class="o">=</span><span class="n">log_level</span><span class="p">,</span>
+        <span class="n">additional_log_standard_attrs</span><span class="o">=</span><span class="n">additional_log_standard_attrs</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Ray logging configured: preset=</span><span class="si">{</span><span class="n">preset_level</span><span class="si">}</span><span class="s2">, level=</span><span class="si">{</span><span class="n">log_level</span><span class="si">}</span><span class="s2">, encoding=</span><span class="si">{</span><span class="n">encoding</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;additional_attrs=</span><span class="si">{</span><span class="n">additional_log_standard_attrs</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;dedup_logs=</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;RAY_DEDUP_LOGS&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;1&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;log_to_driver=</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;RAY_LOG_TO_DRIVER&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;0&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;rotate_bytes=</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;RAY_LOGGING_ROTATE_BYTES&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;1073741824&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">, &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;rotate_backup_count=</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;RAY_LOGGING_ROTATE_BACKUP_COUNT&#39;</span><span class="p">,</span><span class="w"> </span><span class="s1">&#39;19&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">logging_config</span></div>
+
+
+
+<div class="viewcode-block" id="launch_pipeline">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.launch_pipeline">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">launch_pipeline</span><span class="p">(</span>
+    <span class="n">pipeline_config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">,</span>
+    <span class="n">block</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+    <span class="n">disable_dynamic_scaling</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">dynamic_memory_threshold</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">float</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Launch a pipeline using the provided configuration.</span>
+
+<span class="sd">    This function handles the core pipeline launching logic including Ray</span>
+<span class="sd">    initialization, pipeline building, and execution loop.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pipeline_config : PipelineConfigSchema</span>
+<span class="sd">        Validated pipeline configuration to execute.</span>
+<span class="sd">    block : bool, optional</span>
+<span class="sd">        Whether to block until pipeline completes, by default True.</span>
+<span class="sd">    disable_dynamic_scaling : Optional[bool], optional</span>
+<span class="sd">        Override for dynamic scaling behavior, by default None.</span>
+<span class="sd">    dynamic_memory_threshold : Optional[float], optional</span>
+<span class="sd">        Override for memory threshold, by default None.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Tuple[Union[Any, None], Optional[float]]</span>
+<span class="sd">        Raw pipeline object (type elided to avoid circular import) and elapsed time. For blocking execution,</span>
+<span class="sd">        returns (None, elapsed_time). For non-blocking, returns (pipeline, None).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Starting pipeline setup&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Initialize Ray if not already initialized</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+        <span class="c1"># Build Ray logging configuration</span>
+        <span class="n">logging_config</span> <span class="o">=</span> <span class="n">build_logging_config_from_env</span><span class="p">()</span>
+
+        <span class="c1"># Clear existing handlers from root logger before Ray adds its handler</span>
+        <span class="c1"># This prevents duplicate logging caused by multiple handlers on the root logger</span>
+        <span class="n">root_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">handler</span> <span class="ow">in</span> <span class="n">root_logger</span><span class="o">.</span><span class="n">handlers</span><span class="p">[:]:</span>
+            <span class="n">root_logger</span><span class="o">.</span><span class="n">removeHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Cleared existing root logger handlers to prevent Ray logging duplicates&quot;</span><span class="p">)</span>
+
+        <span class="n">ray</span><span class="o">.</span><span class="n">init</span><span class="p">(</span>
+            <span class="n">namespace</span><span class="o">=</span><span class="s2">&quot;nv_ingest_ray&quot;</span><span class="p">,</span>
+            <span class="n">ignore_reinit_error</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">dashboard_host</span><span class="o">=</span><span class="s2">&quot;0.0.0.0&quot;</span><span class="p">,</span>
+            <span class="n">dashboard_port</span><span class="o">=</span><span class="mi">8265</span><span class="p">,</span>
+            <span class="n">logging_config</span><span class="o">=</span><span class="n">logging_config</span><span class="p">,</span>  <span class="c1"># Ray will add its own StreamHandler</span>
+            <span class="n">_system_config</span><span class="o">=</span><span class="p">{</span>
+                <span class="s2">&quot;local_fs_capacity_threshold&quot;</span><span class="p">:</span> <span class="mf">0.9</span><span class="p">,</span>
+                <span class="s2">&quot;object_spilling_config&quot;</span><span class="p">:</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;filesystem&quot;</span><span class="p">,</span>
+                        <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="p">{</span>
+                            <span class="s2">&quot;directory_path&quot;</span><span class="p">:</span> <span class="p">[</span>
+                                <span class="s2">&quot;/tmp/ray_spill_testing_0&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;/tmp/ray_spill_testing_1&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;/tmp/ray_spill_testing_2&quot;</span><span class="p">,</span>
+                                <span class="s2">&quot;/tmp/ray_spill_testing_3&quot;</span><span class="p">,</span>
+                            <span class="p">],</span>
+                            <span class="s2">&quot;buffer_size&quot;</span><span class="p">:</span> <span class="mi">100_000_000</span><span class="p">,</span>
+                        <span class="p">},</span>
+                    <span class="p">},</span>
+                <span class="p">),</span>
+            <span class="p">},</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Handle disable_dynamic_scaling parameter override</span>
+    <span class="k">if</span> <span class="n">disable_dynamic_scaling</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">pipeline_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">disable_dynamic_scaling</span><span class="p">:</span>
+        <span class="c1"># Directly modify the pipeline config to disable dynamic scaling</span>
+        <span class="n">pipeline_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">disable_dynamic_scaling</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Dynamic scaling disabled via function parameter override&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Resolve static replicas</span>
+    <span class="n">pipeline_config</span> <span class="o">=</span> <span class="n">resolve_static_replicas</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">)</span>
+
+    <span class="c1"># Pretty print the final pipeline configuration (after replica resolution)</span>
+    <span class="c1"># INFO level so it shows in docker/helm deployments; quiet mode suppresses in library mode</span>
+    <span class="n">pretty_output</span> <span class="o">=</span> <span class="n">pretty_print_pipeline_config</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">,</span> <span class="n">config_path</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span> <span class="o">+</span> <span class="n">pretty_output</span><span class="p">)</span>
+
+    <span class="c1"># Set up the ingestion pipeline</span>
+    <span class="n">start_abs</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+    <span class="n">ingest_pipeline</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">ingest_pipeline</span> <span class="o">=</span> <span class="n">IngestPipelineBuilder</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">)</span>
+        <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">build</span><span class="p">()</span>
+
+        <span class="c1"># Record setup time</span>
+        <span class="n">end_setup</span> <span class="o">=</span> <span class="n">start_run</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="n">setup_time</span> <span class="o">=</span> <span class="p">(</span><span class="n">end_setup</span> <span class="o">-</span> <span class="n">start_abs</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pipeline setup complete in </span><span class="si">{</span><span class="n">setup_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Run the pipeline</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Running pipeline&quot;</span><span class="p">)</span>
+        <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="c1"># Ensure any partial startup is torn down</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pipeline startup failed, initiating cleanup: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">ingest_pipeline</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="k">pass</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+                    <span class="n">ray</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Ray shutdown complete after startup failure.&quot;</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="k">pass</span>
+        <span class="c1"># Re-raise to surface failure to caller</span>
+        <span class="k">raise</span>
+
+    <span class="k">if</span> <span class="n">block</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Block indefinitely until a KeyboardInterrupt is received</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Interrupt received, shutting down pipeline.&quot;</span><span class="p">)</span>
+            <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="n">ray</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Ray shutdown complete.&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error during pipeline run: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+                    <span class="n">ray</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+            <span class="k">raise</span>
+
+        <span class="c1"># Record execution times</span>
+        <span class="n">end_run</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span>
+        <span class="n">run_time</span> <span class="o">=</span> <span class="p">(</span><span class="n">end_run</span> <span class="o">-</span> <span class="n">start_run</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+        <span class="n">total_elapsed</span> <span class="o">=</span> <span class="p">(</span><span class="n">end_run</span> <span class="o">-</span> <span class="n">start_abs</span><span class="p">)</span><span class="o">.</span><span class="n">total_seconds</span><span class="p">()</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pipeline execution time: </span><span class="si">{</span><span class="n">run_time</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total time elapsed: </span><span class="si">{</span><span class="n">total_elapsed</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">total_elapsed</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Non-blocking - return the pipeline interface</span>
+        <span class="c1"># Access the internal RayPipeline from IngestPipelineBuilder</span>
+        <span class="k">return</span> <span class="n">ingest_pipeline</span><span class="o">.</span><span class="n">_pipeline</span><span class="p">,</span> <span class="kc">None</span></div>
+
+
+
+<div class="viewcode-block" id="run_pipeline_process">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.run_pipeline_process">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">run_pipeline_process</span><span class="p">(</span>
+    <span class="n">pipeline_config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">,</span>
+    <span class="n">stdout</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextIO</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">stderr</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextIO</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Entry point for running a pipeline in a subprocess.</span>
+
+<span class="sd">    This function is designed to be the target of a multiprocessing.Process,</span>
+<span class="sd">    handling output redirection and process group management.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pipeline_config : PipelineConfigSchema</span>
+<span class="sd">        Pipeline configuration object.</span>
+<span class="sd">    stdout : Optional[TextIO], optional</span>
+<span class="sd">        Output stream for subprocess stdout, by default None.</span>
+<span class="sd">    stderr : Optional[TextIO], optional</span>
+<span class="sd">        Error stream for subprocess stderr, by default None.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Set up output redirection</span>
+    <span class="k">if</span> <span class="n">stdout</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span> <span class="o">=</span> <span class="n">stdout</span>
+    <span class="k">if</span> <span class="n">stderr</span><span class="p">:</span>
+        <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span> <span class="o">=</span> <span class="n">stderr</span>
+
+    <span class="c1"># Ensure the subprocess is killed if the parent dies to avoid hangs</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">set_pdeathsig</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGKILL</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;set_pdeathsig not available or failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create a new process group so we can terminate the entire subtree cleanly</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">os</span><span class="o">.</span><span class="n">setpgrp</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;os.setpgrp() not available or failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Install signal handlers for graceful shutdown in the subprocess</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_handle_signal</span><span class="p">(</span><span class="n">signum</span><span class="p">,</span> <span class="n">frame</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">_safe_log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Received signal </span><span class="si">{</span><span class="n">signum</span><span class="si">}</span><span class="s2">; shutting down Ray and exiting...&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">is_initialized</span><span class="p">():</span>
+                <span class="n">ray</span><span class="o">.</span><span class="n">shutdown</span><span class="p">()</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="c1"># Exit immediately after best-effort cleanup</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">_exit</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGINT</span><span class="p">,</span> <span class="n">_handle_signal</span><span class="p">)</span>
+        <span class="n">signal</span><span class="o">.</span><span class="n">signal</span><span class="p">(</span><span class="n">signal</span><span class="o">.</span><span class="n">SIGTERM</span><span class="p">,</span> <span class="n">_handle_signal</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Signal handlers not set: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Test output redirection</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;DEBUG: Direct print to stdout - should appear in parent process&quot;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;DEBUG: Direct write to stderr - should appear in parent process</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Test logging output</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;DEBUG: Logger info - may not appear if logging handlers not redirected&quot;</span><span class="p">)</span>
+
+    <span class="c1"># If requested, start the simple broker inside this subprocess so it shares the process group</span>
+    <span class="n">broker_proc</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;NV_INGEST_BROKER_IN_SUBPROCESS&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Only launch if the config requests it</span>
+                <span class="k">if</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">,</span> <span class="s2">&quot;pipeline&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">getattr</span><span class="p">(</span>
+                    <span class="n">pipeline_config</span><span class="o">.</span><span class="n">pipeline</span><span class="p">,</span> <span class="s2">&quot;launch_simple_broker&quot;</span><span class="p">,</span> <span class="kc">False</span>
+                <span class="p">):</span>
+                    <span class="n">_safe_log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">INFO</span><span class="p">,</span> <span class="s2">&quot;Starting SimpleMessageBroker inside subprocess&quot;</span><span class="p">)</span>
+                    <span class="n">broker_proc</span> <span class="o">=</span> <span class="n">start_simple_message_broker</span><span class="p">({})</span>
+            <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                <span class="n">_safe_log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">ERROR</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;Failed to start SimpleMessageBroker in subprocess: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="c1"># Continue without broker; launch will fail fast if required</span>
+
+        <span class="c1"># Launch the pipeline (blocking)</span>
+        <span class="n">launch_pipeline</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">,</span> <span class="n">block</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Subprocess pipeline execution failed: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">raise</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="c1"># Best-effort: if we created a broker here and the pipeline exits normally,</span>
+        <span class="c1"># attempt a graceful terminate. In failure/termination paths the process group kill</span>
+        <span class="c1"># from parent or signal handler will take care of it.</span>
+        <span class="k">if</span> <span class="n">broker_proc</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">broker_proc</span><span class="p">,</span> <span class="s2">&quot;is_alive&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">broker_proc</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+                    <span class="n">broker_proc</span><span class="o">.</span><span class="n">terminate</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="k">pass</span></div>
+
+
+
+<div class="viewcode-block" id="kill_pipeline_process_group">
+<a class="viewcode-back" href="../../../../../nv-ingest/nv_ingest.framework.orchestration.process.html#nv_ingest.framework.orchestration.process.execution.kill_pipeline_process_group">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">kill_pipeline_process_group</span><span class="p">(</span><span class="n">process</span><span class="p">:</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Process</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Backward-compatible shim that delegates to process.termination implementation.&quot;&quot;&quot;</span>
+    <span class="n">_safe_log</span><span class="p">(</span><span class="n">logging</span><span class="o">.</span><span class="n">DEBUG</span><span class="p">,</span> <span class="s2">&quot;Delegating kill_pipeline_process_group to process.termination module&quot;</span><span class="p">)</span>
+    <span class="n">_kill_pipeline_process_group</span><span class="p">(</span><span class="n">process</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

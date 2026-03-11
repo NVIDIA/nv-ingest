@@ -1,0 +1,898 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.framework.orchestration.ray.primitives.pipeline_topology &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../../../../../../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../../../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/framework/orchestration/ray/primitives/pipeline_topology';</script>
+
+    <link rel="icon" href="../../../../../../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../../../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../../../search.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../../../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.framework.orchestration.ray.primitives.pipeline_topology</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.framework.orchestration.ray.primitives.pipeline_topology</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">threading</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Iterator</span><span class="p">,</span> <span class="n">Set</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">ray</span>
+
+<span class="c1"># --- Constants ---</span>
+<span class="n">CLEANUP_INTERVAL_SECONDS</span> <span class="o">=</span> <span class="mf">15.0</span>
+<span class="n">PENDING_SHUTDOWN_TIMEOUT_SECONDS</span> <span class="o">=</span> <span class="mf">60.0</span> <span class="o">*</span> <span class="mi">60</span>
+<span class="n">PENDING_CHECK_ACTOR_METHOD_TIMEOUT</span> <span class="o">=</span> <span class="mf">5.0</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="StageInfo">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.StageInfo">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StageInfo</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">name</span><span class="p">,</span>
+        <span class="nb">callable</span><span class="p">,</span>
+        <span class="n">config</span><span class="p">,</span>
+        <span class="n">is_source</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">is_sink</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+        <span class="n">min_replicas</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">max_replicas</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">pending_shutdown</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">callable</span> <span class="o">=</span> <span class="nb">callable</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">config</span> <span class="o">=</span> <span class="n">config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_source</span> <span class="o">=</span> <span class="n">is_source</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_sink</span> <span class="o">=</span> <span class="n">is_sink</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">min_replicas</span> <span class="o">=</span> <span class="n">min_replicas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">max_replicas</span> <span class="o">=</span> <span class="n">max_replicas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">pending_shutdown</span> <span class="o">=</span> <span class="n">pending_shutdown</span></div>
+
+
+
+<div class="viewcode-block" id="PipelineTopology">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">PipelineTopology</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Holds the structural definition and runtime state of the pipeline.</span>
+
+<span class="sd">    Encapsulates stages, connections, actors, queues, and associated state</span>
+<span class="sd">    with thread-safe access via internal locking.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># --- Definition ---</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">StageInfo</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>
+
+        <span class="c1"># --- Runtime State ---</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_edge_queues</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Map: q_name -&gt; (QueueHandle, Capacity)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Map: stage_name -&gt; &quot;Idle&quot; | &quot;Scaling Up&quot; | &quot;Scaling Down&quot; | &quot;Error&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stage_memory_overhead</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># Populated during build/config</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+        <span class="c1"># --- Operational State ---</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_is_flushing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="c1"># --- Synchronization &amp; Threading ---</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_stop_cleanup</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Event</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__del__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Ensure cleanup thread is stopped and internal actor references are released.&quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;PipelineTopology destructor called. Cleaning up thread and actor references.&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Stop the background cleanup thread</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">stop_cleanup_thread</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error stopping cleanup thread during __del__: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Clear references to actor handles and shutdown futures</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_edge_queues</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_memory_overhead</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error clearing internal state during __del__: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="c1"># --- Lock Context Manager ---</span>
+<div class="viewcode-block" id="PipelineTopology.lock_context">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.lock_context">[docs]</a>
+    <span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">lock_context</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="s2">&quot;PipelineTopology&quot;</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Provides safe access to the topology under lock for complex operations.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="bp">self</span></div>
+
+
+    <span class="c1"># --- Mutator Methods (Write Operations - Use Lock) ---</span>
+
+<div class="viewcode-block" id="PipelineTopology.add_stage">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_stage">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_info</span><span class="p">:</span> <span class="n">StageInfo</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds a stage definition.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="c1"># Prevent duplicate stage names?</span>
+            <span class="k">if</span> <span class="nb">any</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">stage_info</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">):</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempted to add duplicate stage name: </span><span class="si">{</span><span class="n">stage_info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Stage name &#39;</span><span class="si">{</span><span class="n">stage_info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; already exists.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage_info</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Added stage definition: </span><span class="si">{</span><span class="n">stage_info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.add_connection">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_connection">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_connection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">from_stage</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">to_stage</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">queue_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds a connection definition between two stages.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="c1"># Basic validation (more can be added in Pipeline class)</span>
+            <span class="n">stage_names</span> <span class="o">=</span> <span class="p">{</span><span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">from_stage</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">stage_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Source stage &#39;</span><span class="si">{</span><span class="n">from_stage</span><span class="si">}</span><span class="s2">&#39; for connection not found.&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">to_stage</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">stage_names</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Destination stage &#39;</span><span class="si">{</span><span class="n">to_stage</span><span class="si">}</span><span class="s2">&#39; for connection not found.&quot;</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">from_stage</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">to_stage</span><span class="p">,</span> <span class="n">queue_size</span><span class="p">))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Added connection definition: </span><span class="si">{</span><span class="n">from_stage</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">to_stage</span><span class="si">}</span><span class="s2"> (q_size=</span><span class="si">{</span><span class="n">queue_size</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.set_actors_for_stage">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_actors_for_stage">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_actors_for_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">actors</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the list of actors for a given stage, resetting scaling state.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">}:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempted to set actors for unknown stage: </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span>  <span class="c1"># Or raise error?</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">actors</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Idle&quot;</span>  <span class="c1"># Initialize/reset state</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">actors</span><span class="p">)</span><span class="si">}</span><span class="s2"> actors for stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39;. State set to Idle.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.add_actor_to_stage">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.add_actor_to_stage">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_actor_to_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">actor</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adds a single actor to a stage&#39;s list.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">:</span>
+                <span class="c1"># This might happen if stage has 0 min_replicas and is scaled up first time</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;Idle&quot;</span>  <span class="c1"># Ensure state exists</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Initialized actor list for stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39; during add.&quot;</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">actor</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Added actor to stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39;. New count: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">])</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.remove_actors_from_stage">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.remove_actors_from_stage">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">remove_actors_from_stage</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">actors_to_remove</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Removes specific actors from a stage&#39;s list immediately.</span>
+<span class="sd">        Called by the cleanup thread or potentially for forced removal.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">removed</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1"># Assumes lock is already held by caller (e.g., cleanup thread or lock_context)</span>
+        <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[Topology-InternalRemove] Attempted to remove actors from non-existent stage entry: </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="n">current_actors</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="p">[])</span>
+
+        <span class="c1"># Create sets for efficient lookup</span>
+        <span class="n">current_actor_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">current_actors</span><span class="p">)</span>
+        <span class="n">to_remove_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="n">actors_to_remove</span><span class="p">)</span>
+
+        <span class="c1"># Actors remaining are those in current set but not in removal set</span>
+        <span class="n">actors_remaining</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">current_actor_set</span> <span class="o">-</span> <span class="n">to_remove_set</span><span class="p">)</span>
+        <span class="c1"># Actors actually removed are the intersection</span>
+        <span class="n">actors_actually_removed</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">current_actor_set</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">to_remove_set</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">actors_actually_removed</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">actors_remaining</span>
+            <span class="n">removed</span> <span class="o">=</span> <span class="n">actors_actually_removed</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;[Topology-InternalRemove] Removed </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">removed</span><span class="p">)</span><span class="si">}</span><span class="s2"> actors from stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39;. &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Remaining: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">actors_remaining</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">to_remove_set</span><span class="p">:</span>
+            <span class="c1"># This might happen if called twice for the same actor</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[Topology-InternalRemove] No actors matching removal list found in stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">removed</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.mark_actor_for_removal">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.mark_actor_for_removal">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">mark_actor_for_removal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">actor</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Marks an actor as pending removal, to be cleaned up by the background thread.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="o">.</span><span class="n">add</span><span class="p">((</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span><span class="p">))</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Marked actor </span><span class="si">{</span><span class="n">actor</span><span class="si">}</span><span class="s2"> from stage </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2"> for removal.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.start_cleanup_thread">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.start_cleanup_thread">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">start_cleanup_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Starts the background thread for periodic cleanup tasks.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stop_cleanup</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_loop</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">interval</span><span class="p">,),</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Topology cleanup thread started.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.stop_cleanup_thread">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.stop_cleanup_thread">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop_cleanup_thread</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Stops the background cleanup thread.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span><span class="o">.</span><span class="n">is_alive</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stop_cleanup</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_cleanup_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Topology cleanup thread stopped.&quot;</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cleanup_loop</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Periodically checks for and removes actors that have completed shutdown.&quot;&quot;&quot;</span>
+        <span class="k">while</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stop_cleanup</span><span class="o">.</span><span class="n">is_set</span><span class="p">():</span>
+            <span class="n">actors_to_remove_finally</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="p">:</span>
+                <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">interval</span><span class="p">)</span>
+                <span class="k">continue</span>
+
+            <span class="c1"># Check the status of actors pending removal</span>
+            <span class="c1"># Create a copy for safe iteration, as the set might be modified elsewhere</span>
+            <span class="n">pending_actors_copy</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+                <span class="n">pending_actors_copy</span> <span class="o">=</span> <span class="nb">set</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span> <span class="ow">in</span> <span class="n">pending_actors_copy</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">ray</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">actor</span><span class="o">.</span><span class="n">is_shutdown_complete</span><span class="o">.</span><span class="n">remote</span><span class="p">()):</span>
+                        <span class="n">actors_to_remove_finally</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span><span class="p">))</span>
+                <span class="k">except</span> <span class="n">ray</span><span class="o">.</span><span class="n">exceptions</span><span class="o">.</span><span class="n">RayActorError</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Actor </span><span class="si">{</span><span class="n">actor</span><span class="si">}</span><span class="s2"> from stage </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2"> is no longer available (RayActorError). &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;Assuming it has shut down and marking for removal.&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">actors_to_remove_finally</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span><span class="p">))</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error checking shutdown status for actor </span><span class="si">{</span><span class="n">actor</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">exc_info</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+            <span class="c1"># Remove the fully shut-down actors from the topology</span>
+            <span class="k">if</span> <span class="n">actors_to_remove_finally</span><span class="p">:</span>
+                <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+                    <span class="k">for</span> <span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span> <span class="ow">in</span> <span class="n">actors_to_remove_finally</span><span class="p">:</span>
+                        <span class="k">if</span> <span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span><span class="p">)</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="o">.</span><span class="n">remove</span><span class="p">((</span><span class="n">stage_name</span><span class="p">,</span> <span class="n">actor</span><span class="p">))</span>
+                        <span class="k">if</span> <span class="n">actor</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="p">[]):</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">actor</span><span class="p">)</span>
+                            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully removed actor </span><span class="si">{</span><span class="n">actor</span><span class="si">}</span><span class="s2"> from stage </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2"> in topology.&quot;</span><span class="p">)</span>
+
+            <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">interval</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PipelineTopology.set_edge_queues">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_edge_queues">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_edge_queues</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">queues</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the dictionary of edge queues.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_edge_queues</span> <span class="o">=</span> <span class="n">queues</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">queues</span><span class="p">)</span><span class="si">}</span><span class="s2"> edge queues.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.update_scaling_state">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.update_scaling_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_scaling_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Updates the scaling state for a stage.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="c1"># Add validation for state values?</span>
+            <span class="n">valid_states</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;Idle&quot;</span><span class="p">,</span> <span class="s2">&quot;Scaling Up&quot;</span><span class="p">,</span> <span class="s2">&quot;Scaling Down&quot;</span><span class="p">,</span> <span class="s2">&quot;Error&quot;</span><span class="p">}</span>
+            <span class="k">if</span> <span class="n">state</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">valid_states</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid scaling state &#39;</span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">&#39; for stage &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39;. Ignoring.&quot;</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="k">if</span> <span class="n">stage_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">{</span><span class="n">s</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">}:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Attempted to set scaling state for unknown stage: </span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Updated scaling state for &#39;</span><span class="si">{</span><span class="n">stage_name</span><span class="si">}</span><span class="s2">&#39; to &#39;</span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">&#39;.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.set_flushing">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_flushing">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_flushing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">is_flushing</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the pipeline flushing state.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_flushing</span> <span class="o">=</span> <span class="n">is_flushing</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Pipeline flushing state set to: </span><span class="si">{</span><span class="n">is_flushing</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.set_stage_memory_overhead">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.set_stage_memory_overhead">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">set_stage_memory_overhead</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">overheads</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Sets the estimated memory overhead for stages.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_memory_overhead</span> <span class="o">=</span> <span class="n">overheads</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Set memory overheads for </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">overheads</span><span class="p">)</span><span class="si">}</span><span class="s2"> stages.&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.clear_runtime_state">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.clear_runtime_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clear_runtime_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Clears actors, queues, and scaling state. Keeps definitions.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_edge_queues</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_is_flushing</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># Reset flushing state too</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Cleared runtime state (actors, queues, scaling state, flushing flag).&quot;</span><span class="p">)</span></div>
+
+
+    <span class="c1"># --- Accessor Methods (Read Operations - Use Lock, Return Copies) ---</span>
+
+<div class="viewcode-block" id="PipelineTopology.get_all_actors">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_all_actors">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_all_actors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a list of all actors across all stages.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">actor</span> <span class="k">for</span> <span class="n">actors</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">values</span><span class="p">()</span> <span class="k">for</span> <span class="n">actor</span> <span class="ow">in</span> <span class="n">actors</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_stages_info">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stages_info">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_stages_info</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">StageInfo</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a copy of stage info with pending_shutdown flags updated.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="n">updated_stages</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">:</span>
+                <span class="n">pending_shutdown</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_actors_pending_removal</span><span class="p">)</span>
+                <span class="c1"># Make a shallow copy with updated pending_shutdown</span>
+                <span class="n">stage_copy</span> <span class="o">=</span> <span class="n">StageInfo</span><span class="p">(</span>
+                    <span class="n">name</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+                    <span class="nb">callable</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">callable</span><span class="p">,</span>
+                    <span class="n">config</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">config</span><span class="p">,</span>
+                    <span class="n">is_source</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">is_source</span><span class="p">,</span>
+                    <span class="n">is_sink</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">is_sink</span><span class="p">,</span>
+                    <span class="n">min_replicas</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">min_replicas</span><span class="p">,</span>
+                    <span class="n">max_replicas</span><span class="o">=</span><span class="n">stage</span><span class="o">.</span><span class="n">max_replicas</span><span class="p">,</span>
+                    <span class="n">pending_shutdown</span><span class="o">=</span><span class="n">pending_shutdown</span><span class="p">,</span>
+                <span class="p">)</span>
+                <span class="n">updated_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage_copy</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">updated_stages</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_stage_info">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_info">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_stage_info</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">StageInfo</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the StageInfo for a specific stage, or None if not found.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stages</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">name</span> <span class="o">==</span> <span class="n">stage_name</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">stage</span>
+            <span class="k">return</span> <span class="kc">None</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_connections">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_connections">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_connections</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a shallow copy of the connection dictionary.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="c1"># Shallow copy is usually sufficient here as tuples are immutable</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connections</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_stage_actors">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_actors">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_stage_actors</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Any</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a copy of the stage actors dictionary (with copies of actor lists).&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">actors</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">actors</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_actor_count">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_actor_count">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_actor_count</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">stage_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the number of actors for a specific stage.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_stage_actors</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">stage_name</span><span class="p">,</span> <span class="p">[]))</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_edge_queues">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_edge_queues">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_edge_queues</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a shallow copy of the edge queues&#39; dictionary.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_edge_queues</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_scaling_state">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_scaling_state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_scaling_state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a copy of the scaling state dictionary.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_scaling_state</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_is_flushing">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_is_flushing">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_is_flushing</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns the current flushing state.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_is_flushing</span></div>
+
+
+<div class="viewcode-block" id="PipelineTopology.get_stage_memory_overhead">
+<a class="viewcode-back" href="../../../../../../nv-ingest/nv_ingest.framework.orchestration.ray.primitives.html#nv_ingest.framework.orchestration.ray.primitives.pipeline_topology.PipelineTopology.get_stage_memory_overhead">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_stage_memory_overhead</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Returns a copy of the stage memory overhead dictionary.&quot;&quot;&quot;</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_lock</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_stage_memory_overhead</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
