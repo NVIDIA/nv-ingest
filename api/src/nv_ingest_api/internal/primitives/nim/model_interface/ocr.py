@@ -16,7 +16,8 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import global_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import lock
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
@@ -752,12 +753,11 @@ class NemoRetrieverOCRModelInterface(OCRModelInterfaceBase):
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
 
-@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MODEL_NAME):
     """
     Determines the OCR model name by checking the environment, querying the gRPC endpoint,
-    or falling back to a default.
+    or falling back to a default. Only caches when the repository is successfully queried.
     """
     # 1. Check for an explicit override from the environment variable first.
     ocr_model_name = os.getenv("OCR_MODEL_NAME", None)
@@ -769,14 +769,25 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MO
         logger.debug(f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'.")
         return default_model_name
 
-    # 3. Attempt to query the gRPC endpoint to discover the model name.
+    # 3. Check cache (only populated on successful repository query).
+    key = (
+        "get_ocr_model_name",
+        (ocr_grpc_endpoint,),
+        frozenset({"default_model_name": default_model_name}.items()),
+    )
+    with lock:
+        if key in global_cache:
+            return global_cache[key]
+
+    # 4. Attempt to query the gRPC endpoint to discover the model name.
     try:
         client = grpcclient.InferenceServerClient(ocr_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
         ocr_model_name = model_names[0]
+        with lock:
+            global_cache[key] = ocr_model_name
+        return ocr_model_name
     except Exception:
         logger.warning(f"Failed to get ocr model name after 30 seconds. Falling back to '{default_model_name}'.")
-        ocr_model_name = default_model_name
-
-    return ocr_model_name
+        return default_model_name

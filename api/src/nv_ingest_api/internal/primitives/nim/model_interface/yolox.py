@@ -20,6 +20,8 @@ import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 import tritonclient.grpc as grpcclient
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import global_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import lock
 from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
@@ -135,10 +137,36 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.class_labels = class_labels
 
         if endpoints:
-            self.model_name = get_yolox_model_name(endpoints[0], default_model_name="yolox_ensemble")
-            self._grpc_uses_bls = self.model_name == "pipeline"
+            self._yolox_grpc_endpoint = endpoints[0]
+            self._model_name = None
+            self._grpc_uses_bls_value = None  # Resolved on first use
         else:
-            self._grpc_uses_bls = False
+            self._yolox_grpc_endpoint = None
+            self._model_name = None
+            self._grpc_uses_bls_value = False
+
+    def _resolve_yolox_model_name_if_needed(self) -> None:
+        """Resolve model name and BLS flag from the gRPC endpoint on first use. Cached on the instance."""
+        if self._yolox_grpc_endpoint is None:
+            return
+        if self._model_name is not None:
+            return
+        self._model_name = get_yolox_model_name(self._yolox_grpc_endpoint, default_model_name="yolox_ensemble")
+        self._grpc_uses_bls_value = self._model_name == "pipeline"
+
+    @property
+    def model_name(self) -> Optional[str]:
+        self._resolve_yolox_model_name_if_needed()
+        return self._model_name
+
+    @model_name.setter
+    def model_name(self, value: Optional[str]) -> None:
+        self._model_name = value
+
+    @property
+    def _grpc_uses_bls(self) -> bool:
+        self._resolve_yolox_model_name_if_needed()
+        return bool(self._grpc_uses_bls_value)
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -2117,7 +2145,6 @@ def postprocess_included_texts(boxes, confs, labels, classes):
     return boxes, labels, confs
 
 
-@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
     # If a gRPC endpoint isn't provided (common when using HTTP-only NIM endpoints),
@@ -2130,6 +2157,15 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
         yolox_grpc_endpoint.startswith("http://") or yolox_grpc_endpoint.startswith("https://")
     ):
         return default_model_name
+
+    key = (
+        "get_yolox_model_name",
+        (yolox_grpc_endpoint,),
+        frozenset({"default_model_name": default_model_name}.items()),
+    )
+    with lock:
+        if key in global_cache:
+            return global_cache[key]
 
     try:
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
@@ -2148,14 +2184,23 @@ def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
             "nemoretriever-page-elements-v2",
         ):
             if preferred in model_names:
-                return preferred
+                result = preferred
+                with lock:
+                    global_cache[key] = result
+                return result
 
         # Otherwise pick a best-effort match for newer model names.
         candidates = [m for m in model_names if isinstance(m, str) and ("yolox" in m or "page-elements" in m)]
         if candidates:
-            return sorted(candidates)[0]
+            result = sorted(candidates)[0]
+            with lock:
+                global_cache[key] = result
+            return result
 
-        return default_model_name
+        result = default_model_name
+        with lock:
+            global_cache[key] = result
+        return result
     except Exception as e:
         logger.warning(
             "Failed to inspect YOLOX model repository at '%s' (%s). Falling back to '%s'.",

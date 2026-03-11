@@ -45,7 +45,9 @@ class ServiceManager(ABC):
         pass
 
     @abstractmethod
-    def check_readiness(self, timeout_s: int, check_milvus: bool = True, check_embedding: bool = True) -> bool:
+    def check_readiness(
+        self, timeout_s: int, check_milvus: bool = True, check_embedding: bool = True, verbose: bool = True
+    ) -> bool:
         """
         Check if services are ready.
 
@@ -53,6 +55,7 @@ class ServiceManager(ABC):
             timeout_s: Timeout in seconds
             check_milvus: If True, also check Milvus health endpoint
             check_embedding: If True, also check embedding service health endpoint
+            verbose: If True, print waiting message and per-service readiness status
 
         Returns:
             True when ready, False on timeout

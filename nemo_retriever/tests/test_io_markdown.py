@@ -120,8 +120,8 @@ def test_to_markdown_reads_saved_records_wrapper(tmp_path: Path) -> None:
     assert "### Table 1" in markdown
 
 
-def test_to_markdown_empty_results_returns_placeholder() -> None:
-    assert to_markdown([]) == "# Extracted Content\n\n_No content found._"
+def test_to_markdown_empty_results_returns_none() -> None:
+    assert to_markdown([]) is None
 
 
 def test_to_markdown_rejects_multi_document_results() -> None:
