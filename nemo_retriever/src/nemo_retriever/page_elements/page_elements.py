@@ -125,6 +125,10 @@ def _decode_b64_image_to_np_array(image_b64: str) -> Tuple["np.array", Tuple[int
         im = im0.convert("RGB")
         w, h = im.size
         arr = np.array(im)
+        # The NIM container receives BGR images (PNG encoded from BGR numpy
+        # arrays) and decodes the raw channels as-is, so the model effectively
+        # runs on BGR input.  Match that here by reversing the channel order.
+        arr = arr[:, :, ::-1].copy()
 
     return arr, (int(h), int(w))
 
