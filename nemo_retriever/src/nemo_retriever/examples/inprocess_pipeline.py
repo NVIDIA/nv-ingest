@@ -168,6 +168,24 @@ def main(
         "--graphic-elements-invoke-url",
         help="Optional remote endpoint URL for graphic-elements model inference.",
     ),
+    text_chunk: bool = typer.Option(
+        False,
+        "--text-chunk",
+        help=(
+            "Re-chunk extracted page text by token count before embedding. "
+            "Uses --text-chunk-max-tokens and --text-chunk-overlap-tokens (defaults: 1024, 150)."
+        ),
+    ),
+    text_chunk_max_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-max-tokens",
+        help="Max tokens per text chunk (default: 1024). Implies --text-chunk.",
+    ),
+    text_chunk_overlap_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-overlap-tokens",
+        help="Token overlap between consecutive text chunks (default: 150). Implies --text-chunk.",
+    ),
 ) -> None:
     if gpu_devices is not None and num_gpus is not None:
         raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")
@@ -194,145 +212,92 @@ def main(
 
     ingestor = create_ingestor(run_mode="inprocess")
     if input_type == "txt":
-        ingestor = (
-            ingestor.files(file_patterns)
-            .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(
-                EmbedParams(
-                    model_name=str(embed_model_name),
-                    embed_invoke_url=embed_invoke_url,
-                    embed_modality=embed_modality,
-                    text_elements_modality=text_elements_modality,
-                    structured_elements_modality=structured_elements_modality,
-                    embed_granularity=embed_granularity,
-                )
-            )
-            .vdb_upload(
-                VdbUploadParams(
-                    lancedb={
-                        "lancedb_uri": LANCEDB_URI,
-                        "table_name": LANCEDB_TABLE,
-                        "overwrite": True,
-                        "create_index": True,
-                    }
-                )
+        ingestor = ingestor.files(file_patterns).extract_txt(
+            TextChunkParams(
+                max_tokens=text_chunk_max_tokens or 1024,
+                overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
             )
         )
     elif input_type == "html":
-        ingestor = (
-            ingestor.files(file_patterns)
-            .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-            .embed(
-                EmbedParams(
-                    model_name=str(embed_model_name),
-                    embed_invoke_url=embed_invoke_url,
-                    embed_modality=embed_modality,
-                    text_elements_modality=text_elements_modality,
-                    structured_elements_modality=structured_elements_modality,
-                    embed_granularity=embed_granularity,
-                )
-            )
-            .vdb_upload(
-                VdbUploadParams(
-                    lancedb={
-                        "lancedb_uri": LANCEDB_URI,
-                        "table_name": LANCEDB_TABLE,
-                        "overwrite": True,
-                        "create_index": True,
-                    }
-                )
+        ingestor = ingestor.files(file_patterns).extract_html(
+            TextChunkParams(
+                max_tokens=text_chunk_max_tokens or 1024,
+                overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
             )
         )
     elif input_type == "doc":
-        ingestor = (
-            ingestor.files(file_patterns)
-            .extract(
-                ExtractParams(
-                    method=method,
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
-                    use_graphic_elements=use_graphic_elements,
-                    graphic_elements_invoke_url=graphic_elements_invoke_url,
-                    use_table_structure=use_table_structure,
-                    table_output_format=table_output_format,
-                    table_structure_invoke_url=table_structure_invoke_url,
-                    page_elements_invoke_url=page_elements_invoke_url,
-                    ocr_invoke_url=ocr_invoke_url,
-                    batch_tuning={
-                        "nemotron_parse_workers": float(nemotron_parse_actors),
-                        "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                        "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                    },
-                )
-            )
-            .embed(
-                EmbedParams(
-                    model_name=str(embed_model_name),
-                    embed_invoke_url=embed_invoke_url,
-                    embed_modality=embed_modality,
-                    text_elements_modality=text_elements_modality,
-                    structured_elements_modality=structured_elements_modality,
-                    embed_granularity=embed_granularity,
-                )
-            )
-            .vdb_upload(
-                VdbUploadParams(
-                    lancedb={
-                        "lancedb_uri": LANCEDB_URI,
-                        "table_name": LANCEDB_TABLE,
-                        "overwrite": True,
-                        "create_index": True,
-                    }
-                )
+        ingestor = ingestor.files(file_patterns).extract(
+            ExtractParams(
+                method=method,
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+                use_graphic_elements=use_graphic_elements,
+                graphic_elements_invoke_url=graphic_elements_invoke_url,
+                use_table_structure=use_table_structure,
+                table_output_format=table_output_format,
+                table_structure_invoke_url=table_structure_invoke_url,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
+                batch_tuning={
+                    "nemotron_parse_workers": float(nemotron_parse_actors),
+                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
+                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
+                },
             )
         )
     else:
-        ingestor = (
-            ingestor.files(file_patterns)
-            .extract(
-                ExtractParams(
-                    method=method,
-                    extract_text=True,
-                    extract_tables=True,
-                    extract_charts=True,
-                    extract_infographics=False,
-                    use_graphic_elements=use_graphic_elements,
-                    graphic_elements_invoke_url=graphic_elements_invoke_url,
-                    use_table_structure=use_table_structure,
-                    table_output_format=table_output_format,
-                    table_structure_invoke_url=table_structure_invoke_url,
-                    page_elements_invoke_url=page_elements_invoke_url,
-                    ocr_invoke_url=ocr_invoke_url,
-                    batch_tuning={
-                        "nemotron_parse_workers": float(nemotron_parse_actors),
-                        "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                        "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                    },
-                )
-            )
-            .embed(
-                EmbedParams(
-                    model_name=str(embed_model_name),
-                    embed_invoke_url=embed_invoke_url,
-                    embed_modality=embed_modality,
-                    text_elements_modality=text_elements_modality,
-                    structured_elements_modality=structured_elements_modality,
-                    embed_granularity=embed_granularity,
-                )
-            )
-            .vdb_upload(
-                VdbUploadParams(
-                    lancedb={
-                        "lancedb_uri": LANCEDB_URI,
-                        "table_name": LANCEDB_TABLE,
-                        "overwrite": True,
-                        "create_index": True,
-                    }
-                )
+        ingestor = ingestor.files(file_patterns).extract(
+            ExtractParams(
+                method=method,
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+                use_graphic_elements=use_graphic_elements,
+                graphic_elements_invoke_url=graphic_elements_invoke_url,
+                use_table_structure=use_table_structure,
+                table_output_format=table_output_format,
+                table_structure_invoke_url=table_structure_invoke_url,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
+                batch_tuning={
+                    "nemotron_parse_workers": float(nemotron_parse_actors),
+                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
+                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
+                },
             )
         )
+
+    enable_text_chunk = text_chunk or text_chunk_max_tokens is not None or text_chunk_overlap_tokens is not None
+    if enable_text_chunk:
+        ingestor = ingestor.split(
+            TextChunkParams(
+                max_tokens=text_chunk_max_tokens or 1024,
+                overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
+            )
+        )
+
+    ingestor = ingestor.embed(
+        EmbedParams(
+            model_name=str(embed_model_name),
+            embed_invoke_url=embed_invoke_url,
+            embed_modality=embed_modality,
+            text_elements_modality=text_elements_modality,
+            structured_elements_modality=structured_elements_modality,
+            embed_granularity=embed_granularity,
+        )
+    ).vdb_upload(
+        VdbUploadParams(
+            lancedb={
+                "lancedb_uri": LANCEDB_URI,
+                "table_name": LANCEDB_TABLE,
+                "overwrite": True,
+                "create_index": True,
+            }
+        )
+    )
 
     print("Running extraction...")
     ingest_start = time.perf_counter()
