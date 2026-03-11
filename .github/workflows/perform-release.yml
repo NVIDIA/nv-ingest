@@ -19,11 +19,16 @@ on:
         required: false
         type: boolean
         default: false
+      skip-docker:
+        description: '⛔ SKIP Docker — disable Docker build and publish entirely'
+        required: false
+        type: boolean
+        default: false
       skip-helm-chart:
         description: '⛔ SKIP Helm chart — disable Helm build and publish entirely'
         required: false
         type: boolean
-        default: true
+        default: false
       release-type:
         description: 'Release type for PyPI packages'
         required: false
@@ -85,17 +90,19 @@ jobs:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: ${{ inputs.release-type }}
       source-ref: ${{ needs.determine-version.outputs.source-ref }}
+      workflow-ref: ${{ github.ref_name }}
       runner: linux-large-disk
 
   nvingest-docker-build:
     name: Build nv-ingest Docker Image
+    if: ${{ !inputs.skip-docker }}
     needs: determine-version
     runs-on: linux-large-disk
     outputs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -123,7 +130,7 @@ jobs:
           fi
 
       - name: Build image (validate)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -138,6 +145,18 @@ jobs:
           cache-to: type=gha,scope=nvingest,mode=max
           cache-from: type=gha,scope=nvingest
 
+      - name: Export Docker image
+        run: |
+          docker save "${{ steps.meta.outputs.image }}" | gzip -1 > nv-ingest-docker-image.tar.gz
+          ls -lh nv-ingest-docker-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: nv-ingest-docker-image
+          path: nv-ingest-docker-image.tar.gz
+          if-no-files-found: error
+
   helm-build:
     name: Build Helm Chart
     if: ${{ !inputs.skip-helm-chart }}
@@ -145,9 +164,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Overlay CI scripts from workflow branch
+        run: |
+          git fetch --depth=1 origin "${{ github.ref_name }}"
+          git checkout FETCH_HEAD -- ci/scripts/
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -175,7 +199,7 @@ jobs:
           helm dependency build helm/
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -191,96 +215,68 @@ jobs:
             --version "${{ needs.determine-version.outputs.version }}" \
             --dry-run
 
+      - name: Upload Helm chart artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: helm-chart
+          path: nv-ingest-*.tgz
+          if-no-files-found: error
+
   # ══════════════════════════════════════════════════════════════════════
   #  Publish Phase — runs only after ALL builds succeed and dry-run is
   #  off.  Every publish job depends on every build job so that a single
   #  build failure prevents any artifact from being published.
   # ══════════════════════════════════════════════════════════════════════
 
-  pypi-publish:
-    name: Publish Python Wheels
-    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
-    needs:
-      - pypi-build
-      - nvingest-docker-build
-      - helm-build
-    uses: ./.github/workflows/reusable-pypi-publish.yml
-    secrets:
-      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
-      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-
   nvingest-docker-publish:
     name: Publish nv-ingest Docker Image
-    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    if: ${{ !inputs.dry-run && !inputs.skip-docker && !cancelled() && !failure() }}
     needs:
       - determine-version
-      - pypi-build
       - nvingest-docker-build
+      - pypi-build
       - helm-build
     runs-on: linux-large-disk
     outputs:
-      image: ${{ steps.meta.outputs.image }}
+      image: ${{ steps.push.outputs.image }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
-
-      - name: Setup Docker Buildx
-        uses: ./.github/actions/setup-docker-buildx
-        with:
-          use-qemu: 'true'
-          platforms: 'linux/amd64,linux/arm64'
 
       - name: Login to NGC
         uses: ./.github/actions/docker-login-ngc
         with:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set image metadata
-        id: meta
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: nv-ingest-docker-image
+
+      - name: Load and push image
+        id: push
         run: |
-          if [ -z "$DOCKER_REGISTRY" ]; then
-            echo "::error::DOCKER_REGISTRY secret is not set"
+          echo "Loading image from tarball..."
+          LOAD_OUTPUT=$(gunzip -c nv-ingest-docker-image.tar.gz | docker load)
+          echo "$LOAD_OUTPUT"
+          IMAGE=$(echo "$LOAD_OUTPUT" | sed -n 's/^Loaded image: //p')
+          if [ -z "$IMAGE" ]; then
+            echo "::error::Failed to parse image name from docker load output"
             exit 1
           fi
-          IMAGE="${DOCKER_REGISTRY}/nv-ingest:${{ needs.determine-version.outputs.version }}"
           echo "image=${IMAGE}" >> $GITHUB_OUTPUT
-          echo "Image tag: ${IMAGE}"
-        env:
-          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
-
-      - name: Create HF token file
-        env:
-          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
-        run: |
-          mkdir -p ./scripts/private_local
-          if [ -n "${HF_ACCESS_TOKEN}" ]; then
-            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
-          fi
-
-      - name: Build and push multi-platform image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          target: runtime
-          platforms: linux/amd64,linux/arm64
-          build-args: |
-            DOWNLOAD_LLAMA_TOKENIZER=True
-            GIT_COMMIT=${{ github.sha }}
-          tags: ${{ steps.meta.outputs.image }}
-          secret-files: hf_token=./scripts/private_local/hf_token.txt
-          cache-from: type=gha,scope=nvingest
+          echo "Pushing ${IMAGE}..."
+          docker push "${IMAGE}"
 
   helm-publish:
     name: Publish Helm Chart
     if: ${{ !inputs.dry-run && !inputs.skip-helm-chart && !cancelled() && !failure() }}
     needs:
       - determine-version
-      - pypi-build
       - nvingest-docker-build
+      - pypi-build
       - helm-build
     runs-on: ubuntu-latest
     env:
@@ -290,9 +286,14 @@ jobs:
       NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Overlay CI scripts from workflow branch
+        run: |
+          git fetch --depth=1 origin "${{ github.ref_name }}"
+          git checkout FETCH_HEAD -- ci/scripts/
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -304,7 +305,7 @@ jobs:
             | tar xz -C /usr/local/bin helm-docs
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -332,10 +333,23 @@ jobs:
           NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           python ci/scripts/release_helm_chart.py \
-            --org nvidian \
-            --team nemo-llm \
+            --org ${{ secrets.NGC_ORG }} \
+            --team ${{ secrets.NGC_TEAM }} \
             --name nv-ingest \
             --version "${{ needs.determine-version.outputs.version }}"
+
+  pypi-publish:
+    name: Publish Python Wheels (last — PyPI versions are immutable)
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    needs:
+      - pypi-build
+      - nvingest-docker-publish
+      - helm-publish
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
   # ── Tag Release ───────────────────────────────────────────────────────
   tag-release:
@@ -349,7 +363,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -384,14 +398,18 @@ jobs:
           SOURCE_BRANCH: ${{ needs.determine-version.outputs.source-ref }}
           PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
           PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
+          PYPI_VERSION: ${{ needs.pypi-build.outputs.version }}
           NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
           NVINGEST_PUBLISH_RESULT: ${{ needs.nvingest-docker-publish.result }}
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
           TAG_RESULT: ${{ needs.tag-release.result }}
+          SKIP_DOCKER: ${{ inputs.skip-docker }}
           SKIP_HELM: ${{ inputs.skip-helm-chart }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
         run: |
           status_emoji() {
             case "$1" in
@@ -419,6 +437,9 @@ jobs:
             HEADER=":rocket: *Release ${VERSION} Published* :rocket:"
           fi
 
+          PIP_VER="${PYPI_VERSION:-${VERSION}}"
+          TAG_URL="${REPO_URL}/releases/tag/${VERSION}"
+
           MSG="${HEADER}"
           MSG+="\n"
           MSG+="\n*Version:* \`${VERSION}\`"
@@ -435,15 +456,21 @@ jobs:
           elif [ "$PYPI_BUILD_RESULT" != "success" ]; then
             MSG+="\n$(status_emoji "$PYPI_BUILD_RESULT") *PyPI Wheels* — Build: ${PYPI_BUILD_RESULT}"
           else
-            MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other build failed)"
+            MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other publish failed)"
           fi
-          MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
+          MSG+="\n    \`nv-ingest-api==${PIP_VER}\`  \`nv-ingest-client==${PIP_VER}\`  \`nv-ingest==${PIP_VER}\`  \`nemo-retriever==${PIP_VER}\`"
+          MSG+="\n"
+          MSG+="\n    *Quick install:*"
+          MSG+="\n    \`\`\`pip install --index-url ${ARTIFACTORY_URL} nv-ingest-api==${PIP_VER} nv-ingest-client==${PIP_VER} nv-ingest==${PIP_VER} nemo-retriever==${PIP_VER}\`\`\`"
 
           # — nv-ingest Docker —
-          if [ "$DRY_RUN" = "true" ]; then
+          if [ "$SKIP_DOCKER" = "true" ]; then
+            MSG+="\n:fast_forward: *nv-ingest Docker* — Disabled (skip-docker)"
+          elif [ "$DRY_RUN" = "true" ]; then
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Built and validated (not pushed)"
           elif [ "$NVINGEST_PUBLISH_RESULT" = "success" ]; then
             MSG+="\n:white_check_mark: *nv-ingest Docker* — \`${NVINGEST_IMAGE}\`"
+            MSG+="\n    \`\`\`docker pull ${NVINGEST_IMAGE}\`\`\`"
           elif [ "$NVINGEST_BUILD_RESULT" != "success" ]; then
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Build: ${NVINGEST_BUILD_RESULT}"
           else
@@ -468,7 +495,7 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then
             MSG+="\n:fast_forward: *Git Tag* — Skipped (dry run)"
           elif [ "$TAG_RESULT" = "success" ]; then
-            MSG+="\n:white_check_mark: *Git Tag* — \`${VERSION}\`"
+            MSG+="\n:white_check_mark: *Git Tag* — <${TAG_URL}|\`${VERSION}\`>"
           else
             MSG+="\n$(status_emoji "$TAG_RESULT") *Git Tag* — ${TAG_RESULT}"
           fi

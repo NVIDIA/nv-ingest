@@ -44,7 +44,7 @@ jobs:
       NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.source-ref }}
 
@@ -58,7 +58,7 @@ jobs:
             | tar xz -C /usr/local/bin helm-docs
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
