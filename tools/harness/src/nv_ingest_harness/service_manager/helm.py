@@ -225,6 +225,41 @@ class HelmManager(ServiceManager):
             print(f"Warning: Error finding services: {e}")
             return []
 
+    def _wait_for_services_by_pattern(self, pattern: str, timeout_s: int = 120, interval_s: int = 5) -> list[str]:
+        """
+        Wait for at least one service matching the pattern to appear, then return all matches.
+
+        For patterns without wildcards, returns [pattern] immediately (no wait).
+        For wildcard patterns, polls until matches are found or timeout.
+
+        Args:
+            pattern: Service name or pattern (e.g., "nv-ingest", "*embed*")
+            timeout_s: Maximum time to wait in seconds
+            interval_s: Time between poll attempts in seconds
+
+        Returns:
+            List of matching service names (may be empty if timeout)
+        """
+        if "*" not in pattern:
+            return [pattern]
+
+        deadline = time.time() + timeout_s
+        attempt = 0
+        while time.time() < deadline:
+            attempt += 1
+            service_names = self._find_services_by_pattern(pattern)
+            if service_names:
+                if attempt > 1:
+                    print(f"  Found {len(service_names)} service(s) matching '{pattern}' after {attempt} attempt(s)")
+                return service_names
+            if attempt == 1:
+                print(
+                    f"Waiting for service(s) matching '{pattern}' (timeout: {timeout_s}s, poll every {interval_s}s)..."
+                )
+            time.sleep(interval_s)
+
+        return []
+
     def _start_port_forwards(self) -> None:
         """Start port forwarding for all configured services."""
         # Get port forward configuration
@@ -253,8 +288,8 @@ class HelmManager(ServiceManager):
                 print(f"Warning: Invalid port forward config: {pf_config}")
                 continue
 
-            # Find matching services
-            service_names = self._find_services_by_pattern(service_pattern)
+            # Find matching services (wait for pattern-matched services to appear)
+            service_names = self._wait_for_services_by_pattern(service_pattern)
 
             if not service_names:
                 print(f"Warning: No services found matching pattern '{service_pattern}'")
