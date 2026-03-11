@@ -64,8 +64,9 @@ def run_datasets(
             return 1
 
         # Wait for readiness
+        print("Checking service readiness...")
         if not service_manager.check_readiness(first_config.readiness_timeout):
-            print("Services failed to become ready")
+            print("Services failed to become ready (see above for which services were not ready)")
             service_manager.stop()
             return 1
 
