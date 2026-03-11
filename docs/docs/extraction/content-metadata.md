@@ -374,4 +374,4 @@ For the full file, refer to the [data folder](https://github.com/NVIDIA/NeMo-Ret
 
 ## Related Topics
 
-- [Environment Variables](environment-variables.md)
+- [Environment Variables](environment-config.md)

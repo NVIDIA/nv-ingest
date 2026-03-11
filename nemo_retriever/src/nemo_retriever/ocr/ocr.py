@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 from nemo_retriever.params import RemoteRetryParams
 from nemo_retriever.nim.nim import invoke_image_inference_batches
-from nemo_retriever.util.table_and_chart import join_graphic_elements_and_ocr_output
+from nemo_retriever.utils.table_and_chart import join_graphic_elements_and_ocr_output
 
 try:
     from PIL import Image
