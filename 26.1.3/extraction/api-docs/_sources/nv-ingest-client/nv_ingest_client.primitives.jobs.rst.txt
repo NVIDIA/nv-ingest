@@ -1,0 +1,29 @@
+nv\_ingest\_client.primitives.jobs package
+==========================================
+
+Submodules
+----------
+
+nv\_ingest\_client.primitives.jobs.job\_spec module
+---------------------------------------------------
+
+.. automodule:: nv_ingest_client.primitives.jobs.job_spec
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest\_client.primitives.jobs.job\_state module
+----------------------------------------------------
+
+.. automodule:: nv_ingest_client.primitives.jobs.job_state
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_client.primitives.jobs
+   :members:
+   :show-inheritance:
+   :undoc-members:
