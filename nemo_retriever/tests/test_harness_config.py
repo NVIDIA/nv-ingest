@@ -305,3 +305,76 @@ def test_load_harness_config_uses_financebench_repo_fixture(monkeypatch: pytest.
     assert cfg.dataset_dir == str(Path("/raid/tester/financebench").resolve())
     assert cfg.query_csv == str(expected_query_csv)
     assert cfg.recall_required is True
+
+
+def test_load_harness_config_defaults_observability_flags_to_false(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                f"  dataset_dir: {dataset_dir}",
+                "  preset: base",
+                "  recall_required: false",
+                "presets:",
+                "  base: {}",
+                "datasets: {}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_harness_config(config_file=str(cfg_path))
+    assert cfg.write_extract_artifacts is False
+    assert cfg.write_chunk_manifest is False
+    assert cfg.observability_archive_dir is None
+
+
+def test_load_harness_config_resolves_relative_observability_archive_dir(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                f"  dataset_dir: {dataset_dir}",
+                "  preset: base",
+                "  recall_required: false",
+                "  observability_archive_dir: observability_archive",
+                "presets:",
+                "  base: {}",
+                "datasets: {}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    cfg = load_harness_config(config_file=str(cfg_path))
+    assert cfg.observability_archive_dir == str((harness_config.REPO_ROOT / "observability_archive").resolve())
+
+
+def test_load_harness_config_rejects_blank_observability_archive_dir(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    cfg_path = tmp_path / "test_configs.yaml"
+    cfg_path.write_text(
+        "\n".join(
+            [
+                "active:",
+                f"  dataset_dir: {dataset_dir}",
+                "  preset: base",
+                "  recall_required: false",
+                "  observability_archive_dir: '   '",
+                "presets:",
+                "  base: {}",
+                "datasets: {}",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="observability_archive_dir must be a non-empty string when set"):
+        load_harness_config(config_file=str(cfg_path))

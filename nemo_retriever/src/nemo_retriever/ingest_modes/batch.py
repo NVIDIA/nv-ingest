@@ -801,6 +801,10 @@ class BatchIngestor(Ingestor):
                 "No Ray Dataset to embed. Provide input_dataset or run .files(...) / .extract(...) first."
             )
 
+        chunk_manifest_output_dir = kwargs.pop("chunk_manifest_output_dir", None)
+        durable_chunk_manifest_dir = kwargs.pop("durable_chunk_manifest_dir", None)
+        chunk_manifest_drop_columns = kwargs.pop("chunk_manifest_drop_columns", None)
+
         from nemo_retriever.params.utils import build_embed_kwargs
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
@@ -839,6 +843,21 @@ class BatchIngestor(Ingestor):
             num_cpus=1,
         )
 
+        if chunk_manifest_output_dir:
+            from nemo_retriever.ingest_modes.observability import write_jsonl_snapshot_batch
+
+            self._rd_dataset = self._rd_dataset.map_batches(
+                partial(
+                    write_jsonl_snapshot_batch,
+                    output_dir=str(chunk_manifest_output_dir),
+                    stage_name="chunk-manifest",
+                    durable_output_dir=str(durable_chunk_manifest_dir) if durable_chunk_manifest_dir else None,
+                    drop_columns=list(chunk_manifest_drop_columns or []),
+                ),
+                batch_format="pandas",
+                num_cpus=1,
+            )
+
         # When using a remote NIM endpoint, no GPU is needed for embedding.
         endpoint = (kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
@@ -859,6 +878,35 @@ class BatchIngestor(Ingestor):
             fn_constructor_kwargs={"params": resolved},
         )
 
+        return self
+
+    def write_observability_snapshot(
+        self,
+        output_dir: str,
+        *,
+        stage_name: str,
+        durable_output_dir: str | None = None,
+        drop_columns: list[str] | None = None,
+    ) -> "BatchIngestor":
+        """Persist the current dataset to JSONL shards and continue the pipeline."""
+        if not isinstance(output_dir, str) or not output_dir.strip():
+            raise ValueError(f"output_dir must be a non-empty string, got {output_dir!r}")
+        if self._rd_dataset is None:
+            raise RuntimeError("No Ray Dataset to snapshot. Call .files(...) and a pipeline stage first.")
+
+        from nemo_retriever.ingest_modes.observability import write_jsonl_snapshot_batch
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            partial(
+                write_jsonl_snapshot_batch,
+                output_dir=output_dir,
+                stage_name=stage_name,
+                durable_output_dir=durable_output_dir,
+                drop_columns=list(drop_columns or []),
+            ),
+            batch_format="pandas",
+            num_cpus=1,
+        )
         return self
 
     def vdb_upload(self, params: VdbUploadParams | None = None, **kwargs: Any) -> "BatchIngestor":

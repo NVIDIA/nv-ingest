@@ -201,6 +201,45 @@ def main(
         dir_okay=False,
         help="Optional JSON file path to write end-of-run detection counts summary.",
     ),
+    extract_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--extract-output-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where extract snapshots are written as JSONL shards.",
+    ),
+    durable_extract_output_dir: Optional[Path] = typer.Option(
+        None,
+        "--durable-extract-output-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional durable mirror directory for extract snapshots.",
+    ),
+    chunk_manifest_dir: Optional[Path] = typer.Option(
+        None,
+        "--chunk-manifest-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional directory where pre-embed chunk manifests are written as JSONL shards.",
+    ),
+    durable_chunk_manifest_dir: Optional[Path] = typer.Option(
+        None,
+        "--durable-chunk-manifest-dir",
+        path_type=Path,
+        file_okay=False,
+        dir_okay=True,
+        help="Optional durable mirror directory for chunk manifests.",
+    ),
+    ingest_errors_file: Optional[Path] = typer.Option(
+        None,
+        "--ingest-errors-file",
+        path_type=Path,
+        dir_okay=False,
+        help="Optional JSON file path where ingest error rows are written on failure.",
+    ),
     recall_match_mode: str = typer.Option(
         "pdf_page",
         "--recall-match-mode",
@@ -486,6 +525,21 @@ def main(
         if recall_match_mode not in {"pdf_page", "pdf_only"}:
             raise ValueError(f"Unsupported --recall-match-mode: {recall_match_mode}")
 
+        if durable_extract_output_dir is not None and extract_output_dir is None:
+            raise typer.BadParameter("--durable-extract-output-dir requires --extract-output-dir")
+        if durable_chunk_manifest_dir is not None and chunk_manifest_dir is None:
+            raise typer.BadParameter("--durable-chunk-manifest-dir requires --chunk-manifest-dir")
+
+        extract_output_dir = extract_output_dir.expanduser().resolve() if extract_output_dir is not None else None
+        durable_extract_output_dir = (
+            durable_extract_output_dir.expanduser().resolve() if durable_extract_output_dir is not None else None
+        )
+        chunk_manifest_dir = chunk_manifest_dir.expanduser().resolve() if chunk_manifest_dir is not None else None
+        durable_chunk_manifest_dir = (
+            durable_chunk_manifest_dir.expanduser().resolve() if durable_chunk_manifest_dir is not None else None
+        )
+        ingest_errors_file = ingest_errors_file.expanduser().resolve() if ingest_errors_file is not None else None
+
         os.environ["RAY_LOG_TO_DRIVER"] = "1" if ray_log_to_driver else "0"
         # Use an absolute path so driver and Ray actors resolve the same LanceDB URI.
         lancedb_uri = str(Path(lancedb_uri).expanduser().resolve())
@@ -665,6 +719,8 @@ def main(
             max_tokens=text_chunk_max_tokens or 1024,
             overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
         )
+        extract_snapshot_drop_columns = ["bytes", "page_image"] if input_type in {"pdf", "doc", "image"} else []
+        chunk_manifest_drop_columns = ["_image_b64", "page_image"]
 
         if input_type == "txt":
             ingestor = ingestor.files(file_patterns).extract_txt(_text_chunk_params)
@@ -679,11 +735,26 @@ def main(
                 _extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size)
             )
 
+        if extract_output_dir is not None:
+            ingestor = ingestor.write_observability_snapshot(
+                str(extract_output_dir),
+                stage_name="extract",
+                durable_output_dir=str(durable_extract_output_dir) if durable_extract_output_dir is not None else None,
+                drop_columns=extract_snapshot_drop_columns,
+            )
+
         enable_text_chunk = text_chunk or text_chunk_max_tokens is not None or text_chunk_overlap_tokens is not None
         if enable_text_chunk:
             ingestor = ingestor.split(_text_chunk_params)
 
-        ingestor = ingestor.embed(embed_params)
+        ingestor = ingestor.embed(
+            embed_params,
+            chunk_manifest_output_dir=str(chunk_manifest_dir) if chunk_manifest_dir is not None else None,
+            durable_chunk_manifest_dir=(
+                str(durable_chunk_manifest_dir) if durable_chunk_manifest_dir is not None else None
+            ),
+            chunk_manifest_drop_columns=chunk_manifest_drop_columns,
+        )
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()
@@ -717,7 +788,8 @@ def main(
 
             # Error out, stop processing, and write top 5 errors rows to a local file for analysis.
             if error_count > 0:
-                error_file = Path("ingest_errors.json").resolve()
+                error_file = ingest_errors_file or Path("ingest_errors.json").resolve()
+                error_file.parent.mkdir(parents=True, exist_ok=True)
                 max_error_rows_to_write = 5
                 error_rows_to_write = error_rows.take(min(max_error_rows_to_write, error_count))
                 with error_file.open("w", encoding="utf-8") as fh:

@@ -61,6 +61,9 @@ class HarnessConfig:
     hybrid: bool = False
     embed_model_name: str = "nvidia/llama-nemotron-embed-1b-v2"
     write_detection_file: bool = False
+    write_extract_artifacts: bool = False
+    write_chunk_manifest: bool = False
+    observability_archive_dir: str | None = None
 
     pdf_extract_workers: int = 8
     pdf_extract_num_cpus: float = 2.0
@@ -100,6 +103,9 @@ class HarnessConfig:
 
         if self.recall_adapter not in VALID_RECALL_ADAPTERS:
             errors.append(f"recall_adapter must be one of {sorted(VALID_RECALL_ADAPTERS)}")
+
+        if self.observability_archive_dir is not None and not str(self.observability_archive_dir).strip():
+            errors.append("observability_archive_dir must be a non-empty string when set")
 
         for name in TUNING_FIELDS:
             val = getattr(self, name)
@@ -207,6 +213,9 @@ def _apply_env_overrides(config_dict: dict[str, Any]) -> None:
         "HARNESS_HYBRID": ("hybrid", _parse_bool),
         "HARNESS_EMBED_MODEL_NAME": ("embed_model_name", str),
         "HARNESS_WRITE_DETECTION_FILE": ("write_detection_file", _parse_bool),
+        "HARNESS_WRITE_EXTRACT_ARTIFACTS": ("write_extract_artifacts", _parse_bool),
+        "HARNESS_WRITE_CHUNK_MANIFEST": ("write_chunk_manifest", _parse_bool),
+        "HARNESS_OBSERVABILITY_ARCHIVE_DIR": ("observability_archive_dir", str),
     }
 
     for key in TUNING_FIELDS:
@@ -308,6 +317,17 @@ def load_harness_config(
 
     if merged.get("artifacts_dir") is not None:
         merged["artifacts_dir"] = _resolve_path_like(str(merged["artifacts_dir"]), REPO_ROOT)
+
+    if merged.get("observability_archive_dir") is not None:
+        archive_dir_raw = str(merged["observability_archive_dir"])
+        if archive_dir_raw.strip():
+            merged["observability_archive_dir"] = _resolve_path_like(
+                archive_dir_raw,
+                REPO_ROOT,
+            )
+        else:
+            # Preserve blank values so dataclass validation raises a clear error.
+            merged["observability_archive_dir"] = archive_dir_raw
 
     if merged.get("lancedb_uri") is None:
         merged["lancedb_uri"] = "lancedb"
