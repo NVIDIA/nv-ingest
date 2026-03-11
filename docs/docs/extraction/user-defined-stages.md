@@ -44,8 +44,8 @@ The following example demonstrates how to create a valid Lambda function and con
 ```python
 import pandas as pd
 from pydantic import BaseModel
-from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
-from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 
 # Config schema for your stage
 class MyToyConfig(BaseModel):
@@ -166,7 +166,7 @@ After you change any metadata, you can validate it by using the `validate_metada
 as demonstrated in the following code example.
 
 ```python
-from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 
 def edit_metadata(control_message: IngestControlMessage, stage_config: MyToyConfig) -> IngestControlMessage:
   df = control_message.payload()
@@ -235,8 +235,8 @@ The  following example adds user-defined stages to your NeMo Retriever Library p
     ```python
     # my_pipeline/stages.py
     from pydantic import BaseModel
-    from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
-    from nemo_retriever.internal.schemas.meta.metadata_schema import validate_metadata
+    from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+    from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 
     class DoubleConfig(BaseModel):
     multiply_by: int = 2
