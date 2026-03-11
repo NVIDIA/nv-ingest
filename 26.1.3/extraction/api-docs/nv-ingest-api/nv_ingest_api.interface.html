@@ -1,0 +1,1520 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_api.interface package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-api/nv_ingest_api.interface';</script>
+
+    <link rel="icon" href="../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_api.internal package" href="nv_ingest_api.internal.html" />
+    <link rel="prev" title="nv_ingest_api package" href="nv_ingest_api.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_api</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_api.html">nv_ingest_api package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active"><a class="current reference internal" href="#">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_api</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_api.html" class="nav-link">nv_ingest_api package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_api.interface package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-api-interface-package">
+<h1>nv_ingest_api.interface package<a class="headerlink" href="#nv-ingest-api-interface-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_api.interface.extract">
+<span id="nv-ingest-api-interface-extract-module"></span><h2>nv_ingest_api.interface.extract module<a class="headerlink" href="#module-nv_ingest_api.interface.extract" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_chart_data_from_image">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_chart_data_from_image</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_chart_data_from_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_chart_data_from_image" title="Link to this definition">#</a></dt>
+<dd><p>Public interface to extract chart data from ledger DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – DataFrame containing metadata required for chart extraction.</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em>) – YOLOX inference server endpoints.</p></li>
+<li><p><strong>ocr_endpoints</strong> (<em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em>) – OCR inference server endpoints.</p></li>
+<li><p><strong>yolox_protocol</strong> (<em>str</em><em>, </em><em>optional</em>) – Protocol for YOLOX inference (default “grpc”).</p></li>
+<li><p><strong>ocr_protocol</strong> (<em>str</em><em>, </em><em>optional</em>) – Protocol for OCR inference (default “grpc”).</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>optional</em>) – Authentication token for inference services.</p></li>
+<li><p><strong>execution_trace_log</strong> (<em>list</em><em>, </em><em>optional</em>) – Execution trace logs.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Updated DataFrame after chart extraction.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If an error occurs during extraction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_infographic_data_from_image">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_infographic_data_from_image</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_infographic_data_from_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_infographic_data_from_image" title="Link to this definition">#</a></dt>
+<dd><p>Extract infographic data from a DataFrame using the configured infographic extraction pipeline.</p>
+<p>This function creates a task configuration for infographic extraction, builds the extraction
+configuration from the provided OCR endpoints, protocol, and authentication token (or uses
+the default values from InfographicExtractorConfigSchema if None), and then calls the internal
+extraction function to process the DataFrame. The unified exception handler decorator ensures
+that any errors are appropriately logged and managed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_extraction_ledger</strong> (<em>pd.DataFrame</em>) – DataFrame containing the images and associated metadata from which infographic data is to be extracted.</p></li>
+<li><p><strong>ocr_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – A tuple of OCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
+If None, the default endpoints from InfographicExtractorConfigSchema are used.</p></li>
+<li><p><strong>ocr_protocol</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default=None</em>) – The protocol (e.g., “grpc” or “http”) for OCR inference.
+If None, the default protocol from InfographicExtractorConfigSchema is used.</p></li>
+<li><p><strong>auth_token</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default=None</em>) – The authentication token required for secure access to OCR inference services.
+If None, the default value from InfographicExtractorConfigSchema is used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The updated DataFrame after infographic extraction has been performed.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – Propagates any exception raised during the extraction process, after being handled by the
+    unified exception handler.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_audio">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_audio</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">audio_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">audio_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">use_ssl</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ssl_cert</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_audio"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_audio" title="Link to this definition">#</a></dt>
+<dd><p>Extract audio primitives from a ledger DataFrame using the specified audio configuration.</p>
+<p>This function builds an extraction configuration based on the provided audio endpoints,
+inference protocol, authentication token, and SSL settings. It then delegates the extraction
+work to the internal function <code class="docutils literal notranslate"><span class="pre">extract_text_from_audio_internal</span></code> using the constructed
+configuration and ledger DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pandas.DataFrame</em>) – A DataFrame containing the ledger information required for audio extraction.</p></li>
+<li><p><strong>audio_endpoints</strong> (<em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em>) – A tuple of two strings representing the audio service endpoints gRPC and HTTP services.</p></li>
+<li><p><strong>audio_infer_protocol</strong> (<em>str</em><em>, </em><em>optional</em>) – The protocol to use for audio inference (e.g., “grpc”). Default is “grpc”.</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>optional</em>) – Authentication token for the audio inference service. Default is an empty string.</p></li>
+<li><p><strong>use_ssl</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to use SSL for secure connections. Default is False.</p></li>
+<li><p><strong>ssl_cert</strong> (<em>str</em><em>, </em><em>optional</em>) – Path to the SSL certificate file to use if <code class="docutils literal notranslate"><span class="pre">use_ssl</span></code> is True. Default is an empty string.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The result of the audio extraction as returned by
+<code class="docutils literal notranslate"><span class="pre">extract_text_from_audio_internal</span></code>. The specific type depends on the internal implementation.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Any</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – Any exceptions raised during the extraction process will be handled by the
+    <code class="docutils literal notranslate"><span class="pre">&#64;unified_exception_handler</span></code> decorator.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a sample DataFrame with ledger data</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s2">&quot;audio_data&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;file1.wav&quot;</span><span class="p">,</span> <span class="s2">&quot;file2.wav&quot;</span><span class="p">]})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result</span> <span class="o">=</span> <span class="n">extract_primitives_from_audio</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">df_ledger</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">audio_endpoints</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;http://primary.endpoint&quot;</span><span class="p">,</span> <span class="s2">&quot;http://secondary.endpoint&quot;</span><span class="p">),</span>
+<span class="gp">... </span>    <span class="n">audio_infer_protocol</span><span class="o">=</span><span class="s2">&quot;grpc&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">auth_token</span><span class="o">=</span><span class="s2">&quot;secret-token&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">use_ssl</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="n">ssl_cert</span><span class="o">=</span><span class="s2">&quot;/path/to/cert.pem&quot;</span>
+<span class="gp">... </span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_docx">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_docx</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'python_docx'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_docx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_docx" title="Link to this definition">#</a></dt>
+<dd><p>Extract primitives from DOCX documents in a DataFrame.</p>
+<p>This function configures and invokes the DOCX extraction process. It builds a task configuration
+using the provided extraction flags (for text, images, tables, charts, and infographics) and additional
+settings for YOLOX endpoints, inference protocol, and authentication. It then creates a DOCX extraction
+configuration (an instance of DocxExtractorSchema) and delegates the extraction to an internal function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – The input DataFrame containing DOCX documents in base64 encoding. The DataFrame is expected to
+include required columns such as “content” (with the base64-encoded DOCX) and optionally “source_id”.</p></li>
+<li><p><strong>extract_text</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to extract text content from the DOCX documents (default is True).</p></li>
+<li><p><strong>extract_images</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to extract images from the DOCX documents (default is True).</p></li>
+<li><p><strong>extract_tables</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to extract tables from the DOCX documents (default is True).</p></li>
+<li><p><strong>extract_charts</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to extract charts from the DOCX documents (default is True).</p></li>
+<li><p><strong>extract_infographics</strong> (<em>bool</em><em>, </em><em>optional</em>) – Flag indicating whether to extract infographics from the DOCX documents (default is True).</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>optional</em>) – A tuple containing YOLOX inference endpoints. If None, the default endpoints defined in the
+DOCX extraction configuration will be used.</p></li>
+<li><p><strong>yolox_infer_protocol</strong> (<em>str</em><em>, </em><em>optional</em>) – The inference protocol to use with the YOLOX endpoints (default is “grpc”).</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>optional</em>) – The authentication token for accessing the YOLOX inference service (default is an empty string).</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing the extracted DOCX primitives. Typically, the resulting DataFrame contains
+columns such as “document_type”, “metadata”, and “uuid”.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If an error occurs during the DOCX extraction process, the exception is logged and re-raised.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_image">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_image</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_image" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_pdf">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_pdf</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_extraction_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'pdfium'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">text_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'page'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">adobe_client_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">adobe_client_secret</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">llama_api_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">unstructured_io_api_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tika_server_url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_pdf"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf" title="Link to this definition">#</a></dt>
+<dd><p>Extract text, images, tables, charts, and infographics from PDF documents.</p>
+<p>This function serves as a unified interface for PDF primitive extraction, supporting multiple
+extraction engines (pdfium, adobe, llama, nemotron_parse, unstructured_io, and tika).
+It processes a DataFrame containing base64-encoded PDF data and returns a new DataFrame
+with structured information about the extracted elements.</p>
+<p>The function uses a decorator pattern (<cite>extraction_interface_relay_constructor</cite>) that
+validates parameters against the method-specific Pydantic schema (e.g. PDFiumConfigSchema
+for pdfium, NemotronParseConfigSchema for nemotron_parse) and passes only schema-defined
+keys into the backend.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_extraction_ledger</strong> (<em>pd.DataFrame</em>) – <p>DataFrame containing PDF documents to process. Must include the following columns:
+- “content” : str</p>
+<blockquote>
+<div><p>Base64-encoded PDF data</p>
+</div></blockquote>
+<ul>
+<li><dl class="simple">
+<dt>”source_id”<span class="classifier">str</span></dt><dd><p>Unique identifier for the document</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”source_name”<span class="classifier">str</span></dt><dd><p>Name of the document (filename or descriptive name)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”document_type”<span class="classifier">str or enum</span></dt><dd><p>Document type identifier (should be “pdf” or related enum value)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”metadata”<span class="classifier">Dict[str, Any]</span></dt><dd><p>Dictionary containing additional metadata about the document</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>extract_method</strong> (<em>str</em><em>, </em><em>default &quot;pdfium&quot;</em>) – The extraction engine to use. Valid options:
+- “pdfium” : PDFium-based extraction (default)
+- “adobe” : Adobe PDF Services API
+- “llama” : LlamaParse extraction
+- “nemotron_parse” : NVIDIA Nemotron Parse
+- “unstructured_io” : Unstructured.io extraction
+- “tika” : Apache Tika extraction</p></li>
+<li><p><strong>extract_text</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract text content from the PDFs.</p></li>
+<li><p><strong>extract_images</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract embedded images from the PDFs.</p></li>
+<li><p><strong>extract_infographics</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract infographics from the PDFs.</p></li>
+<li><p><strong>extract_tables</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract tables from the PDFs.</p></li>
+<li><p><strong>extract_charts</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract charts and graphs from the PDFs.</p></li>
+<li><p><strong>text_depth</strong> (<em>str</em><em>, </em><em>default &quot;page&quot;</em>) – Level of text granularity to extract. Options:
+- “page” : Text extracted at page level
+- “block” : Text extracted at block level
+- “paragraph” : Text extracted at paragraph level
+- “line” : Text extracted at line level</p></li>
+<li><p><strong>adobe_client_id</strong> (<em>str</em><em>, </em><em>optional</em>) – Client ID for Adobe PDF Services API. Required when extract_method=”adobe”.</p></li>
+<li><p><strong>adobe_client_secret</strong> (<em>str</em><em>, </em><em>optional</em>) – Client secret for Adobe PDF Services API. Required when extract_method=”adobe”.</p></li>
+<li><p><strong>llama_api_key</strong> (<em>str</em><em>, </em><em>optional</em>) – API key for LlamaParse service. Required when extract_method=”llama”.</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>optional</em>) – Authentication token for method-specific services. Used for pdfium (YOLOX/page-elements
+and related NVIDIA CV APIs) and for nemotron_parse (NVIDIA API). Required when using
+NVIDIA-hosted endpoints (e.g. ai.api.nvidia.com, integrate.api.nvidia.com).</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>tuple</em><em> of </em><em>(</em><em>str</em><em>, </em><em>str</em><em>)</em><em>, </em><em>optional</em>) – A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
+At least one endpoint must be non-empty.</p></li>
+<li><p><strong>yolox_infer_protocol</strong> (<em>str</em><em>, </em><em>default &quot;http&quot;</em>) – Protocol to use for YOLOX inference. Options: “http” or “grpc”.</p></li>
+<li><p><strong>nemotron_parse_endpoints</strong> (<em>tuple</em><em> of </em><em>(</em><em>str</em><em>, </em><em>str</em><em>)</em><em>, </em><em>optional</em>) – A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
+Required when extract_method=”nemotron_parse”.</p></li>
+<li><p><strong>nemotron_parse_protocol</strong> (<em>str</em><em>, </em><em>default &quot;http&quot;</em>) – Protocol to use for Nemotron Parse. Options: “http” or “grpc”.</p></li>
+<li><p><strong>nemotron_parse_model_name</strong> (<em>str</em><em>, </em><em>optional</em>) – Model name for Nemotron Parse. Default is “nvidia/nemotron-parse”.</p></li>
+<li><p><strong>unstructured_io_api_key</strong> (<em>str</em><em>, </em><em>optional</em>) – API key for Unstructured.io services. Required when extract_method=”unstructured_io”.</p></li>
+<li><p><strong>tika_server_url</strong> (<em>str</em><em>, </em><em>optional</em>) – URL for Apache Tika server. Required when extract_method=”tika”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing the extracted primitives with the following columns:
+- “document_type” : Type of the extracted element (e.g., “text”, “image”, “table”)
+- “metadata” : Dictionary containing detailed information about the extracted element
+- “uuid” : Unique identifier for the extracted element</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If an unsupported extraction method is specified.
+    If required parameters for the specified extraction method are missing.
+    If the input DataFrame does not have the required structure.</p></li>
+<li><p><strong>KeyError</strong> – If required columns are missing from the input DataFrame.</p></li>
+<li><p><strong>RuntimeError</strong> – If extraction fails due to processing errors.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The decorator validates parameters against the schema for the chosen <code class="docutils literal notranslate"><span class="pre">extract_method</span></code> (e.g. PDFiumConfigSchema
+for pdfium) and passes the resulting config to <cite>extract_primitives_from_pdf_internal</cite>. Only parameters that exist
+as fields on that schema are passed through.</p>
+<p>For each extraction method, specific parameters are required:
+- pdfium: yolox_endpoints; auth_token for NVIDIA-hosted YOLOX (e.g. page-elements)
+- adobe: adobe_client_id, adobe_client_secret
+- llama: llama_api_key
+- nemotron_parse: nemotron_parse_endpoints; auth_token for NVIDIA API
+- unstructured_io: unstructured_io_api_key
+- tika: tika_server_url</p>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Read a PDF file and encode it as base64</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;document.pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">pdf_content</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a DataFrame with the PDF content</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;doc1&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;document.pdf&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">pdf_content</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;document_type&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;document&quot;</span><span class="p">}}]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Extract primitives using PDFium</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result_df</span> <span class="o">=</span> <span class="n">extract_primitives_from_pdf</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">df_extraction_ledger</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">extract_method</span><span class="o">=</span><span class="s2">&quot;pdfium&quot;</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">yolox_endpoints</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;http://localhost:8000/v1/infer&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Display the types of extracted elements</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">result_df</span><span class="p">[</span><span class="s2">&quot;document_type&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_pdf_nemotron_parse">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_pdf_nemotron_parse</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_extraction_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">text_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'page'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">nemotron_parse_model_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_pdf_nemotron_parse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf_nemotron_parse" title="Link to this definition">#</a></dt>
+<dd><p>Extract primitives from PDF documents using the Nemotron Parse extraction method.</p>
+<p>This function serves as a specialized wrapper around the general extract_primitives_from_pdf
+function, pre-configured to use Nemotron Parse as the extraction engine. It processes
+PDF documents to extract various content types including text, images, tables, charts, and
+infographics, returning the results in a structured DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_extraction_ledger</strong> (<em>pd.DataFrame</em>) – <p>DataFrame containing PDF documents to process. Must include the following columns:
+- “content” : str</p>
+<blockquote>
+<div><p>Base64-encoded PDF data</p>
+</div></blockquote>
+<ul>
+<li><dl class="simple">
+<dt>”source_id”<span class="classifier">str</span></dt><dd><p>Unique identifier for the document</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”source_name”<span class="classifier">str</span></dt><dd><p>Name of the document (filename or descriptive name)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”document_type”<span class="classifier">str or enum</span></dt><dd><p>Document type identifier (should be “pdf” or related enum value)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”metadata”<span class="classifier">Dict[str, Any]</span></dt><dd><p>Dictionary containing additional metadata about the document</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>extract_text</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract text content from the PDFs. When True, the function will
+attempt to extract and structure all textual content according to the
+granularity specified by <cite>text_depth</cite>.</p></li>
+<li><p><strong>extract_images</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract embedded images from the PDFs. When True, the function
+will identify, extract, and process images embedded within the document.</p></li>
+<li><p><strong>extract_tables</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract tables from the PDFs. When True, the function will
+detect tabular structures and convert them into structured data.</p></li>
+<li><p><strong>extract_charts</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract charts and graphs from the PDFs. When True, the function
+will detect and extract visual data representations.</p></li>
+<li><p><strong>extract_infographics</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract infographics from the PDFs. When True, the function will
+identify and extract complex visual information displays.</p></li>
+<li><p><strong>text_depth</strong> (<em>str</em><em>, </em><em>default &quot;page&quot;</em>) – Level of text granularity to extract. Options:
+- “page” : Text extracted at page level (coarsest granularity)
+- “block” : Text extracted at block level (groups of paragraphs)
+- “paragraph” : Text extracted at paragraph level (semantic units)
+- “line” : Text extracted at line level (finest granularity)</p></li>
+<li><p><strong>auth_token</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default None</em>) – Authentication token used for both YOLOX inference (image processing) and Nemotron
+Parse (NVIDIA API). Required when using NVIDIA-hosted endpoints.</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>Optional</em><em>[</em><em>str</em><em>]</em><em>]</em><em>]</em><em>, </em><em>default None</em>) – A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
+Used for image processing capabilities within the extraction pipeline.
+Format: (grpc_endpoint, http_endpoint)
+Example: (None, “<a class="reference external" href="http://localhost:8000/v1/infer">http://localhost:8000/v1/infer</a>”)</p></li>
+<li><p><strong>yolox_infer_protocol</strong> (<em>str</em><em>, </em><em>default &quot;http&quot;</em>) – Protocol to use for YOLOX inference. Options:
+- “http” : Use HTTP protocol for YOLOX inference services
+- “grpc” : Use gRPC protocol for YOLOX inference services</p></li>
+<li><p><strong>nemotron_parse_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>default None</em>) – A tuple containing (gRPC endpoint, HTTP endpoint) for Nemotron Parse.
+Format: (grpc_endpoint, http_endpoint)
+Example: (None, “<a class="reference external" href="http://localhost:8015/v1/chat/completions">http://localhost:8015/v1/chat/completions</a>”)
+Required for this extraction method.</p></li>
+<li><p><strong>nemotron_parse_protocol</strong> (<em>str</em><em>, </em><em>default &quot;http&quot;</em>) – Protocol to use for Nemotron Parse. Options:
+- “http” : Use HTTP protocol for Nemotron Parse services
+- “grpc” : Use gRPC protocol for Nemotron Parse services</p></li>
+<li><p><strong>nemotron_parse_model_name</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default None</em>) – Model name for Nemotron Parse.
+Default is typically “nvidia/nemotron-parse” if None is provided.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>A DataFrame containing the extracted primitives with the following columns:
+- “document_type” : str</p>
+<blockquote>
+<div><p>Type of the extracted element (e.g., “text”, “image”, “structured”)</p>
+</div></blockquote>
+<ul class="simple">
+<li><dl class="simple">
+<dt>”metadata”<span class="classifier">Dict[str, Any]</span></dt><dd><p>Dictionary containing detailed information about the extracted element
+including position, content, confidence scores, etc.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”uuid”<span class="classifier">str</span></dt><dd><p>Unique identifier for the extracted element</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><strong>ValueError</strong> – If <cite>nemotron_parse_endpoints</cite> is None or empty
+    If the input DataFrame does not have the required structure</p></li>
+<li><p><strong>KeyError</strong> – If required columns are missing from the input DataFrame</p></li>
+<li><p><strong>RuntimeError</strong> – If extraction fails due to service unavailability or processing errors</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Read a PDF file and encode it as base64</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="s2">&quot;document.pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">pdf_content</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64encode</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">())</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Create a DataFrame with the PDF content</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;doc1&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;document.pdf&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">pdf_content</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;document_type&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;pdf&quot;</span><span class="p">],</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;document&quot;</span><span class="p">}}]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Extract primitives using Nemotron Parse</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">result_df</span> <span class="o">=</span> <span class="n">extract_primitives_from_pdf_nemotron_parse</span><span class="p">(</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">df_extraction_ledger</span><span class="o">=</span><span class="n">df</span><span class="p">,</span>
+<span class="gp">&gt;&gt;&gt; </span>    <span class="n">nemotron_parse_endpoints</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;http://localhost:8015/v1/chat/completions&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Display the types of extracted elements</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">result_df</span><span class="p">[</span><span class="s2">&quot;document_type&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">value_counts</span><span class="p">())</span>
+</pre></div>
+</div>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>Nemotron Parse excels at extracting structured data like tables from PDFs</p></li>
+<li><p>For optimal results, ensure both Nemotron Parse and YOLOX services are
+properly configured and accessible</p></li>
+<li><p>The extraction quality may vary depending on the complexity and quality of the input PDF</p></li>
+<li><p>This function wraps the more general <cite>extract_primitives_from_pdf</cite> function with
+pre-configured parameters for Nemotron Parse extraction</p></li>
+</ul>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_pdf_pdfium">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_pdf_pdfium</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_extraction_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">text_depth</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'page'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'http'</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_pdf_pdfium"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf_pdfium" title="Link to this definition">#</a></dt>
+<dd><p>Extract primitives from PDF documents using the PDFium extraction method.</p>
+<p>A simplified wrapper around the general extract_primitives_from_pdf function
+that defaults to using the PDFium extraction engine.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_extraction_ledger</strong> (<em>pd.DataFrame</em>) – <p>DataFrame containing PDF documents to process. Must include the following columns:
+- “content” : str</p>
+<blockquote>
+<div><p>Base64-encoded PDF data</p>
+</div></blockquote>
+<ul>
+<li><dl class="simple">
+<dt>”source_id”<span class="classifier">str</span></dt><dd><p>Unique identifier for the document</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”source_name”<span class="classifier">str</span></dt><dd><p>Name of the document (filename or descriptive name)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”document_type”<span class="classifier">str or enum</span></dt><dd><p>Document type identifier (should be “pdf” or related enum value)</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>”metadata”<span class="classifier">Dict[str, Any]</span></dt><dd><p>Dictionary containing additional metadata about the document</p>
+</dd>
+</dl>
+</li>
+</ul>
+</p></li>
+<li><p><strong>extract_text</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract text content</p></li>
+<li><p><strong>extract_images</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract embedded images</p></li>
+<li><p><strong>extract_tables</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract tables</p></li>
+<li><p><strong>extract_charts</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract charts</p></li>
+<li><p><strong>extract_infographics</strong> (<em>bool</em><em>, </em><em>default True</em>) – Whether to extract infographics</p></li>
+<li><p><strong>text_depth</strong> (<em>str</em><em>, </em><em>default &quot;page&quot;</em>) – Level of text granularity (page, block, paragraph, line)</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>optional</em>) – Authentication token for YOLOX inference services (NVIDIA CV APIs, e.g. page-elements).
+Passed into the pdfium config schema; required for NVIDIA-hosted endpoints.</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>tuple</em><em> of </em><em>(</em><em>str</em><em>, </em><em>str</em><em>)</em><em>, </em><em>optional</em>) – Tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services</p></li>
+<li><p><strong>yolox_infer_protocol</strong> (<em>str</em><em>, </em><em>default &quot;http&quot;</em>) – Protocol to use for YOLOX inference (“http” or “grpc”)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>DataFrame containing the extracted primitives</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_primitives_from_pptx">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_primitives_from_pptx</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_method</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'python_pptx'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_images</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_tables</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_charts</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">extract_infographics</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_infer_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'grpc'</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_primitives_from_pptx"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_primitives_from_pptx" title="Link to this definition">#</a></dt>
+<dd><p>Extract primitives from PPTX files provided in a DataFrame.</p>
+<p>This function configures the PPTX extraction task by assembling a task configuration
+dictionary using the provided parameters. It then creates an extraction configuration
+object (e.g., an instance of PPTXExtractorSchema) and delegates the actual extraction
+process to the internal function <cite>extract_primitives_from_pptx_internal</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – A DataFrame containing base64-encoded PPTX files. The DataFrame is expected to include
+columns such as “content” (with the base64-encoded PPTX) and “source_id”.</p></li>
+<li><p><strong>extract_text</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Flag indicating whether text should be extracted from the PPTX files.</p></li>
+<li><p><strong>extract_images</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Flag indicating whether images should be extracted.</p></li>
+<li><p><strong>extract_tables</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Flag indicating whether tables should be extracted.</p></li>
+<li><p><strong>extract_charts</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Flag indicating whether charts should be extracted.</p></li>
+<li><p><strong>extract_infographics</strong> (<em>bool</em><em>, </em><em>default=True</em>) – Flag indicating whether infographics should be extracted.</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – Optional tuple containing endpoints for YOLOX inference, if needed for image analysis.</p></li>
+<li><p><strong>yolox_infer_protocol</strong> (<em>str</em><em>, </em><em>default=&quot;grpc&quot;</em>) – The protocol to use for YOLOX inference.</p></li>
+<li><p><strong>auth_token</strong> (<em>str</em><em>, </em><em>default=&quot;&quot;</em>) – Authentication token to be used with the PPTX extraction configuration.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A DataFrame containing the extracted primitives from the PPTX files. Expected columns include
+“document_type”, “metadata”, and “uuid”.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function is decorated with <cite>&#64;unified_exception_handler</cite> to handle exceptions uniformly.
+The task configuration is assembled with two main keys:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>“params”: Contains boolean flags for controlling which primitives to extract.</p></li>
+<li><p>“pptx_extraction_config”: Contains additional settings for PPTX extraction (e.g., YOLOX endpoints,
+inference protocol, and auth token).</p></li>
+</ul>
+</div></blockquote>
+<p>It then calls <cite>extract_primitives_from_pptx_internal</cite> with the DataFrame, the task configuration,
+and the extraction configuration.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extract.extract_table_data_from_image">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.extract.</span></span><span class="sig-name descname"><span class="pre">extract_table_data_from_image</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_endpoints</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">yolox_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">ocr_protocol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">auth_token</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/extract.html#extract_table_data_from_image"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extract.extract_table_data_from_image" title="Link to this definition">#</a></dt>
+<dd><p>Public interface to extract chart data from a ledger DataFrame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – DataFrame containing metadata required for chart extraction.</p></li>
+<li><p><strong>yolox_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – YOLOX inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.</p></li>
+<li><p><strong>ocr_endpoints</strong> (<em>Optional</em><em>[</em><em>Tuple</em><em>[</em><em>str</em><em>, </em><em>str</em><em>]</em><em>]</em><em>, </em><em>default=None</em>) – OCR inference server endpoints. If None, the default defined in
+ChartExtractorConfigSchema is used.</p></li>
+<li><p><strong>yolox_protocol</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default=None</em>) – Protocol for YOLOX inference. If None, the default defined in ChartExtractorConfigSchema is used.</p></li>
+<li><p><strong>ocr_protocol</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default=None</em>) – Protocol for OCR inference. If None, the default defined in ChartExtractorConfigSchema is used.</p></li>
+<li><p><strong>auth_token</strong> (<em>Optional</em><em>[</em><em>str</em><em>]</em><em>, </em><em>default=None</em>) – Authentication token for inference services. If None, the default defined in ChartExtractorConfigSchema is used.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>The updated DataFrame after chart extraction.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If an error occurs during extraction.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.interface.mutate">
+<span id="nv-ingest-api-interface-mutate-module"></span><h2>nv_ingest_api.interface.mutate module<a class="headerlink" href="#module-nv_ingest_api.interface.mutate" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.mutate.deduplicate_images">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.mutate.</span></span><span class="sig-name descname"><span class="pre">deduplicate_images</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">hash_algorithm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'md5'</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/mutate.html#deduplicate_images"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.mutate.deduplicate_images" title="Link to this definition">#</a></dt>
+<dd><p>Deduplicate images in the DataFrame based on content hashes.</p>
+<p>This function constructs a task configuration using the specified hashing algorithm
+and delegates the deduplication process to the internal function
+<code class="docutils literal notranslate"><span class="pre">deduplicate_images_internal</span></code>. The deduplication is performed by computing content
+hashes for each image in the DataFrame and then removing duplicate images.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – <p>A pandas DataFrame containing image metadata. The DataFrame must include at least
+the columns:</p>
+<blockquote>
+<div><ul>
+<li><p><code class="docutils literal notranslate"><span class="pre">document_type</span></code>: A string representing the document type (e.g., “png”).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">metadata</span></code>: A dictionary that contains image-related metadata. For example,
+it should include keys such as <code class="docutils literal notranslate"><span class="pre">content</span></code> (base64-encoded image data),
+<code class="docutils literal notranslate"><span class="pre">source_metadata</span></code>, and <code class="docutils literal notranslate"><span class="pre">content_metadata</span></code>.</p></li>
+</ul>
+</div></blockquote>
+</p></li>
+<li><p><strong>hash_algorithm</strong> (<em>str</em><em>, </em><em>optional</em>) – The hashing algorithm to use for deduplication. Valid algorithms are those supported
+by Python’s <code class="docutils literal notranslate"><span class="pre">hashlib.new()</span></code> function (e.g., “md5”, “sha1”, “sha256”). Default is “md5”.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A deduplicated DataFrame in which duplicate images have been removed. The structure
+of the returned DataFrame is the same as the input, with duplicate rows eliminated.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – Propagates any exceptions encountered during the deduplication process.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="c1"># Example DataFrame with image metadata.</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+<span class="gp">... </span>    <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;image1.png&quot;</span><span class="p">,</span> <span class="s2">&quot;image2.png&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;image1.png&quot;</span><span class="p">,</span> <span class="s2">&quot;image2.png&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;&lt;base64-encoded-image-1&gt;&quot;</span><span class="p">,</span> <span class="s2">&quot;&lt;base64-encoded-image-2&gt;&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">&quot;document_type&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;png&quot;</span><span class="p">,</span> <span class="s2">&quot;png&quot;</span><span class="p">],</span>
+<span class="gp">... </span>    <span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">[{</span>
+<span class="gp">... </span>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;base64-encoded-image-1&gt;&quot;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;source_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="s2">&quot;image1.png&quot;</span><span class="p">,</span> <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="s2">&quot;image1.png&quot;</span><span class="p">,</span> <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="s2">&quot;png&quot;</span><span class="p">},</span>
+<span class="gp">... </span>        <span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">},</span>
+<span class="gp">... </span>        <span class="s2">&quot;audio_metadata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;text_metadata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;image_metadata&quot;</span><span class="p">:</span> <span class="p">{},</span>
+<span class="gp">... </span>        <span class="s2">&quot;raise_on_failure&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">},</span>
+<span class="gp">... </span>    <span class="p">{</span>
+<span class="gp">... </span>        <span class="s2">&quot;content&quot;</span><span class="p">:</span> <span class="s2">&quot;&lt;base64-encoded-image-2&gt;&quot;</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;source_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="s2">&quot;image2.png&quot;</span><span class="p">,</span> <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="s2">&quot;image2.png&quot;</span><span class="p">,</span> <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="s2">&quot;png&quot;</span><span class="p">},</span>
+<span class="gp">... </span>        <span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;image&quot;</span><span class="p">},</span>
+<span class="gp">... </span>        <span class="s2">&quot;audio_metadata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;text_metadata&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="gp">... </span>        <span class="s2">&quot;image_metadata&quot;</span><span class="p">:</span> <span class="p">{},</span>
+<span class="gp">... </span>        <span class="s2">&quot;raise_on_failure&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="p">}]</span>
+<span class="gp">... </span><span class="p">})</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dedup_df</span> <span class="o">=</span> <span class="n">deduplicate_images</span><span class="p">(</span><span class="n">df_ledger</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">hash_algorithm</span><span class="o">=</span><span class="s2">&quot;md5&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">dedup_df</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.mutate.filter_images">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.mutate.</span></span><span class="sig-name descname"><span class="pre">filter_images</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">df_ledger</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">DataFrame</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">128</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">max_aspect_ratio</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">5.0</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">min_aspect_ratio</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/mutate.html#filter_images"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.mutate.filter_images" title="Link to this definition">#</a></dt>
+<dd><p>Apply an image filter to the ledger DataFrame based on size and aspect ratio criteria.</p>
+<p>This function builds a set of task parameters and then delegates the filtering work to
+<cite>filter_images_internal</cite>. If an exception occurs during filtering, the error is logged
+and re-raised with additional context.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df_ledger</strong> (<em>pd.DataFrame</em>) – DataFrame containing image metadata. It must include the columns ‘document_type’ and ‘metadata’.</p></li>
+<li><p><strong>min_size</strong> (<em>int</em><em>, </em><em>optional</em>) – Minimum average image size threshold. Images with an average size less than or equal to this
+value are considered for filtering. Default is 128.</p></li>
+<li><p><strong>max_aspect_ratio</strong> (<em>float</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – Maximum allowed image aspect ratio. Images with an aspect ratio greater than or equal to this value
+are considered for filtering. Default is 5.0.</p></li>
+<li><p><strong>min_aspect_ratio</strong> (<em>float</em><em> or </em><em>int</em><em>, </em><em>optional</em>) – Minimum allowed image aspect ratio. Images with an aspect ratio less than or equal to this value
+are considered for filtering. Default is 2.0.</p></li>
+<li><p><strong>execution_trace_log</strong> (<em>Optional</em><em>[</em><em>List</em><em>[</em><em>Any</em><em>]</em><em>]</em><em>, </em><em>optional</em>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The DataFrame after applying the image filter.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pd.DataFrame</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>Exception</strong> – If an error occurs during the filtering process.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="nv-ingest-api-interface-store-module">
+<h2>nv_ingest_api.interface.store module<a class="headerlink" href="#nv-ingest-api-interface-store-module" title="Link to this heading">#</a></h2>
+</section>
+<section id="nv-ingest-api-interface-transform-module">
+<h2>nv_ingest_api.interface.transform module<a class="headerlink" href="#nv-ingest-api-interface-transform-module" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_api.interface.utility">
+<span id="nv-ingest-api-interface-utility-module"></span><h2>nv_ingest_api.interface.utility module<a class="headerlink" href="#module-nv_ingest_api.interface.utility" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.utility.build_dataframe_from_files">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.utility.</span></span><span class="sig-name descname"><span class="pre">build_dataframe_from_files</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">file_paths</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">BytesIO</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_names</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">document_types</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">DataFrame</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/utility.html#build_dataframe_from_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.utility.build_dataframe_from_files" title="Link to this definition">#</a></dt>
+<dd><p>Given lists of file paths (or BytesIO objects), source names, source IDs, and document types,
+reads each file (base64-encoding its contents) and constructs a DataFrame.</p>
+<p>For image content, ‘image_metadata’ is initialized as an empty dict, so it can later be updated.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.utility.create_content_metadata">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.utility.</span></span><span class="sig-name descname"><span class="pre">create_content_metadata</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">document_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/utility.html#create_content_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.utility.create_content_metadata" title="Link to this definition">#</a></dt>
+<dd><p>Creates a content metadata dictionary for a file based on its document type.</p>
+<p>It maps the document type to the corresponding content type.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.utility.create_source_metadata">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.utility.</span></span><span class="sig-name descname"><span class="pre">create_source_metadata</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">source_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">document_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/utility.html#create_source_metadata"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.utility.create_source_metadata" title="Link to this definition">#</a></dt>
+<dd><p>Creates a source metadata dictionary for a file.</p>
+<p>The source_type is set to the provided document_type.
+The date_created and last_modified fields are set to the current ISO timestamp.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.utility.read_bytesio_as_base64">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.utility.</span></span><span class="sig-name descname"><span class="pre">read_bytesio_as_base64</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_io</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">BytesIO</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/utility.html#read_bytesio_as_base64"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.utility.read_bytesio_as_base64" title="Link to this definition">#</a></dt>
+<dd><p>Reads a BytesIO object and returns its base64-encoded string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>file_io</strong> (<em>BytesIO</em>) – A file-like object containing binary data.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The base64-encoded string representation of the file’s contents.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.utility.read_file_as_base64">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.utility.</span></span><span class="sig-name descname"><span class="pre">read_file_as_base64</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_api/interface/utility.html#read_file_as_base64"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.utility.read_file_as_base64" title="Link to this definition">#</a></dt>
+<dd><p>Reads the file at file_path in binary mode and returns its base64-encoded string.</p>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_api.interface">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_api.interface" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_api.interface.extraction_interface_relay_constructor">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_api.interface.</span></span><span class="sig-name descname"><span class="pre">extraction_interface_relay_constructor</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">api_fn</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_api/interface.html#extraction_interface_relay_constructor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_api.interface.extraction_interface_relay_constructor" title="Link to this definition">#</a></dt>
+<dd><p>Decorator for constructing and validating configuration using Pydantic schemas.</p>
+<p>This decorator wraps a user-facing interface function. It extracts common task parameters
+(using the provided task_keys, or defaults if not specified) and method-specific configuration
+parameters based on a required ‘extract_method’ keyword argument. It then uses the corresponding
+Pydantic schema (from the global CONFIG_SCHEMAS registry) to validate and build a method-specific
+configuration. The resulting composite configuration, along with the extraction ledger and
+execution trace log, is passed to the backend API function.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>api_fn</strong> (<em>callable</em>) – <p>The backend API function that will be called with the extraction ledger, the task configuration
+dictionary, the extractor configuration, and the execution trace log. This function must conform
+to the signature:</p>
+<blockquote>
+<div><dl class="simple">
+<dt>extract_primitives_from_pdf_internal(df_extraction_ledger: pd.DataFrame,</dt><dd><p>task_config: Dict[str, Any],
+extractor_config: Any,
+execution_trace_log: Optional[List[Any]] = None)</p>
+</dd>
+</dl>
+</div></blockquote>
+</p></li>
+<li><p><strong>task_keys</strong> (<em>list</em><em> of </em><em>str</em><em>, </em><em>optional</em>) – A list of keyword names that should be extracted from the user function as common task parameters.
+If not provided, defaults to [“extract_text”, “extract_images”, “extract_tables”, “extract_charts”].</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A wrapped function that builds and validates the configuration before invoking the backend API function.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>callable</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the extraction method specified is not supported (i.e., no corresponding Pydantic schema exists
+    in CONFIG_SCHEMAS), if api_fn does not conform to the expected signature, or if the required
+    ‘extract_method’ parameter is not provided.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_api.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_api package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_api.internal.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_api.internal package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.interface.extract">nv_ingest_api.interface.extract module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_chart_data_from_image"><code class="docutils literal notranslate"><span class="pre">extract_chart_data_from_image()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_infographic_data_from_image"><code class="docutils literal notranslate"><span class="pre">extract_infographic_data_from_image()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_audio"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_audio()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_docx"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_docx()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_image"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_image()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_pdf()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf_nemotron_parse"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_pdf_nemotron_parse()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_pdf_pdfium"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_pdf_pdfium()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_primitives_from_pptx"><code class="docutils literal notranslate"><span class="pre">extract_primitives_from_pptx()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extract.extract_table_data_from_image"><code class="docutils literal notranslate"><span class="pre">extract_table_data_from_image()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.interface.mutate">nv_ingest_api.interface.mutate module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.mutate.deduplicate_images"><code class="docutils literal notranslate"><span class="pre">deduplicate_images()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.mutate.filter_images"><code class="docutils literal notranslate"><span class="pre">filter_images()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nv-ingest-api-interface-store-module">nv_ingest_api.interface.store module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nv-ingest-api-interface-transform-module">nv_ingest_api.interface.transform module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.interface.utility">nv_ingest_api.interface.utility module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.utility.build_dataframe_from_files"><code class="docutils literal notranslate"><span class="pre">build_dataframe_from_files()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.utility.create_content_metadata"><code class="docutils literal notranslate"><span class="pre">create_content_metadata()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.utility.create_source_metadata"><code class="docutils literal notranslate"><span class="pre">create_source_metadata()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.utility.read_bytesio_as_base64"><code class="docutils literal notranslate"><span class="pre">read_bytesio_as_base64()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.utility.read_file_as_base64"><code class="docutils literal notranslate"><span class="pre">read_file_as_base64()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_api.interface">Module contents</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_api.interface.extraction_interface_relay_constructor"><code class="docutils literal notranslate"><span class="pre">extraction_interface_relay_constructor()</span></code></a></li>
+</ul>
+</li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

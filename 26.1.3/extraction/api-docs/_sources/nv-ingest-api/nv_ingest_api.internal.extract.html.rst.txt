@@ -1,0 +1,21 @@
+nv\_ingest\_api.internal.extract.html package
+=============================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.html.html\_extractor module
+------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.html.html_extractor
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.html
+   :members:
+   :show-inheritance:
+   :undoc-members:
