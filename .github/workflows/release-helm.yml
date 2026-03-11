@@ -39,6 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NGC_CLI_ORG: ${{ inputs.ngc-org }}
+      NGC_CLI_TEAM: ${{ inputs.ngc-team }}
+      NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -54,23 +57,13 @@ jobs:
           curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
             | tar xz -C /usr/local/bin helm-docs
 
-      - name: Install NGC CLI
-        run: |
-          curl -sSL "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.55.0/files/ngccli_linux.zip" -o /tmp/ngccli.zip
-          unzip -q /tmp/ngccli.zip -d /tmp
-          sudo mv /tmp/ngc-cli/ngc /usr/local/bin/ngc
-          sudo chmod +x /usr/local/bin/ngc
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Configure and verify NGC CLI
-        run: |
-          ngc config set <<EOF
-          $NGC_CLI_API_KEY
-          json
-          ${{ inputs.ngc-org }}
-          ${{ inputs.ngc-team }}
-          EOF
-          echo "NGC CLI configured. Verifying authentication..."
-          ngc config current
+      - name: Install Python dependencies
+        run: pip install ngcsdk pyyaml
 
       - name: Update Helm README
         run: helm/update_helm_readme.sh
@@ -87,14 +80,6 @@ jobs:
         run: |
           helm dependency update helm/
           helm dependency build helm/
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: pip install pyyaml
 
       - name: Release Helm chart
         run: |

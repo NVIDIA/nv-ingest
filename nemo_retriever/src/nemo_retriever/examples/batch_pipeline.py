@@ -468,6 +468,24 @@ def main(
             "(used when --table-output-format=markdown)."
         ),
     ),
+    text_chunk: bool = typer.Option(
+        False,
+        "--text-chunk",
+        help=(
+            "Re-chunk extracted page text by token count before embedding. "
+            "Uses --text-chunk-max-tokens and --text-chunk-overlap-tokens (defaults: 1024, 150)."
+        ),
+    ),
+    text_chunk_max_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-max-tokens",
+        help="Max tokens per text chunk (default: 1024). Implies --text-chunk.",
+    ),
+    text_chunk_overlap_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-overlap-tokens",
+        help="Token overlap between consecutive text chunks (default: 150). Implies --text-chunk.",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
@@ -650,33 +668,31 @@ def main(
                 batch_tuning={**batch_tuning, **overrides},
             )
 
+        _text_chunk_params = TextChunkParams(
+            max_tokens=text_chunk_max_tokens or 1024,
+            overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
+        )
+
         if input_type == "txt":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_txt(_text_chunk_params)
         elif input_type == "html":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_html(_text_chunk_params)
         elif input_type == "image":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_image_files(_extract_params(_detection_batch_tuning))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_image_files(_extract_params(_detection_batch_tuning))
         elif input_type == "doc":
-            ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning)).embed(embed_params)
+            ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning))
         else:
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(_extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size))
-                .embed(embed_params)
+            ingestor = ingestor.files(file_patterns).extract(
+                _extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size)
             )
 
+        enable_text_chunk = text_chunk or text_chunk_max_tokens is not None or text_chunk_overlap_tokens is not None
+        if enable_text_chunk:
+            ingestor = ingestor.split(_text_chunk_params)
+
+        ingestor = ingestor.embed(embed_params)
+
+        logger.info("Running extraction...")
         ingest_start = time.perf_counter()
 
         ingest_results = (

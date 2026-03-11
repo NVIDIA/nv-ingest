@@ -65,7 +65,7 @@ class PdfSplitParams(_ParamsModel):
 
 
 class TextChunkParams(_ParamsModel):
-    max_tokens: int = 512
+    max_tokens: int = 1024
     overlap_tokens: int = 0
     tokenizer_model_id: Optional[str] = None
     encoding: str = "utf-8"
