@@ -13,10 +13,10 @@ readme = "README.md"
 authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
 ]
-license = {file = "LICENSE"}
+license = {text = "Apache-2.0"}
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 dependencies = [
