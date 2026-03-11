@@ -50,7 +50,7 @@ active:
         local_port: 8012
         remote_port: 8000
       - service: "*rerank*"  # Wildcard pattern to match reranker services
-        local_port: 8020
+        local_port: 8015
         remote_port: 8000
     values:  # inline Helm values
       nimOperator.llama_3_2_nv_rerankqa_1b_v2.enabled: true

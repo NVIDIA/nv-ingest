@@ -138,8 +138,9 @@ def main(config=None, log_path: str = "test_results") -> int:
             "top_k": recall_top_k,
             "gpu_search": gpu_search,
             "ground_truth_dir": ground_truth_dir,
+            "dataset_dir": config.dataset_dir,
             "vdb_backend": vdb_backend,
-            "nv_ranker_endpoint": f"http://{hostname}:8020/v1/ranking",
+            "nv_ranker_endpoint": f"http://{hostname}:8015/v1/ranking",
             "nv_ranker_model_name": "nvidia/llama-nemotron-rerank-1b-v2",
         }
         if vdb_backend == "lancedb":
