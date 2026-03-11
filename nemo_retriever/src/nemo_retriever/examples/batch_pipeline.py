@@ -16,7 +16,6 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Optional, TextIO
 
-from nemo_retriever.examples.common import estimate_processed_pages
 from nemo_retriever.utils.detection_summary import print_run_summary
 import ray
 import typer
@@ -723,8 +722,6 @@ def main(
                 logger.error(f"Exiting with code 1 due to {error_count} error rows in ingest results.")
                 raise typer.Exit(code=1)
 
-        ray.shutdown()
-
         # ---------------------------------------------------------------------------
         # Recall calculation
         # ---------------------------------------------------------------------------
@@ -778,8 +775,13 @@ def main(
 
         total_time = time.perf_counter() - ingest_start
 
+        # This processing has nothing to do with processing or performance so we exclude
+        # it from the runtimes. Just getting row counts for metrics ...
+        num_rows = ingest_results.get_dataset().group_by("source_id").count().count()
+
+        ray.shutdown()
+
         # Print runtimes for easy user viewing at end
-        num_rows = estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         print_run_summary(
             num_rows,
             input_path,
