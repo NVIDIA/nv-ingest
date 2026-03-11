@@ -122,4 +122,4 @@ By loading the model and corpus once and protecting access with a reentrant lock
 
 <a id="acknowledgement"></a>
 ## ✨ Acknowledgement
-This pipeline is based on work by [Jie He](https://probe2.github.io/) (retriever model) and [Reza Esfandiarpoor](https://reza.website/) (agentic pipeline), developed during their internships at NVIDIA.
+This pipeline is based on work done by [Jie He](https://probe2.github.io/) (retriever model) and [Reza Esfandiarpoor](https://reza.website/) (agentic pipeline) during their internships at NVIDIA.
