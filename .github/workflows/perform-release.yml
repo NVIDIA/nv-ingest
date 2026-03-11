@@ -303,8 +303,13 @@ jobs:
           curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
             | tar xz -C /usr/local/bin helm-docs
 
-      - name: Install NGC CLI
-        run: pip install ngcsdk
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install ngcsdk pyyaml
 
       - name: Verify NGC CLI
         run: ngc --version
@@ -324,14 +329,6 @@ jobs:
         run: |
           helm dependency update helm/
           helm dependency build helm/
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Python dependencies
-        run: pip install pyyaml
 
       - name: Publish chart to NGC
         run: |
