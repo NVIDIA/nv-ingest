@@ -198,12 +198,12 @@ def print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: flo
 
 
 def _fmt_time(seconds: float) -> str:
-    """Format *seconds* as ``raw / H.MM.SS:mmm``."""
+    """Format *seconds* as ``raw / H:MM:SS.mmm``."""
     ms = int(round(seconds * 1000))
     h, remainder = divmod(ms, 3_600_000)
     m, remainder = divmod(remainder, 60_000)
     s, millis = divmod(remainder, 1000)
-    return f"{seconds:.2f}s / {h}.{m:02d}.{s:02d}:{millis:03d}"
+    return f"{seconds:.2f}s / {h}:{m:02d}:{s:02d}.{millis:03d}"
 
 
 def print_run_summary(
@@ -231,14 +231,14 @@ def print_run_summary(
     print(f"\tInput path: {input_path}")
     print(f"\tHybrid: {hybrid}")
     print(f"\tLancedb URI: {lancedb_uri}")
-    print(f"\tLancedb Table: {lancedb_table_name}\n")
+    print(f"\tLancedb Table: {lancedb_table_name}")
 
     print("Runtimes:")
     print(f"\tTotal pages processed: {processed_pages} from {input_path}")
     print(f"\tIngestion only time: {_fmt_time(ingest_only_total_time)}")
     print(f"\tRay dataset download time: {_fmt_time(ray_dataset_download_total_time)}")
     print(f"\tLanceDB Write Time: {_fmt_time(lancedb_write_total_time)}")
-    print(f"\tRecall time: {_fmt_time(recall_total_time)}\n")
+    print(f"\tRecall time: {_fmt_time(recall_total_time)}")
 
     print("PPS:")
     print(f"\tIngestion only PPS: {ingest_only_pps:.2f}")
