@@ -59,11 +59,11 @@ def to_markdown_by_page(results: object) -> dict[int, str]:
     return rendered
 
 
-def to_markdown(results: object) -> str:
+def to_markdown(results: object) -> str | None:
     """Render a single document result as one markdown document."""
     pages = to_markdown_by_page(results)
     if not pages:
-        return f"# {_DOCUMENT_TITLE}\n\n_No content found._"
+        return None
     return f"# {_DOCUMENT_TITLE}\n\n" + "\n\n".join(pages.values())
 
 
@@ -109,6 +109,9 @@ def _records_from_mapping(results: Mapping[str, Any]) -> list[dict[str, Any]]:
     if _looks_like_record(results):
         return [dict(results)]
     raise ValueError("Markdown rendering expects a document row, row list, or saved results payload.")
+
+    # TODO(jioffe): Centralize retriever result-shape detection so helpers and
+    # actor outputs do not rely on duplicated key-based heuristics.
 
 
 def _looks_like_record(record: Mapping[str, Any]) -> bool:

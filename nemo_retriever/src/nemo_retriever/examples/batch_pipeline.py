@@ -16,18 +16,21 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Optional, TextIO
 
+from nemo_retriever.utils.detection_summary import print_run_summary
 import ray
 import typer
 from nemo_retriever import create_ingestor
 from nemo_retriever.ingest_modes.batch import BatchIngestor
+from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
+from nemo_retriever.model import resolve_embed_model
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
-from nemo_retriever.ingest_modes.lancedb_utils import lancedb_schema
 from nemo_retriever.utils.remote_auth import resolve_remote_api_key
+from nemo_retriever.vector_store.lancedb_store import handle_lancedb
 
 logger = logging.getLogger(__name__)
 
@@ -106,28 +109,6 @@ def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tupl
     return fh, original_stdout, original_stderr
 
 
-def _to_int(value: object, default: int = 0) -> int:
-    try:
-        if value is None:
-            return default
-        return int(value)
-    except Exception:
-        return default
-
-
-def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
-    """Collect per-model detection totals deduped by (source_id, page_number)."""
-    from nemo_retriever.utils.detection_summary import collect_detection_summary_from_lancedb
-
-    return collect_detection_summary_from_lancedb(uri, table_name)
-
-
-def _print_detection_summary(summary: Optional[dict]) -> None:
-    from nemo_retriever.utils.detection_summary import print_detection_summary
-
-    print_detection_summary(summary)
-
-
 def _extract_error_payloads(v: object) -> list[object]:
     """Recursively extract only error payloads from nested values."""
     payloads: list[object] = []
@@ -157,34 +138,6 @@ def _extract_error_payloads(v: object) -> list[object]:
         if any(tok in low for tok in ("error", "exception", "traceback", "failed")):
             payloads.append(s)
     return payloads
-
-
-def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
-    target = Path(path).expanduser().resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = summary if summary is not None else {"error": "Detection summary unavailable."}
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
-    if ingest_elapsed_s <= 0:
-        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
-        return
-    if processed_pages is None:
-        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
-        return
-
-    pps = processed_pages / ingest_elapsed_s
-    print(f"Pages processed: {processed_pages}")
-    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
-
-
-def _count_materialized_rows(dataset: object) -> int:
-    """Count rows from a materialized Ray Dataset without relying on ``len()``."""
-    count = getattr(dataset, "count", None)
-    if callable(count):
-        return int(count())
-    return len(dataset)  # type: ignore[arg-type]
 
 
 def _ensure_lancedb_table(uri: str, table_name: str) -> None:
@@ -509,6 +462,24 @@ def main(
             "(used when --table-output-format=markdown)."
         ),
     ),
+    text_chunk: bool = typer.Option(
+        False,
+        "--text-chunk",
+        help=(
+            "Re-chunk extracted page text by token count before embedding. "
+            "Uses --text-chunk-max-tokens and --text-chunk-overlap-tokens (defaults: 1024, 150)."
+        ),
+    ),
+    text_chunk_max_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-max-tokens",
+        help="Max tokens per text chunk (default: 1024). Implies --text-chunk.",
+    ),
+    text_chunk_overlap_tokens: Optional[int] = typer.Option(
+        None,
+        "--text-chunk-overlap-tokens",
+        help="Token overlap between consecutive text chunks (default: 150). Implies --text-chunk.",
+    ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
     try:
@@ -690,32 +661,29 @@ def main(
                 batch_tuning={**batch_tuning, **overrides},
             )
 
+        _text_chunk_params = TextChunkParams(
+            max_tokens=text_chunk_max_tokens or 1024,
+            overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
+        )
+
         if input_type == "txt":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_txt(_text_chunk_params)
         elif input_type == "html":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_html(_text_chunk_params)
         elif input_type == "image":
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract_image_files(_extract_params(_detection_batch_tuning))
-                .embed(embed_params)
-            )
+            ingestor = ingestor.files(file_patterns).extract_image_files(_extract_params(_detection_batch_tuning))
         elif input_type == "doc":
-            ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning)).embed(embed_params)
+            ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning))
         else:
-            ingestor = (
-                ingestor.files(file_patterns)
-                .extract(_extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size))
-                .embed(embed_params)
+            ingestor = ingestor.files(file_patterns).extract(
+                _extract_params(_pdf_batch_tuning, inference_batch_size=page_elements_batch_size)
             )
+
+        enable_text_chunk = text_chunk or text_chunk_max_tokens is not None or text_chunk_overlap_tokens is not None
+        if enable_text_chunk:
+            ingestor = ingestor.split(_text_chunk_params)
+
+        ingestor = ingestor.embed(embed_params)
 
         logger.info("Running extraction...")
         ingest_start = time.perf_counter()
@@ -731,18 +699,17 @@ def main(
             .materialize()
         )
 
-        # if hasattr(ingestor, "_create_lancedb_index"):
-        #     ingestor._create_lancedb_index()
-        from nemo_retriever.vector_store.lancedb_store import handle_lancedb
+        ingestion_only_total_time = time.perf_counter() - ingest_start
 
-        handle_lancedb(ingest_results.take_all(), lancedb_uri, LANCEDB_TABLE, hybrid=hybrid, mode="overwrite")
+        # Capture the time it takes to download the Ray dataset to the local machine for reporting.
+        ray_dataset_download_start = time.perf_counter()
+        ingest_local_results = ingest_results.take_all()
+        ray_dataset_download_time = time.perf_counter() - ray_dataset_download_start
 
-        ingest_elapsed_s = time.perf_counter() - ingest_start
-        rows_processed = _count_materialized_rows(ingest_results)
-        logger.info(
-            f"Ingestion complete. {rows_processed} rows procesed in "
-            f"{ingest_elapsed_s:.2f} seconds. {rows_processed/ingest_elapsed_s:.2f} PPS"
-        )
+        # Write to lancedb and capture the time it takes.
+        lancedb_write_start = time.perf_counter()
+        handle_lancedb(ingest_local_results, lancedb_uri, LANCEDB_TABLE, hybrid=hybrid, mode="overwrite")
+        lancedb_write_time = time.perf_counter() - lancedb_write_start
 
         if isinstance(ingestor, BatchIngestor):
             error_rows = ingestor.get_error_rows(dataset=ingest_results).materialize()
@@ -770,8 +737,6 @@ def main(
                 ray.shutdown()
                 logger.error(f"Exiting with code 1 due to {error_count} error rows in ingest results.")
                 raise typer.Exit(code=1)
-
-        ray.shutdown()
 
         # ---------------------------------------------------------------------------
         # Recall calculation
@@ -805,10 +770,6 @@ def main(
         except Exception:
             pass
 
-        # Resolve the HF model ID for recall query embedding so aliases
-        # (e.g. "nemo_retriever_v1") map to the correct model.
-        from nemo_retriever.model import resolve_embed_model
-
         _recall_model = resolve_embed_model(str(embed_model_name))
 
         cfg = RecallConfig(
@@ -823,11 +784,34 @@ def main(
             match_mode=recall_match_mode,
         )
 
+        # Capture recall only times.
+        recall_start = time.perf_counter()
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
+        recall_total_time = time.perf_counter() - recall_start
 
-        logger.info("\nRecall metrics (matching nemo_retriever.recall.core):")
-        for k, v in metrics.items():
-            logger.info(f"  {k}: {v:.4f}")
+        total_time = time.perf_counter() - ingest_start
+
+        # This processing has nothing to do with processing or performance so we exclude
+        # it from the runtimes. Just getting row counts for metrics ...
+        num_rows = ingest_results.groupby("source_id").count().count()
+
+        ray.shutdown()
+
+        # Print runtimes for easy user viewing at end
+        print_run_summary(
+            num_rows,
+            input_path,
+            hybrid,
+            lancedb_uri,
+            LANCEDB_TABLE,
+            total_time,
+            ingestion_only_total_time,
+            ray_dataset_download_time,
+            lancedb_write_time,
+            recall_total_time,
+            metrics,
+        )
+
     finally:
         # Restore real stdio before closing the mirror file so exception hooks
         # and late flushes never write to a closed stream wrapper.

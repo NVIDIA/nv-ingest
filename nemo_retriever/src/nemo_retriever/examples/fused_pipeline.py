@@ -27,11 +27,13 @@ from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.examples.batch_pipeline import (
     LANCEDB_TABLE,
     LANCEDB_URI,
-    _collect_detection_summary,
     _configure_logging,
     _ensure_lancedb_table,
-    _print_detection_summary,
-    _write_detection_summary,
+)
+from nemo_retriever.utils.detection_summary import (
+    collect_detection_summary_from_lancedb,
+    print_detection_summary,
+    write_detection_summary,
 )
 from nemo_retriever.examples.common import estimate_processed_pages, print_pages_per_second
 from nemo_retriever.recall.core import (
@@ -245,11 +247,11 @@ def main(
         )
         ingest_elapsed_s = time.perf_counter() - ingest_start
         processed_pages = estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
-        detection_summary = _collect_detection_summary(lancedb_uri, LANCEDB_TABLE)
+        detection_summary = collect_detection_summary_from_lancedb(lancedb_uri, LANCEDB_TABLE)
         print("Extraction complete.")
-        _print_detection_summary(detection_summary)
+        print_detection_summary(detection_summary)
         if detection_summary_file is not None:
-            _write_detection_summary(detection_summary_file, detection_summary)
+            write_detection_summary(detection_summary_file, detection_summary)
             print(f"Wrote detection summary JSON to {Path(detection_summary_file).expanduser().resolve()}")
 
         ray.shutdown()

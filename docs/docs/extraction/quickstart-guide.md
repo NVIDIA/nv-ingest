@@ -131,8 +131,8 @@ The following examples demonstrate how to extract text, charts, tables, and imag
 <a id="ingest_python_example"></a>
 ```python
 import logging, os, time
-from nemo_retriever.client import Ingestor, NemoRetrieverClient
-from nemo_retriever.util.process_json_files import ingest_json_results_to_blob
+from nv_ingest_client.client import Ingestor, NemoRetrieverClient
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 client = NemoRetrieverClient(                                                                         
     message_client_port=7670,                                                               
     message_client_hostname="localhost"        

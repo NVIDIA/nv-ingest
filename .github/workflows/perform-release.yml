@@ -1,0 +1,488 @@
+name: Perform Release
+run-name: "Perform Release ${{ inputs.version || inputs.source-branch || github.ref_name }}${{ inputs.dry-run == true && ' (dry run)' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      source-branch:
+        description: '*** SOURCE BRANCH *** — Branch to build artifacts from (leave empty to use the branch selected above)'
+        required: false
+        type: string
+        default: ''
+      version:
+        description: 'Override release version (leave empty to derive from source branch name)'
+        required: false
+        type: string
+        default: ''
+      dry-run:
+        description: 'Build and validate artifacts without publishing'
+        required: false
+        type: boolean
+        default: false
+      skip-helm-chart:
+        description: '⛔ SKIP Helm chart — disable Helm build and publish entirely'
+        required: false
+        type: boolean
+        default: true
+      release-type:
+        description: 'Release type for PyPI packages'
+        required: false
+        type: choice
+        default: 'release'
+        options:
+          - release
+          - dev
+
+permissions:
+  contents: write
+
+jobs:
+  determine-version:
+    name: Determine Release Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      source-ref: ${{ steps.resolve.outputs.source_ref }}
+    steps:
+      - name: Resolve source branch and version
+        id: resolve
+        run: |
+          if [ -n "${{ inputs.source-branch }}" ]; then
+            SOURCE_REF="${{ inputs.source-branch }}"
+          else
+            SOURCE_REF="${{ github.ref_name }}"
+          fi
+          echo "source_ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Using explicit version: $VERSION"
+          else
+            VERSION="$SOURCE_REF"
+            echo "Derived version from source branch: $VERSION"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          echo "### Release Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Source Branch | \`$SOURCE_REF\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | \`${{ inputs.dry-run }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Release Type | \`${{ inputs.release-type }}\` |" >> $GITHUB_STEP_SUMMARY
+
+  # ══════════════════════════════════════════════════════════════════════
+  #  Build Phase — all artifacts are built and validated in parallel.
+  #  Nothing is published until every build succeeds.
+  # ══════════════════════════════════════════════════════════════════════
+
+  pypi-build:
+    name: Build Python Wheels
+    needs: determine-version
+    uses: ./.github/workflows/reusable-pypi-build.yml
+    with:
+      version: ${{ needs.determine-version.outputs.version }}
+      release-type: ${{ inputs.release-type }}
+      source-ref: ${{ needs.determine-version.outputs.source-ref }}
+      runner: linux-large-disk
+
+  nvingest-docker-build:
+    name: Build nv-ingest Docker Image
+    needs: determine-version
+    runs-on: linux-large-disk
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          if [ -z "$DOCKER_REGISTRY" ]; then
+            echo "::error::DOCKER_REGISTRY secret is not set"
+            exit 1
+          fi
+          echo "image=${DOCKER_REGISTRY}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
+      - name: Build image (validate)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          target: runtime
+          platforms: linux/amd64
+          build-args: |
+            DOWNLOAD_LLAMA_TOKENIZER=True
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
+          cache-to: type=gha,scope=nvingest,mode=max
+          cache-from: type=gha,scope=nvingest
+
+  helm-build:
+    name: Build Helm Chart
+    if: ${{ !inputs.skip-helm-chart }}
+    needs: determine-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install helm-docs
+        run: |
+          HELM_DOCS_VERSION="1.14.2"
+          curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin helm-docs
+
+      - name: Update Helm README
+        run: helm/update_helm_readme.sh
+
+      - name: Add Helm dependency repos
+        run: |
+          helm repo add milvus https://zilliztech.github.io/milvus-helm
+          helm repo add zipkin https://zipkin.io/zipkin-helm
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Build Helm dependencies
+        run: |
+          helm dependency update helm/
+          helm dependency build helm/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install pyyaml
+
+      - name: Package chart (validate)
+        run: |
+          python ci/scripts/release_helm_chart.py \
+            --org nvidian \
+            --team nemo-llm \
+            --name nv-ingest \
+            --version "${{ needs.determine-version.outputs.version }}" \
+            --dry-run
+
+  # ══════════════════════════════════════════════════════════════════════
+  #  Publish Phase — runs only after ALL builds succeed and dry-run is
+  #  off.  Every publish job depends on every build job so that a single
+  #  build failure prevents any artifact from being published.
+  # ══════════════════════════════════════════════════════════════════════
+
+  pypi-publish:
+    name: Publish Python Wheels
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    needs:
+      - pypi-build
+      - nvingest-docker-build
+      - helm-build
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+
+  nvingest-docker-publish:
+    name: Publish nv-ingest Docker Image
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    needs:
+      - determine-version
+      - pypi-build
+      - nvingest-docker-build
+      - helm-build
+    runs-on: linux-large-disk
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Setup Docker Buildx
+        uses: ./.github/actions/setup-docker-buildx
+        with:
+          use-qemu: 'true'
+          platforms: 'linux/amd64,linux/arm64'
+
+      - name: Login to NGC
+        uses: ./.github/actions/docker-login-ngc
+        with:
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set image metadata
+        id: meta
+        run: |
+          if [ -z "$DOCKER_REGISTRY" ]; then
+            echo "::error::DOCKER_REGISTRY secret is not set"
+            exit 1
+          fi
+          IMAGE="${DOCKER_REGISTRY}/nv-ingest:${{ needs.determine-version.outputs.version }}"
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
+          echo "Image tag: ${IMAGE}"
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
+      - name: Build and push multi-platform image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          target: runtime
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            DOWNLOAD_LLAMA_TOKENIZER=True
+            GIT_COMMIT=${{ github.sha }}
+          tags: ${{ steps.meta.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
+          cache-from: type=gha,scope=nvingest
+
+  helm-publish:
+    name: Publish Helm Chart
+    if: ${{ !inputs.dry-run && !inputs.skip-helm-chart && !cancelled() && !failure() }}
+    needs:
+      - determine-version
+      - pypi-build
+      - nvingest-docker-build
+      - helm-build
+    runs-on: ubuntu-latest
+    env:
+      NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NGC_CLI_ORG: ${{ secrets.NGC_ORG }}
+      NGC_CLI_TEAM: ${{ secrets.NGC_TEAM }}
+      NGC_CLI_FORMAT_TYPE: json
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install helm-docs
+        run: |
+          HELM_DOCS_VERSION="1.14.2"
+          curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin helm-docs
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install ngcsdk pyyaml
+
+      - name: Update Helm README
+        run: helm/update_helm_readme.sh
+
+      - name: Add Helm dependency repos
+        run: |
+          helm repo add milvus https://zilliztech.github.io/milvus-helm
+          helm repo add zipkin https://zipkin.io/zipkin-helm
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Build Helm dependencies
+        run: |
+          helm dependency update helm/
+          helm dependency build helm/
+
+      - name: Publish chart to NGC
+        env:
+          NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+        run: |
+          python ci/scripts/release_helm_chart.py \
+            --org nvidian \
+            --team nemo-llm \
+            --name nv-ingest \
+            --version "${{ needs.determine-version.outputs.version }}"
+
+  # ── Tag Release ───────────────────────────────────────────────────────
+  tag-release:
+    name: Tag Release
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    needs:
+      - determine-version
+      - pypi-publish
+      - nvingest-docker-publish
+      - helm-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-version.outputs.source-ref }}
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "### Git Tag" >> $GITHUB_STEP_SUMMARY
+          echo "Created and pushed tag: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+
+  # ── Announcement ─────────────────────────────────────────────────────
+  announce:
+    name: Release Announcement
+    if: always()
+    needs:
+      - determine-version
+      - pypi-build
+      - pypi-publish
+      - nvingest-docker-build
+      - nvingest-docker-publish
+      - helm-build
+      - helm-publish
+      - tag-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Slack announcement
+        env:
+          VERSION: ${{ needs.determine-version.outputs.version }}
+          DRY_RUN: ${{ inputs.dry-run }}
+          RELEASE_TYPE: ${{ inputs.release-type }}
+          SOURCE_BRANCH: ${{ needs.determine-version.outputs.source-ref }}
+          PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
+          PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
+          NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
+          NVINGEST_PUBLISH_RESULT: ${{ needs.nvingest-docker-publish.result }}
+          HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
+          HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
+          TAG_RESULT: ${{ needs.tag-release.result }}
+          SKIP_HELM: ${{ inputs.skip-helm-chart }}
+          NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          status_emoji() {
+            case "$1" in
+              success)   echo ":white_check_mark:" ;;
+              failure)   echo ":x:" ;;
+              skipped)   echo ":fast_forward:" ;;
+              cancelled) echo ":no_entry:" ;;
+              *)         echo ":grey_question:" ;;
+            esac
+          }
+
+          ALL_BUILDS_OK="true"
+          for r in "$PYPI_BUILD_RESULT" "$NVINGEST_BUILD_RESULT" "$HELM_BUILD_RESULT"; do
+            if [ "$r" != "success" ] && [ "$r" != "skipped" ]; then
+              ALL_BUILDS_OK="false"
+              break
+            fi
+          done
+
+          if [ "$DRY_RUN" = "true" ]; then
+            HEADER=":test_tube: *Release ${VERSION} — DRY RUN Complete* :test_tube:"
+          elif [ "$ALL_BUILDS_OK" = "false" ]; then
+            HEADER=":rotating_light: *Release ${VERSION} — FAILED (no artifacts published)* :rotating_light:"
+          else
+            HEADER=":rocket: *Release ${VERSION} Published* :rocket:"
+          fi
+
+          MSG="${HEADER}"
+          MSG+="\n"
+          MSG+="\n*Version:* \`${VERSION}\`"
+          MSG+="\n*Source Branch:* \`${SOURCE_BRANCH}\`"
+          MSG+="\n*Release Type:* \`${RELEASE_TYPE}\`"
+          MSG+="\n"
+          MSG+="\n*Artifacts:*"
+
+          # — PyPI —
+          if [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n$(status_emoji "$PYPI_BUILD_RESULT") *PyPI Wheels* — Built and validated (not published)"
+          elif [ "$PYPI_PUBLISH_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *PyPI Wheels* — Published to Artifactory"
+          elif [ "$PYPI_BUILD_RESULT" != "success" ]; then
+            MSG+="\n$(status_emoji "$PYPI_BUILD_RESULT") *PyPI Wheels* — Build: ${PYPI_BUILD_RESULT}"
+          else
+            MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other build failed)"
+          fi
+          MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
+
+          # — nv-ingest Docker —
+          if [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Built and validated (not pushed)"
+          elif [ "$NVINGEST_PUBLISH_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *nv-ingest Docker* — \`${NVINGEST_IMAGE}\`"
+          elif [ "$NVINGEST_BUILD_RESULT" != "success" ]; then
+            MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Build: ${NVINGEST_BUILD_RESULT}"
+          else
+            MSG+="\n$(status_emoji "$NVINGEST_PUBLISH_RESULT") *nv-ingest Docker* — Publish blocked (other build failed)"
+          fi
+
+          # — Helm Chart —
+          HELM_REF="nvidian/nemo-llm/nv-ingest:${VERSION}"
+          if [ "$SKIP_HELM" = "true" ]; then
+            MSG+="\n:fast_forward: *Helm Chart* — Disabled (skip-helm-chart)"
+          elif [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n$(status_emoji "$HELM_BUILD_RESULT") *Helm Chart* — Built and validated (not published)"
+          elif [ "$HELM_PUBLISH_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *Helm Chart* — \`${HELM_REF}\` (NGC)"
+          elif [ "$HELM_BUILD_RESULT" != "success" ]; then
+            MSG+="\n$(status_emoji "$HELM_BUILD_RESULT") *Helm Chart* — Build: ${HELM_BUILD_RESULT}"
+          else
+            MSG+="\n$(status_emoji "$HELM_PUBLISH_RESULT") *Helm Chart* — Publish blocked (other build failed)"
+          fi
+
+          # — Git Tag —
+          if [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n:fast_forward: *Git Tag* — Skipped (dry run)"
+          elif [ "$TAG_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *Git Tag* — \`${VERSION}\`"
+          else
+            MSG+="\n$(status_emoji "$TAG_RESULT") *Git Tag* — ${TAG_RESULT}"
+          fi
+
+          MSG+="\n"
+          MSG+="\n<${RUN_URL}|:github: View Workflow Run>"
+
+          echo "========================================="
+          echo "  Slack-ready announcement (copy below)"
+          echo "========================================="
+          echo -e "$MSG"
+          echo "========================================="
+
+          echo "### :mega: Slack Announcement" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo -e "$MSG" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
