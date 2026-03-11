@@ -409,11 +409,13 @@ def _greedy_wbf(
     merge_type: str = "biggest",
     conf_type: str = "max",
 ) -> tuple:
-    """Greedy single-linkage WBF matching the NIM's weighted_boxes_fusion_batched.
+    """Growing-cluster WBF matching the NIM container's weighted_boxes_fusion.
 
-    Sort by confidence descending. Each unassigned box becomes a cluster leader.
-    All unassigned boxes overlapping the leader (same class, IoU > iou_thr) join
-    that cluster. Non-transitive: only direct overlap with the leader matters.
+    Sorts by confidence descending.  Each box is compared against the current
+    *fused* representative of each existing cluster (not the original leader).
+    After a merge the representative is recalculated, so the cluster can grow
+    and absorb boxes that overlap the expanded representative even if they did
+    not overlap any original member — matching the container's snowball behaviour.
     """
     n = len(boxes)
     if n == 0:
@@ -425,55 +427,59 @@ def _greedy_wbf(
     scores = scores[order]
     labels = labels[order]
 
-    # Compute IoU matrix
-    x1 = np.maximum(boxes[:, 0:1], boxes[:, 0:1].T)
-    y1 = np.maximum(boxes[:, 1:2], boxes[:, 1:2].T)
-    x2 = np.minimum(boxes[:, 2:3], boxes[:, 2:3].T)
-    y2 = np.minimum(boxes[:, 3:4], boxes[:, 3:4].T)
-    inter = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
-    area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
-    union = area[:, None] + area[None, :] - inter
-    iou = np.where(union > 0, inter / union, 0.0)
+    # Each cluster: (fused_box [4], label, list of (box, score) members)
+    clusters: list = []  # [(fused_box, label, [(box, score), ...])]
 
-    same_class = labels[:, None] == labels[None, :]
-    adjacency = (iou > iou_thr) & same_class
-
-    # Greedy single-linkage clustering
-    cluster_ids = np.full(n, -1, dtype=np.int64)
-    num_clusters = 0
     for i in range(n):
-        if cluster_ids[i] >= 0:
-            continue
-        cluster_ids[i] = num_clusters
-        unassigned = cluster_ids < 0
-        to_assign = adjacency[i] & unassigned
-        cluster_ids[to_assign] = num_clusters
-        num_clusters += 1
+        matched = False
+        for c in clusters:
+            fused_box, c_label, members = c
+            if labels[i] != c_label:
+                continue
+            iou = _box_iou(boxes[i], fused_box)
+            if iou > iou_thr:
+                members.append((boxes[i], scores[i]))
+                # Recalculate representative
+                c[0] = _fuse_boxes(members, merge_type)
+                matched = True
+                break
+        if not matched:
+            clusters.append([boxes[i].copy(), labels[i], [(boxes[i], scores[i])]])
 
-    # Merge boxes per cluster
     fused_boxes = []
     fused_scores = []
     fused_labels = []
-    for c in range(num_clusters):
-        mask = cluster_ids == c
-        c_boxes = boxes[mask]
-        c_scores = scores[mask]
-        c_labels = labels[mask]
-
-        if merge_type == "biggest":
-            fb = np.array([c_boxes[:, 0].min(), c_boxes[:, 1].min(), c_boxes[:, 2].max(), c_boxes[:, 3].max()])
-        else:
-            w = c_scores / c_scores.sum()
-            fb = (c_boxes * w[:, None]).sum(axis=0)
-
-        fs = c_scores.max() if conf_type == "max" else c_scores.mean()
-        fl = c_labels[0]  # leader's label (highest confidence)
-
-        fused_boxes.append(fb)
+    for fused_box, label, members in clusters:
+        member_scores = np.array([s for _, s in members])
+        fs = member_scores.max() if conf_type == "max" else member_scores.mean()
+        fused_boxes.append(fused_box)
         fused_scores.append(fs)
-        fused_labels.append(fl)
+        fused_labels.append(label)
 
     return np.array(fused_boxes), np.array(fused_scores), np.array(fused_labels, dtype=np.int64)
+
+
+def _box_iou(a: "np.ndarray", b: "np.ndarray") -> float:
+    """IoU between two boxes in (x1, y1, x2, y2) format."""
+    ix1 = max(a[0], b[0])
+    iy1 = max(a[1], b[1])
+    ix2 = min(a[2], b[2])
+    iy2 = min(a[3], b[3])
+    inter = max(ix2 - ix1, 0.0) * max(iy2 - iy1, 0.0)
+    area_a = (a[2] - a[0]) * (a[3] - a[1])
+    area_b = (b[2] - b[0]) * (b[3] - b[1])
+    union = area_a + area_b - inter
+    return inter / union if union > 0 else 0.0
+
+
+def _fuse_boxes(members: list, merge_type: str) -> "np.ndarray":
+    """Recalculate the fused representative box for a cluster."""
+    boxes = np.array([b for b, _ in members])
+    if merge_type == "biggest":
+        return np.array([boxes[:, 0].min(), boxes[:, 1].min(), boxes[:, 2].max(), boxes[:, 3].max()])
+    scores = np.array([s for _, s in members])
+    w = scores / scores.sum()
+    return (boxes * w[:, None]).sum(axis=0)
 
 
 def _apply_page_elements_v3_postprocess(
