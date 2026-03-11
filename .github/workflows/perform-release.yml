@@ -1,4 +1,5 @@
 name: Perform Release
+run-name: "Perform Release ${{ inputs.version || inputs.source-branch || github.ref_name }}${{ inputs.dry-run == true && ' (dry run)' || '' }}"
 
 on:
   workflow_dispatch:
