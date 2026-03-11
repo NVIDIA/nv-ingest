@@ -27,8 +27,7 @@ jobs:
       - name: Install unit test dependencies
         run: |
           uv pip install --system -e src/ -e api/ -e client/
-          uv pip install --system -e nemo_retriever/[dev] \
-            --extra-index-url https://test.pypi.org/simple/ \
+          uv pip install --system -e nemo_retriever
 
       - name: Run retriever unit tests
         env:
