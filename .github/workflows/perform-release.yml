@@ -238,7 +238,7 @@ jobs:
       - helm-build
     runs-on: linux-large-disk
     outputs:
-      image: ${{ needs.nvingest-docker-build.outputs.image }}
+      image: ${{ steps.push.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -256,10 +256,17 @@ jobs:
           name: nv-ingest-docker-image
 
       - name: Load and push image
+        id: push
         run: |
-          IMAGE="${{ needs.nvingest-docker-build.outputs.image }}"
           echo "Loading image from tarball..."
-          gunzip -c nv-ingest-docker-image.tar.gz | docker load
+          LOAD_OUTPUT=$(gunzip -c nv-ingest-docker-image.tar.gz | docker load)
+          echo "$LOAD_OUTPUT"
+          IMAGE=$(echo "$LOAD_OUTPUT" | sed -n 's/^Loaded image: //p')
+          if [ -z "$IMAGE" ]; then
+            echo "::error::Failed to parse image name from docker load output"
+            exit 1
+          fi
+          echo "image=${IMAGE}" >> $GITHUB_OUTPUT
           echo "Pushing ${IMAGE}..."
           docker push "${IMAGE}"
 
