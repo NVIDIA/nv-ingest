@@ -105,6 +105,11 @@ class OnlineIngestor(Ingestor):
         _ = params or ExtractParams(**kwargs)
         return self
 
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "OnlineIngestor":
+        """Record image file config. API compatibility. Server must accept image MIME types."""
+        _ = params or ExtractParams(**kwargs)
+        return self
+
     def extract_txt(self, params: ExtractParams | None = None, **kwargs: Any) -> "OnlineIngestor":
         """Record txt config. API compatibility. Online mode typically serves PDF only."""
         _ = params or ExtractParams(**kwargs)

@@ -9,9 +9,10 @@
 ## Table of Contents
 
 1. [Quick Start](#quick-start) - Get running in 5 minutes
-2. [Configuration Guide](#configuration-guide) - All configuration options
-3. [How It Works](#how-it-works) - Architecture overview
-4. [Migration from V1](#migration-from-v1) - Upgrade existing code
+2. [HTTP API Reference](#http-api-reference) - Endpoint paths, methods, and status codes
+3. [Configuration Guide](#configuration-guide) - All configuration options
+4. [How It Works](#how-it-works) - Architecture overview
+5. [Migration from V1](#migration-from-v1) - Upgrade existing code
 
 
 ---
@@ -41,7 +42,7 @@ ingestor = Ingestor(
 # Run with optional chunk size override
 results = ingestor.files(["large_document.pdf"]) \
     .extract(extract_text=True, extract_tables=True) \
-    .pdf_split_config(pages_per_chunk=64) \  # ← Step 2: Configure splitting
+    .pdf_split_config(pages_per_chunk=64) \
     .ingest()
 
 print(f"Processed {results['metadata']['total_pages']} pages")
@@ -59,6 +60,63 @@ nemo-retriever \
 ```
 
 **That's it!** PDFs larger than 64 pages will be automatically split and processed in parallel.
+
+---
+
+## HTTP API Reference
+
+The following endpoint reference is provided for custom HTTP clients (curl, Postman, etc.) and debugging. Base URL is the service root (e.g. `http://localhost:7670`); use the paths below as the path component of the full URL.
+
+### Endpoint Summary
+
+| Version | Method | Endpoint | Purpose | Status codes |
+|---------|--------|----------|---------|--------------|
+| V1 | POST | `/v1/submit` | Multipart/form-data upload (curl-friendly) | 200 |
+| V1 | POST | `/v1/submit_job` | JSON job submission | 200 |
+| V1 | GET | `/v1/fetch_job/{job_id}` | Fetch job result | 200, 202, 404, 410, 503 |
+| V1 | POST | `/v1/convert` | PDF conversion | 200 |
+| V1 | GET | `/v1/status/{job_id}` | Job status check | 200 |
+| V2 | POST | `/v2/submit_job` | V2 job submission (with optional PDF splitting) | 200, 500, 503 |
+| V2 | GET | `/v2/fetch_job/{job_id}` | V2 fetch with parent job aggregation | 200, 202, 404, 410, 500, 503 |
+
+### Request and Response Overview
+
+**V1 `/v1/submit` (POST)**  
+- **Content-Type:** `multipart/form-data`  
+- **Body:** `file` (uploaded PDF)  
+- **Response:** `200` — job ID (text)
+
+**V1 `/v1/submit_job` (POST)**  
+- **Content-Type:** `application/json`  
+- **Body:** `MessageWrapper` with job spec payload (JSON)  
+- **Response:** `200` — job ID (text). Header `x-trace-id` set.
+
+**V1 `/v1/fetch_job/{job_id}` (GET)**  
+- **Path:** `job_id` — UUID returned from submit  
+- **Response:** `200` result body, `202` still processing, `404` not found, `410` result consumed, `503` processing failed
+
+**V1 `/v1/convert` (POST)**  
+- **Content-Type:** `application/json` (or as defined by endpoint)  
+- **Response:** Conversion result (format depends on request)
+
+**V1 `/v1/status/{job_id}` (GET)**  
+- **Path:** `job_id`  
+- **Response:** Job state (e.g. SUBMITTED, PROCESSING, RETRIEVED_*)
+
+**V2 `/v2/submit_job` (POST)**  
+- **Content-Type:** `application/json`  
+- **Body:** Same as V1 `submit_job`; may include PDF split config in job spec  
+- **Response:** `200` — parent job ID (text). Header `x-trace-id` set.
+
+**V2 `/v2/fetch_job/{job_id}` (GET)**  
+- **Path:** `job_id` — parent job ID from V2 submit  
+- **Response:** Same status codes as V1 fetch; when the job was split, the service aggregates all chunk results and returns a single combined response. See [HTTP status codes](#http-status-codes) below.
+
+*Endpoint reference added for custom HTTP clients and debugging (Bug 596672).*
+
+### HTTP Status Codes
+
+See the [status code table](#http-status-codes) in this guide for `200`, `202`, `404`, `410`, `500`, and `503` meanings.
 
 ---
 
@@ -114,7 +172,7 @@ PDF_SPLIT_PAGE_COUNT=64
 ```yaml
 # docker-compose.yaml (already configured)
 services:
-  nemo-retriever-ms-runtime:
+  nv-ingest-ms-runtime:
     environment:
       - PDF_SPLIT_PAGE_COUNT=${PDF_SPLIT_PAGE_COUNT:-32}
 ```
@@ -404,7 +462,7 @@ ingestor = ingestor.extract(...).ingest()
 ### Backward Compatibility
 
 **V1 clients continue to work:**
-- Still route to `/v1/submit_job` and `/v1/fetch_job`
+- Still route to `/v1/submit_job` and `/v1/fetch_job` (refer to the [HTTP API Reference](#http-api-reference) for all V1/V2 paths)
 - No changes required
 - No splitting occurs
 
@@ -415,7 +473,7 @@ ingestor = ingestor.extract(...).ingest()
 
 ---
 
-**HTTP status codes:**
+<a id="http-status-codes"></a>**HTTP status codes:**
 
 | Code | Meaning | Action |
 |------|---------|--------|
@@ -468,9 +526,9 @@ WARNING: Client requested split_page_count=1000; clamped to 128
 
 ### Key Files
 
-**Server Implementation:**
-- `src/nemo_retriever/api/v2/ingest.py` - V2 endpoints
-- `src/nemo_retriever/framework/util/service/impl/ingest/redis_ingest_service.py` - Redis state management
+**Server Implementation (this repo: `nv_ingest`, refer to the [NeMo-Retriever](https://github.com/NVIDIA/NeMo-Retriever.git) for client):**
+- `src/nv_ingest/api/v2/ingest.py` - V2 endpoints
+- `src/nv_ingest/framework/util/service/impl/ingest/redis_ingest_service.py` - Redis state management
 
 **Client Implementation:**
 - `client/src/nemo_retriever/client/interface.py` - Ingestor class
