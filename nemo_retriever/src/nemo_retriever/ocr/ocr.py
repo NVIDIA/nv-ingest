@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import base64
 import io
+import os
 import time
 import traceback
 
@@ -39,6 +40,39 @@ except Exception:  # pragma: no cover
 # content like tables/charts/infographics).  Used by the OCR stage to
 # decide which detections contribute to the page's ``text`` column.
 _TEXT_LABELS: frozenset[str] = frozenset({"text", "title", "header_footer"})
+
+# ---------------------------------------------------------------------------
+# Debug: save OCR crops to disk
+# ---------------------------------------------------------------------------
+
+_DEBUG_OCR_CROPS_DIR = os.environ.get("DEBUG_OCR_CROPS_DIR", "")
+
+
+def _save_debug_crops(
+    crops: List[Tuple[str, List[float], Any]],
+    row_idx: int,
+    *,
+    is_b64: bool,
+) -> None:
+    """Save cropped images to ``_DEBUG_OCR_CROPS_DIR`` for visual inspection."""
+    if not _DEBUG_OCR_CROPS_DIR:
+        return
+    os.makedirs(_DEBUG_OCR_CROPS_DIR, exist_ok=True)
+    for crop_idx, (label_name, bbox, value) in enumerate(crops):
+        fname = f"row{row_idx:04d}_crop{crop_idx:03d}_{label_name}.png"
+        path = os.path.join(_DEBUG_OCR_CROPS_DIR, fname)
+        try:
+            if is_b64:
+                raw = base64.b64decode(value)
+                with open(path, "wb") as f:
+                    f.write(raw)
+            else:
+                img = Image.fromarray(value.astype(np.uint8), mode="RGB")
+                img.save(path, format="PNG")
+                img.close()
+        except Exception as exc:
+            print(f"Warning: failed to save debug crop {path}: {exc}")
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -495,7 +529,7 @@ def ocr_page_elements(
 
     t0_total = time.perf_counter()
 
-    for row in batch_df.itertuples(index=False):
+    for row_idx, row in enumerate(batch_df.itertuples(index=False)):
         table_items: List[Dict[str, Any]] = []
         chart_items: List[Dict[str, Any]] = []
         infographic_items: List[Dict[str, Any]] = []
@@ -535,6 +569,7 @@ def ocr_page_elements(
             # --- decode page image once, crop all matching detections ---
             if use_remote:
                 crops = _crop_all_from_page(page_image_b64, dets, row_wanted, as_b64=True)
+                _save_debug_crops(crops, row_idx, is_b64=True)
                 crop_b64s: List[str] = [b64 for _label, _bbox, b64 in crops]
                 crop_meta: List[Tuple[str, List[float]]] = [(label, bbox) for label, bbox, _b64 in crops]
 
@@ -588,6 +623,7 @@ def ocr_page_elements(
                             row_ocr_text_blocks.extend(blocks)
             else:
                 crops = _crop_all_from_page(page_image_b64, dets, row_wanted)
+                _save_debug_crops(crops, row_idx, is_b64=False)
 
                 if inference_batch_size is None or inference_batch_size < 1:
                     raise ValueError(

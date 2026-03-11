@@ -189,6 +189,12 @@ def main(
         "--debug/--no-debug",
         help="Enable debug-level logging for this full pipeline run.",
     ),
+    dpi: int = typer.Option(
+        200,
+        "--dpi",
+        min=72,
+        help="Render DPI for PDF page images (default: 200).",
+    ),
     input_path: Path = typer.Argument(
         ...,
         help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
@@ -440,6 +446,10 @@ def main(
         "--use-graphic-elements",
         help="Enable the combined graphic-elements + OCR stage for charts (requires extract_charts).",
     ),
+    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
+    refine_factor: int = typer.Option(
+        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
+    ),
     use_table_structure: bool = typer.Option(
         False,
         "--use-table-structure",
@@ -627,6 +637,7 @@ def main(
         def _extract_params(batch_tuning: dict, **overrides: Any) -> ExtractParams:
             return ExtractParams(
                 method=method,
+                dpi=int(dpi),
                 extract_text=True,
                 extract_tables=True,
                 extract_charts=True,
@@ -766,6 +777,8 @@ def main(
             ks=(1, 5, 10),
             hybrid=hybrid,
             match_mode=recall_match_mode,
+            nprobes=nprobes,
+            refine_factor=refine_factor,
         )
 
         # Capture recall only times.

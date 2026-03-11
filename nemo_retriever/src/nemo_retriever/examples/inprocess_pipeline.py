@@ -168,6 +168,10 @@ def main(
         "--graphic-elements-invoke-url",
         help="Optional remote endpoint URL for graphic-elements model inference.",
     ),
+    nprobes: int = typer.Option(0, "--nprobes", help="Number of IVF partitions to probe (0 = all partitions)."),
+    refine_factor: int = typer.Option(
+        10, "--refine-factor", help="Re-rank factor for SQ quantization error correction."
+    ),
 ) -> None:
     if gpu_devices is not None and num_gpus is not None:
         raise typer.BadParameter("--gpu-devices and --num-gpus are mutually exclusive.")
@@ -375,6 +379,8 @@ def main(
         embedding_http_endpoint=embed_invoke_url,
         top_k=10,
         ks=(1, 5, 10),
+        nprobes=nprobes,
+        refine_factor=refine_factor,
     )
 
     _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
