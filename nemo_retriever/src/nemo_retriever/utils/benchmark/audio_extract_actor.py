@@ -55,58 +55,16 @@ class MockASRActor:
 app = typer.Typer(help="Benchmark audio extraction (MediaChunkActor + ASRActor) throughput (chunk rows/sec).")
 
 
-@app.command("run")
-def run(
-    audio_path: Path = typer.Option(
-        ...,
-        "--audio-path",
-        exists=True,
-        dir_okay=False,
-        file_okay=True,
-        help="Input audio file (e.g. WAV, MP3).",
-    ),
-    rows: int = typer.Option(
-        16,
-        "--rows",
-        min=1,
-        help="Number of source-file rows to replicate for each trial.",
-    ),
-    workers: str = typer.Option(
-        "1,2",
-        "--workers",
-        help="Comma-separated worker counts to try.",
-    ),
-    batch_sizes: str = typer.Option(
-        "2,4,8",
-        "--batch-sizes",
-        help="Comma-separated Ray batch sizes to try.",
-    ),
-    mock_asr: bool = typer.Option(
-        True,
-        "--mock-asr/--no-mock-asr",
-        help="Use mock ASR (no GPU/Parakeet); when False, uses local or remote ASR from env.",
-    ),
-    split_type: str = typer.Option(
-        "size",
-        "--split-type",
-        help="Chunk split type: size, time, or frame.",
-    ),
-    split_interval: int = typer.Option(
-        450,
-        "--split-interval",
-        min=1,
-        help="Chunk split interval (bytes/seconds/frames).",
-    ),
-    ray_address: Optional[str] = typer.Option(
-        None,
-        "--ray-address",
-        help="Ray address (default local).",
-    ),
-    output_json: Optional[Path] = typer.Option(
-        None,
-        "--output-json",
-        help="Optional output JSON summary path.",
-    ),
+def run_benchmark(
+    audio_path: Path,
+    rows: int = 16,
+    workers: str = "1,2",
+    batch_sizes: str = "2,4,8",
+    mock_asr: bool = True,
+    split_type: str = "size",
+    split_interval: int = 450,
+    ray_address: Optional[str] = None,
+    output_json: Optional[Path] = None,
 ) -> None:
     if not is_media_available():
         raise typer.BadParameter("Audio benchmark requires ffmpeg on PATH.")
@@ -162,3 +120,69 @@ def run(
         f"chunk_rows={best.rows} elapsed={best.elapsed_seconds:.3f}s rows_per_second={best.rows_per_second:.2f}"
     )
     maybe_write_results_json(output_json, best=best, results=results)
+
+
+@app.command("run")
+def run(
+    audio_path: Path = typer.Option(
+        ...,
+        "--audio-path",
+        exists=True,
+        dir_okay=False,
+        file_okay=True,
+        help="Input audio file (e.g. WAV, MP3).",
+    ),
+    rows: int = typer.Option(
+        16,
+        "--rows",
+        min=1,
+        help="Number of source-file rows to replicate for each trial.",
+    ),
+    workers: str = typer.Option(
+        "1,2",
+        "--workers",
+        help="Comma-separated worker counts to try.",
+    ),
+    batch_sizes: str = typer.Option(
+        "2,4,8",
+        "--batch-sizes",
+        help="Comma-separated Ray batch sizes to try.",
+    ),
+    mock_asr: bool = typer.Option(
+        True,
+        "--mock-asr/--no-mock-asr",
+        help="Use mock ASR (no GPU/Parakeet); when False, uses local or remote ASR from env.",
+    ),
+    split_type: str = typer.Option(
+        "size",
+        "--split-type",
+        help="Chunk split type: size, time, or frame.",
+    ),
+    split_interval: int = typer.Option(
+        450,
+        "--split-interval",
+        min=1,
+        help="Chunk split interval (bytes/seconds/frames).",
+    ),
+    ray_address: Optional[str] = typer.Option(
+        None,
+        "--ray-address",
+        help="Ray address (default local).",
+    ),
+    output_json: Optional[Path] = typer.Option(
+        None,
+        "--output-json",
+        help="Optional output JSON summary path.",
+    ),
+) -> None:
+    run_benchmark(
+        audio_path=audio_path,
+        rows=rows,
+        workers=workers,
+        batch_sizes=batch_sizes,
+        mock_asr=mock_asr,
+        split_type=split_type,
+        split_interval=split_interval,
+        ray_address=ray_address,
+        output_json=output_json,
+    )
