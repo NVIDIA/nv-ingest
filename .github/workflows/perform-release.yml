@@ -102,6 +102,15 @@ jobs:
         run: |
           echo "image=${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ needs.determine-version.outputs.version }}" >> $GITHUB_OUTPUT
 
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
       - name: Build image (validate)
         uses: docker/build-push-action@v5
         with:
@@ -111,10 +120,10 @@ jobs:
           target: runtime
           platforms: linux/amd64
           build-args: |
-            HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }}
             DOWNLOAD_LLAMA_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
           tags: ${{ steps.meta.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-to: type=gha,scope=nvingest,mode=max
           cache-from: type=gha,scope=nvingest
 
@@ -215,6 +224,15 @@ jobs:
         with:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Create HF token file
+        env:
+          HF_ACCESS_TOKEN: ${{ secrets.HF_ACCESS_TOKEN }}
+        run: |
+          mkdir -p ./scripts/private_local
+          if [ -n "${HF_ACCESS_TOKEN}" ]; then
+            printf '%s' "${HF_ACCESS_TOKEN}" > ./scripts/private_local/hf_token.txt
+          fi
+
       - name: Build and push multi-platform image
         uses: docker/build-push-action@v5
         with:
@@ -223,10 +241,10 @@ jobs:
           target: runtime
           platforms: linux/amd64,linux/arm64
           build-args: |
-            HF_ACCESS_TOKEN=${{ secrets.HF_ACCESS_TOKEN }}
             DOWNLOAD_LLAMA_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
           tags: ${{ needs.nvingest-docker-build.outputs.image }}
+          secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-from: type=gha,scope=nvingest
 
   helm-publish:
