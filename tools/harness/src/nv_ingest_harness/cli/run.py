@@ -120,7 +120,7 @@ def run_datasets(
 
             # Default to local reranker if not explicitly configured
             if not os.environ.get("RERANKER_NIM_ENDPOINT"):
-                os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8020/v1/ranking"
+                os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8015/v1/ranking"
 
             # Set collection_name from dataset if not set
             if case == "recall" and not config.collection_name:

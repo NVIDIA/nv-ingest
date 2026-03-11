@@ -26,7 +26,7 @@ runs:
 # Recall configuration (applies to all e2e_recall runs)
 recall:
   reranker_mode: both  # Options: "none", "with", "both"
-  reranker_endpoint: http://localhost:8020/v1/ranking  # Local container
+  reranker_endpoint: http://localhost:8015/v1/ranking  # Local container
   top_k: 10
 
 # Sinks configuration
