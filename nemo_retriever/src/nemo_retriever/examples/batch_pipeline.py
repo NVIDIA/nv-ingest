@@ -106,28 +106,6 @@ def _configure_logging(log_file: Optional[Path], *, debug: bool = False) -> tupl
     return fh, original_stdout, original_stderr
 
 
-def _to_int(value: object, default: int = 0) -> int:
-    try:
-        if value is None:
-            return default
-        return int(value)
-    except Exception:
-        return default
-
-
-def _collect_detection_summary(uri: str, table_name: str) -> Optional[dict]:
-    """Collect per-model detection totals deduped by (source_id, page_number)."""
-    from nemo_retriever.utils.detection_summary import collect_detection_summary_from_lancedb
-
-    return collect_detection_summary_from_lancedb(uri, table_name)
-
-
-def _print_detection_summary(summary: Optional[dict]) -> None:
-    from nemo_retriever.utils.detection_summary import print_detection_summary
-
-    print_detection_summary(summary)
-
-
 def _extract_error_payloads(v: object) -> list[object]:
     """Recursively extract only error payloads from nested values."""
     payloads: list[object] = []
@@ -159,26 +137,6 @@ def _extract_error_payloads(v: object) -> list[object]:
     return payloads
 
 
-def _write_detection_summary(path: Path, summary: Optional[dict]) -> None:
-    target = Path(path).expanduser().resolve()
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = summary if summary is not None else {"error": "Detection summary unavailable."}
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
-
-
-def _print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: float) -> None:
-    if ingest_elapsed_s <= 0:
-        print("Pages/sec: unavailable (ingest elapsed time was non-positive).")
-        return
-    if processed_pages is None:
-        print("Pages/sec: unavailable (could not estimate processed pages). " f"Ingest time: {ingest_elapsed_s:.2f}s")
-        return
-
-    pps = processed_pages / ingest_elapsed_s
-    print(f"Pages processed: {processed_pages}")
-    print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
-
-
 def _count_materialized_rows(dataset: object) -> int:
     """Count rows from a materialized Ray Dataset without relying on ``len()``."""
     count = getattr(dataset, "count", None)
@@ -206,26 +164,6 @@ def _ensure_lancedb_table(uri: str, table_name: str) -> None:
     schema = lancedb_schema()
     empty = pa.table({f.name: [] for f in schema}, schema=schema)
     db.create_table(table_name, data=empty, schema=schema, mode="create")
-
-
-def _gold_to_doc_page(golden_key: str) -> tuple[str, str]:
-    s = str(golden_key)
-    if "_" not in s:
-        return s, ""
-    doc, page = s.rsplit("_", 1)
-    return doc, page
-
-
-def _hit_key_and_distance(hit: dict) -> tuple[str | None, float | None]:
-
-    source_id = hit.get("source_id")
-    page_number = hit.get("page_number")
-    if not source_id or page_number is None:
-        return None, float(hit.get("_distance")) if "_distance" in hit else None
-
-    key = f"{Path(str(source_id)).stem}_{page_number}"
-    dist = float(hit["_distance"]) if "_distance" in hit else float(hit["_score"]) if "_score" in hit else None
-    return key, dist
 
 
 @app.command()
@@ -498,6 +436,13 @@ def main(
             "Optional remote endpoint URL for table-structure model inference "
             "(used when --table-output-format=markdown)."
         ),
+    ),
+    reranker: Optional[str] = typer.Option(
+        "nvidia/llama-nemotron-rerank-1b-v2",
+        "--reranker",
+        help="HuggingFace model ID for local reranking "
+        "(e.g. 'nvidia/llama-nemotron-rerank-1b-v2'). Set to None to "
+        "skip reranking (default).",
     ),
 ) -> None:
     log_handle, original_stdout, original_stderr = _configure_logging(log_file, debug=bool(debug))
@@ -788,6 +733,7 @@ def main(
             ks=(1, 5, 10),
             hybrid=hybrid,
             match_mode=recall_match_mode,
+            reranker=reranker,
         )
 
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
