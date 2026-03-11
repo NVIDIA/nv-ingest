@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any, Optional, TextIO
 
 from nemo_retriever.examples.common import estimate_processed_pages
+from nemo_retriever.utils.detection_summary import print_run_summary
 import ray
 import typer
 from nemo_retriever import create_ingestor
@@ -770,19 +771,26 @@ def main(
             match_mode=recall_match_mode,
         )
 
+        # Capture recall only times.
+        recall_start = time.perf_counter()
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
-
-        logger.info("\nRecall metrics (matching nemo_retriever.recall.core):")
-        for k, v in metrics.items():
-            logger.info(f"  {k}: {v:.4f}")
+        recall_total_time = time.perf_counter() - recall_start
 
         # Print runtimes for easy user viewing at end
         num_rows = estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
+        print_run_summary(
+            num_rows,
+            input_path,
+            hybrid,
+            lancedb_uri,
+            LANCEDB_TABLE,
+            ingestion_only_total_time,
+            ray_dataset_download_time,
+            lancedb_write_time,
+            recall_total_time,
+            metrics,
+        )
 
-        logger.info(f"Ingestion only total time: {ingestion_only_total_time:.2f} seconds")
-        logger.info(f"Ray dataset download time: {ray_dataset_download_time:.2f} seconds")
-        logger.info(f"Lancedb write time: {lancedb_write_time:.2f} seconds")
-        logger.info(f"Number of rows: {num_rows}")
     finally:
         # Restore real stdio before closing the mirror file so exception hooks
         # and late flushes never write to a closed stream wrapper.

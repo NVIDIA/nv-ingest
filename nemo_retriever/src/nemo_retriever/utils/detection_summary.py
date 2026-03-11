@@ -13,6 +13,7 @@ be shared.
 
 from __future__ import annotations
 
+from datetime import datetime
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -194,3 +195,57 @@ def print_pages_per_second(processed_pages: Optional[int], ingest_elapsed_s: flo
     pps = processed_pages / ingest_elapsed_s
     print(f"Pages processed: {processed_pages}")
     print(f"Pages/sec (ingest only; excludes Ray startup and recall): {pps:.2f}")
+
+
+def _fmt_time(seconds: float) -> str:
+    """Format *seconds* as ``raw / H.MM.SS:mmm``."""
+    ms = int(round(seconds * 1000))
+    h, remainder = divmod(ms, 3_600_000)
+    m, remainder = divmod(remainder, 60_000)
+    s, millis = divmod(remainder, 1000)
+    return f"{seconds:.2f}s / {h}.{m:02d}.{s:02d}:{millis:03d}"
+
+
+def print_run_summary(
+    processed_pages: Optional[int],
+    input_path: Path,
+    hybrid: bool,
+    lancedb_uri: str,
+    lancedb_table_name: str,
+    total_time: float,
+    ingest_only_total_time: float,
+    ray_dataset_download_total_time: float,
+    lancedb_write_total_time: float,
+    recall_total_time: float,
+    recall_metrics: Dict[str, float],
+) -> None:
+    ingest_only_pps = processed_pages / ingest_only_total_time
+    ingest_and_lancedb_write_pps = processed_pages / (ingest_only_total_time + lancedb_write_total_time)
+    recall_qps = processed_pages / recall_total_time
+    total_pps = processed_pages / total_time
+    utc_now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"===== Run Summary - {utc_now} UTC =====\n")
+
+    print("Run Configuration:\n")
+    print(f"\tInput path: {input_path}")
+    print(f"\tHybrid: {hybrid}")
+    print(f"\tLancedb URI: {lancedb_uri}")
+    print(f"\tLancedb Table: {lancedb_table_name}\n")
+
+    print("Runtimes:\n")
+    print(f"\tTotal pages processed: {processed_pages} from {input_path}")
+    print(f"\tIngestion only time: {_fmt_time(ingest_only_total_time)}")
+    print(f"\tRay dataset download time: {_fmt_time(ray_dataset_download_total_time)}")
+    print(f"\tLanceDB Write Time: {_fmt_time(lancedb_write_total_time)}")
+    print(f"\tRecall time: {_fmt_time(recall_total_time)}\n")
+
+    print("PPS:\n")
+    print(f"\tIngestion only PPS: {ingest_only_pps:.2f}")
+    print(f"\tIngestion + LanceDB Write PPS: {ingest_and_lancedb_write_pps:.2f}")
+    print(f"\tRecall QPS: {recall_qps:.2f}")
+    print(f"\tTotal - Processed: {processed_pages} pages in {_fmt_time(total_time)} @ {total_pps:.2f} PPS")
+
+    print("Recall metrics:\n")
+    for k, v in recall_metrics.items():
+        print(f"  {k}: {v:.4f}")
