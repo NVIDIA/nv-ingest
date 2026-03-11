@@ -70,7 +70,7 @@ nimOperator:
       - name: OMP_NUM_THREADS
         value: "1"
 
-  nemoretriever_ocr_v1:
+  ocr:
     env:
       - name: OMP_NUM_THREADS
         value: "8"
@@ -81,7 +81,7 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "1"
 
-  llama_3_2_nv_rerankqa_1b_v2:
+  rerankqa:
     env:
       - name: NIM_HTTP_API_PORT
         value: "8000"

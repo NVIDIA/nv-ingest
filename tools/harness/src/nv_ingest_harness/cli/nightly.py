@@ -264,7 +264,7 @@ def main(
 
     os.environ["RERANKER_MODE"] = reranker_mode
     # Use local reranker container instead of build API
-    reranker_endpoint = recall_config.get("reranker_endpoint", "http://localhost:8020/v1/ranking")
+    reranker_endpoint = recall_config.get("reranker_endpoint", "http://localhost:8015/v1/ranking")
     os.environ["RERANKER_NIM_ENDPOINT"] = reranker_endpoint
     # Pass recall_top_k from nightly config to harness
     recall_top_k = recall_config.get("top_k", 10)
@@ -342,8 +342,9 @@ def main(
             print("Failed to start services")
             return 1
 
-        # Wait for readiness
-        if not service_manager.check_readiness(service_config.readiness_timeout):
+        # Wait for readiness (skip Milvus check when using LanceDB)
+        check_milvus = service_config.vdb_backend == "milvus"
+        if not service_manager.check_readiness(service_config.readiness_timeout, check_milvus=check_milvus):
             print("Services failed to become ready")
             service_manager.stop()
             return 1
