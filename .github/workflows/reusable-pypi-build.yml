@@ -18,6 +18,11 @@ on:
         required: false
         type: string
         default: 'main'
+      workflow-ref:
+        description: 'Git ref of the workflow branch (used to overlay pyproject.toml files)'
+        required: false
+        type: string
+        default: ''
       runner:
         description: 'GitHub runner to use'
         required: false
@@ -39,6 +44,12 @@ jobs:
         uses: actions/checkout@v5
         with:
           ref: ${{ inputs.source-ref }}
+
+      - name: Overlay build config from workflow branch
+        if: ${{ inputs.workflow-ref != '' && inputs.workflow-ref != inputs.source-ref }}
+        run: |
+          git fetch --depth=1 origin "${{ inputs.workflow-ref }}"
+          git checkout FETCH_HEAD -- api/pyproject.toml client/pyproject.toml src/pyproject.toml nemo_retriever/pyproject.toml
 
       - name: Determine version
         id: set-version

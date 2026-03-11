@@ -90,6 +90,7 @@ jobs:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: ${{ inputs.release-type }}
       source-ref: ${{ needs.determine-version.outputs.source-ref }}
+      workflow-ref: ${{ github.ref_name }}
       runner: linux-large-disk
 
   nvingest-docker-build:
