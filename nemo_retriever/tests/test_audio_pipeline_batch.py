@@ -96,6 +96,7 @@ def test_batch_audio_pipeline_with_mocked_asr(tmp_path: Path):
                 runtime_env={"working_dir": str(_nv_ingest_root)},
             )
             results = ingestor.ingest()
+            results = results._rd_dataset.take_all() if results is not None else None
         finally:
             try:
                 ray.shutdown()
@@ -219,6 +220,7 @@ def test_fused_audio_pipeline_with_mocked_asr(tmp_path: Path):
                 runtime_env={"working_dir": str(_nv_ingest_root)},
             )
             results = ingestor.ingest()
+            results = results._rd_dataset.take_all() if results is not None else None
         finally:
             try:
                 ray.shutdown()

@@ -64,6 +64,9 @@ class Retriever:
     """Tokenizer truncation length for local reranking (max 8 192)."""
     reranker_batch_size: int = 32
     """GPU micro-batch size for local reranking."""
+    reranker_refine_factor: int = 4
+    """Number of candidates to rerank = top_k * reranker_refine_factor.
+    Set to 1 to rerank only the top_k results."""
     # Internal cache for the local rerank model (not part of the public API).
     _reranker_model: Any = field(default=None, init=False, repr=False, compare=False)
 
@@ -147,7 +150,7 @@ class Retriever:
         for i, vector in enumerate(query_vectors):
             q = np.asarray(vector, dtype="float32")
             # doubling top_k for both hybrid and dense search in order to have more to rerank
-            top_k = self.top_k if not self.reranker else self.top_k * 4
+            top_k = self.top_k if not self.reranker else self.top_k * self.reranker_refine_factor
             if self.hybrid:
                 from lancedb.rerankers import RRFReranker  # type: ignore
 
@@ -281,7 +284,11 @@ class Retriever:
             query_vectors=vectors,
             query_texts=query_texts,
         )
+
         if self.reranker:
+            assert self.top_k * self.reranker_refine_factor == len(
+                results[0]
+            ), "top_k must be at least 1/4 of the number of retrieved hits for reranking to work properly."
             results = self._rerank_results(query_texts, results)
 
         return results

@@ -198,7 +198,7 @@ class TestLancedbSchema:
         assert "text" in names
         assert "metadata" in names
         assert "source" in names
-        assert len(names) == 10
+        assert len(names) == 9
 
 
 class TestInferVectorDim:
