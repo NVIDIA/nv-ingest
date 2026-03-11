@@ -23,7 +23,7 @@ on:
         description: '⛔ SKIP Helm chart — disable Helm build and publish entirely'
         required: false
         type: boolean
-        default: true
+        default: false
       release-type:
         description: 'Release type for PyPI packages'
         required: false
@@ -95,7 +95,7 @@ jobs:
       image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -123,7 +123,7 @@ jobs:
           fi
 
       - name: Build image (validate)
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           push: false
@@ -144,7 +144,7 @@ jobs:
           ls -lh nv-ingest-docker-image.tar.gz
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: nv-ingest-docker-image
           path: nv-ingest-docker-image.tar.gz
@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -192,7 +192,7 @@ jobs:
           helm dependency build helm/
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -209,7 +209,7 @@ jobs:
             --dry-run
 
       - name: Upload Helm chart artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: helm-chart
           path: nv-ingest-*.tgz
@@ -234,7 +234,7 @@ jobs:
       image: ${{ needs.nvingest-docker-build.outputs.image }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -244,7 +244,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: nv-ingest-docker-image
 
@@ -272,7 +272,7 @@ jobs:
       NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
@@ -291,7 +291,7 @@ jobs:
             | tar xz -C /usr/local/bin helm-docs
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.12'
 
@@ -349,7 +349,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ needs.determine-version.outputs.source-ref }}
 
