@@ -3,8 +3,13 @@ name: Perform Release
 on:
   workflow_dispatch:
     inputs:
+      source-branch:
+        description: '*** SOURCE BRANCH *** — Branch to build artifacts from (leave empty to use the branch selected above)'
+        required: false
+        type: string
+        default: ''
       version:
-        description: 'Override release version (leave empty to derive from branch name)'
+        description: 'Override release version (leave empty to derive from source branch name)'
         required: false
         type: string
         default: ''
@@ -31,24 +36,34 @@ jobs:
     name: Determine Release Version
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.resolve.outputs.version }}
+      source-ref: ${{ steps.resolve.outputs.source_ref }}
     steps:
-      - name: Determine version
-        id: version
+      - name: Resolve source branch and version
+        id: resolve
         run: |
+          if [ -n "${{ inputs.source-branch }}" ]; then
+            SOURCE_REF="${{ inputs.source-branch }}"
+          else
+            SOURCE_REF="${{ github.ref_name }}"
+          fi
+          echo "source_ref=$SOURCE_REF" >> $GITHUB_OUTPUT
+
           if [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
             echo "Using explicit version: $VERSION"
           else
-            VERSION="${{ github.ref_name }}"
-            echo "Derived version from branch: $VERSION"
+            VERSION="$SOURCE_REF"
+            echo "Derived version from source branch: $VERSION"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+
           echo "### Release Configuration" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Version | \`$VERSION\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Source Branch | \`$SOURCE_REF\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry Run | \`${{ inputs.dry-run }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "| Release Type | \`${{ inputs.release-type }}\` |" >> $GITHUB_STEP_SUMMARY
 
@@ -64,7 +79,7 @@ jobs:
     with:
       version: ${{ needs.determine-version.outputs.version }}
       release-type: ${{ inputs.release-type }}
-      source-ref: ${{ github.ref_name }}
+      source-ref: ${{ needs.determine-version.outputs.source-ref }}
       runner: linux-large-disk
 
   nvingest-docker-build:
@@ -77,7 +92,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Docker Buildx
         uses: ./.github/actions/setup-docker-buildx
@@ -113,7 +128,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
           fetch-depth: 0
 
       - name: Setup Docker Buildx
@@ -145,7 +160,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -223,7 +238,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Docker Buildx
         uses: ./.github/actions/setup-docker-buildx
@@ -264,7 +279,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
           fetch-depth: 0
 
       - name: Setup Docker Buildx
@@ -308,7 +323,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Setup Helm
         uses: azure/setup-helm@v4
@@ -384,7 +399,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: ${{ needs.determine-version.outputs.source-ref }}
 
       - name: Create and push tag
         run: |
@@ -416,7 +431,7 @@ jobs:
           VERSION: ${{ needs.determine-version.outputs.version }}
           DRY_RUN: ${{ inputs.dry-run }}
           RELEASE_TYPE: ${{ inputs.release-type }}
-          BASE_BRANCH: ${{ github.ref_name }}
+          SOURCE_BRANCH: ${{ needs.determine-version.outputs.source-ref }}
           PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
           PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
           NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
@@ -459,7 +474,7 @@ jobs:
           MSG="${HEADER}"
           MSG+="\n"
           MSG+="\n*Version:* \`${VERSION}\`"
-          MSG+="\n*Branch:* \`${BASE_BRANCH}\`"
+          MSG+="\n*Source Branch:* \`${SOURCE_BRANCH}\`"
           MSG+="\n*Release Type:* \`${RELEASE_TYPE}\`"
           MSG+="\n"
           MSG+="\n*Artifacts:*"
