@@ -398,6 +398,7 @@ jobs:
           SOURCE_BRANCH: ${{ needs.determine-version.outputs.source-ref }}
           PYPI_BUILD_RESULT: ${{ needs.pypi-build.result }}
           PYPI_PUBLISH_RESULT: ${{ needs.pypi-publish.result }}
+          PYPI_VERSION: ${{ needs.pypi-build.outputs.version }}
           NVINGEST_BUILD_RESULT: ${{ needs.nvingest-docker-build.result }}
           NVINGEST_PUBLISH_RESULT: ${{ needs.nvingest-docker-publish.result }}
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
@@ -406,7 +407,9 @@ jobs:
           SKIP_DOCKER: ${{ inputs.skip-docker }}
           SKIP_HELM: ${{ inputs.skip-helm-chart }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
+          REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
         run: |
           status_emoji() {
             case "$1" in
@@ -434,6 +437,9 @@ jobs:
             HEADER=":rocket: *Release ${VERSION} Published* :rocket:"
           fi
 
+          PIP_VER="${PYPI_VERSION:-${VERSION}}"
+          TAG_URL="${REPO_URL}/releases/tag/${VERSION}"
+
           MSG="${HEADER}"
           MSG+="\n"
           MSG+="\n*Version:* \`${VERSION}\`"
@@ -452,7 +458,10 @@ jobs:
           else
             MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other publish failed)"
           fi
-          MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
+          MSG+="\n    \`nv-ingest-api==${PIP_VER}\`  \`nv-ingest-client==${PIP_VER}\`  \`nv-ingest==${PIP_VER}\`  \`nemo-retriever==${PIP_VER}\`"
+          MSG+="\n"
+          MSG+="\n    *Quick install:*"
+          MSG+="\n    \`\`\`pip install --index-url ${ARTIFACTORY_URL} nv-ingest-api==${PIP_VER} nv-ingest-client==${PIP_VER} nv-ingest==${PIP_VER} nemo-retriever==${PIP_VER}\`\`\`"
 
           # — nv-ingest Docker —
           if [ "$SKIP_DOCKER" = "true" ]; then
@@ -461,6 +470,7 @@ jobs:
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Built and validated (not pushed)"
           elif [ "$NVINGEST_PUBLISH_RESULT" = "success" ]; then
             MSG+="\n:white_check_mark: *nv-ingest Docker* — \`${NVINGEST_IMAGE}\`"
+            MSG+="\n    \`\`\`docker pull ${NVINGEST_IMAGE}\`\`\`"
           elif [ "$NVINGEST_BUILD_RESULT" != "success" ]; then
             MSG+="\n$(status_emoji "$NVINGEST_BUILD_RESULT") *nv-ingest Docker* — Build: ${NVINGEST_BUILD_RESULT}"
           else
@@ -485,7 +495,7 @@ jobs:
           if [ "$DRY_RUN" = "true" ]; then
             MSG+="\n:fast_forward: *Git Tag* — Skipped (dry run)"
           elif [ "$TAG_RESULT" = "success" ]; then
-            MSG+="\n:white_check_mark: *Git Tag* — \`${VERSION}\`"
+            MSG+="\n:white_check_mark: *Git Tag* — <${TAG_URL}|\`${VERSION}\`>"
           else
             MSG+="\n$(status_emoji "$TAG_RESULT") *Git Tag* — ${TAG_RESULT}"
           fi
