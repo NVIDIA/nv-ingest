@@ -777,7 +777,7 @@ def main(
 
         # This processing has nothing to do with processing or performance so we exclude
         # it from the runtimes. Just getting row counts for metrics ...
-        num_rows = ingestor.get_dataset().group_by("source_id").count().count()
+        num_rows = ingest_results.groupby("source_id").count().count()
 
         ray.shutdown()
 
