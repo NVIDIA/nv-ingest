@@ -225,27 +225,27 @@ def print_run_summary(
     total_pps = processed_pages / total_time
     utc_now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
-    print(f"===== Run Summary - {utc_now} UTC =====\n")
+    print(f"===== Run Summary - {utc_now} UTC =====")
 
-    print("Run Configuration:\n")
+    print("Run Configuration:")
     print(f"\tInput path: {input_path}")
     print(f"\tHybrid: {hybrid}")
     print(f"\tLancedb URI: {lancedb_uri}")
     print(f"\tLancedb Table: {lancedb_table_name}\n")
 
-    print("Runtimes:\n")
+    print("Runtimes:")
     print(f"\tTotal pages processed: {processed_pages} from {input_path}")
     print(f"\tIngestion only time: {_fmt_time(ingest_only_total_time)}")
     print(f"\tRay dataset download time: {_fmt_time(ray_dataset_download_total_time)}")
     print(f"\tLanceDB Write Time: {_fmt_time(lancedb_write_total_time)}")
     print(f"\tRecall time: {_fmt_time(recall_total_time)}\n")
 
-    print("PPS:\n")
+    print("PPS:")
     print(f"\tIngestion only PPS: {ingest_only_pps:.2f}")
     print(f"\tIngestion + LanceDB Write PPS: {ingest_and_lancedb_write_pps:.2f}")
     print(f"\tRecall QPS: {recall_qps:.2f}")
     print(f"\tTotal - Processed: {processed_pages} pages in {_fmt_time(total_time)} @ {total_pps:.2f} PPS")
 
-    print("Recall metrics:\n")
+    print("Recall metrics:")
     for k, v in recall_metrics.items():
         print(f"  {k}: {v:.4f}")
