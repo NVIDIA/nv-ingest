@@ -10,11 +10,15 @@ helm dependency build helm/
     -t nemo-llm
     -v 24.06
     -n nv-ingest
+
+Requires: pip install ngcsdk pyyaml
+Env vars: NGC_CLI_API_KEY (required for publish)
 """
 
 import argparse
 import os
 import subprocess
+import sys
 
 import yaml
 
@@ -101,17 +105,13 @@ def main() -> None:
         shell=True,
     )
 
-    # Update the version and chart name
     chart = yaml.safe_load(open(f"dist/{n}/Chart.yaml").read())
     chart["name"] = n
     chart["version"] = v
     with open(f"dist/{n}/Chart.yaml", "w") as f:
         f.write(yaml.safe_dump(chart))
 
-    # Update the README.md
     overview = f"dist/{n}/README.md"
-
-    ngc = "ngc registry chart"
     logo = args.logo_url if args.logo_url else LOGO
 
     subprocess.check_call(f"helm package dist/{n}", shell=True)
@@ -120,15 +120,33 @@ def main() -> None:
         print(f"[DRY RUN] Chart packaged successfully: {n}-{v}.tgz")
         print(f"[DRY RUN] Skipping NGC chart update and push for {o}/{t}/{n}:{v}")
     else:
-        subprocess.check_call(
-            f"{ngc} update {o}/{t}/{n} --overview-filename {overview} --short-desc '{d}'"
-            + f"  --logo '{logo}' --display-name '{dn}' --publisher NVIDIA",
-            shell=True,
+        api_key = os.environ.get("NGC_CLI_API_KEY", "")
+        if not api_key:
+            print("ERROR: NGC_CLI_API_KEY environment variable is not set", file=sys.stderr)
+            sys.exit(1)
+
+        from ngcsdk import Client
+
+        clt = Client()
+        clt.configure(api_key=api_key, org_name=o, team_name=t)
+
+        target = f"{o}/{t}/{n}"
+        print(f"Updating chart metadata for {target} ...")
+        clt.registry.chart.update(
+            target=target,
+            overview_filepath=overview,
+            short_description=d,
+            logo=logo,
+            display_name=dn,
+            publisher="NVIDIA",
         )
-        subprocess.check_call(
-            f"{ngc} push --org {o} --team {t} {o}/{t}/{n}:{v}",
-            shell=True,
+
+        print(f"Pushing chart {target}:{v} ...")
+        clt.registry.chart.push(
+            target=f"{target}:{v}",
+            source_dir=".",
         )
+        print(f"Successfully pushed {target}:{v}")
 
 
 if __name__ == "__main__":
