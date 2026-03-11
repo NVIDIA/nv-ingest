@@ -160,11 +160,13 @@ class ExtractParams(_ParamsModel):
     extract_page_as_image: Optional[bool] = None
 
     # Extraction options
-    method: Optional[str] = None
+    method: str = "pdfium"
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     use_graphic_elements: bool = False
     dpi: int = 200
+    image_format: str = "jpeg"
+    jpeg_quality: int = 100
     inference_batch_size: int = 8
     ocr_model_dir: Optional[str] = None
 
@@ -216,6 +218,7 @@ class EmbedParams(_ParamsModel):
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
+    api_key: Optional[str] = None
     input_type: str = "passage"
     embed_modality: str = "text"  # "text", "image", or "text_image" — default for all element types
     embed_granularity: Literal["element", "page"] = "element"  # "element" = per-element rows, "page" = one row per page

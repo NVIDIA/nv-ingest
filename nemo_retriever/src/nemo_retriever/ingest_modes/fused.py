@@ -76,6 +76,8 @@ class _FusedModelActor:
             self._use_table_structure,
             str(kwargs.get("table_output_format", "pseudo_markdown")),
         )
+        self._extract_text = bool(kwargs.get("extract_text", False))
+        self._method = str(kwargs.get("method", "pdfium"))
         self._extract_charts = bool(kwargs.get("extract_charts", False))
         self._extract_infographics = bool(kwargs.get("extract_infographics", False))
         self._use_graphic_elements = bool(kwargs.get("use_graphic_elements", False))
@@ -119,6 +121,9 @@ class _FusedModelActor:
             **self._detect_kwargs,
         )
 
+        # Determine if OCR should extract text for scanned pages.
+        ocr_extract_text = self._extract_text and self._method in ("pdfium_hybrid", "ocr")
+
         # Charts: combined graphic-elements + OCR stage (like table-structure + OCR).
         ocr_extract_charts = self._extract_charts
         if self._use_graphic_elements and self._extract_charts:
@@ -140,6 +145,7 @@ class _FusedModelActor:
             ocred = ocr_page_elements(
                 detected,
                 model=self._ocr_model,
+                extract_text=ocr_extract_text,
                 extract_tables=False,
                 extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
@@ -148,6 +154,7 @@ class _FusedModelActor:
             ocred = ocr_page_elements(
                 detected,
                 model=self._ocr_model,
+                extract_text=ocr_extract_text,
                 extract_tables=self._extract_tables,
                 extract_charts=ocr_extract_charts,
                 extract_infographics=self._extract_infographics,
@@ -165,6 +172,10 @@ class _FusedModelActor:
 class FusedIngestor(BatchIngestor):
     RUN_MODE = "fused"
     _fused_extract_flags: Dict[str, Any] = {}
+
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
+        """Fused mode does not yet support extract_image_files."""
+        raise NotImplementedError("Fused mode does not yet support extract_image_files")
 
     def extract(self, params: ExtractParams | None = None, **kwargs: Any) -> "FusedIngestor":
         """
@@ -193,6 +204,8 @@ class FusedIngestor(BatchIngestor):
 
         self._tasks.append(("extract", dict(kwargs)))
         self._fused_extract_flags = {
+            "extract_text": bool(kwargs.get("extract_text", False)),
+            "method": str(kwargs.get("method", "pdfium")),
             "extract_tables": bool(kwargs.get("extract_tables", False)),
             "use_table_structure": bool(kwargs.get("use_table_structure", False)),
             "table_output_format": str(kwargs.get("table_output_format", "pseudo_markdown")),

@@ -31,6 +31,7 @@ from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.hf_cache import resolve_hf_cache_dir
+from nemo_retriever.utils.remote_auth import resolve_remote_api_key
 from nemo_retriever.utils.ray_resource_hueristics import (
     gather_cluster_resources,
     resolve_requested_plan,
@@ -308,6 +309,19 @@ class BatchIngestor(Ingestor):
         """
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -331,34 +345,10 @@ class BatchIngestor(Ingestor):
         # 1700x2200) gives enough detail while reducing extraction time and
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
-
+        kwargs.setdefault("image_format", "jpeg")
+        kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
-
-        # Stage-specific kwargs: upstream PDF stages accept many options (dpi, extract_*),
-        # but downstream detect_* Ray actors accept only a small set. Passing the whole
-        # dict can cause TypeErrors (e.g. unexpected `method=`).
-        detect_passthrough_keys = {
-            "inference_batch_size",
-            "output_column",
-            "num_detections_column",
-            "counts_by_label_column",
-            "api_key",
-            "request_timeout_s",
-            "remote_max_pool_workers",
-            "remote_max_retries",
-            "remote_max_429_retries",
-        }
-        detect_kwargs = {k: kwargs[k] for k in detect_passthrough_keys if k in kwargs}
-        page_elements_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url"))
-        if page_elements_invoke_url:
-            detect_kwargs["invoke_url"] = page_elements_invoke_url
-        if "page_elements_request_timeout_s" in kwargs:
-            detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
-        if "page_elements_api_key" in kwargs:
-            detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
-
-        detect_kwargs["inference_batch_size"] = self._requested_plan.get_page_elements_batch_size()
 
         # Convert DOCX/PPTX to PDF before splitting.  CPU-only, one
         # LibreOffice process per file (batch_size=1).
@@ -393,6 +383,40 @@ class BatchIngestor(Ingestor):
             num_cpus=self._requested_plan.get_pdf_extract_cpus_per_task(),
             compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
+
+        self._append_detection_stages(kwargs)
+
+        return self
+
+    def _append_detection_stages(self, kwargs: dict[str, Any]) -> None:
+        """Append downstream GPU detection stages (page elements, OCR, table/chart/infographic).
+
+        Shared by ``extract()`` (PDF) and ``extract_image_files()`` (standalone images).
+        """
+        # Stage-specific kwargs: upstream PDF stages accept many options (dpi, extract_*),
+        # but downstream detect_* Ray actors accept only a small set. Passing the whole
+        # dict can cause TypeErrors (e.g. unexpected `method=`).
+        detect_passthrough_keys = {
+            "inference_batch_size",
+            "output_column",
+            "num_detections_column",
+            "counts_by_label_column",
+            "api_key",
+            "request_timeout_s",
+            "remote_max_pool_workers",
+            "remote_max_retries",
+            "remote_max_429_retries",
+        }
+        detect_kwargs = {k: kwargs[k] for k in detect_passthrough_keys if k in kwargs}
+        page_elements_invoke_url = kwargs.get("page_elements_invoke_url", kwargs.get("invoke_url"))
+        if page_elements_invoke_url:
+            detect_kwargs["invoke_url"] = page_elements_invoke_url
+        if "page_elements_request_timeout_s" in kwargs:
+            detect_kwargs["request_timeout_s"] = kwargs["page_elements_request_timeout_s"]
+        if "page_elements_api_key" in kwargs:
+            detect_kwargs["api_key"] = kwargs["page_elements_api_key"]
+
+        detect_kwargs["inference_batch_size"] = self._requested_plan.get_page_elements_batch_size()
 
         # In further stages we don't prefer individual rows as batching is more performant.
         # Here we set the target number of rows per block to either
@@ -548,6 +572,9 @@ class BatchIngestor(Ingestor):
             # When use_table_structure is True, tables are handled above;
             # charts/infographics still go through OCR.
             ocr_flags = {}
+            method = kwargs.get("method", "pdfium")
+            if method in ("pdfium_hybrid", "ocr") and kwargs.get("extract_text") is True:
+                ocr_flags["extract_text"] = True
             if kwargs.get("extract_tables") is True and not use_table_structure:
                 ocr_flags["extract_tables"] = True
             if kwargs.get("extract_charts") is True and not use_graphic_elements:
@@ -586,6 +613,49 @@ class BatchIngestor(Ingestor):
                     ),
                     fn_constructor_kwargs=ocr_flags,
                 )
+
+    def extract_image_files(self, params: ExtractParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Configure image-only pipeline: read_binary_files -> ImageLoadActor -> detection stages.
+
+        Use with .files("*.png").extract_image_files(...).embed().vdb_upload().ingest().
+        Do not call .extract() when using .extract_image_files().
+        """
+        from nemo_retriever.image.ray_data import ImageLoadActor
+
+        resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+        kwargs = {
+            **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
+            **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
+            **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
+        }
+
+        self._pipeline_type = "image"
+        self._tasks.append(("extract_image_files", dict(kwargs)))
+
+        # Image loading: bytes+path -> page DataFrame (CPU-only, like TxtSplitActor).
+        self._rd_dataset = self._rd_dataset.map_batches(
+            ImageLoadActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+        )
+
+        # Downstream detection stages (page elements, OCR, table/chart/infographic).
+        self._append_detection_stages(kwargs)
 
         return self
 
@@ -713,6 +783,8 @@ class BatchIngestor(Ingestor):
         from nemo_retriever.params.utils import build_embed_kwargs
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
+        if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.

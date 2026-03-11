@@ -92,7 +92,7 @@ Each dataset includes its path, extraction settings, and recall evaluator in one
 ```yaml
 datasets:
   bo767:
-    path: /raid/jioffe/bo767
+    path: /datasets/nv-ingest/bo767
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -110,7 +110,7 @@ datasets:
     recall_dataset: jp20  # bo10k evaluator filtered to jp20 subset
 
   bo20:
-    path: /raid/jioffe/bo20
+    path: /datasets/nv-ingest/bo20
     extract_text: true
     extract_tables: true
     extract_charts: true
@@ -119,7 +119,7 @@ datasets:
     recall_dataset: null  # bo20 does not have recall
   
   earnings:
-    path: /raid/jioffe/earnings_conusulting
+    path: /datasets/nv-ingest/earnings_consulting
     extract_text: true
     extract_tables: true
     extract_charts: true
