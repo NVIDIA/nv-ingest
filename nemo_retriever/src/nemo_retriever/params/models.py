@@ -164,7 +164,7 @@ class ExtractParams(_ParamsModel):
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     use_graphic_elements: bool = False
-    dpi: int = 200
+    dpi: int = 300
     image_format: str = "jpeg"
     jpeg_quality: int = 100
     inference_batch_size: int = 8

@@ -37,7 +37,7 @@ except Exception:  # pragma: no cover
 def _render_page_to_base64(
     page: Any,
     *,
-    dpi: int = 200,
+    dpi: int = 300,
     image_format: str = "jpeg",
     jpeg_quality: int = 100,
 ) -> Dict[str, Any]:
@@ -90,7 +90,7 @@ def _error_record(
     stage: str,
     exc: BaseException,
     page_number: int = 0,
-    dpi: int = 200,
+    dpi: int = 300,
 ) -> Dict[str, Any]:
     """
     Return a single output record with the same shape as a normal page record,
@@ -139,7 +139,7 @@ def pdf_extraction(
     extract_tables: bool = False,
     extract_charts: bool = False,
     extract_infographics: bool = False,
-    dpi: int = 200,
+    dpi: int = 300,
     image_format: str = "jpeg",
     jpeg_quality: int = 100,
     text_extraction_method: str = "pdfium_hybrid",
