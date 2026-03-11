@@ -63,6 +63,7 @@ dependencies = [
   "nemotron-ocr>=0.dev0",
   "markitdown",
   "timm==1.0.22",
+  "tqdm",
   "accelerate==1.12.0",
   "albumentations==2.0.8",
   "scikit-learn>=1.6.0",
