@@ -8,6 +8,8 @@ This quick start guide shows how to run NeMo Retriever Library in library mode, 
 
 You’ll set up a CUDA 13–compatible environment, install the library and its dependencies, and run GPU‑accelerated ingestion pipelines that convert PDFs, HTML, plain text, and audio into vector embeddings stored in LanceDB, with optional Ray‑based scaling and built‑in recall benchmarking.
 
+To use the latest NeMo Retriever Library (v26.3), navigate to the [NeMo Retriever repository](https://github.com/NVIDIA/NeMo-Retriever/tree/main/nemo_retriever)
+
 ## Prerequisites
 
 > **Warning:** The `online` and `fused` run modes are experimental and not fully supported. They may be incomplete, unstable, or subject to breaking changes. Use `batch` or `inprocess` modes for production workloads.
