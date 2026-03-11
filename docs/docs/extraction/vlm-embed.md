@@ -1,6 +1,6 @@
 # Use Multimodal Embedding with NeMo Retriever Library
 
-This guide explains how to use the [NeMo Retriever Library](https://www.perplexity.ai/search/overview.md) with the multimodal embedding model [Llama Nemotron Embed VL 1B v2](https://build.nvidia.com/nvidia/llama-nemotron-embed-vl-1b-v2).
+This guide explains how to use the [NeMo Retriever Library](overview.md) with the multimodal embedding model [Llama Nemotron Embed VL 1B v2](https://build.nvidia.com/nvidia/llama-nemotron-embed-vl-1b-v2).
 
 The `Llama Nemotron Embed VL 1B v2` model is optimized for multimodal question-answering and retrieval tasks.
 It can embed documents as text, images, or paired text-image combinations.

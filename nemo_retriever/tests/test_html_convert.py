@@ -52,7 +52,10 @@ def test_html_file_to_chunks_df(tmp_path: Path):
         "<html><body><h1>Heading</h1><p>First paragraph.</p><p>Second paragraph.</p></body></html>",
         encoding="utf-8",
     )
-    df = html_file_to_chunks_df(str(f), HtmlChunkParams(max_tokens=10, overlap_tokens=0))
+    df = html_file_to_chunks_df(
+        str(f),
+        params=HtmlChunkParams(max_tokens=512, overlap_tokens=0),
+    )
     assert isinstance(df, pd.DataFrame)
     assert "text" in df.columns and "path" in df.columns and "page_number" in df.columns and "metadata" in df.columns
     assert len(df) >= 1
@@ -68,7 +71,7 @@ def test_html_file_to_chunks_df_empty_content(tmp_path: Path):
     pytest.importorskip("transformers")
     f = tmp_path / "empty.html"
     f.write_text("<html><body></body></html>", encoding="utf-8")
-    df = html_file_to_chunks_df(str(f), HtmlChunkParams(max_tokens=500))
+    df = html_file_to_chunks_df(str(f), params=HtmlChunkParams(max_tokens=512))
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["text", "path", "page_number", "metadata"]
     assert len(df) == 0
@@ -79,7 +82,7 @@ def test_html_bytes_to_chunks_df(tmp_path: Path):
     pytest.importorskip("transformers")
     html_bytes = b"<html><body><p>Chunk content from bytes.</p></body></html>"
     path = str(tmp_path / "virtual.html")
-    df = html_bytes_to_chunks_df(html_bytes, path, HtmlChunkParams(max_tokens=512, overlap_tokens=0))
+    df = html_bytes_to_chunks_df(html_bytes, path, params=HtmlChunkParams(max_tokens=512, overlap_tokens=0))
     assert isinstance(df, pd.DataFrame)
     assert "text" in df.columns and "path" in df.columns and "page_number" in df.columns and "metadata" in df.columns
     assert len(df) >= 1

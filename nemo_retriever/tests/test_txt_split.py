@@ -61,7 +61,10 @@ def test_txt_file_to_chunks_df(tmp_path: Path):
     pytest.importorskip("transformers")
     f = tmp_path / "doc.txt"
     f.write_text("First paragraph here. Second paragraph there.", encoding="utf-8")
-    df = txt_file_to_chunks_df(str(f), TextChunkParams(max_tokens=512, overlap_tokens=0))
+    df = txt_file_to_chunks_df(
+        str(f),
+        params=TextChunkParams(max_tokens=512, overlap_tokens=0),
+    )
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["text", "content", "path", "page_number", "metadata"]
     assert len(df) >= 1
@@ -75,7 +78,7 @@ def test_txt_file_to_chunks_df_empty_file(tmp_path: Path):
     pytest.importorskip("transformers")
     f = tmp_path / "empty.txt"
     f.write_text("", encoding="utf-8")
-    df = txt_file_to_chunks_df(str(f), TextChunkParams(max_tokens=512))
+    df = txt_file_to_chunks_df(str(f), params=TextChunkParams(max_tokens=512))
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["text", "path", "page_number", "metadata"]
     assert len(df) == 0
