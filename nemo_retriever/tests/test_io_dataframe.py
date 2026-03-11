@@ -35,6 +35,17 @@ def test_read_dataframe_jsonl_unwraps_nested_stage_payload(tmp_path: Path) -> No
     assert df.iloc[0]["metadata"]["id"] == 123
 
 
+def test_read_dataframe_json_mapping_unwraps_saved_records_payload(tmp_path: Path) -> None:
+    payload = {"records": [{"metadata": {"id": 456}, "document_type": "pdf"}]}
+    path = tmp_path / "saved.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    df = read_dataframe(path)
+    assert len(df) == 1
+    assert df.iloc[0]["document_type"] == "pdf"
+    assert df.iloc[0]["metadata"]["id"] == 456
+
+
 def test_write_and_read_dataframe_json_round_trip(tmp_path: Path) -> None:
     source = pd.DataFrame([{"metadata": {"k": "v"}, "document_type": "html", "text": "chunk"}])
     path = tmp_path / "roundtrip.json"
