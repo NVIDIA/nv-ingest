@@ -776,6 +776,8 @@ def main(
         _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
         recall_total_time = time.perf_counter() - recall_start
 
+        total_time = time.perf_counter() - ingest_start
+
         # Print runtimes for easy user viewing at end
         num_rows = estimate_processed_pages(lancedb_uri, LANCEDB_TABLE)
         print_run_summary(
@@ -784,6 +786,7 @@ def main(
             hybrid,
             lancedb_uri,
             LANCEDB_TABLE,
+            total_time,
             ingestion_only_total_time,
             ray_dataset_download_time,
             lancedb_write_time,
