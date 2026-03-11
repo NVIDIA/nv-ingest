@@ -1001,6 +1001,12 @@ class InProcessIngestor(Ingestor):
         # NOTE: `kwargs` passed to `.extract()` are intended primarily for PDF extraction
         # (e.g. `extract_text`, `dpi`, etc). Downstream model stages do NOT necessarily
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
+        if self._input_documents and all(f.lower().endswith(".txt") for f in self._input_documents):
+            txt_params = TextChunkParams(
+                max_tokens=kwargs.pop("max_tokens", 1024),
+                overlap_tokens=kwargs.pop("overlap_tokens", 0),
+            )
+            return self.extract_txt(params=txt_params)
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
