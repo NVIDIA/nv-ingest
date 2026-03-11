@@ -615,6 +615,7 @@ def main(
                 "embed_workers": embed_actors,
                 "embed_batch_size": int(embed_batch_size),
                 "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                "gpu_embed": float(embed_gpus_per_actor),
             },
         )
         # txt/html don't use embed_granularity from batch_tuning the same way,

@@ -254,6 +254,49 @@ class BatchIngestor(Ingestor):
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._use_nemotron_parse_only: bool = False
 
+    def _apply_batch_tuning_overrides(self, batch_tuning: Any) -> None:
+        """Re-resolve ``_requested_plan`` with user-supplied batch_tuning overrides.
+
+        ``batch_tuning`` is a ``BatchTuningParams`` (from ``ExtractParams`` or
+        ``EmbedParams``).  Any field that is non-zero/non-None overrides the
+        corresponding heuristic default.
+        """
+        bt = batch_tuning
+
+        def _opt_int(v: Any) -> Optional[int]:
+            return int(v) if v is not None and int(v) > 0 else None
+
+        def _opt_float(v: Any) -> Optional[float]:
+            return float(v) if v is not None and float(v) > 0.0 else None
+
+        self._requested_plan = resolve_requested_plan(
+            cluster_resources=self._cluster_resources,
+            override_page_elements_initial_actors=_opt_int(getattr(bt, "page_elements_workers", None)),
+            override_page_elements_min_actors=_opt_int(getattr(bt, "page_elements_workers", None)),
+            override_page_elements_max_actors=_opt_int(getattr(bt, "page_elements_workers", None)),
+            override_page_elements_gpus_per_actor=_opt_float(getattr(bt, "gpu_page_elements", None)),
+            override_page_elements_batch_size=_opt_int(getattr(bt, "page_elements_batch_size", None)),
+            override_ocr_initial_actors=_opt_int(getattr(bt, "detect_workers", None)),
+            override_ocr_min_actors=_opt_int(getattr(bt, "detect_workers", None)),
+            override_ocr_max_actors=_opt_int(getattr(bt, "detect_workers", None)),
+            override_ocr_gpus_per_actor=_opt_float(getattr(bt, "gpu_ocr", None)),
+            override_ocr_batch_size=_opt_int(getattr(bt, "detect_batch_size", None)),
+            override_embed_initial_actors=_opt_int(getattr(bt, "embed_workers", None)),
+            override_embed_min_actors=_opt_int(getattr(bt, "embed_workers", None)),
+            override_embed_max_actors=_opt_int(getattr(bt, "embed_workers", None)),
+            override_embed_gpus_per_actor=_opt_float(getattr(bt, "gpu_embed", None)),
+            override_embed_batch_size=_opt_int(getattr(bt, "embed_batch_size", None)),
+            override_nemotron_parse_initial_actors=_opt_int(getattr(bt, "nemotron_parse_workers", None)),
+            override_nemotron_parse_min_actors=_opt_int(getattr(bt, "nemotron_parse_workers", None)),
+            override_nemotron_parse_max_actors=_opt_int(getattr(bt, "nemotron_parse_workers", None)),
+            override_nemotron_parse_gpus_per_actor=_opt_float(getattr(bt, "gpu_nemotron_parse", None)),
+            override_nemotron_parse_batch_size=_opt_int(getattr(bt, "nemotron_parse_batch_size", None)),
+            override_pdf_extract_batch_size=_opt_int(getattr(bt, "pdf_extract_batch_size", None)),
+            override_pdf_extract_cpus_per_task=_opt_float(getattr(bt, "pdf_extract_num_cpus", None)),
+            override_pdf_extract_tasks=_opt_int(getattr(bt, "pdf_extract_workers", None)),
+        )
+        logger.info("Re-resolved requested plan with batch_tuning overrides: %s", self._requested_plan)
+
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
         Add local files for batch processing.
@@ -322,6 +365,12 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
+        # Apply user-supplied batch_tuning overrides to the resource plan
+        # so that CLI flags like --ocr-actors, --page-elements-actors, etc.
+        # actually affect Ray actor scheduling.
+        self._apply_batch_tuning_overrides(resolved.batch_tuning)
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -636,6 +685,9 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
+        self._apply_batch_tuning_overrides(resolved.batch_tuning)
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -805,6 +857,9 @@ class BatchIngestor(Ingestor):
         resolved = _coerce_params(params, EmbedParams, kwargs)
         if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
+        self._apply_batch_tuning_overrides(resolved.batch_tuning)
+
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.

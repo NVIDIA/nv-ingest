@@ -168,6 +168,11 @@ def main(
         "--graphic-elements-invoke-url",
         help="Optional remote endpoint URL for graphic-elements model inference.",
     ),
+    hybrid: bool = typer.Option(
+        False,
+        "--hybrid/--no-hybrid",
+        help="Enable LanceDB hybrid mode (dense + FTS text).",
+    ),
     text_chunk: bool = typer.Option(
         False,
         "--text-chunk",
@@ -295,6 +300,7 @@ def main(
                 "table_name": LANCEDB_TABLE,
                 "overwrite": True,
                 "create_index": True,
+                "hybrid": hybrid,
             }
         )
     )
@@ -340,6 +346,7 @@ def main(
         embedding_http_endpoint=embed_invoke_url,
         top_k=10,
         ks=(1, 5, 10),
+        hybrid=hybrid,
     )
 
     _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
