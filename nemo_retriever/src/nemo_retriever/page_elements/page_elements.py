@@ -33,13 +33,11 @@ except Exception:  # pragma: no cover
 try:
     from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
         postprocess_page_elements_v3,
-        weighted_boxes_fusion,
         YOLOX_PAGE_V3_CLASS_LABELS,
         YOLOX_PAGE_V3_FINAL_SCORE,
     )
 except ImportError:
     postprocess_page_elements_v3 = None  # type: ignore[assignment,misc]
-    weighted_boxes_fusion = None  # type: ignore[assignment]
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
     YOLOX_PAGE_V3_FINAL_SCORE = {}  # type: ignore[assignment]
 
@@ -365,42 +363,117 @@ def _apply_final_score_filter(
 def _apply_container_wbf(
     dets: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
-    """Apply the container-internal WBF step (iou=0.1, biggest, max) to fuse
-    near-duplicate detections per class.
-
-    This mirrors the WBF that runs inside the NIM container between per-class
-    score filtering and returning results to the client.
+    """Apply the container-internal WBF step (iou=0.1, biggest, max) using
+    greedy single-linkage clustering to match the NIM container behavior.
     """
-    if weighted_boxes_fusion is None or np is None or not dets:
+    if np is None or not dets:
         return dets
     try:
         boxes = np.array([d["bbox_xyxy_norm"] for d in dets], dtype=np.float64)
         scores = np.array([d["score"] if d["score"] is not None else 0.0 for d in dets], dtype=np.float64)
-        labels = np.array([d["label"] if d["label"] is not None else 0 for d in dets], dtype=np.float64)
+        labels = np.array([d["label"] if d["label"] is not None else 0 for d in dets], dtype=np.int64)
 
-        fused_boxes, fused_scores, fused_labels = weighted_boxes_fusion(
-            boxes[:, None],
-            scores[:, None],
-            labels[:, None],
+        fused_boxes, fused_scores, fused_labels = _greedy_wbf(
+            boxes,
+            scores,
+            labels,
             iou_thr=0.1,
             merge_type="biggest",
             conf_type="max",
-            class_agnostic=False,
         )
 
         result: List[Dict[str, Any]] = []
         for i in range(len(fused_boxes)):
             label_i = int(fused_labels[i])
-            label_name = _RETRIEVER_LABEL_NAMES[label_i] if 0 <= label_i < len(_RETRIEVER_LABEL_NAMES) else f"label_{label_i}"
-            result.append({
-                "bbox_xyxy_norm": fused_boxes[i].tolist(),
-                "label": label_i,
-                "label_name": label_name,
-                "score": float(fused_scores[i]),
-            })
+            label_name = (
+                _RETRIEVER_LABEL_NAMES[label_i] if 0 <= label_i < len(_RETRIEVER_LABEL_NAMES) else f"label_{label_i}"
+            )
+            result.append(
+                {
+                    "bbox_xyxy_norm": fused_boxes[i].tolist(),
+                    "label": label_i,
+                    "label_name": label_name,
+                    "score": float(fused_scores[i]),
+                }
+            )
         return result
     except Exception:
         return dets
+
+
+def _greedy_wbf(
+    boxes: "np.ndarray",
+    scores: "np.ndarray",
+    labels: "np.ndarray",
+    iou_thr: float = 0.1,
+    merge_type: str = "biggest",
+    conf_type: str = "max",
+) -> tuple:
+    """Greedy single-linkage WBF matching the NIM's weighted_boxes_fusion_batched.
+
+    Sort by confidence descending. Each unassigned box becomes a cluster leader.
+    All unassigned boxes overlapping the leader (same class, IoU > iou_thr) join
+    that cluster. Non-transitive: only direct overlap with the leader matters.
+    """
+    n = len(boxes)
+    if n == 0:
+        return np.zeros((0, 4)), np.zeros((0,)), np.zeros((0,), dtype=np.int64)
+
+    # Sort by score descending
+    order = np.argsort(-scores)
+    boxes = boxes[order]
+    scores = scores[order]
+    labels = labels[order]
+
+    # Compute IoU matrix
+    x1 = np.maximum(boxes[:, 0:1], boxes[:, 0:1].T)
+    y1 = np.maximum(boxes[:, 1:2], boxes[:, 1:2].T)
+    x2 = np.minimum(boxes[:, 2:3], boxes[:, 2:3].T)
+    y2 = np.minimum(boxes[:, 3:4], boxes[:, 3:4].T)
+    inter = np.maximum(x2 - x1, 0) * np.maximum(y2 - y1, 0)
+    area = (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+    union = area[:, None] + area[None, :] - inter
+    iou = np.where(union > 0, inter / union, 0.0)
+
+    same_class = labels[:, None] == labels[None, :]
+    adjacency = (iou > iou_thr) & same_class
+
+    # Greedy single-linkage clustering
+    cluster_ids = np.full(n, -1, dtype=np.int64)
+    num_clusters = 0
+    for i in range(n):
+        if cluster_ids[i] >= 0:
+            continue
+        cluster_ids[i] = num_clusters
+        unassigned = cluster_ids < 0
+        to_assign = adjacency[i] & unassigned
+        cluster_ids[to_assign] = num_clusters
+        num_clusters += 1
+
+    # Merge boxes per cluster
+    fused_boxes = []
+    fused_scores = []
+    fused_labels = []
+    for c in range(num_clusters):
+        mask = cluster_ids == c
+        c_boxes = boxes[mask]
+        c_scores = scores[mask]
+        c_labels = labels[mask]
+
+        if merge_type == "biggest":
+            fb = np.array([c_boxes[:, 0].min(), c_boxes[:, 1].min(), c_boxes[:, 2].max(), c_boxes[:, 3].max()])
+        else:
+            w = c_scores / c_scores.sum()
+            fb = (c_boxes * w[:, None]).sum(axis=0)
+
+        fs = c_scores.max() if conf_type == "max" else c_scores.mean()
+        fl = c_labels[0]  # leader's label (highest confidence)
+
+        fused_boxes.append(fb)
+        fused_scores.append(fs)
+        fused_labels.append(fl)
+
+    return np.array(fused_boxes), np.array(fused_scores), np.array(fused_labels, dtype=np.int64)
 
 
 def _apply_page_elements_v3_postprocess(

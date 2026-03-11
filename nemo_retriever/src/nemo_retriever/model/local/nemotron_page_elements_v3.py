@@ -67,6 +67,8 @@ class NemotronPageElementsV3(HuggingFaceModel):
                     raise TypeError(f"resize_pad returned non-tensor: {type(y)!r}")
                 if y.ndim != 3:
                     raise ValueError(f"Expected CHW from resize_pad, got {tuple(y.shape)}")
+                # Match NIM preprocessing: quantize to uint8 after interpolation
+                y = torch.clamp(y, 0, 255).to(torch.uint8).float()
                 return y.unsqueeze(0)
 
             outs: List[torch.Tensor] = []
@@ -74,6 +76,8 @@ class NemotronPageElementsV3(HuggingFaceModel):
                 y = resize_pad_page_elements(x[i], self.input_shape)
                 if not isinstance(y, torch.Tensor) or y.ndim != 3:
                     raise ValueError(f"resize_pad produced unexpected output for batch item {i}: {type(y)!r}")
+                # Match NIM preprocessing: quantize to uint8 after interpolation
+                y = torch.clamp(y, 0, 255).to(torch.uint8).float()
                 outs.append(y)
             return torch.stack(outs, dim=0)
 
@@ -83,6 +87,8 @@ class NemotronPageElementsV3(HuggingFaceModel):
                 raise TypeError(f"resize_pad returned non-tensor: {type(y)!r}")
             if y.ndim != 3:
                 raise ValueError(f"Expected CHW from resize_pad, got {tuple(y.shape)}")
+            # Match NIM preprocessing: quantize to uint8 after interpolation
+            y = torch.clamp(y, 0, 255).to(torch.uint8).float()
             return y.unsqueeze(0)
 
         raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
