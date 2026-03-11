@@ -342,8 +342,9 @@ def main(
             print("Failed to start services")
             return 1
 
-        # Wait for readiness
-        if not service_manager.check_readiness(service_config.readiness_timeout):
+        # Wait for readiness (skip Milvus check when using LanceDB)
+        check_milvus = service_config.vdb_backend == "milvus"
+        if not service_manager.check_readiness(service_config.readiness_timeout, check_milvus=check_milvus):
             print("Services failed to become ready")
             service_manager.stop()
             return 1

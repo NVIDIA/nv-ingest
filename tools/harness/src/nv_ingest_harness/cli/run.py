@@ -63,9 +63,10 @@ def run_datasets(
             print("Failed to start services")
             return 1
 
-        # Wait for readiness
+        # Wait for readiness (skip Milvus check when using LanceDB)
         print("Checking service readiness...")
-        if not service_manager.check_readiness(first_config.readiness_timeout):
+        check_milvus = first_config.vdb_backend == "milvus"
+        if not service_manager.check_readiness(first_config.readiness_timeout, check_milvus=check_milvus):
             print("Services failed to become ready (see above for which services were not ready)")
             service_manager.stop()
             return 1
