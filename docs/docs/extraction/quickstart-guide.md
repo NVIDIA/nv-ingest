@@ -84,7 +84,7 @@ h. Run the command `docker ps`. You should see output similar to the following. 
     CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
 uv venv --python 3.12 nv-ingest-dev
 source nv-ingest-dev/bin/activate
-uv pip install nv-ingest==26.1.2 nv-ingest-api==26.1.2 nv-ingest-client==26.1.2
+uv pip install nv-ingest==26.3.0-RC1 nv-ingest-api==26.3.0-RC1 nv-ingest-client==26.3.0-RC1
 ```
 
 !!! tip

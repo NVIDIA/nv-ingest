@@ -941,6 +941,6 @@ def debug_udf(control_message: IngestControlMessage) -> IngestControlMessage:
 
 ## Related Topics
 
-- [NeMo Retriever Library UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.1.2/examples/udfs/README.md)
+- [NeMo Retriever Library UDF Examples](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.3.0-RC1/examples/udfs/README.md)
 - [User-Defined Stages for NeMo Retriever Library](user-defined-stages.md)
 - [NimClient Usage](nimclient.md)

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="NV-Ingest Microservice",
     description="Service for ingesting heterogenous datatypes",
-    version="26.1.2",
+    version="26.3.0-RC1",
     contact={
         "name": "NVIDIA Corporation",
         "url": "https://nvidia.com",
