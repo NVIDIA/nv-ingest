@@ -39,6 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NGC_CLI_ORG: ${{ inputs.ngc-org }}
+      NGC_CLI_TEAM: ${{ inputs.ngc-team }}
+      NGC_CLI_FORMAT_TYPE: json
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,22 +58,10 @@ jobs:
             | tar xz -C /usr/local/bin helm-docs
 
       - name: Install NGC CLI
-        run: |
-          curl -sSL "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.55.0/files/ngccli_linux.zip" -o /tmp/ngccli.zip
-          unzip -q /tmp/ngccli.zip -d /tmp
-          sudo mv /tmp/ngc-cli/ngc /usr/local/bin/ngc
-          sudo chmod +x /usr/local/bin/ngc
+        run: pip install ngcsdk
 
-      - name: Configure and verify NGC CLI
-        run: |
-          ngc config set <<EOF
-          $NGC_CLI_API_KEY
-          json
-          ${{ inputs.ngc-org }}
-          ${{ inputs.ngc-team }}
-          EOF
-          echo "NGC CLI configured. Verifying authentication..."
-          ngc config current
+      - name: Verify NGC CLI
+        run: ngc --version
 
       - name: Update Helm README
         run: helm/update_helm_readme.sh
