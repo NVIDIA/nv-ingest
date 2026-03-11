@@ -31,6 +31,7 @@ from nemo_retriever.table.table_detection import TableStructureActor
 from nemo_retriever.pdf.extract import PDFExtractionActor
 from nemo_retriever.pdf.split import PDFSplitActor
 from nemo_retriever.utils.hf_cache import resolve_hf_cache_dir
+from nemo_retriever.utils.remote_auth import resolve_remote_api_key
 from nemo_retriever.utils.ray_resource_hueristics import (
     gather_cluster_resources,
     resolve_requested_plan,
@@ -394,6 +395,19 @@ class BatchIngestor(Ingestor):
         """
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -418,7 +432,8 @@ class BatchIngestor(Ingestor):
         # 1700x2200) gives enough detail while reducing extraction time and
         # memory usage by ~30-40% vs 300 DPI.
         kwargs.setdefault("dpi", 200)
-
+        kwargs.setdefault("image_format", "jpeg")
+        kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
         self._tasks.append(("extract", dict(kwargs)))
 
@@ -696,6 +711,19 @@ class BatchIngestor(Ingestor):
         from nemo_retriever.image.ray_data import ImageLoadActor
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
+        if (
+            any(
+                (
+                    resolved.invoke_url,
+                    resolved.page_elements_invoke_url,
+                    resolved.ocr_invoke_url,
+                    resolved.graphic_elements_invoke_url,
+                    resolved.table_structure_invoke_url,
+                )
+            )
+            and not resolved.api_key
+        ):
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -716,6 +744,27 @@ class BatchIngestor(Ingestor):
         # Downstream detection stages (page elements, OCR, table/chart/infographic).
         self._append_detection_stages(kwargs)
 
+        return self
+
+    def split(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
+        """
+        Re-chunk the ``text`` column by token count (post-extraction transform).
+
+        Adds a ``map_batches(TextChunkActor, ...)`` stage to the Ray Dataset so
+        already-extracted text is re-chunked before embedding.
+        """
+        from nemo_retriever.txt.ray_data import TextChunkActor
+
+        resolved = _coerce_params(params, TextChunkParams, kwargs)
+        self._tasks.append(("split", resolved.model_dump(mode="python")))
+
+        self._rd_dataset = self._rd_dataset.map_batches(
+            TextChunkActor,
+            batch_size=4,
+            batch_format="pandas",
+            num_cpus=1,
+            fn_constructor_kwargs={"params": resolved},
+        )
         return self
 
     def extract_txt(self, params: TextChunkParams | None = None, **kwargs: Any) -> "BatchIngestor":
@@ -842,6 +891,8 @@ class BatchIngestor(Ingestor):
         from nemo_retriever.params.utils import build_embed_kwargs
 
         resolved = _coerce_params(params, EmbedParams, kwargs)
+        if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
+            resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
         self._refresh_requested_plan(kwargs)
 

@@ -16,7 +16,7 @@ This guide covers how to write, validate, and submit UDFs using both the CLI and
 Create a Python function that accepts an `IngestControlMessage` and returns a modified `IngestControlMessage`:
 
 ```python
-from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 def my_custom_processor(control_message: IngestControlMessage) -> IngestControlMessage:
     """Add custom metadata to all documents."""
@@ -77,7 +77,7 @@ nemo-retriever \
 ### 3. Submit via Python Client
 
 ```python
-from nemo_retriever.client.interface import Ingestor
+from nv_ingest_client.client import Ingestor
 
 # Create an Ingestor instance with default client
 ingestor = Ingestor()
@@ -265,7 +265,7 @@ def enhance_metadata(control_message: IngestControlMessage) -> IngestControlMess
     return control_message
 ```
 
-> **📖 For detailed metadata schema documentation, see:** [metadata_documentation.md](metadata_documentation.md)
+> **📖 For detailed metadata schema documentation, see:** [Content Metadata](content-metadata.md)
 
 ### UDF Targeting
 
@@ -305,7 +305,7 @@ UDFs can be executed at different stages of the pipeline by specifying the `targ
 - `broker_response` - Response message handling
 - `otel_tracer` - OpenTelemetry tracing
 
-> **Note:** For the complete and up-to-date list of pipeline stages, see the [default_pipeline.yaml](../../../config/default_pipeline.yaml) configuration file.
+> **Note:** For the complete and up-to-date list of pipeline stages, see the [default_pipeline.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/config/default_pipeline.yaml) configuration file.
 
 #### Target Stage Selection Examples
 
@@ -461,9 +461,9 @@ NVIDIA Inference Microservices (NIMs) provide powerful AI capabilities that can 
 ### Quick NIM Integration
 
 ```python
-from nemo_retriever.internal.primitives.control_message import IngestControlMessage
-from nemo_retriever.util.nim import create_inference_client
-from nemo_retriever.internal.primitives.nim.model_interface.vlm import VLMModelInterface
+from nv_ingest_api.internal.primitives.control_message import IngestControlMessage
+from nv_ingest_api.util.nim import create_inference_client
+from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
 import os
 
 def document_analysis_with_nim(control_message: IngestControlMessage) -> IngestControlMessage:
@@ -538,7 +538,7 @@ For detailed guidance on creating custom NIM integrations, including:
 - Error handling and debugging
 - Performance best practices
 
-See the comprehensive [**NimClient Usage Guide**](nimclient_usage.md).
+See the comprehensive [**NimClient Usage Guide**](nimclient.md).
 
 ### Error Handling
 
@@ -873,7 +873,7 @@ Test your UDF functions in isolation before deploying them to the pipeline:
 
 ```python
 import pandas as pd
-from nemo_retriever.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 def test_my_udf():
     # Create test data

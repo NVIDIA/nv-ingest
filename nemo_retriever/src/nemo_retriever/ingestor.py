@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from nemo_retriever.application.modes.factory import create_runmode_ingestor
 from nemo_retriever.params import EmbedParams
 from nemo_retriever.params import ExtractParams
+from nemo_retriever.params import TextChunkParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import RunMode
@@ -132,8 +133,9 @@ class ingestor:
         """Record a filter task configuration."""
         self._not_implemented("filter")
 
-    def split(self) -> "ingestor":
+    def split(self, params: TextChunkParams | None = None, **kwargs: Any) -> "ingestor":
         """Record a split task configuration."""
+        _ = _merge_params(params, kwargs)
         self._not_implemented("split")
 
     def store(self) -> "ingestor":

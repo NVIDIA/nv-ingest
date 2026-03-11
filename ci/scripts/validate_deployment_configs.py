@@ -49,9 +49,9 @@ SERVICE_MAPPING = {
     "page-elements": "page_elements",
     "graphic-elements": "graphic_elements",
     "table-structure": "table_structure",
-    "ocr": "nemoretriever_ocr_v1",
+    "ocr": "ocr",
     "embedding": "embedqa",
-    "reranker": "llama_3_2_nv_rerankqa_1b_v2",
+    "reranker": "rerankqa",
     "nemotron-parse": "nemotron_parse",
     "vlm": "nemotron_nano_12b_v2_vl",
     "audio": "audio",
@@ -106,10 +106,10 @@ def parse_compose_image(image_str: str) -> tuple[Optional[str], Optional[str]]:
     Parse Docker Compose image string into repository and tag.
 
     Examples:
-        'nvcr.io/nim/nvidia/nemoretriever-ocr-v1:1.2.1'
-            -> ('nvcr.io/nim/nvidia/nemoretriever-ocr-v1', '1.2.1')
-        '${OCR_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-ocr-v1}:${OCR_TAG:-1.2.1}'
-            -> ('nvcr.io/nim/nvidia/nemoretriever-ocr-v1', '1.2.1')
+        'nvcr.io/nim/nvidia/nemotron-ocr-v1:1.3.0'
+            -> ('nvcr.io/nim/nvidia/nemotron-ocr-v1', '1.3.0')
+        '${OCR_IMAGE:-nvcr.io/nim/nvidia/nemotron-ocr-v1}:${OCR_TAG:-1.3.0}'
+            -> ('nvcr.io/nim/nvidia/nemotron-ocr-v1', '1.3.0')
     """
     # Handle environment variable substitution patterns
     # Extract default values from ${VAR:-default} patterns

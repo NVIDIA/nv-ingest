@@ -18,7 +18,7 @@ import pandas as pd
 from nemo_retriever.params import TextChunkParams
 
 DEFAULT_TOKENIZER_MODEL_ID = "nvidia/llama-nemotron-embed-1b-v2"
-DEFAULT_MAX_TOKENS = 512
+DEFAULT_MAX_TOKENS = 1024
 DEFAULT_OVERLAP_TOKENS = 0
 
 
@@ -89,6 +89,84 @@ def split_text_by_tokens(
             break
 
     return chunks if chunks else [text]
+
+
+def split_df(
+    df: pd.DataFrame,
+    *,
+    max_tokens: int = DEFAULT_MAX_TOKENS,
+    overlap_tokens: int = DEFAULT_OVERLAP_TOKENS,
+    tokenizer_model_id: Optional[str] = None,
+    tokenizer_cache_dir: Optional[str] = None,
+    encoding: str = "utf-8",
+) -> pd.DataFrame:
+    """
+    Re-chunk a DataFrame's ``text`` column by token count.
+
+    This is a **post-extraction** transform: it takes rows that already have a
+    ``text`` column (produced by ``extract`` / ``extract_txt`` / etc.) and
+    splits long texts into multiple rows using :func:`split_text_by_tokens`.
+    All other columns (``path``, ``page_number``, ``metadata``, …) are
+    preserved on every output row.  Each chunk row's ``metadata`` dict is
+    updated with ``chunk_index`` and ``chunk_count``.
+
+    Rows whose ``text`` is empty or missing are passed through unchanged.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input DataFrame with at least a ``text`` column.
+    max_tokens, overlap_tokens, tokenizer_model_id, tokenizer_cache_dir, encoding
+        Forwarded to :func:`split_text_by_tokens` / :func:`_get_tokenizer`.
+
+    Returns
+    -------
+    pd.DataFrame
+        Expanded DataFrame (one row per chunk).
+    """
+    if df.empty:
+        return df.copy()
+
+    model_id = tokenizer_model_id or DEFAULT_TOKENIZER_MODEL_ID
+    tokenizer = _get_tokenizer(model_id, cache_dir=tokenizer_cache_dir)
+
+    out_rows: List[Dict[str, Any]] = []
+    for _, row in df.iterrows():
+        row_dict = row.to_dict()
+        text = row_dict.get("text")
+        if not isinstance(text, str) or not text.strip():
+            out_rows.append(row_dict)
+            continue
+
+        chunks = split_text_by_tokens(
+            text,
+            tokenizer=tokenizer,
+            max_tokens=max_tokens,
+            overlap_tokens=overlap_tokens,
+        )
+        if len(chunks) <= 1:
+            out_rows.append(row_dict)
+            continue
+
+        import copy
+
+        for i, chunk in enumerate(chunks):
+            new_row = {k: copy.deepcopy(v) if isinstance(v, (dict, list)) else v for k, v in row_dict.items()}
+            new_row["text"] = chunk
+            if "content" in new_row:
+                new_row["content"] = chunk
+            meta = new_row.get("metadata")
+            if isinstance(meta, dict):
+                meta["chunk_index"] = i
+                meta["chunk_count"] = len(chunks)
+                meta["content"] = chunk
+            new_row["page_number"] = i + 1
+            out_rows.append(new_row)
+
+    if not out_rows:
+        return df.iloc[:0].copy()
+
+    return pd.DataFrame(out_rows)
 
 
 def txt_file_to_chunks_df(

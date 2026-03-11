@@ -128,6 +128,13 @@ def build_lancedb_row(
         metadata_obj["pdf_page"] = pdf_page
     metadata_obj.update(_build_detection_metadata(row))
 
+    # Preserve split metadata (chunk_index, chunk_count) from the original row.
+    orig_meta = getattr(row, "metadata", None)
+    if isinstance(orig_meta, dict):
+        for k in ("chunk_index", "chunk_count"):
+            if k in orig_meta:
+                metadata_obj[k] = orig_meta[k]
+
     source_obj: Dict[str, Any] = {"source_id": str(path)}
 
     row_out: Dict[str, Any] = {
@@ -190,6 +197,7 @@ def lancedb_schema(vector_dim: int = 2048) -> Any:
             pa.field("pdf_basename", pa.string()),
             pa.field("page_number", pa.int32()),
             pa.field("source", pa.string()),
+            pa.field("source_id", pa.string()),
             pa.field("path", pa.string()),
             pa.field("text", pa.string()),
             pa.field("metadata", pa.string()),

@@ -170,7 +170,7 @@ envVars:
   AUDIO_GRPC_ENDPOINT: "audio:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
-  EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
+  EMBEDDING_NIM_ENDPOINT: "http://llama-nemotron-embed-1b-v2:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-nemotron-embed-1b-v2"
 
   NEMOTRON_PARSE_HTTP_ENDPOINT: http://nemotron-parse:8000/v1/chat/completions
@@ -190,10 +190,10 @@ envVars:
   YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemotron-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
 
-  OCR_GRPC_ENDPOINT: nemoretriever-ocr-v1:8001
-  OCR_HTTP_ENDPOINT: http://nemoretriever-ocr-v1:8000/v1/infer
+  OCR_GRPC_ENDPOINT: nemotron-ocr-v1:8001
+  OCR_HTTP_ENDPOINT: http://nemotron-ocr-v1:8000/v1/infer
   OCR_INFER_PROTOCOL: grpc
-  OCR_MODEL_NAME: scene_text_ensemble
+  OCR_MODEL_NAME: pipeline
 
   MINIO_BUCKET: nv-ingest
   MINIO_ACCESS_KEY: minioadmin
@@ -828,20 +828,20 @@ nimOperator:
       - name: NIM_TRITON_PERFORMANCE_MODE
         value: "throughput"
 
-  ## @param nemoretriever_ocr_v1 [object] Configuration for NemoRetriever OCR v1 NIM
-  ## @param nemoretriever_ocr_v1.enabled [bool] Enable the NEMORetriever OCR v1 service
-  ## @param nemoretriever_ocr_v1.image.* [various] Image settings for NEMORetriever OCR v1
-  ## @param nemoretriever_ocr_v1.authSecret [string] Secret for authentication
-  ## @param nemoretriever_ocr_v1.storage.* [object] Storage/PVC configuration
-  ## @param nemoretriever_ocr_v1.replicas [int] Number of service replicas
-  ## @param nemoretriever_ocr_v1.resources [object] Limits/requests for compute resources
-  ## @param nemoretriever_ocr_v1.expose.* [object] Ports and service config
-  ## @param nemoretriever_ocr_v1.env [array] Additional environment variables
-  nemoretriever_ocr_v1:
+  ## @param ocr [object] Configuration for Nemotron OCR v1 NIM
+  ## @param ocr.enabled [bool] Enable the Nemotron OCR v1 service
+  ## @param ocr.image.* [various] Image settings for Nemotron OCR v1
+  ## @param ocr.authSecret [string] Secret for authentication
+  ## @param ocr.storage.* [object] Storage/PVC configuration
+  ## @param ocr.replicas [int] Number of service replicas
+  ## @param ocr.resources [object] Limits/requests for compute resources
+  ## @param ocr.expose.* [object] Ports and service config
+  ## @param ocr.env [array] Additional environment variables
+  ocr:
     enabled: true
     image:
-      repository: nvcr.io/nim/nvidia/nemoretriever-ocr-v1
-      tag: 1.2.1
+      repository: nvcr.io/nim/nvidia/nemotron-ocr-v1
+      tag: 1.3.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret
@@ -870,16 +870,16 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
 
-  ## @param llama_3_2_nv_rerankqa_1b_v2 [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.enabled [bool] Enable this NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.image.* [various] Image repository/tag for this NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.authSecret [string] Authentication secret for the NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.storage.* [various] Storage/PVC configuration
-  ## @param llama_3_2_nv_rerankqa_1b_v2.replicas [int] Number of replicas
-  ## @param llama_3_2_nv_rerankqa_1b_v2.resources [object] Limits/requests for resources
-  ## @param llama_3_2_nv_rerankqa_1b_v2.expose.* [object] Port/service configuration
-  ## @param llama_3_2_nv_rerankqa_1b_v2.env [array] Additional environment variables
-  llama_3_2_nv_rerankqa_1b_v2:
+  ## @param rerankqa [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
+  ## @param rerankqa.enabled [bool] Enable this NIM
+  ## @param rerankqa.image.* [various] Image repository/tag for this NIM
+  ## @param rerankqa.authSecret [string] Authentication secret for the NIM
+  ## @param rerankqa.storage.* [various] Storage/PVC configuration
+  ## @param rerankqa.replicas [int] Number of replicas
+  ## @param rerankqa.resources [object] Limits/requests for resources
+  ## @param rerankqa.expose.* [object] Port/service configuration
+  ## @param rerankqa.env [array] Additional environment variables
+  rerankqa:
     enabled: false
     image:
       repository: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2
@@ -927,7 +927,7 @@ nimOperator:
     enabled: false
     image:
       repository: nvcr.io/nim/nvidia/nemotron-nano-12b-v2-vl
-      tag: 1.6.0
+      tag: 1.5.0
       pullPolicy: IfNotPresent
       pullSecrets:
         - ngc-secret

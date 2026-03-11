@@ -10,6 +10,8 @@ You’ll set up a CUDA 13–compatible environment, install the library and its 
 
 ## Prerequisites
 
+> **Warning:** The `online` and `fused` run modes are experimental and not fully supported. They may be incomplete, unstable, or subject to breaking changes. Use `batch` or `inprocess` modes for production workloads.
+
 Before you start, make sure your system meets the following requirements:
 
 - The host is running CUDA 13.x so that `libcudart.so.13` is available.
@@ -169,6 +171,77 @@ After you’ve finished installing and configuring NeMo Retriever Library, it's 
 uv run python -m nemo_retriever.examples.batch_pipeline /datasets/nemo-retriever/bo20
 ```
 This uses the module form of the NeMo Retriever Library batch pipeline example and points it at a sample dataset directory, verifying both ingestion and OCR under CUDA 13.
+
+7. Ingest image files
+
+NeMo Retriever Library can ingest standalone image files through the same detection, OCR, and embedding pipeline used for PDFs. Supported formats are PNG, JPEG, BMP, TIFF, and SVG. SVG support requires the optional `cairosvg` package. Each image is treated as a single page.
+
+To run the batch pipeline on a directory of images, use `--input-type image` to match all supported formats at once.
+
+```bash
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/images \
+  --input-type image
+```
+
+You can also pass a single-format shortcut to restrict which files are picked up.
+
+```bash
+uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path/to/images \
+  --input-type png
+```
+
+Valid single-format values are `png`, `jpg`, `jpeg`, `bmp`, `tiff`, `tif`, and `svg`.
+
+For in-process mode, build the ingestor chain with `extract_image_files` instead of `extract`.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.params import ExtractParams, EmbedParams
+
+ingestor = (
+    create_ingestor(run_mode="inprocess")
+    .files("images/*.png")
+    .extract_image_files(
+        ExtractParams(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_infographics=True,
+        )
+    )
+    .embed()
+    .vdb_upload()
+    .ingest()
+)
+```
+
+All `ExtractParams` options (`extract_text`, `extract_tables`, `extract_charts`, `extract_infographics`) apply to image ingestion.
+
+### Render one document as markdown
+
+If you want a readable page-by-page markdown view of a single in-process result, pass the
+single-document result from `results[0]` to `nemo_retriever.io.to_markdown`.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.io import to_markdown
+
+ingestor = (
+    create_ingestor(run_mode="inprocess")
+    .files("data/multimodal_test.pdf")
+    .extract(
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
+    )
+)
+results = ingestor.ingest()
+print(to_markdown(results[0]))
+```
+
+Use `to_markdown_by_page(results[0])` when you want a `dict[int, str]` instead of one concatenated
+markdown document.
 
 ## Benchmark harness
 

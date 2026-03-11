@@ -38,7 +38,7 @@ nemotron-table-structure-v1:
       nvidia.com/gpu: 0
       nvidia.com/mig-1g.10gb: 1
 
-nvidia-nim-llama-32-nv-embedqa-1b-v2:
+nvidia-nim-llama-nemotron-embed-1b-v2:
   resources:
     limits:
       nvidia.com/gpu: 0
@@ -47,7 +47,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
       nvidia.com/gpu: 0
       nvidia.com/mig-1g.10gb: 1
 
-nemoretriever-ocr:
+nemotron-ocr-v1:
   resources:
     limits:
       nvidia.com/gpu: 0
@@ -75,8 +75,8 @@ text-embedding-nim:
       nvidia.com/gpu: 0
       nvidia.com/mig-1g.10gb: 1
 
-# If you want to deploy llama-32-nv-rerankqa-1b-v2
-llama-32-nv-rerankqa-1b-v2:
+# If you want to deploy llama-nemotron-rerank-1b-v2
+llama-nemotron-rerank-1b-v2:
   resources:
     limits:
       nvidia.com/gpu: 0

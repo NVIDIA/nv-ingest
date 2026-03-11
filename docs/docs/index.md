@@ -36,7 +36,7 @@ The following are some applications that use NVIDIA NeMo Retriever Library:
 - [Build an Enterprise RAG pipeline](https://build.nvidia.com/nvidia/build-an-enterprise-rag-pipeline/blueprintcard) (NVIDIA AI Blueprint)
 - [Building Code Documentation Agents with CrewAI](https://github.com/crewAIInc/nvidia-demo) (CrewAI Demo)
 - [Digital Human for Customer Service](https://github.com/NVIDIA-AI-Blueprints/digital-human) (NVIDIA AI Blueprint)
-- [Document Research Assistant for Blog Creation](https://github.com/run-llama/llama_index/blob/main/docs/docs/examples/agent/nvidia_document_research_assistant_for_blog_creation.ipynb) (LlamaIndex Jupyter Notebook)
+- [Document Research Assistant for Blog Creation](https://developers.llamaindex.ai/python/examples/agent/nvidia_document_research_assistant_for_blog_creation/) (LlamaIndex)
 - [Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) (NVIDIA AI Blueprint)
 
 
