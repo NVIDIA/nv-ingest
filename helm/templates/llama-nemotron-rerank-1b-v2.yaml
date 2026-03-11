@@ -1,0 +1,47 @@
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.rerankqa.enabled true) -}}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: llama-nemotron-rerank-1b-v2
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ .Values.nimOperator.rerankqa.image.repository }}:{{ .Values.nimOperator.rerankqa.image.tag }}"
+      pullSecret: "{{ index .Values.nimOperator.rerankqa.image.pullSecrets 0 }}"
+      authSecret: {{ .Values.nimOperator.rerankqa.authSecret }}
+  storage:
+    pvc:
+      create: {{ .Values.nimOperator.rerankqa.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.rerankqa.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.rerankqa.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.rerankqa.storage.pvc.volumeAccessMode }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: llama-nemotron-rerank-1b-v2
+spec:
+  image:
+    repository: {{ .Values.nimOperator.rerankqa.image.repository }}
+    tag: {{ .Values.nimOperator.rerankqa.image.tag }}
+    pullPolicy: {{ .Values.nimOperator.rerankqa.image.pullPolicy }}
+    pullSecrets:
+{{ toYaml .Values.nimOperator.rerankqa.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.rerankqa.authSecret }}
+  storage:
+    nimCache:
+      name: llama-nemotron-rerank-1b-v2
+  replicas: {{ .Values.nimOperator.rerankqa.replicas }}
+  nodeSelector:
+{{ toYaml .Values.nimOperator.rerankqa.nodeSelector | nindent 4 }}
+  resources:
+{{ toYaml .Values.nimOperator.rerankqa.resources | nindent 4 }}
+  tolerations:
+{{ toYaml .Values.nimOperator.rerankqa.tolerations | nindent 4 }}
+  expose:
+{{ toYaml .Values.nimOperator.rerankqa.expose | nindent 4 }}
+  env:
+{{ toYaml .Values.nimOperator.rerankqa.env | nindent 4 }}
+{{- end }}
