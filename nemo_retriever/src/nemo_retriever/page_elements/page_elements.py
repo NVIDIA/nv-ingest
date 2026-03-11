@@ -33,11 +33,13 @@ except Exception:  # pragma: no cover
 try:
     from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
         postprocess_page_elements_v3,
+        weighted_boxes_fusion,
         YOLOX_PAGE_V3_CLASS_LABELS,
         YOLOX_PAGE_V3_FINAL_SCORE,
     )
 except ImportError:
     postprocess_page_elements_v3 = None  # type: ignore[assignment,misc]
+    weighted_boxes_fusion = None  # type: ignore[assignment]
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
     YOLOX_PAGE_V3_FINAL_SCORE = {}  # type: ignore[assignment]
 
@@ -355,9 +357,50 @@ def _apply_final_score_filter(
     for d in dets:
         api_name = _RETRIEVER_TO_API.get(d["label_name"], d["label_name"])
         threshold = YOLOX_PAGE_V3_FINAL_SCORE.get(api_name, 0.0)
-        if d.get("score") is not None and d["score"] > threshold:
+        if d.get("score") is not None and d["score"] >= threshold:
             filtered.append(d)
     return filtered
+
+
+def _apply_container_wbf(
+    dets: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Apply the container-internal WBF step (iou=0.1, biggest, max) to fuse
+    near-duplicate detections per class.
+
+    This mirrors the WBF that runs inside the NIM container between per-class
+    score filtering and returning results to the client.
+    """
+    if weighted_boxes_fusion is None or np is None or not dets:
+        return dets
+    try:
+        boxes = np.array([d["bbox_xyxy_norm"] for d in dets], dtype=np.float64)
+        scores = np.array([d["score"] if d["score"] is not None else 0.0 for d in dets], dtype=np.float64)
+        labels = np.array([d["label"] if d["label"] is not None else 0 for d in dets], dtype=np.float64)
+
+        fused_boxes, fused_scores, fused_labels = weighted_boxes_fusion(
+            boxes[:, None],
+            scores[:, None],
+            labels[:, None],
+            iou_thr=0.1,
+            merge_type="biggest",
+            conf_type="max",
+            class_agnostic=False,
+        )
+
+        result: List[Dict[str, Any]] = []
+        for i in range(len(fused_boxes)):
+            label_i = int(fused_labels[i])
+            label_name = _RETRIEVER_LABEL_NAMES[label_i] if 0 <= label_i < len(_RETRIEVER_LABEL_NAMES) else f"label_{label_i}"
+            result.append({
+                "bbox_xyxy_norm": fused_boxes[i].tolist(),
+                "label": label_i,
+                "label_name": label_name,
+                "score": float(fused_scores[i]),
+            })
+        return result
+    except Exception:
+        return dets
 
 
 def _apply_page_elements_v3_postprocess(
@@ -672,30 +715,30 @@ def detect_page_elements_v3(
             preds_list2 = [preds]  # type: ignore[list-item]
 
         try:
-            # Use LOW uniform thresholds (matching NMS conf=0.01) so that all
-            # detections survive into WBF.  Per-class final score filtering is
-            # applied *after* WBF to match the NIM gRPC pipeline ordering.
-            low_thresholds = {name: 0.01 for name in label_names}
-
-            # Run upstream util per-image with low thresholds.
-            boxes_list: List["torch.Tensor"] = []
-            labels_list: List["torch.Tensor"] = []
-            scores_list: List["torch.Tensor"] = []
-            for p in preds_list2:
-                if not isinstance(p, dict):
-                    boxes_list.append(torch.empty((0, 4), dtype=torch.float32))
-                    labels_list.append(torch.empty((0,), dtype=torch.int64))
-                    scores_list.append(torch.empty((0,), dtype=torch.float32))
-                    continue
-                b_np, l_np, s_np = postprocess_preds_page_element(
-                    p,
-                    low_thresholds,
-                    label_names,
-                )
-                boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))
-                labels_list.append(torch.as_tensor(l_np, dtype=torch.int64))
-                scores_list.append(torch.as_tensor(s_np, dtype=torch.float32))
-            boxes, labels, scores = boxes_list, labels_list, scores_list
+            # Preferred: allow model wrapper to handle batched postprocess.
+            if hasattr(model, "postprocess"):
+                boxes, labels, scores = model.postprocess(preds_list2)  # type: ignore[attr-defined]
+            else:
+                # Fallback: run upstream util per-image.
+                # `postprocess_preds_page_element` expects a single pred dict and returns numpy arrays.
+                boxes_list: List["torch.Tensor"] = []
+                labels_list: List["torch.Tensor"] = []
+                scores_list: List["torch.Tensor"] = []
+                for p in preds_list2:
+                    if not isinstance(p, dict):
+                        boxes_list.append(torch.empty((0, 4), dtype=torch.float32))
+                        labels_list.append(torch.empty((0,), dtype=torch.int64))
+                        scores_list.append(torch.empty((0,), dtype=torch.float32))
+                        continue
+                    b_np, l_np, s_np = postprocess_preds_page_element(
+                        p,
+                        thresholds_per_class,
+                        label_names,
+                    )
+                    boxes_list.append(torch.as_tensor(b_np, dtype=torch.float32))
+                    labels_list.append(torch.as_tensor(l_np, dtype=torch.int64))
+                    scores_list.append(torch.as_tensor(s_np, dtype=torch.float32))
+                boxes, labels, scores = boxes_list, labels_list, scores_list
 
             per_image_dets = _postprocess_to_per_image_detections(
                 boxes=boxes,
@@ -704,6 +747,8 @@ def detect_page_elements_v3(
                 batch_size=len(pre_list),
                 label_names=label_names,
             )
+            # Apply container-internal WBF (iou=0.1, biggest, max) to fuse near-duplicates
+            per_image_dets = [_apply_container_wbf(dets) for dets in per_image_dets]
             # Apply v3 postprocessing (box fusion, title matching, expansion, overlap removal)
             per_image_dets = [_apply_page_elements_v3_postprocess(dets) for dets in per_image_dets]
             # Apply per-class final score filtering AFTER WBF (matches NIM pipeline ordering)
