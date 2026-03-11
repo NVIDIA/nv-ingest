@@ -828,16 +828,16 @@ nimOperator:
       - name: NIM_TRITON_PERFORMANCE_MODE
         value: "throughput"
 
-  ## @param nemoretriever_ocr_v1 [object] Configuration for NemoRetriever OCR v1 NIM
-  ## @param nemoretriever_ocr_v1.enabled [bool] Enable the NEMORetriever OCR v1 service
-  ## @param nemoretriever_ocr_v1.image.* [various] Image settings for NEMORetriever OCR v1
-  ## @param nemoretriever_ocr_v1.authSecret [string] Secret for authentication
-  ## @param nemoretriever_ocr_v1.storage.* [object] Storage/PVC configuration
-  ## @param nemoretriever_ocr_v1.replicas [int] Number of service replicas
-  ## @param nemoretriever_ocr_v1.resources [object] Limits/requests for compute resources
-  ## @param nemoretriever_ocr_v1.expose.* [object] Ports and service config
-  ## @param nemoretriever_ocr_v1.env [array] Additional environment variables
-  nemoretriever_ocr_v1:
+  ## @param ocr [object] Configuration for Nemotron OCR v1 NIM
+  ## @param ocr.enabled [bool] Enable the Nemotron OCR v1 service
+  ## @param ocr.image.* [various] Image settings for Nemotron OCR v1
+  ## @param ocr.authSecret [string] Secret for authentication
+  ## @param ocr.storage.* [object] Storage/PVC configuration
+  ## @param ocr.replicas [int] Number of service replicas
+  ## @param ocr.resources [object] Limits/requests for compute resources
+  ## @param ocr.expose.* [object] Ports and service config
+  ## @param ocr.env [array] Additional environment variables
+  ocr:
     enabled: true
     image:
       repository: nvcr.io/nim/nvidia/nemotron-ocr-v1

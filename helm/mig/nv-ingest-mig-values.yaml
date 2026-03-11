@@ -39,7 +39,7 @@ nimOperator:
         nvidia.com/gpu: "0"
         nvidia.com/mig-1g.10gb: 1
 
-  nemoretriever_ocr_v1:
+  ocr:
     resources:
       limits:
         nvidia.com/gpu: "0"

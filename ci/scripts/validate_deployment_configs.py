@@ -49,7 +49,7 @@ SERVICE_MAPPING = {
     "page-elements": "page_elements",
     "graphic-elements": "graphic_elements",
     "table-structure": "table_structure",
-    "ocr": "nemoretriever_ocr_v1",
+    "ocr": "ocr",
     "embedding": "embedqa",
     "reranker": "llama_3_2_nv_rerankqa_1b_v2",
     "nemotron-parse": "nemotron_parse",
