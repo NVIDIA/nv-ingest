@@ -870,16 +870,16 @@ nimOperator:
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "32"
 
-  ## @param llama_3_2_nv_rerankqa_1b_v2 [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.enabled [bool] Enable this NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.image.* [various] Image repository/tag for this NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.authSecret [string] Authentication secret for the NIM
-  ## @param llama_3_2_nv_rerankqa_1b_v2.storage.* [various] Storage/PVC configuration
-  ## @param llama_3_2_nv_rerankqa_1b_v2.replicas [int] Number of replicas
-  ## @param llama_3_2_nv_rerankqa_1b_v2.resources [object] Limits/requests for resources
-  ## @param llama_3_2_nv_rerankqa_1b_v2.expose.* [object] Port/service configuration
-  ## @param llama_3_2_nv_rerankqa_1b_v2.env [array] Additional environment variables
-  llama_3_2_nv_rerankqa_1b_v2:
+  ## @param rerankqa [object] Configuration for LLaMA-3.2 NV RerankQA 1B v2 NIM
+  ## @param rerankqa.enabled [bool] Enable this NIM
+  ## @param rerankqa.image.* [various] Image repository/tag for this NIM
+  ## @param rerankqa.authSecret [string] Authentication secret for the NIM
+  ## @param rerankqa.storage.* [various] Storage/PVC configuration
+  ## @param rerankqa.replicas [int] Number of replicas
+  ## @param rerankqa.resources [object] Limits/requests for resources
+  ## @param rerankqa.expose.* [object] Port/service configuration
+  ## @param rerankqa.env [array] Additional environment variables
+  rerankqa:
     enabled: false
     image:
       repository: nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2

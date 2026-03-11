@@ -51,7 +51,7 @@ SERVICE_MAPPING = {
     "table-structure": "table_structure",
     "ocr": "ocr",
     "embedding": "embedqa",
-    "reranker": "llama_3_2_nv_rerankqa_1b_v2",
+    "reranker": "rerankqa",
     "nemotron-parse": "nemotron_parse",
     "vlm": "nemotron_nano_12b_v2_vl",
     "audio": "audio",
