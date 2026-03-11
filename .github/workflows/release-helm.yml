@@ -75,6 +75,14 @@ jobs:
       - name: Update Helm README
         run: helm/update_helm_readme.sh
 
+      - name: Add Helm dependency repos
+        run: |
+          helm repo add milvus https://zilliztech.github.io/milvus-helm
+          helm repo add zipkin https://zipkin.io/zipkin-helm
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
       - name: Build Helm dependencies
         run: |
           helm dependency update helm/
