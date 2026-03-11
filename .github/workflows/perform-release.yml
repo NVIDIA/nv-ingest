@@ -3,6 +3,11 @@ name: Perform Release
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: 'Override release version (leave empty to derive from branch name)'
+        required: false
+        type: string
+        default: ''
       dry-run:
         description: 'Build and validate artifacts without publishing'
         required: false
@@ -18,7 +23,7 @@ on:
           - dev
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -28,10 +33,16 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
-      - name: Extract version from branch name
+      - name: Determine version
         id: version
         run: |
-          VERSION="${{ github.ref_name }}"
+          if [ -n "${{ inputs.version }}" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Using explicit version: $VERSION"
+          else
+            VERSION="${{ github.ref_name }}"
+            echo "Derived version from branch: $VERSION"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "### Release Configuration" >> $GITHUB_STEP_SUMMARY
           echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
@@ -358,6 +369,31 @@ jobs:
             --name nv-ingest \
             --version "${{ needs.determine-version.outputs.version }}"
 
+  # ── Tag Release ───────────────────────────────────────────────────────
+  tag-release:
+    name: Tag Release
+    if: ${{ !inputs.dry-run }}
+    needs:
+      - determine-version
+      - pypi-publish
+      - nvingest-docker-publish
+      - retriever-docker-publish
+      - helm-publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ needs.determine-version.outputs.version }}"
+          git tag "$VERSION"
+          git push origin "$VERSION"
+          echo "### Git Tag" >> $GITHUB_STEP_SUMMARY
+          echo "Created and pushed tag: \`$VERSION\`" >> $GITHUB_STEP_SUMMARY
+
   # ── Announcement ─────────────────────────────────────────────────────
   announce:
     name: Release Announcement
@@ -372,6 +408,7 @@ jobs:
       - retriever-docker-publish
       - helm-build
       - helm-publish
+      - tag-release
     runs-on: ubuntu-latest
     steps:
       - name: Generate Slack announcement
@@ -388,6 +425,7 @@ jobs:
           RETRIEVER_PUBLISH_RESULT: ${{ needs.retriever-docker-publish.result }}
           HELM_BUILD_RESULT: ${{ needs.helm-build.result }}
           HELM_PUBLISH_RESULT: ${{ needs.helm-publish.result }}
+          TAG_RESULT: ${{ needs.tag-release.result }}
           NVINGEST_IMAGE: ${{ needs.nvingest-docker-build.outputs.image }}
           RETRIEVER_IMAGE: ${{ needs.retriever-docker-build.outputs.image }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -471,6 +509,15 @@ jobs:
             MSG+="\n$(status_emoji "$HELM_BUILD_RESULT") *Helm Chart* — Build: ${HELM_BUILD_RESULT}"
           else
             MSG+="\n$(status_emoji "$HELM_PUBLISH_RESULT") *Helm Chart* — Publish blocked (other build failed)"
+          fi
+
+          # — Git Tag —
+          if [ "$DRY_RUN" = "true" ]; then
+            MSG+="\n:fast_forward: *Git Tag* — Skipped (dry run)"
+          elif [ "$TAG_RESULT" = "success" ]; then
+            MSG+="\n:white_check_mark: *Git Tag* — \`${VERSION}\`"
+          else
+            MSG+="\n$(status_emoji "$TAG_RESULT") *Git Tag* — ${TAG_RESULT}"
           fi
 
           MSG+="\n"
