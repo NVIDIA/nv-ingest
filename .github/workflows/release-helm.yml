@@ -65,9 +65,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install ngcsdk pyyaml
 
-      - name: Verify NGC CLI
-        run: ngc --version
-
       - name: Update Helm README
         run: helm/update_helm_readme.sh
 

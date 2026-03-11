@@ -22,7 +22,7 @@ jobs:
           path: ./dist
 
       - name: Install twine
-        run: pip install twine
+        run: pip install 'twine>=6.1'
 
       - name: Publish wheels to Artifactory
         env:

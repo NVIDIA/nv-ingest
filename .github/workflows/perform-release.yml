@@ -311,9 +311,6 @@ jobs:
       - name: Install Python dependencies
         run: pip install ngcsdk pyyaml
 
-      - name: Verify NGC CLI
-        run: ngc --version
-
       - name: Update Helm README
         run: helm/update_helm_readme.sh
 
@@ -331,6 +328,8 @@ jobs:
           helm dependency build helm/
 
       - name: Publish chart to NGC
+        env:
+          NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
         run: |
           python ci/scripts/release_helm_chart.py \
             --org nvidian \
