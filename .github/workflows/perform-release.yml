@@ -197,26 +197,13 @@ jobs:
   #  build failure prevents any artifact from being published.
   # ══════════════════════════════════════════════════════════════════════
 
-  pypi-publish:
-    name: Publish Python Wheels
-    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
-    needs:
-      - pypi-build
-      - nvingest-docker-build
-      - helm-build
-    uses: ./.github/workflows/reusable-pypi-publish.yml
-    secrets:
-      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
-      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
-      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
-
   nvingest-docker-publish:
     name: Publish nv-ingest Docker Image
     if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
     needs:
       - determine-version
-      - pypi-build
       - nvingest-docker-build
+      - pypi-build
       - helm-build
     runs-on: linux-large-disk
     outputs:
@@ -279,8 +266,8 @@ jobs:
     if: ${{ !inputs.dry-run && !inputs.skip-helm-chart && !cancelled() && !failure() }}
     needs:
       - determine-version
-      - pypi-build
       - nvingest-docker-build
+      - pypi-build
       - helm-build
     runs-on: ubuntu-latest
     env:
@@ -336,6 +323,19 @@ jobs:
             --team nemo-llm \
             --name nv-ingest \
             --version "${{ needs.determine-version.outputs.version }}"
+
+  pypi-publish:
+    name: Publish Python Wheels (last — PyPI versions are immutable)
+    if: ${{ !inputs.dry-run && !cancelled() && !failure() }}
+    needs:
+      - pypi-build
+      - nvingest-docker-publish
+      - helm-publish
+    uses: ./.github/workflows/reusable-pypi-publish.yml
+    secrets:
+      ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+      ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+      ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
 
   # ── Tag Release ───────────────────────────────────────────────────────
   tag-release:
@@ -435,7 +435,7 @@ jobs:
           elif [ "$PYPI_BUILD_RESULT" != "success" ]; then
             MSG+="\n$(status_emoji "$PYPI_BUILD_RESULT") *PyPI Wheels* — Build: ${PYPI_BUILD_RESULT}"
           else
-            MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other build failed)"
+            MSG+="\n$(status_emoji "$PYPI_PUBLISH_RESULT") *PyPI Wheels* — Publish blocked (other publish failed)"
           fi
           MSG+="\n    \`nv-ingest-api\`  \`nv-ingest-client\`  \`nv-ingest\`  \`nemo-retriever\`"
 
