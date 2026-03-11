@@ -1,0 +1,41 @@
+{{ if and (.Capabilities.APIVersions.Has "apps.nvidia.com/v1alpha1") (eq .Values.nimOperator.ocr.enabled true) -}}
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMCache
+metadata:
+  name: nemotron-ocr-v1
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  source:
+    ngc:
+      modelPuller: "{{ .Values.nimOperator.ocr.image.repository }}:{{ .Values.nimOperator.ocr.image.tag }}"
+      pullSecret: "{{ index .Values.nimOperator.ocr.image.pullSecrets 0 }}"
+      authSecret: {{ .Values.nimOperator.ocr.authSecret }}
+  storage:
+    pvc:
+      create: {{ .Values.nimOperator.ocr.storage.pvc.create }}
+      storageClass: {{ .Values.nimOperator.ocr.storage.pvc.storageClass }}
+      size: {{ .Values.nimOperator.ocr.storage.pvc.size }}
+      volumeAccessMode: {{ .Values.nimOperator.ocr.storage.pvc.volumeAccessMode }}
+---
+apiVersion: apps.nvidia.com/v1alpha1
+kind: NIMService
+metadata:
+  name: nemotron-ocr-v1
+spec:
+  image:
+    repository: {{ .Values.nimOperator.ocr.image.repository }}
+    tag: {{ .Values.nimOperator.ocr.image.tag }}
+    pullPolicy: {{ .Values.nimOperator.ocr.image.pullPolicy }}
+    pullSecrets: {{ toYaml .Values.nimOperator.ocr.image.pullSecrets | nindent 6 }}
+  authSecret: {{ .Values.nimOperator.ocr.authSecret }}
+  storage:
+    nimCache:
+      name: nemotron-ocr-v1
+  replicas: {{ .Values.nimOperator.ocr.replicas }}
+  nodeSelector: {{ toYaml .Values.nimOperator.ocr.nodeSelector | nindent 4 }}
+  resources: {{ toYaml .Values.nimOperator.ocr.resources | nindent 4 }}
+  tolerations: {{ toYaml .Values.nimOperator.ocr.tolerations | nindent 4 }}
+  expose: {{ toYaml .Values.nimOperator.ocr.expose | nindent 4 }}
+  env: {{ toYaml .Values.nimOperator.ocr.env | nindent 4 }}
+{{- end }}
