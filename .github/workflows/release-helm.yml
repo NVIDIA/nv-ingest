@@ -1,0 +1,120 @@
+name: Release - Helm Chart
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Chart version (e.g. 26.03)'
+        required: true
+        type: string
+      source-ref:
+        description: 'Git ref to build from'
+        required: false
+        type: string
+        default: 'main'
+      dry-run:
+        description: 'Build chart without publishing to NGC'
+        required: false
+        type: boolean
+        default: false
+      ngc-org:
+        description: 'NGC organization'
+        required: false
+        type: string
+        default: 'nvidian'
+      ngc-team:
+        description: 'NGC team'
+        required: false
+        type: string
+        default: 'nemo-llm'
+      chart-name:
+        description: 'Helm chart name'
+        required: false
+        type: string
+        default: 'nv-ingest'
+
+jobs:
+  release-helm:
+    name: Build & Publish Helm Chart
+    runs-on: ubuntu-latest
+    env:
+      NGC_CLI_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source-ref }}
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install helm-docs
+        run: |
+          HELM_DOCS_VERSION="1.14.2"
+          curl -sSL "https://github.com/norwoodj/helm-docs/releases/download/v${HELM_DOCS_VERSION}/helm-docs_${HELM_DOCS_VERSION}_Linux_x86_64.tar.gz" \
+            | tar xz -C /usr/local/bin helm-docs
+
+      - name: Install NGC CLI
+        run: |
+          curl -sSL "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.55.0/files/ngccli_linux.zip" -o /tmp/ngccli.zip
+          unzip -q /tmp/ngccli.zip -d /tmp
+          sudo mv /tmp/ngc-cli/ngc /usr/local/bin/ngc
+          sudo chmod +x /usr/local/bin/ngc
+
+      - name: Configure and verify NGC CLI
+        run: |
+          ngc config set <<EOF
+          $NGC_CLI_API_KEY
+          json
+          ${{ inputs.ngc-org }}
+          ${{ inputs.ngc-team }}
+          EOF
+          echo "NGC CLI configured. Verifying authentication..."
+          ngc config current
+
+      - name: Update Helm README
+        run: helm/update_helm_readme.sh
+
+      - name: Add Helm dependency repos
+        run: |
+          helm repo add milvus https://zilliztech.github.io/milvus-helm
+          helm repo add zipkin https://zipkin.io/zipkin-helm
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+
+      - name: Build Helm dependencies
+        run: |
+          helm dependency update helm/
+          helm dependency build helm/
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install pyyaml
+
+      - name: Release Helm chart
+        run: |
+          DRY_RUN_FLAG=""
+          if [ "${{ inputs.dry-run }}" = "true" ]; then
+            DRY_RUN_FLAG="--dry-run"
+          fi
+          python ci/scripts/release_helm_chart.py \
+            --org "${{ inputs.ngc-org }}" \
+            --team "${{ inputs.ngc-team }}" \
+            --name "${{ inputs.chart-name }}" \
+            --version "${{ inputs.version }}" \
+            $DRY_RUN_FLAG
+
+      - name: Summary
+        run: |
+          echo "### Helm Chart Release" >> $GITHUB_STEP_SUMMARY
+          echo "| Setting | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Chart | \`${{ inputs.chart-name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Version | \`${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| NGC | \`${{ inputs.ngc-org }}/${{ inputs.ngc-team }}/${{ inputs.chart-name }}:${{ inputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | \`${{ inputs.dry-run }}\` |" >> $GITHUB_STEP_SUMMARY
