@@ -21,7 +21,7 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: llama-32-nv-rerankqa-1b-v2
+  name: llama-nemotron-rerank-1b-v2
 spec:
   image:
     repository: {{ .Values.nimOperator.llama_3_2_nv_rerankqa_1b_v2.image.repository }}

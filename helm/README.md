@@ -298,7 +298,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
-| envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://llama-32-nv-embedqa-1b-v2:8000/v1"` |  |
+| envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://llama-nemotron-embed-1b-v2:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-nemotron-embed-1b-v2"` |  |
 | envVars.IMAGE_STORAGE_PUBLIC_BASE_URL | string | `""` |  |
 | envVars.IMAGE_STORAGE_URI | string | `"s3://nv-ingest/artifacts/store/images"` |  |

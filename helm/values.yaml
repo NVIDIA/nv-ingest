@@ -170,7 +170,7 @@ envVars:
   AUDIO_GRPC_ENDPOINT: "audio:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
-  EMBEDDING_NIM_ENDPOINT: "http://llama-32-nv-embedqa-1b-v2:8000/v1"
+  EMBEDDING_NIM_ENDPOINT: "http://llama-nemotron-embed-1b-v2:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-nemotron-embed-1b-v2"
 
   NEMOTRON_PARSE_HTTP_ENDPOINT: http://nemotron-parse:8000/v1/chat/completions
