@@ -28,6 +28,7 @@ from nemo_retriever.params import ExtractParams
 from nemo_retriever.params import IngestExecuteParams
 from nemo_retriever.params import IngestorCreateParams
 from nemo_retriever.params import TextChunkParams
+from nemo_retriever.params import VdbUploadParams
 from nemo_retriever.recall.core import RecallConfig, retrieve_and_score
 from nemo_retriever.utils.remote_auth import resolve_remote_api_key
 from nemo_retriever.vector_store.lancedb_store import handle_lancedb
@@ -259,6 +260,11 @@ def main(
         "nvidia/llama-nemotron-embed-1b-v2",
         "--embed-model-name",
         help="Embedding model name passed to .embed().",
+    ),
+    embed_use_vllm: bool = typer.Option(
+        False,
+        "--embed-use-vllm/--no-embed-use-vllm",
+        help="Use vLLM Python API for embedding (docs and recall queries). Requires [embed-vllm] extra.",
     ),
     embed_modality: str = typer.Option(
         "text",
@@ -583,6 +589,7 @@ def main(
             model_name=str(embed_model_name),
             embed_invoke_url=embed_invoke_url,
             api_key=embed_remote_api_key,
+            embed_use_vllm=embed_use_vllm,
             embed_modality=embed_modality,
             text_elements_modality=text_elements_modality,
             structured_elements_modality=structured_elements_modality,
@@ -648,18 +655,51 @@ def main(
                 ingestor.files(file_patterns)
                 .extract_txt(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(embed_params)
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
         elif input_type == "html":
             ingestor = (
                 ingestor.files(file_patterns)
                 .extract_html(TextChunkParams(max_tokens=512, overlap_tokens=0))
                 .embed(embed_params)
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
         elif input_type == "image":
             ingestor = (
                 ingestor.files(file_patterns)
                 .extract_image_files(_extract_params(_detection_batch_tuning))
                 .embed(embed_params)
+                .vdb_upload(
+                    VdbUploadParams(
+                        lancedb={
+                            "lancedb_uri": lancedb_uri,
+                            "table_name": LANCEDB_TABLE,
+                            "overwrite": True,
+                            "create_index": True,
+                            "hybrid": hybrid,
+                        }
+                    )
+                )
             )
         elif input_type == "doc":
             ingestor = ingestor.files(file_patterns).extract(_extract_params(_pdf_batch_tuning)).embed(embed_params)
@@ -761,6 +801,7 @@ def main(
             lancedb_table=str(LANCEDB_TABLE),
             embedding_model=_recall_model,
             embedding_http_endpoint=embed_invoke_url,
+            use_vllm=embed_use_vllm,
             embedding_api_key=embed_remote_api_key or "",
             top_k=10,
             ks=(1, 5, 10),

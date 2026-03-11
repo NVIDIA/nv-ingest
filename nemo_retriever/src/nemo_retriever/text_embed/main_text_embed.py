@@ -46,10 +46,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
-from urllib.parse import urlparse  # noqa: F401
 
 import pandas as pd
 
+from nemo_retriever.model import _DEFAULT_EMBED_MODEL
 from nemo_retriever.params.models import IMAGE_MODALITIES
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,7 @@ class TextEmbeddingConfig:
     # Remote / NIM-like settings
     api_key: Optional[str] = None
     embedding_nim_endpoint: Optional[str] = None  # e.g. "http://host:8000/v1"
-    embedding_model: str = "nvidia/llama-nemotron-embed-1b-v2"
+    embedding_model: str = _DEFAULT_EMBED_MODEL
     encoding_format: str = "float"  # OpenAI-compatible embeddings often accept "float"
     input_type: str = "passage"
     truncate: str = "END"
@@ -482,6 +482,47 @@ def _callable_runner(
     return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
 
 
+def _vllm_runner(
+    prompts: List[List[str]],
+    *,
+    model: str,
+    batch_size: int = 64,
+    dimensions: Optional[int] = None,
+    llm: Optional[Any] = None,
+) -> dict:
+    """
+    Request embeddings using vLLM Python API (no server).
+    If llm is provided (e.g. from a batch actor), reuse it and skip model load/CUDA capture.
+    Returns the same {"embeddings": [...], "info_msgs": [...]} shape as _callable_runner.
+    """
+    flat_prompts: List[str] = []
+    for batch in prompts:
+        flat_prompts.extend(batch)
+    if not flat_prompts:
+        return {"embeddings": [], "info_msgs": []}
+    if llm is not None:
+        from nemo_retriever.text_embed.vllm import embed_with_vllm_llm
+
+        vectors = embed_with_vllm_llm(
+            flat_prompts,
+            llm,
+            batch_size=batch_size,
+            prefix="passage: ",
+        )
+    else:
+        from nemo_retriever.text_embed.vllm import embed_via_vllm
+
+        vectors = embed_via_vllm(
+            flat_prompts,
+            model=model,
+            batch_size=batch_size,
+            prefix="passage: ",
+            dimensions=dimensions,
+        )
+    embeddings = [v if v else None for v in vectors]
+    return {"embeddings": embeddings, "info_msgs": [None] * len(embeddings)}
+
+
 # ------------------------------------------------------------------------------
 # Row update helpers (adapted for retriever-local DataFrames)
 # ------------------------------------------------------------------------------
@@ -540,7 +581,8 @@ def create_text_embeddings_for_df(
         - **endpoint_url**: optional str; if set, remote HTTP embeddings are used
         - **model_name**: optional str
         - **dimensions**: optional int
-        - **embedder**: optional callable(texts)->vectors; used when endpoint_url is empty/None
+        - **embedder**: optional callable(texts)->vectors; used when endpoint_url is empty/None (injected by pipeline
+                        or processor, e.g. from LlamaNemotronEmbed1BV2Embedder with HF or use_vllm=True)
         - **local_batch_size**: int; used to sub-batch for the callable embedder path
     transform_config:
         Optional TextEmbeddingConfig; if omitted, defaults are used.

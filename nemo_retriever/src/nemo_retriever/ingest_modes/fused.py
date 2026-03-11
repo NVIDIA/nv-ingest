@@ -59,8 +59,9 @@ class _FusedModelActor:
     def __init__(self, **kwargs: Any) -> None:
         _assert_no_remote_endpoints(dict(kwargs), context="actor init")
 
-        from nemo_retriever.model import create_local_embedder
+        from nemo_retriever.model import resolve_embed_model
         from nemo_retriever.model.local import NemotronOCRV1, NemotronPageElementsV3
+        from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 
         self._detect_kwargs = {
             "inference_batch_size": int(kwargs.get("inference_batch_size", 8)),
@@ -94,6 +95,14 @@ class _FusedModelActor:
             "has_embedding_column": str(kwargs.get("has_embedding_column", "text_embeddings_1b_v2_has_embedding")),
         }
 
+        device = kwargs.get("device")
+        hf_cache_dir = kwargs.get("hf_cache_dir")
+        normalize = bool(kwargs.get("normalize", True))
+        max_length = int(kwargs.get("max_length", 8192))
+        model_name_raw = kwargs.get("model_name")
+        embed_use_vllm = bool(kwargs.get("embed_use_vllm", False))
+        resolved_model_id = resolve_embed_model(model_name_raw)
+
         self._page_elements_model = NemotronPageElementsV3()
         self._ge_model = None
         if self._use_graphic_elements and self._extract_charts:
@@ -101,18 +110,29 @@ class _FusedModelActor:
 
             self._ge_model = NemotronGraphicElementsV1()
         self._ocr_model = NemotronOCRV1()
+
         self._table_structure_model = None
         if self._extract_tables and self._use_table_structure:
             from nemo_retriever.model.local import NemotronTableStructureV1
 
             self._table_structure_model = NemotronTableStructureV1()
-        self._embed_model = create_local_embedder(
-            kwargs.get("model_name"),
-            device=str(kwargs["device"]) if kwargs.get("device") else None,
-            hf_cache_dir=str(kwargs["hf_cache_dir"]) if kwargs.get("hf_cache_dir") else None,
-            normalize=bool(kwargs.get("normalize", True)),
-            max_length=int(kwargs.get("max_length", 8192)),
-        )
+        embedder_kwargs: dict[str, Any] = {"model_id": resolved_model_id}
+        if embed_use_vllm:
+            embedder_kwargs.update(
+                use_vllm=True,
+                gpu_memory_utilization=float(kwargs.get("gpu_memory_utilization", 0.45)),
+                enforce_eager=bool(kwargs.get("enforce_eager", False)),
+                compile_cache_dir=kwargs.get("compile_cache_dir"),
+                dimensions=kwargs.get("dimensions"),
+            )
+        else:
+            embedder_kwargs.update(
+                device=str(device) if device else None,
+                hf_cache_dir=str(hf_cache_dir) if hf_cache_dir else None,
+                normalize=normalize,
+                max_length=max_length,
+            )
+        self._embed_model = LlamaNemotronEmbed1BV2Embedder(**embedder_kwargs)
 
     def __call__(self, batch_df: Any) -> Any:
         detected = detect_page_elements_v3(

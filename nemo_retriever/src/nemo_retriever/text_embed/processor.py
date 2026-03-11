@@ -89,24 +89,45 @@ def maybe_inject_local_hf_embedder(task_config: Dict[str, Any], transform_config
     if has_endpoint or not use_local:
         return
 
-    from nemo_retriever.model import create_local_embedder
+    # Single constructor: vLLM branch only controls which kwargs are passed.
+    from nemo_retriever.model import resolve_embed_model
+    from nemo_retriever.model.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
 
-    local_device = task_config.get("local_hf_device")
-    local_cache_dir = task_config.get("local_hf_cache_dir")
-    local_batch_size = int(task_config.get("local_hf_batch_size") or 64)
-
-    embedder = create_local_embedder(
-        task_config.get("model_name"),
-        device=local_device,
-        hf_cache_dir=local_cache_dir,
+    embed_model = resolve_embed_model(
+        task_config.get("embed_model_name")
+        or task_config.get("model_name")
+        or getattr(transform_config, "embedding_model", None)
     )
+    embed_model = str(embed_model).strip() if embed_model else resolve_embed_model(None)
+
+    use_vllm = bool(task_config.get("use_vllm"))
+    embedder_kwargs = {"model_id": embed_model}
+    if use_vllm:
+        embedder_kwargs.update(
+            use_vllm=True,
+            gpu_memory_utilization=float(task_config.get("gpu_memory_utilization", 0.45)),
+            enforce_eager=bool(task_config.get("enforce_eager", False)),
+            compile_cache_dir=task_config.get("compile_cache_dir"),
+            dimensions=task_config.get("dimensions") or getattr(transform_config, "dimensions", None),
+        )
+        local_batch_size = int(task_config.get("local_batch_size") or 256)
+    else:
+        embedder_kwargs.update(
+            device=task_config.get("local_hf_device"),
+            hf_cache_dir=task_config.get("local_hf_cache_dir"),
+            normalize=True,
+        )
+        local_batch_size = int(task_config.get("local_hf_batch_size") or 64)
+
+    embedder_instance = LlamaNemotronEmbed1BV2Embedder(**embedder_kwargs)
+
+    prefix = f"{transform_config.input_type}: " if getattr(transform_config, "input_type", None) else ""
 
     def _embed(texts):
-        prefix = f"{transform_config.input_type}: " if getattr(transform_config, "input_type", None) else ""
-        vecs = embedder.embed([prefix + t for t in texts], batch_size=local_batch_size)
+        prefixed = [prefix + t for t in texts] if prefix else texts
+        vecs = embedder_instance.embed(prefixed, batch_size=local_batch_size)
         return vecs.tolist()
 
-    # Force the API transform to use the callable path by explicitly overriding endpoint_url to None.
     task_config["endpoint_url"] = None
     task_config["embedder"] = _embed
     task_config["local_batch_size"] = local_batch_size

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import Any, List, Optional, Sequence
 
 import torch
 
@@ -23,9 +23,11 @@ def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
 @dataclass
 class LlamaNemotronEmbed1BV2Embedder:
     """
-    Minimal embedder wrapper for local-only HuggingFace execution.
+    Minimal embedder wrapper for local HuggingFace or vLLM execution.
 
-    This intentionally contains **no remote invocation logic**.
+    When use_vllm=False (default), uses HuggingFace AutoModel. When use_vllm=True,
+    uses vLLM's Python API (bfloat16 + FLASH_ATTN). Exposes the same embed() interface
+    for both backends. No remote invocation logic.
     """
 
     device: Optional[str] = None
@@ -37,15 +39,42 @@ class LlamaNemotronEmbed1BV2Embedder:
     # max_length: int = 4096
     max_length: int = 8192
     model_id: Optional[str] = None
+    # vLLM backend: when True, use vLLM Python API instead of HF.
+    use_vllm: bool = False
+    gpu_memory_utilization: float = 0.45
+    enforce_eager: bool = False
+    compile_cache_dir: Optional[str] = None
+    dimensions: Optional[int] = None
 
     def __post_init__(self) -> None:
         self._tokenizer = None
         self._model = None
         self._device = None
+        self._llm: Any = None
 
+        if self.use_vllm:
+            try:
+                from nemo_retriever.model import _DEFAULT_EMBED_MODEL
+                from nemo_retriever.text_embed.vllm import create_vllm_llm
+            except ImportError as e:
+                raise RuntimeError(
+                    "vLLM embedding requires the embed-vllm extra. "
+                    "Install with: uv pip install -e '.[embed-vllm]' or pip install -e '.[embed-vllm]'"
+                ) from e
+            model_id = self.model_id or _DEFAULT_EMBED_MODEL
+            self._llm = create_vllm_llm(
+                str(model_id),
+                dimensions=self.dimensions,
+                gpu_memory_utilization=self.gpu_memory_utilization,
+                enforce_eager=self.enforce_eager,
+                compile_cache_dir=self.compile_cache_dir,
+            )
+            return
+
+        from nemo_retriever.model import _DEFAULT_EMBED_MODEL
         from transformers import AutoModel, AutoTokenizer
 
-        MODEL_ID = self.model_id or "nvidia/llama-nemotron-embed-1b-v2"
+        MODEL_ID = self.model_id or _DEFAULT_EMBED_MODEL
         dev = torch.device(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
         hf_cache_dir = configure_global_hf_cache_base(self.hf_cache_dir)
         _revision = get_hf_revision(MODEL_ID)
@@ -77,6 +106,18 @@ class LlamaNemotronEmbed1BV2Embedder:
         if not texts_list:
             return torch.empty((0, 0), dtype=torch.float32)
 
+        if self.use_vllm and self._llm is not None:
+            from nemo_retriever.text_embed.vllm import embed_with_vllm_llm
+
+            vectors = embed_with_vllm_llm(
+                texts_list,
+                self._llm,
+                batch_size=max(1, int(batch_size)),
+                prefix="passage: ",
+            )
+            if not vectors:
+                return torch.empty((0, 0), dtype=torch.float32)
+            return torch.tensor(vectors, dtype=torch.float32)
         return self._embed_local(texts_list, batch_size=batch_size)
 
     def _embed_local(self, texts: List[str], *, batch_size: int) -> torch.Tensor:

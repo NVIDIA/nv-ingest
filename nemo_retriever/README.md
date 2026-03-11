@@ -85,6 +85,17 @@ This creates a project-local environment and installs the `nemo_retriever` Pytho
 
 5. Run the batch pipeline on PDFs
 
+### Optional extras
+
+- **`embed-vllm`** — vLLM embedding (bfloat16 + FLASH_ATTN). Use `--use-vllm` or `embed_use_vllm=True` in batch/inprocess. Install with:
+  ```bash
+  uv pip install -e './nemo_retriever[embed-vllm]'
+  ```
+- **`asr`** — Local ASR (Parakeet). Has a different `transformers` requirement than the core package; install only if you need local ASR:
+  ```bash
+  uv pip install -e './nemo_retriever[asr]'
+  ```
+
 In this procedure, you run the end‑to‑end NeMo Retriever Library batch pipeline to ingest a collection of PDFs and generate embeddings for them. Pointing the script at a directory of PDF files lets the pipeline handle parsing, OCR, embedding, optional LanceDB upload, and (if configured) recall evaluation in a single command.
 
 Run the batch pipeline script and point it at the directory that contains your PDFs using the following command.
