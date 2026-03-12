@@ -50,6 +50,27 @@ class DockerComposeManager(ServiceManager):
             cmd += ["-f", self.override_file]
         return cmd
 
+    def _compose_cmd_with_profiles(self, subcmd: str, *args: str) -> list[str]:
+        """Build compose command with same files and profiles as start(), for stop/start by service name."""
+        profile_list = self.config.profiles or []
+        cmd = self._build_compose_cmd(["docker", "compose"])
+        for p in profile_list:
+            cmd += ["--profile", p]
+        cmd += [subcmd]
+        cmd += list(args)
+        return cmd
+
+    # Ingestion-only services (per STAGE-BASED-DEPLOYMENT / DOCKER-COMPOSE-SERVICES-BY-STAGE)
+    _INGESTION_SERVICES = (
+        "nv-ingest-ms-runtime",
+        "page-elements",
+        "graphic-elements",
+        "table-structure",
+        "ocr",
+    )
+    # Non-ingestion services to stop after initial start when minimize_vram (recall-only, etc.)
+    _NON_INGESTION_SERVICES = ("reranker",)
+
     def start(self, no_build: bool = False) -> int:
         """
         Start Docker Compose services with profiles.
@@ -307,3 +328,73 @@ class DockerComposeManager(ServiceManager):
         except Exception as e:
             print(f"Error: Failed to dump logs: {e}")
             return 1
+
+    def stop_ingestion_services(self) -> int:
+        """Stop only ingestion-related services to free VRAM before recall."""
+        if not self.config.profiles:
+            print("No profiles specified; skipping stop_ingestion_services")
+            return 0
+        print("Stopping ingestion-only services (minimize VRAM)...")
+        cmd = self._compose_cmd_with_profiles("stop", *self._INGESTION_SERVICES)
+        return run_cmd(cmd)
+
+    def start_ingestion_services(self) -> int:
+        """Start ingestion-related services before the next dataset's e2e."""
+        if not self.config.profiles:
+            print("No profiles specified; skipping start_ingestion_services")
+            return 0
+        print("Starting ingestion-only services...")
+        cmd = self._compose_cmd_with_profiles("start", *self._INGESTION_SERVICES)
+        return run_cmd(cmd)
+
+    def stop_non_ingestion_services(self) -> int:
+        """Stop reranker and other non-ingestion services so only ingestion stack runs before e2e."""
+        if not self.config.profiles:
+            print("No profiles specified; skipping stop_non_ingestion_services")
+            return 0
+        print("Stopping non-ingestion services (reranker, etc.)...")
+        cmd = self._compose_cmd_with_profiles("stop", *self._NON_INGESTION_SERVICES)
+        return run_cmd(cmd)
+
+    def wait_for_reranker_readiness(self, timeout_s: int, verbose: bool = True) -> bool:
+        """Wait for reranker NIM to become ready (poll /v1/health/ready on port 8015)."""
+        hostname = getattr(self.config, "hostname", "localhost")
+        url = f"http://{hostname}:8015/v1/health/ready"
+        deadline = time.time() + timeout_s
+        last_status_time = 0.0
+        status_interval = 10.0
+
+        if verbose:
+            print(f"Waiting for reranker to become ready (timeout: {timeout_s}s)...")
+
+        while time.time() < deadline:
+            now = time.time()
+            try:
+                with urllib.request.urlopen(url, timeout=5) as resp:
+                    if resp.status == 200:
+                        if verbose:
+                            print("Reranker ready.")
+                        return True
+            except Exception:
+                pass
+
+            if verbose and (now - last_status_time >= status_interval or last_status_time == 0):
+                last_status_time = now
+                print("  reranker (8015): not ready")
+
+            time.sleep(3)
+
+        if verbose:
+            print("Readiness timeout. Reranker (8015) did not become ready.")
+        return False
+
+    def start_retrieval_services(self, reranker: bool = False) -> int:
+        """Start recall-required services; if reranker is True, bring up reranker."""
+        if not reranker:
+            return 0
+        if not self.config.profiles:
+            print("No profiles specified; skipping start_retrieval_services")
+            return 0
+        print("Starting retrieval services (reranker)...")
+        cmd = self._compose_cmd_with_profiles("start", "reranker")
+        return run_cmd(cmd)

@@ -39,8 +39,9 @@ def run_harness(
     managed: bool = False,
     sku: str | None = None,
     test_config_path: str | None = None,
+    minimize_vram: bool = False,
 ) -> tuple[int, Path | None]:
-    """Run a single harness test."""
+    """Run a single harness test (or multiple datasets when dataset is comma-separated and case is e2e_recall)."""
     cmd = [
         sys.executable,
         "-m",
@@ -52,6 +53,9 @@ def run_harness(
 
     if managed:
         cmd.append("--managed")
+
+    if minimize_vram:
+        cmd.append("--minimize-vram")
 
     if session_dir:
         cmd.append(f"--session-dir={str(session_dir)}")
@@ -143,6 +147,12 @@ def load_results(artifact_dir: Path) -> dict:
     help="Keep services running after nightly run completes (only with --managed)",
 )
 @click.option(
+    "--minimize-vram",
+    is_flag=True,
+    help="Minimize VRAM during e2e_recall by stopping ingestion services between e2e and recall (managed only; "
+    "`--managed` required; mutually exclusive with `--keep-up`)",
+)
+@click.option(
     "--skip-slack",
     is_flag=True,
     help="Disable Slack posting (overrides config)",
@@ -199,6 +209,7 @@ def main(
     deployment_type: str,
     managed: bool,
     keep_up: bool,
+    minimize_vram: bool,
     skip_slack: bool,
     skip_history: bool,
     skip_fresh_start: bool,
@@ -210,6 +221,10 @@ def main(
     test_config_path: str | None,
 ):
     """Run nightly benchmarks and post results."""
+    if keep_up and minimize_vram:
+        print("Error: --keep-up and --minimize-vram are mutually exclusive.", file=sys.stderr)
+        return 1
+
     if replay_dirs:
         return _replay_results(replay_dirs)
 
@@ -371,22 +386,63 @@ def main(
         for sink in sinks:
             sink.process_result(result)
 
-    for dataset in recall_datasets:
-        print(f"\n--- Running e2e_recall for {dataset} ---")
-        rc, artifact_dir = run_harness(
-            dataset,
+    if minimize_vram and recall_datasets:
+        # Run all recall datasets in one harness invocation so run_datasets can do
+        # e2e -> stop ingestion -> recall -> start ingestion per dataset.
+        # Pass managed=True so the run CLI owns service lifecycle and stage control.
+        print(f"\n--- Running e2e_recall (minimize VRAM) for {', '.join(recall_datasets)} ---")
+        rc, _ = run_harness(
+            ",".join(recall_datasets),
             case="e2e_recall",
             session_dir=session_dir,
             deployment_type=deployment_type,
-            managed=False,  # Don't manage per-dataset, already managed at nightly level
+            managed=True,
             sku=sku,
             test_config_path=test_config_path,
+            minimize_vram=True,
         )
-        result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
-        all_results.append(result)
+        # Per-dataset results: read artifact_paths and each dataset's results.json for return_code
+        artifact_paths_file = session_dir / ".artifact_paths.json"
+        if artifact_paths_file.exists():
+            with open(artifact_paths_file) as f:
+                artifact_paths = json.load(f)
+            for dataset in recall_datasets:
+                artifact_dir_str = artifact_paths.get(dataset)
+                artifact_dir = Path(artifact_dir_str) if artifact_dir_str else None
+                dataset_rc = rc
+                if artifact_dir and (artifact_dir / "results.json").exists():
+                    try:
+                        with open(artifact_dir / "results.json") as rf:
+                            dataset_rc = json.load(rf).get("return_code", rc)
+                    except (json.JSONDecodeError, IOError):
+                        pass
+                result = _process_result(dataset, dataset_rc, artifact_dir, case="e2e_recall")
+                all_results.append(result)
+                for sink in sinks:
+                    sink.process_result(result)
+        else:
+            for dataset in recall_datasets:
+                result = _process_result(dataset, rc, None, case="e2e_recall")
+                all_results.append(result)
+                for sink in sinks:
+                    sink.process_result(result)
+    else:
+        for dataset in recall_datasets:
+            print(f"\n--- Running e2e_recall for {dataset} ---")
+            rc, artifact_dir = run_harness(
+                dataset,
+                case="e2e_recall",
+                session_dir=session_dir,
+                deployment_type=deployment_type,
+                managed=False,  # Don't manage per-dataset, already managed at nightly level
+                sku=sku,
+                test_config_path=test_config_path,
+            )
+            result = _process_result(dataset, rc, artifact_dir, case="e2e_recall")
+            all_results.append(result)
 
-        for sink in sinks:
-            sink.process_result(result)
+            for sink in sinks:
+                sink.process_result(result)
 
     # Cleanup services and port forwards if needed
     if service_manager:

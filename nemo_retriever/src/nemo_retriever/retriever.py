@@ -53,7 +53,9 @@ class Retriever:
     local_hf_cache_dir: Optional[Path] = None
     local_hf_batch_size: int = 64
     # Reranking -----------------------------------------------------------
-    reranker: Optional[str] = "nvidia/llama-nemotron-rerank-1b-v2"
+    reranker: Optional[bool] = False
+    """True to enable reranking with the default model, will use the reranker_model_name as hf model"""
+    reranker_model_name: Optional[str] = "nvidia/llama-nemotron-rerank-1b-v2"
     """HuggingFace model ID for local reranking (e.g. 'nvidia/llama-nemotron-rerank-1b-v2').
     Set to None to skip reranking (default)."""
     reranker_endpoint: Optional[str] = None
@@ -183,12 +185,12 @@ class Retriever:
 
     def _get_reranker_model(self) -> Any:
         """Lazily load and cache the local NemotronRerankV2 model."""
-        if self._reranker_model is None:
+        if self._reranker_model is None and self.reranker:
             from nemo_retriever.model.local import NemotronRerankV2
 
             cache_dir = str(self.local_hf_cache_dir) if self.local_hf_cache_dir else None
             self._reranker_model = NemotronRerankV2(
-                model_name=str(self.reranker),
+                model_name=self.reranker_model_name if self.reranker else None,
                 device=self.local_hf_device,
                 hf_cache_dir=cache_dir,
             )
