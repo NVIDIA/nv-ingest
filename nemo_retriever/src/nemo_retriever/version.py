@@ -108,6 +108,18 @@ def _base_version() -> str:
     return os.getenv("RETRIEVER_VERSION") or os.getenv("NV_INGEST_VERSION") or _build_datetime().strftime("%Y.%m.%d")
 
 
+def _has_prerelease(version_str: str) -> bool:
+    """Return True if *version_str* already contains a PEP 440 pre-release segment."""
+    from packaging.version import Version
+
+    try:
+        return Version(version_str).pre is not None
+    except Exception:
+        import re
+
+        return bool(re.search(r"(a|alpha|b|beta|rc|c|dev|pre)[-_.]?\d*", version_str, re.I))
+
+
 def get_build_version() -> str:
     """Return a PEP 440 compliant version string for packaging."""
     release_type = (os.getenv("RETRIEVER_RELEASE_TYPE") or os.getenv("NV_INGEST_RELEASE_TYPE") or "dev").lower()
@@ -116,6 +128,8 @@ def get_build_version() -> str:
     build_number = _build_number()
 
     if release_type == "release":
+        if _has_prerelease(base_version):
+            return base_version
         return f"{base_version}.post{build_number}" if int(build_number) > 0 else base_version
     if release_type == "dev":
         return f"{base_version}.dev{build_number}"
