@@ -42,6 +42,13 @@ pdf:
       http: null
       model_name: null
 
+  # PDF rendering mode for page-element detection images:
+  #   full_dpi     – render at `dpi` (default 300), then resize_pad down to 1024×1024.
+  #                  Higher source resolution, but bilinear downscale may differ from NIM.
+  #   fit_to_model – render directly at the scale that fits within 1024×1024 (~93 DPI
+  #                  for US Letter), matching the nv-ingest/NIM container rasterization.
+  render_mode: fit_to_model
+
   extract:
     text: true
     # Text depth: page | document

@@ -145,6 +145,7 @@ def _normalize_page_elements_config(raw: Dict[str, Any]) -> Dict[str, Any]:
         outputs, "json_output_dir", "json-output-dir"
     )
     out["limit"] = _cfg_get(raw, "limit")
+    out["render_mode"] = _cfg_get(raw, "render_mode")
 
     # Drop Nones so "not specified" stays not specified.
     return {k: v for k, v in out.items() if v is not None}
@@ -522,6 +523,14 @@ def render_page_elements(
         "--text-depth",
         help="Text depth for extracted text primitives: 'page' or 'document'.",
     ),
+    render_mode: str = typer.Option(
+        "fit_to_model",
+        "--render-mode",
+        help=(
+            "Page rendering mode: 'full_dpi' (render at DPI then resize_pad) or "
+            "'fit_to_model' (render at nv-ingest fit-to-1024 scale, ~93 DPI for US Letter)."
+        ),
+    ),
     write_json_outputs: bool = typer.Option(
         True,
         "--write-json-outputs/--no-write-json-outputs",
@@ -582,6 +591,9 @@ def render_page_elements(
 
     if not _argv_has_any(["--text-depth"]):
         text_depth = str(cfg_raw.get("text_depth", text_depth))
+
+    if not _argv_has_any(["--render-mode"]):
+        render_mode = str(cfg_raw.get("render_mode", render_mode))
 
     if not _argv_has_any(["--write-json-outputs", "--no-write-json-outputs"]):
         write_json_outputs = bool(cfg_raw.get("write_json_outputs", write_json_outputs))

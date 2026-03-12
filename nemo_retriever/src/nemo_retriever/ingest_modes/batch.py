@@ -338,6 +338,7 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -357,10 +358,9 @@ class BatchIngestor(Ingestor):
 
         # 200 DPI is sufficient for both detection and OCR.  YOLOX resizes to
         # 1024x1024 internally, and NemotronOCR also resizes crops to 1024x1024,
-        # so resolution above ~1200px per side is wasted.  200 DPI (Letter =
-        # 1700x2200) gives enough detail while reducing extraction time and
-        # memory usage by ~30-40% vs 300 DPI.
-        kwargs.setdefault("dpi", 200)
+        # nv-ingest NIM uses 300 DPI for page-element detection; match that
+        # default here so local-model recall matches the container path.
+        kwargs.setdefault("dpi", 300)
         kwargs.setdefault("image_format", "jpeg")
         kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
@@ -680,6 +680,7 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -850,6 +851,7 @@ class BatchIngestor(Ingestor):
         resolved = _coerce_params(params, EmbedParams, kwargs)
         if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.

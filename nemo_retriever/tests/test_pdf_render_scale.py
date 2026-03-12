@@ -54,7 +54,7 @@ class TestRenderPageEncoding:
         dpi = 200
         base_scale = dpi / 72.0
 
-        _extract._render_page_to_base64(page, dpi=dpi)
+        _extract._render_page_to_base64(page, dpi=dpi, render_mode="full_dpi")
 
         render_call = page.render.call_args
         actual_scale = render_call.kwargs.get("scale", render_call.args[0] if render_call.args else None)

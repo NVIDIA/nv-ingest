@@ -17,6 +17,13 @@ try:
 except Exception:  # pragma: no cover
     torch = None  # type: ignore[assignment]
 
+try:
+    from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+        YOLOX_TABLE_MIN_SCORE,
+    )
+except ImportError:
+    YOLOX_TABLE_MIN_SCORE = 0.1  # type: ignore[assignment]
+
 _DEFAULT_TABLE_STRUCTURE_LABELS: List[str] = ["cell", "row", "column"]
 
 
@@ -351,7 +358,7 @@ def table_structure_ocr_page_elements(
                     if not parsed:
                         pred_item = _extract_remote_pred_item(resp)
                         parsed = _prediction_to_detections(pred_item, label_names=label_names)
-                    structure_results.append(parsed)
+                    structure_results.append([d for d in parsed if (d.get("score") or 0.0) >= YOLOX_TABLE_MIN_SCORE])
             else:
                 # Local batched inference.
                 for _, _, crop_array in crops:
@@ -366,7 +373,7 @@ def table_structure_ocr_page_elements(
                         pre = pre.unsqueeze(0)
                     pred = table_structure_model.invoke(pre, (h, w))
                     dets = _prediction_to_detections(pred, label_names=label_names)
-                    structure_results.append(dets)
+                    structure_results.append([d for d in dets if (d.get("score") or 0.0) >= YOLOX_TABLE_MIN_SCORE])
 
             # --- Pass 3: Run OCR on all crops ---
             ocr_results: List[Any] = []
