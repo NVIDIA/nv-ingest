@@ -748,6 +748,8 @@ class BatchIngestor(Ingestor):
         Use with .files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_audio().
         ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint (see ASRParams.audio_endpoints).
+        Optional kwargs: audio_chunk_batch_size (default 4), asr_batch_size (default 8),
+        asr_num_gpus (default 0.5; GPUs reserved per ASR actor for local Parakeet).
         """
         from nemo_retriever.audio import ASRActor
         from nemo_retriever.audio import MediaChunkActor
@@ -763,6 +765,7 @@ class BatchIngestor(Ingestor):
 
         audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
         asr_batch_size = kwargs.get("asr_batch_size", 8)
+        asr_num_gpus = kwargs.get("asr_num_gpus", 0.5)
 
         self._rd_dataset = self._rd_dataset.map_batches(
             MediaChunkActor,
@@ -776,6 +779,7 @@ class BatchIngestor(Ingestor):
             batch_size=asr_batch_size,
             batch_format="pandas",
             num_cpus=1,
+            num_gpus=asr_num_gpus,
             fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
