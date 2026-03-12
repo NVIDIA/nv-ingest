@@ -167,6 +167,7 @@ class ExtractParams(_ParamsModel):
     dpi: int = 200
     image_format: str = "jpeg"
     jpeg_quality: int = 100
+    render_mode: Literal["full_dpi", "fit_to_model"] = "fit_to_model"
     inference_batch_size: int = 8
     ocr_model_dir: Optional[str] = None
 

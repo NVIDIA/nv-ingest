@@ -337,16 +337,29 @@ def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
 
 
 def _blocks_to_text(blocks: List[Dict[str, Any]]) -> str:
-    """Sort text blocks by reading order (y then x) and join with newlines."""
+    """Sort text blocks by reading order (y then x) and join with whitespace."""
     blocks.sort(key=lambda b: (b.get("sort_y", 0.0), b.get("sort_x", 0.0)))
-    return "\n".join(b["text"] for b in blocks if b.get("text"))
+    return " ".join(b["text"] for b in blocks if b.get("text"))
 
 
-def _blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
+def _blocks_to_pseudo_markdown(
+    blocks: List[Dict[str, Any]],
+    crop_hw: Tuple[int, int] = (0, 0),
+) -> str:
     """Convert OCR text blocks into pseudo-markdown table format.
 
-    Uses DBSCAN clustering on y-coordinates to identify rows, then
+    Uses DBSCAN clustering on pixel y-coordinates to identify rows, then
     sorts within each row by x-coordinate and joins with pipe separators.
+
+    Parameters
+    ----------
+    blocks : list of dict
+        OCR text blocks with ``sort_y`` (normalised [0,1]) and ``sort_x``.
+    crop_hw : (height, width)
+        Pixel dimensions of the crop image.  When provided the normalised
+        ``sort_y`` values are scaled to pixels and clustered with
+        ``eps=10`` (matching nv-ingest behaviour).  Falls back to the old
+        normalised-space heuristic when the height is unavailable.
     """
     if not blocks:
         return ""
@@ -358,19 +371,27 @@ def _blocks_to_pseudo_markdown(blocks: List[Dict[str, Any]]) -> str:
     from sklearn.cluster import DBSCAN
 
     df = pd.DataFrame(valid)
+    df = df.sort_values("sort_y")
 
-    # Normalize y-coordinates to [0,1] for scale-invariant clustering.
     y_vals = df["sort_y"].values
-    y_range = y_vals.max() - y_vals.min()
-    if y_range > 0:
-        y_norm = (y_vals - y_vals.min()) / y_range
-        eps = 0.03  # ~3% of bbox height ≈ one text line
+    crop_h = crop_hw[0] if crop_hw else 0
+
+    if crop_h > 0:
+        # Pixel-space clustering (matches nv-ingest eps=10).
+        y_pixels = (y_vals * crop_h).astype(int)
+        eps = 10
     else:
-        y_norm = y_vals
-        eps = 0.1
+        # Fallback: normalise to [0,1] when pixel dims are unknown.
+        y_range = y_vals.max() - y_vals.min()
+        if y_range > 0:
+            y_pixels = (y_vals - y_vals.min()) / y_range
+            eps = 0.03
+        else:
+            y_pixels = y_vals
+            eps = 0.1
 
     dbscan = DBSCAN(eps=eps, min_samples=1)
-    dbscan.fit(y_norm.reshape(-1, 1))
+    dbscan.fit(y_pixels.reshape(-1, 1))
     df["cluster"] = dbscan.labels_
 
     df = df.sort_values(["cluster", "sort_x"])
@@ -574,7 +595,15 @@ def ocr_page_elements(
 
                         blocks = _parse_ocr_result(preds)
                         if label_name == "table":
-                            text = _blocks_to_pseudo_markdown(blocks) or _blocks_to_text(blocks)
+                            crop_hw_table: Tuple[int, int] = (0, 0)
+                            try:
+                                _raw = base64.b64decode(crop_b64s[i])
+                                with Image.open(io.BytesIO(_raw)) as _cim:
+                                    _cw, _ch = _cim.size
+                                    crop_hw_table = (_ch, _cw)
+                            except Exception:
+                                pass
+                            text = _blocks_to_pseudo_markdown(blocks, crop_hw=crop_hw_table) or _blocks_to_text(blocks)
                         else:
                             text = _blocks_to_text(blocks)
                         entry = {"bbox_xyxy_norm": bbox, "text": text}
@@ -615,7 +644,7 @@ def ocr_page_elements(
                                 return
                     blocks = _parse_ocr_result(preds)
                     if label_name == "table":
-                        text = _blocks_to_pseudo_markdown(blocks)
+                        text = _blocks_to_pseudo_markdown(blocks, crop_hw=crop_hw)
                         if not text:
                             text = _blocks_to_text(blocks)
                     else:

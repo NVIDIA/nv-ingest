@@ -142,6 +142,12 @@ class ASRActor:
                 columns=["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "text"]
             )
 
+        if self._client is not None:
+            return self._call_remote_batch(batch_df)
+        return self._call_local_batch(batch_df)
+
+    def _call_remote_batch(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+        """Remote ASR: one infer call per row (no batching on server side)."""
         out_rows: List[Dict[str, Any]] = []
         for _, row in batch_df.iterrows():
             try:
@@ -151,6 +157,91 @@ class ASRActor:
             except Exception as e:
                 logger.exception("ASR failed for row path=%s: %s", row.get("path"), e)
                 continue
+
+        if not out_rows:
+            return pd.DataFrame(
+                columns=["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "text"]
+            )
+        return pd.DataFrame(out_rows)
+
+    def _call_local_batch(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+        """Local ASR: one batched transcribe call for the whole batch."""
+        if self._model is None:
+            return pd.DataFrame(
+                columns=["path", "source_path", "duration", "chunk_index", "metadata", "page_number", "text"]
+            )
+        temp_paths: List[Optional[str]] = []
+        paths_for_model: List[str] = []
+        rows_list: List[pd.Series] = []
+        for _, row in batch_df.iterrows():
+            rows_list.append(row)
+            raw = row.get("bytes")
+            path = row.get("path")
+            path_to_use: Optional[str] = None
+            temp_created: Optional[str] = None
+            if path and Path(path).exists():
+                path_to_use = str(path)
+            elif raw is not None:
+                try:
+                    f = tempfile.NamedTemporaryFile(suffix=".audio", delete=False)
+                    f.write(raw)
+                    f.close()
+                    path_to_use = f.name
+                    temp_created = f.name
+                except Exception as e:
+                    logger.warning("Failed to write temp file for ASR: %s", e)
+                    path_to_use = ""
+            else:
+                if path:
+                    try:
+                        with open(path, "rb") as fp:
+                            raw = fp.read()
+                    except Exception as e:
+                        logger.warning("Could not read %s: %s", path, e)
+                        path_to_use = ""
+                    else:
+                        try:
+                            f = tempfile.NamedTemporaryFile(suffix=".audio", delete=False)
+                            f.write(raw)
+                            f.close()
+                            path_to_use = f.name
+                            temp_created = f.name
+                        except Exception as e:
+                            logger.warning("Failed to write temp file for ASR: %s", e)
+                            path_to_use = ""
+                else:
+                    path_to_use = ""
+            paths_for_model.append(path_to_use or "")
+            temp_paths.append(temp_created)
+
+        try:
+            transcripts = self._model.transcribe(paths_for_model) if paths_for_model else []
+        finally:
+            for p in temp_paths:
+                if p:
+                    Path(p).unlink(missing_ok=True)
+
+        out_rows: List[Dict[str, Any]] = []
+        for row, transcript in zip(rows_list, transcripts):
+            path = row.get("path")
+            source_path = row.get("source_path", path)
+            duration = row.get("duration")
+            chunk_index = row.get("chunk_index", 0)
+            metadata = row.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {"source_path": source_path, "chunk_index": chunk_index, "duration": duration}
+            page_number = row.get("page_number", chunk_index)
+            out_rows.append(
+                {
+                    "path": path,
+                    "source_path": source_path,
+                    "duration": duration,
+                    "chunk_index": chunk_index,
+                    "metadata": metadata,
+                    "page_number": page_number,
+                    "text": transcript or "",
+                }
+            )
 
         if not out_rows:
             return pd.DataFrame(
