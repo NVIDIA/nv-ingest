@@ -21,7 +21,7 @@ spec:
 apiVersion: apps.nvidia.com/v1alpha1
 kind: NIMService
 metadata:
-  name: llama-32-nv-embedqa-1b-v2
+  name: llama-nemotron-embed-1b-v2
 spec:
   image:
     repository: {{ .Values.nimOperator.embedqa.image.repository }}

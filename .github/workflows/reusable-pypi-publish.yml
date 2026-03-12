@@ -16,10 +16,15 @@ jobs:
 
     steps:
       - name: Download wheel artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: python-wheels
           path: ./dist
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
 
       - name: Install twine
         run: pip install 'twine>=6.1'
@@ -31,7 +36,7 @@ jobs:
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
         run: |
           # Publish all wheels
-          twine upload \
+          twine upload --verbose \
             --repository-url $ARTIFACTORY_URL \
             -u $ARTIFACTORY_USERNAME \
             -p $ARTIFACTORY_PASSWORD \

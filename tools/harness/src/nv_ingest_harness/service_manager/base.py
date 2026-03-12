@@ -120,3 +120,52 @@ class ServiceManager(ABC):
 
         print("Services restarted successfully!")
         return 0
+
+    def stop_ingestion_services(self) -> int:
+        """
+        Stop only ingestion-related services (ingest API + doc-parsing NIMs).
+        Used after e2e when minimize_vram to free VRAM before recall.
+        Default: no-op (return 0).
+        """
+        return 0
+
+    def start_ingestion_services(self) -> int:
+        """
+        Start ingestion-related services (ingest API + doc-parsing NIMs).
+        Used before the next dataset's e2e when minimize_vram.
+        Default: no-op (return 0).
+        """
+        return 0
+
+    def stop_non_ingestion_services(self) -> int:
+        """
+        Stop services not needed for ingestion (e.g. reranker, attu).
+        Called after initial start() when minimize_vram so only ingestion stack runs before e2e.
+        Default: no-op (return 0).
+        """
+        return 0
+
+    def start_retrieval_services(self, reranker: bool = False) -> int:
+        """
+        Start recall-required services; if reranker is True, bring up reranker.
+        Called before recall when minimize_vram.
+        Default: no-op (return 0).
+
+        Args:
+            reranker: If True, start/scale up the reranker service.
+        """
+        return 0
+
+    def wait_for_reranker_readiness(self, timeout_s: int, verbose: bool = True) -> bool:
+        """
+        Wait for the reranker service to become ready (e.g. after start_retrieval_services).
+        Default: no-op (return True).
+
+        Args:
+            timeout_s: Timeout in seconds
+            verbose: If True, print waiting message
+
+        Returns:
+            True when ready, False on timeout
+        """
+        return True

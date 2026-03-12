@@ -431,6 +431,14 @@ def main(
         "--runtime-metrics-prefix",
         help="Optional filename prefix for per-run metrics artifacts.",
     ),
+    reranker: Optional[bool] = typer.Option(
+        False, "--reranker/--no-reranker", help="Enable a re-ranking stage with a cross-encoder model."
+    ),
+    reranker_model_name: str = typer.Option(
+        "nvidia/llama-nemotron-rerank-1b-v2",
+        "--reranker-model-name",
+        help="Cross-encoder model name for re-ranking stage (passed to .embed()).",
+    ),
     structured_elements_modality: Optional[str] = typer.Option(
         None,
         "--structured-elements-modality",
@@ -790,6 +798,7 @@ def main(
             ks=(1, 5, 10),
             hybrid=hybrid,
             match_mode=recall_match_mode,
+            reranker=reranker_model_name if reranker else None,
         )
 
         # Capture recall only times.

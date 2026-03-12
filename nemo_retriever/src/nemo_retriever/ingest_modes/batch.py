@@ -295,6 +295,9 @@ class BatchIngestor(Ingestor):
         This does not run extraction yet; it records configuration so the batch
         executor can build a concrete pipeline later.
 
+        If all input files have a ``.txt`` extension, the pipeline automatically
+        delegates to :meth:`extract_txt` with default :class:`TextChunkParams`.
+
         Resource-tuning kwargs (auto-detected from available resources if omitted):
 
         - ``pdf_split_batch_size``: Batch size for PDF split stage (default 1).
@@ -307,6 +310,13 @@ class BatchIngestor(Ingestor):
         - ``page_elements_cpus_per_actor``: CPUs reserved per page-elements actor (default 1).
         - ``ocr_cpus_per_actor``: CPUs reserved per OCR actor (default 1).
         """
+
+        if self._input_documents and all(f.lower().endswith(".txt") for f in self._input_documents):
+            txt_params = TextChunkParams(
+                max_tokens=kwargs.pop("max_tokens", 1024),
+                overlap_tokens=kwargs.pop("overlap_tokens", 0),
+            )
+            return self.extract_txt(params=txt_params)
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (

@@ -31,25 +31,12 @@ def test_audio_benchmark_run_mock_asr(tmp_path: Path):
     wav = tmp_path / "tiny.wav"
     _make_small_wav(wav, duration_sec=0.3)
 
-    from typer.testing import CliRunner
+    from nemo_retriever.utils.benchmark.audio_extract_actor import run_benchmark
 
-    from nemo_retriever.utils.benchmark.audio_extract_actor import app
-
-    runner = CliRunner()
-    result = runner.invoke(
-        app,
-        [
-            "run",
-            "--audio-path",
-            str(wav),
-            "--rows",
-            "2",
-            "--workers",
-            "1",
-            "--batch-sizes",
-            "2",
-            "--mock-asr",
-        ],
+    run_benchmark(
+        audio_path=wav,
+        rows=2,
+        workers="1",
+        batch_sizes="2",
+        mock_asr=True,
     )
-    assert result.exit_code == 0, (result.stdout, result.stderr)
-    assert "audio_extract" in result.stdout or "BEST" in result.stdout

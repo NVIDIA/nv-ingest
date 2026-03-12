@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from nemo_retriever.txt.split import split_text_by_tokens, txt_file_to_chunks_df
+from nemo_retriever.txt.split import split_text_by_tokens, txt_file_to_chunks_df, TextChunkParams
 
 
 class _MockTokenizer:
@@ -63,11 +63,10 @@ def test_txt_file_to_chunks_df(tmp_path: Path):
     f.write_text("First paragraph here. Second paragraph there.", encoding="utf-8")
     df = txt_file_to_chunks_df(
         str(f),
-        max_tokens=512,
-        overlap_tokens=0,
+        params=TextChunkParams(max_tokens=512, overlap_tokens=0),
     )
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["text", "path", "page_number", "metadata"]
+    assert list(df.columns) == ["text", "content", "path", "page_number", "metadata"]
     assert len(df) >= 1
     assert df["path"].iloc[0] == str(f.resolve())
     assert df["page_number"].iloc[0] >= 1
@@ -79,7 +78,7 @@ def test_txt_file_to_chunks_df_empty_file(tmp_path: Path):
     pytest.importorskip("transformers")
     f = tmp_path / "empty.txt"
     f.write_text("", encoding="utf-8")
-    df = txt_file_to_chunks_df(str(f), max_tokens=512)
+    df = txt_file_to_chunks_df(str(f), params=TextChunkParams(max_tokens=512))
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["text", "path", "page_number", "metadata"]
     assert len(df) == 0

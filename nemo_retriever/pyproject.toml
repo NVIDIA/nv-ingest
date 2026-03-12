@@ -15,11 +15,11 @@ requires-python = ">=3.12"
 authors = [
   { name = "Jeremy Dyer", email = "jdyer@nvidia.com" },
 ]
-license = { text = "Apache-2.0" }
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.12",
-  "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -63,6 +63,7 @@ dependencies = [
   "nemotron-ocr>=0.dev0",
   "markitdown",
   "timm==1.0.22",
+  "tqdm",
   "accelerate==1.12.0",
   "albumentations==2.0.8",
   "scikit-learn>=1.6.0",
