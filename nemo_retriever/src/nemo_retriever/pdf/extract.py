@@ -43,7 +43,7 @@ RenderMode = Literal["full_dpi", "fit_to_model"]
 def _compute_fit_to_model_scale(
     page: Any,
     target_wh: Tuple[int, int] = _MODEL_INPUT_SIZE,
-    max_dpi: int = 300,
+    max_dpi: int = 200,
 ) -> float:
     """Compute a pdfium render scale that fits the page within *target_wh* pixels.
 

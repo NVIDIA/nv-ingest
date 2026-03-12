@@ -35,9 +35,11 @@ class RecallConfig:
     top_k: int = 10
     ks: Sequence[int] = (1, 3, 5, 10)
     # ANN search tuning (LanceDB IVF_HNSW_SQ).
-    # nprobes=0 means "search all partitions" (exhaustive); refine_factor re-ranks
-    # top candidates with full-precision vectors to eliminate SQ quantization error.
-    nprobes: int = 0
+    # nprobes controls how many IVF partitions are searched; 64 matches nv-ingest's
+    # default and guarantees exhaustive search for typical index sizes.
+    # refine_factor re-ranks top candidates with full-precision vectors to
+    # eliminate SQ quantization error.
+    nprobes: int = 64
     refine_factor: int = 50
     hybrid: bool = False
     # Local HF knobs (only used when endpoints are missing).
@@ -186,7 +188,7 @@ def _search_lancedb(
     query_vectors: List[List[float]],
     top_k: int,
     vector_column_name: str = "vector",
-    nprobes: int = 0,
+    nprobes: int = 64,
     refine_factor: int = 50,
     query_texts: Optional[List[str]] = None,
     hybrid: bool = False,
@@ -195,22 +197,6 @@ def _search_lancedb(
 
     db = lancedb.connect(lancedb_uri)
     table = db.open_table(table_name)
-
-    # Determine nprobes: 0 means "search all partitions" for exhaustive ANN search.
-    # Read the actual partition count from the index so we don't hard-code it.
-    effective_nprobes = nprobes
-    if effective_nprobes <= 0:
-        try:
-            indices = table.list_indices()
-            for idx in indices:
-                np_ = getattr(idx, "num_partitions", None)
-                if np_ and int(np_) > 0:
-                    effective_nprobes = int(np_)
-                    break
-        except Exception:
-            pass
-        if effective_nprobes <= 0:
-            effective_nprobes = 16  # safe fallback matching default index config
 
     results: List[List[Dict[str, Any]]] = []
     for i, v in enumerate(query_vectors):
@@ -224,7 +210,7 @@ def _search_lancedb(
                 table.search(query_type="hybrid")
                 .vector(q)
                 .text(text)
-                .nprobes(effective_nprobes)
+                .nprobes(nprobes)
                 .refine_factor(refine_factor)
                 .select(["text", "metadata", "source", "page_number"])
                 .limit(top_k)
@@ -234,7 +220,7 @@ def _search_lancedb(
         else:
             hits = (
                 table.search(q, vector_column_name=vector_column_name)
-                .nprobes(effective_nprobes)
+                .nprobes(nprobes)
                 .refine_factor(refine_factor)
                 .select(["text", "metadata", "source", "page_number", "_distance"])
                 .limit(top_k)

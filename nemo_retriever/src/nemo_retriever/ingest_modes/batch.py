@@ -392,7 +392,7 @@ class BatchIngestor(Ingestor):
         # 1024x1024 internally, and NemotronOCR also resizes crops to 1024x1024,
         # nv-ingest NIM uses 300 DPI for page-element detection; match that
         # default here so local-model recall matches the container path.
-        kwargs.setdefault("dpi", 300)
+        kwargs.setdefault("dpi", 200)
         kwargs.setdefault("image_format", "jpeg")
         kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
