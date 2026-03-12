@@ -141,6 +141,8 @@ def _build_lancedb_rows_from_df(rows: List[Dict[str, Any]]) -> List[Dict[str, An
 
         embedding = meta.get("embedding")
         if embedding is None:
+            embedding = row.get("text_embeddings_1b_v2", {}).get("embedding")  # Alternate key to check for embedding.
+        if embedding is None:
             continue
 
         # Normalize embedding to list[float]
@@ -195,7 +197,7 @@ def create_lancedb_index(table: Any, *, cfg: LanceDBConfig, text_column: str = "
         table.create_index(
             index_type=cfg.index_type,
             metric=cfg.metric,
-            num_partitions=int(cfg.num_partitions),
+            num_partitions=int(min(cfg.num_partitions, max(len(table) - 1, 1))),
             num_sub_vectors=int(cfg.num_sub_vectors),
             vector_column_name="vector",
         )
