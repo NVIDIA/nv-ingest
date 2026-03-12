@@ -4,4 +4,10 @@
 
 """Service adapters for API app and online CLI entrypoints."""
 
-__all__: list[str] = []
+__all__: list[str] = [
+    "app",
+    "cli",
+    "file_routing",
+    "job_manager",
+    "models",
+]
