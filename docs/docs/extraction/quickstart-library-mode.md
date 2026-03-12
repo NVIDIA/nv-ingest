@@ -34,7 +34,7 @@ Use the following procedure to prepare your environment.
     ```
        uv venv --python 3.12 nvingest && \
          source nvingest/bin/activate && \
-         uv pip install nemo-retriever==26.03.0-RC1 milvus-lite==2.4.12
+         uv pip install nemo-retriever==26.03.0-RC2 milvus-lite==2.4.12
     ```
 
     !!! tip

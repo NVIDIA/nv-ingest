@@ -45,7 +45,7 @@ To install or upgrade the Helm chart, run the following code.
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-26.03.0-RC1.tgz \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-26.03.0-RC2.tgz \
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -54,7 +54,7 @@ helm upgrade \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
-    --set image.tag="26.03.0-RC1"
+    --set image.tag="26.03.0-RC2"
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
@@ -105,7 +105,7 @@ For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-i
 # Just to be cautious we remove any existing installation
 pip uninstall nv-ingest-client
 
-pip install nv-ingest-client==26.03.0-RC1
+pip install nv-ingest-client==26.03.0-RC2
 ```
 
 #### Rest Endpoint Ingress
@@ -347,7 +347,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"26.03.0-RC1"` |  |
+| image.tag | string | `"26.03.0-RC2"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -465,46 +465,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.graphic_elements.storage.pvc.create | bool | `true` |  |
 | nimOperator.graphic_elements.storage.pvc.size | string | `"25Gi"` |  |
 | nimOperator.graphic_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
-| nimOperator.rerankqa.authSecret | string | `"ngc-api"` |  |
-| nimOperator.rerankqa.enabled | bool | `false` |  |
-| nimOperator.rerankqa.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
-| nimOperator.rerankqa.env[0].value | string | `"8000"` |  |
-| nimOperator.rerankqa.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
-| nimOperator.rerankqa.env[1].value | string | `"1"` |  |
-| nimOperator.rerankqa.expose.service.grpcPort | int | `8001` |  |
-| nimOperator.rerankqa.expose.service.port | int | `8000` |  |
-| nimOperator.rerankqa.expose.service.type | string | `"ClusterIP"` |  |
-| nimOperator.rerankqa.image.pullPolicy | string | `"IfNotPresent"` |  |
-| nimOperator.rerankqa.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.rerankqa.image.repository | string | `"nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2"` |  |
-| nimOperator.rerankqa.image.tag | string | `"1.10.0"` |  |
-| nimOperator.rerankqa.replicas | int | `1` |  |
-| nimOperator.rerankqa.resources.limits."nvidia.com/gpu" | int | `1` |  |
-| nimOperator.rerankqa.storage.pvc.create | bool | `true` |  |
-| nimOperator.rerankqa.storage.pvc.size | string | `"50Gi"` |  |
-| nimOperator.rerankqa.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
-| nimOperator.ocr.authSecret | string | `"ngc-api"` |  |
-| nimOperator.ocr.enabled | bool | `true` |  |
-| nimOperator.ocr.env[0].name | string | `"OMP_NUM_THREADS"` |  |
-| nimOperator.ocr.env[0].value | string | `"8"` |  |
-| nimOperator.ocr.env[1].name | string | `"NIM_HTTP_API_PORT"` |  |
-| nimOperator.ocr.env[1].value | string | `"8000"` |  |
-| nimOperator.ocr.env[2].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
-| nimOperator.ocr.env[2].value | string | `"1"` |  |
-| nimOperator.ocr.env[3].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
-| nimOperator.ocr.env[3].value | string | `"32"` |  |
-| nimOperator.ocr.expose.service.grpcPort | int | `8001` |  |
-| nimOperator.ocr.expose.service.port | int | `8000` |  |
-| nimOperator.ocr.expose.service.type | string | `"ClusterIP"` |  |
-| nimOperator.ocr.image.pullPolicy | string | `"IfNotPresent"` |  |
-| nimOperator.ocr.image.pullSecrets[0] | string | `"ngc-secret"` |  |
-| nimOperator.ocr.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-ocr-v1"` |  |
-| nimOperator.ocr.image.tag | string | `"1.3.0"` |  |
-| nimOperator.ocr.replicas | int | `1` |  |
-| nimOperator.ocr.resources.limits."nvidia.com/gpu" | int | `1` |  |
-| nimOperator.ocr.storage.pvc.create | bool | `true` |  |
-| nimOperator.ocr.storage.pvc.size | string | `"25Gi"` |  |
-| nimOperator.ocr.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.authSecret | string | `"ngc-api"` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.enabled | bool | `false` |  |
 | nimOperator.nemotron_nano_12b_v2_vl.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -547,6 +507,28 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.nimCache.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.nimService.namespaces | list | `[]` |  |
 | nimOperator.nimService.resources | object | `{}` |  |
+| nimOperator.ocr.authSecret | string | `"ngc-api"` |  |
+| nimOperator.ocr.enabled | bool | `true` |  |
+| nimOperator.ocr.env[0].name | string | `"OMP_NUM_THREADS"` |  |
+| nimOperator.ocr.env[0].value | string | `"8"` |  |
+| nimOperator.ocr.env[1].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nimOperator.ocr.env[1].value | string | `"8000"` |  |
+| nimOperator.ocr.env[2].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.ocr.env[2].value | string | `"1"` |  |
+| nimOperator.ocr.env[3].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
+| nimOperator.ocr.env[3].value | string | `"32"` |  |
+| nimOperator.ocr.expose.service.grpcPort | int | `8001` |  |
+| nimOperator.ocr.expose.service.port | int | `8000` |  |
+| nimOperator.ocr.expose.service.type | string | `"ClusterIP"` |  |
+| nimOperator.ocr.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nimOperator.ocr.image.pullSecrets[0] | string | `"ngc-secret"` |  |
+| nimOperator.ocr.image.repository | string | `"nvcr.io/nim/nvidia/nemotron-ocr-v1"` |  |
+| nimOperator.ocr.image.tag | string | `"1.3.0"` |  |
+| nimOperator.ocr.replicas | int | `1` |  |
+| nimOperator.ocr.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| nimOperator.ocr.storage.pvc.create | bool | `true` |  |
+| nimOperator.ocr.storage.pvc.size | string | `"25Gi"` |  |
+| nimOperator.ocr.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.page_elements.authSecret | string | `"ngc-api"` |  |
 | nimOperator.page_elements.enabled | bool | `true` |  |
 | nimOperator.page_elements.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
@@ -589,6 +571,24 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nimOperator.page_elements.storage.pvc.create | bool | `true` |  |
 | nimOperator.page_elements.storage.pvc.size | string | `"25Gi"` |  |
 | nimOperator.page_elements.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
+| nimOperator.rerankqa.authSecret | string | `"ngc-api"` |  |
+| nimOperator.rerankqa.enabled | bool | `false` |  |
+| nimOperator.rerankqa.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nimOperator.rerankqa.env[0].value | string | `"8000"` |  |
+| nimOperator.rerankqa.env[1].name | string | `"NIM_TRITON_LOG_VERBOSE"` |  |
+| nimOperator.rerankqa.env[1].value | string | `"1"` |  |
+| nimOperator.rerankqa.expose.service.grpcPort | int | `8001` |  |
+| nimOperator.rerankqa.expose.service.port | int | `8000` |  |
+| nimOperator.rerankqa.expose.service.type | string | `"ClusterIP"` |  |
+| nimOperator.rerankqa.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nimOperator.rerankqa.image.pullSecrets[0] | string | `"ngc-secret"` |  |
+| nimOperator.rerankqa.image.repository | string | `"nvcr.io/nim/nvidia/llama-nemotron-rerank-1b-v2"` |  |
+| nimOperator.rerankqa.image.tag | string | `"1.10.0"` |  |
+| nimOperator.rerankqa.replicas | int | `1` |  |
+| nimOperator.rerankqa.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| nimOperator.rerankqa.storage.pvc.create | bool | `true` |  |
+| nimOperator.rerankqa.storage.pvc.size | string | `"50Gi"` |  |
+| nimOperator.rerankqa.storage.pvc.volumeAccessMode | string | `"ReadWriteOnce"` |  |
 | nimOperator.table_structure.authSecret | string | `"ngc-api"` |  |
 | nimOperator.table_structure.enabled | bool | `true` |  |
 | nimOperator.table_structure.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
