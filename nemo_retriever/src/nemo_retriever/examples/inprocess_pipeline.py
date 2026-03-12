@@ -44,7 +44,7 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
+        help="Input format: 'pdf', 'txt', 'html', 'doc', or 'image'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice), 'image' for standalone image files (PNG, JPEG, BMP, TIFF, SVG).",  # noqa: E501
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -186,6 +186,7 @@ def main(
             "txt": ["*.txt"],
             "html": ["*.html"],
             "doc": ["*.docx", "*.pptx"],
+            "image": ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tiff", "*.tif", "*.svg"],
         }
         exts = ext_map.get(input_type, ["*.pdf"])
         file_patterns = [str(input_path / e) for e in exts]
@@ -205,6 +206,23 @@ def main(
             TextChunkParams(
                 max_tokens=text_chunk_max_tokens or 1024,
                 overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
+            )
+        )
+    elif input_type == "image":
+        ingestor = ingestor.files(file_patterns).extract_image_files(
+            ExtractParams(
+                method=method,
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+                use_graphic_elements=use_graphic_elements,
+                graphic_elements_invoke_url=graphic_elements_invoke_url,
+                use_table_structure=use_table_structure,
+                table_output_format=table_output_format,
+                table_structure_invoke_url=table_structure_invoke_url,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
             )
         )
     elif input_type == "doc":
