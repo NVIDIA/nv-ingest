@@ -19,11 +19,15 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
       - name: Install unit test dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest pandas pydantic pyyaml typer scikit-learn
-          python -m pip install api/
+          uv pip install --system -e src/ -e api/ -e client/
+          uv pip install --system -e nemo_retriever
 
       - name: Run retriever unit tests
         env:
