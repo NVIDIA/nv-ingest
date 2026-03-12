@@ -389,9 +389,7 @@ class BatchIngestor(Ingestor):
         kwargs.setdefault("extract_page_as_image", True)
 
         # 200 DPI is sufficient for both detection and OCR.  YOLOX resizes to
-        # 1024x1024 internally, and NemotronOCR also resizes crops to 1024x1024,
-        # nv-ingest NIM uses 300 DPI for page-element detection; match that
-        # default here so local-model recall matches the container path.
+        # 1024x1024 internally, and NemotronOCR also resizes crops to 1024x1024.
         kwargs.setdefault("dpi", 200)
         kwargs.setdefault("image_format", "jpeg")
         kwargs.setdefault("jpeg_quality", 100)

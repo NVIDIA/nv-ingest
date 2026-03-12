@@ -190,10 +190,10 @@ def main(
         help="Enable debug-level logging for this full pipeline run.",
     ),
     dpi: int = typer.Option(
-        300,
+        200,
         "--dpi",
         min=72,
-        help="Render DPI for PDF page images (default: 300).",
+        help="Render DPI for PDF page images (default: 200).",
     ),
     input_path: Path = typer.Argument(
         ...,
