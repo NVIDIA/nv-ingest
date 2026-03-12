@@ -197,7 +197,9 @@ def lancedb_schema(vector_dim: int = 2048) -> Any:
             pa.field("pdf_basename", pa.string()),
             pa.field("page_number", pa.int32()),
             pa.field("source", pa.string()),
-            pa.field("source_id", pa.string()),
+            pa.field(
+                "source_id", pa.string()
+            ),  # Different than the source. Field contains path+page_number for aggregation tasks
             pa.field("path", pa.string()),
             pa.field("text", pa.string()),
             pa.field("metadata", pa.string()),

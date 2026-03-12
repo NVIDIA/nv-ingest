@@ -295,26 +295,6 @@ def write_text_embeddings_dir_to_lancedb(
 
     lancedb.run(results)
 
-    # all_rows: List[Dict[str, Any]] = []
-    # for p in files:
-    #     try:
-    #         df = _read_text_embeddings_json_df(p)
-    #         if df.empty:
-    #             skipped += 1
-    #             continue
-    #         rows = _build_lancedb_rows_from_df(df)
-    #         if not rows:
-    #             skipped += 1
-    #             continue
-    #         all_rows.extend(rows)
-    #         processed += 1
-    #     except Exception:
-    #         failed += 1
-    #         logger.exception("Failed reading embeddings from %s", p)
-
-    # # Write once so --overwrite behaves as expected.
-    # _write_rows_to_lancedb(all_rows, cfg=cfg)
-
     return {
         "input_dir": str(input_dir),
         "n_files": len(files),

@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
+from nemo_retriever.retriever import Retriever
 import json
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,10 @@ class RecallConfig:
     # - pdf_page: compare on "{pdf}_{page}" keys
     # - pdf_only: compare on "{pdf}" document keys
     match_mode: str = "pdf_page"
+    reranker: Optional[str] = None
+    reranker_endpoint: Optional[str] = None
+    reranker_api_key: str = ""
+    reranker_batch_size: int = 32
 
 
 def _normalize_pdf_name(value: str) -> str:
@@ -179,72 +184,6 @@ def _embed_queries_local_hf(
     return vecs.detach().to("cpu").tolist()
 
 
-def _search_lancedb(
-    *,
-    lancedb_uri: str,
-    table_name: str,
-    query_vectors: List[List[float]],
-    top_k: int,
-    vector_column_name: str = "vector",
-    nprobes: int = 0,
-    refine_factor: int = 10,
-    query_texts: Optional[List[str]] = None,
-    hybrid: bool = False,
-) -> List[List[Dict[str, Any]]]:
-    import lancedb  # type: ignore
-
-    db = lancedb.connect(lancedb_uri)
-    table = db.open_table(table_name)
-
-    # Determine nprobes: 0 means "search all partitions" for exhaustive ANN search.
-    # Read the actual partition count from the index so we don't hard-code it.
-    effective_nprobes = nprobes
-    if effective_nprobes <= 0:
-        try:
-            indices = table.list_indices()
-            for idx in indices:
-                np_ = getattr(idx, "num_partitions", None)
-                if np_ and int(np_) > 0:
-                    effective_nprobes = int(np_)
-                    break
-        except Exception:
-            pass
-        if effective_nprobes <= 0:
-            effective_nprobes = 16  # safe fallback matching default index config
-
-    results: List[List[Dict[str, Any]]] = []
-    for i, v in enumerate(query_vectors):
-        q = np.asarray(v, dtype="float32")
-
-        if hybrid and query_texts is not None:
-            from lancedb.rerankers import RRFReranker  # type: ignore
-
-            text = query_texts[i]
-            hits = (
-                table.search(query_type="hybrid")
-                .vector(q)
-                .text(text)
-                .nprobes(effective_nprobes)
-                .refine_factor(refine_factor)
-                .select(["text", "metadata", "source", "page_number"])
-                .limit(top_k)
-                .rerank(RRFReranker())
-                .to_list()
-            )
-        else:
-            hits = (
-                table.search(q, vector_column_name=vector_column_name)
-                .nprobes(effective_nprobes)
-                .refine_factor(refine_factor)
-                .select(["text", "metadata", "source", "page_number", "_distance"])
-                .limit(top_k)
-                .to_list()
-            )
-
-        results.append(hits)
-    return results
-
-
 def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
     retrieved_keys: List[List[str]] = []
     for hits in raw_hits:
@@ -252,7 +191,13 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
         for h in hits:
             page_number = h["page_number"]
             source = h["source"]
+            page_number = h["page_number"]
+            source = h["source"]
             # Prefer explicit `pdf_page` column; fall back to derived form.
+            # if res.get("page_number") is not None and source.get("source_id"):
+            if page_number is not None and source:
+                filename = Path(source).stem
+                keys.append(f"{filename}_{str(page_number)}")
             # if res.get("page_number") is not None and source.get("source_id"):
             if page_number is not None and source:
                 filename = Path(source).stem
@@ -359,35 +304,34 @@ def retrieve_and_score(
 
     queries = df_query["query"].astype(str).tolist()
     gold = df_query["golden_answer"].astype(str).tolist()
-
     endpoint, use_grpc = _resolve_embedding_endpoint(cfg)
-    if endpoint is not None and use_grpc is not None:
-        vectors = _embed_queries_nim(
-            queries,
-            endpoint=endpoint,
-            model=cfg.embedding_model,
-            api_key=cfg.embedding_api_key,
-            grpc=bool(use_grpc),
-        )
-    else:
-        vectors = _embed_queries_local_hf(
-            queries,
-            device=cfg.local_hf_device,
-            cache_dir=cfg.local_hf_cache_dir,
-            batch_size=int(cfg.local_hf_batch_size),
-            model_name=cfg.embedding_model,
-        )
-    raw_hits = _search_lancedb(
+    retriever = Retriever(
         lancedb_uri=cfg.lancedb_uri,
-        table_name=cfg.lancedb_table,
-        query_vectors=vectors,
-        top_k=int(cfg.top_k),
-        vector_column_name=vector_column_name,
-        nprobes=int(cfg.nprobes),
-        refine_factor=int(cfg.refine_factor),
-        query_texts=queries,
+        lancedb_table=cfg.lancedb_table,
+        embedder=cfg.embedding_model or "nvidia/llama-nemotron-embed-1b-v2",
+        embedding_http_endpoint=cfg.embedding_http_endpoint,
+        embedding_api_key=cfg.embedding_api_key,
+        top_k=cfg.top_k,
+        nprobes=cfg.nprobes,
+        refine_factor=cfg.refine_factor,
         hybrid=bool(cfg.hybrid),
+        local_hf_device=cfg.local_hf_device,
+        local_hf_cache_dir=cfg.local_hf_cache_dir,
+        local_hf_batch_size=cfg.local_hf_batch_size,
+        reranker=cfg.reranker,
+        reranker_endpoint=cfg.reranker_endpoint,
+        reranker_api_key=cfg.reranker_api_key,
+        reranker_batch_size=cfg.reranker_batch_size,
     )
+    start = time.time()
+    raw_hits = retriever.queries(queries)
+    end_queries = time.time() - start
+    print(
+        f"Retrieval time for {len(queries)} ",
+        f"queries: {end_queries:.2f} seconds ",
+        f"(average {len(queries)/end_queries:.2f} queries/second)",
+    )
+
     retrieved_keys = _hits_to_keys(raw_hits)
     metrics = {
         f"recall@{k}": _recall_at_k(gold, retrieved_keys, int(k), match_mode=str(cfg.match_mode)) for k in cfg.ks
