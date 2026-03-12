@@ -394,6 +394,13 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
 
+        nemotron_parse_workers = float(kwargs.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(kwargs.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(kwargs.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        self._use_nemotron_parse_only = kwargs.get("method") == "nemotron_parse" or (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
+
         self._append_detection_stages(kwargs)
 
         return self
