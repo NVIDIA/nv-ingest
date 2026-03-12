@@ -138,17 +138,11 @@ def _resolve_summary_metrics(
     runtime_summary: dict[str, Any] | None,
 ) -> dict[str, Any]:
     summary_metrics: dict[str, Any] = {
-        "files": metrics_payload.get("files"),
         "pages": metrics_payload.get("pages"),
         "ingest_secs": metrics_payload.get("ingest_secs"),
         "pages_per_sec_ingest": metrics_payload.get("pages_per_sec_ingest"),
         "recall_5": metrics_payload.get("recall_5"),
     }
-
-    input_files = resolve_input_files(Path(cfg.dataset_dir), cfg.input_type)
-
-    if summary_metrics["files"] is None:
-        summary_metrics["files"] = len(input_files)
 
     if summary_metrics["pages"] is None and isinstance(runtime_summary, dict):
         runtime_pages = runtime_summary.get("num_pages")
@@ -163,7 +157,7 @@ def _resolve_summary_metrics(
     if summary_metrics["pages"] is None and cfg.input_type == "pdf":
         total_pages = 0
         counted_any = False
-        for path in input_files:
+        for path in resolve_input_files(Path(cfg.dataset_dir), cfg.input_type):
             page_count = _safe_pdf_page_count(path)
             if page_count is None:
                 continue
@@ -194,7 +188,7 @@ def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     return str(p)
 
 
-def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path | None]:
+def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path]:
     runtime_dir = artifact_dir / "runtime_metrics"
     runtime_dir.mkdir(parents=True, exist_ok=True)
     if cfg.write_detection_file:
@@ -202,13 +196,11 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
     else:
         # Keep detection summary out of top-level artifacts unless explicitly requested.
         detection_summary_file = runtime_dir / ".detection_summary.json"
-    query_csv: Path | None = None
-    if cfg.query_csv:
-        query_csv = prepare_recall_query_file(
-            query_csv=Path(cfg.query_csv),
-            recall_adapter=cfg.recall_adapter,
-            output_dir=runtime_dir,
-        )
+    query_csv = prepare_recall_query_file(
+        query_csv=Path(cfg.query_csv) if cfg.query_csv else None,
+        recall_adapter=cfg.recall_adapter,
+        output_dir=runtime_dir,
+    )
 
     cmd = [
         sys.executable,
@@ -217,6 +209,8 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         str(Path(cfg.dataset_dir).resolve()),
         "--input-type",
         cfg.input_type,
+        "--query-csv",
+        str(query_csv),
         "--recall-match-mode",
         cfg.recall_match_mode,
         "--no-recall-details",
@@ -263,11 +257,6 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         "--lancedb-uri",
         _resolve_lancedb_uri(cfg, artifact_dir),
     ]
-
-    if query_csv is not None:
-        cmd += ["--query-csv", str(query_csv)]
-    else:
-        cmd += ["--skip-recall"]
 
     if cfg.ray_address:
         cmd += ["--ray-address", cfg.ray_address]
@@ -397,17 +386,6 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
         **recall_metrics_normalized,
     }
     summary_metrics = _resolve_summary_metrics(cfg, metrics_payload, runtime_summary)
-    normalized_metrics = {
-        "files": metrics.files if metrics.files is not None else summary_metrics.get("files"),
-        "pages": metrics.pages if metrics.pages is not None else summary_metrics.get("pages"),
-        "ingest_secs": metrics.ingest_secs if metrics.ingest_secs is not None else summary_metrics.get("ingest_secs"),
-        "pages_per_sec_ingest": (
-            metrics.pages_per_sec_ingest
-            if metrics.pages_per_sec_ingest is not None
-            else summary_metrics.get("pages_per_sec_ingest")
-        ),
-        **recall_metrics_normalized,
-    }
 
     result_payload: dict[str, Any] = {
         "timestamp": now_timestr(),
@@ -420,7 +398,7 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
             "dataset_dir": cfg.dataset_dir,
             "preset": cfg.preset,
             "query_csv": cfg.query_csv,
-            "effective_query_csv": str(effective_query_csv) if effective_query_csv is not None else None,
+            "effective_query_csv": str(effective_query_csv),
             "input_type": cfg.input_type,
             "recall_required": cfg.recall_required,
             "recall_match_mode": cfg.recall_match_mode,
@@ -433,7 +411,13 @@ def _run_single(cfg: HarnessConfig, artifact_dir: Path, run_id: str, tags: list[
             "tuning": {field: getattr(cfg, field) for field in sorted(TUNING_FIELDS)},
         },
         "metrics": {
-            **normalized_metrics,
+            "files": metrics.files,
+            "pages": metrics.pages,
+            "ingest_secs": metrics.ingest_secs,
+            "pages_per_sec_ingest": metrics.pages_per_sec_ingest,
+            "rows_processed": metrics.rows_processed,
+            "rows_per_sec_ingest": metrics.rows_per_sec_ingest,
+            **recall_metrics_normalized,
         },
         "summary_metrics": summary_metrics,
         "run_metadata": run_metadata,

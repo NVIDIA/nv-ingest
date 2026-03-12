@@ -214,11 +214,6 @@ def main(
             "Only the missed-gold summary and recall metrics are printed."
         ),
     ),
-    skip_recall: bool = typer.Option(
-        False,
-        "--skip-recall",
-        help="Skip recall evaluation entirely and only report ingest metrics.",
-    ),
     embed_actors: Optional[int] = typer.Option(
         0,
         "--embed-actors",
@@ -754,63 +749,54 @@ def main(
         # ---------------------------------------------------------------------------
         # Recall calculation
         # ---------------------------------------------------------------------------
-        recall_total_time: Optional[float] = None
-        metrics: dict[str, float] = {}
-        should_run_recall = not skip_recall
+        query_csv = Path(query_csv)
+        if not query_csv.exists():
+            logger.warning(f"Query CSV not found at {query_csv}; skipping recall evaluation.")
+            return
 
-        query_csv_path = Path(query_csv)
-        if should_run_recall and not query_csv_path.exists():
-            logger.warning(f"Query CSV not found at {query_csv_path}; skipping recall evaluation.")
-            should_run_recall = False
-
-        if should_run_recall:
-            db = _lancedb().connect(lancedb_uri)
-            table = None
-            open_err: Optional[Exception] = None
-            for _ in range(3):
-                try:
-                    table = db.open_table(LANCEDB_TABLE)
-                    open_err = None
-                    break
-                except Exception as e:
-                    open_err = e
-                    # Create table if missing, then retry open.
-                    _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
-                    time.sleep(2)
-            if table is None:
-                raise RuntimeError(
-                    f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, "
-                    f"but it was not found."
-                ) from open_err
+        db = _lancedb().connect(lancedb_uri)
+        table = None
+        open_err: Optional[Exception] = None
+        for _ in range(3):
             try:
-                if int(table.count_rows()) == 0:
-                    logger.warning(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
-                    should_run_recall = False
-            except Exception:
-                pass
+                table = db.open_table(LANCEDB_TABLE)
+                open_err = None
+                break
+            except Exception as e:
+                open_err = e
+                # Create table if missing, then retry open.
+                _ensure_lancedb_table(lancedb_uri, LANCEDB_TABLE)
+                time.sleep(2)
+        if table is None:
+            raise RuntimeError(
+                f"Recall stage requires LanceDB table {LANCEDB_TABLE!r} at {lancedb_uri!r}, " f"but it was not found."
+            ) from open_err
+        try:
+            if int(table.count_rows()) == 0:
+                logger.warning(f"LanceDB table {LANCEDB_TABLE!r} exists but is empty; skipping recall evaluation.")
+                return
+        except Exception:
+            pass
 
-        if should_run_recall:
-            _recall_model = resolve_embed_model(str(embed_model_name))
+        _recall_model = resolve_embed_model(str(embed_model_name))
 
-            cfg = RecallConfig(
-                lancedb_uri=str(lancedb_uri),
-                lancedb_table=str(LANCEDB_TABLE),
-                embedding_model=_recall_model,
-                embedding_http_endpoint=embed_invoke_url,
-                embedding_api_key=embed_remote_api_key or "",
-                top_k=10,
-                ks=(1, 5, 10),
-                hybrid=hybrid,
-                match_mode=recall_match_mode,
-                reranker=reranker_model_name if reranker else None,
-            )
+        cfg = RecallConfig(
+            lancedb_uri=str(lancedb_uri),
+            lancedb_table=str(LANCEDB_TABLE),
+            embedding_model=_recall_model,
+            embedding_http_endpoint=embed_invoke_url,
+            embedding_api_key=embed_remote_api_key or "",
+            top_k=10,
+            ks=(1, 5, 10),
+            hybrid=hybrid,
+            match_mode=recall_match_mode,
+            reranker=reranker_model_name if reranker else None,
+        )
 
-            # Capture recall only times.
-            recall_start = time.perf_counter()
-            _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(
-                query_csv=query_csv_path, cfg=cfg
-            )
-            recall_total_time = time.perf_counter() - recall_start
+        # Capture recall only times.
+        recall_start = time.perf_counter()
+        _df_query, _gold, _raw_hits, _retrieved_keys, metrics = retrieve_and_score(query_csv=query_csv, cfg=cfg)
+        recall_total_time = time.perf_counter() - recall_start
 
         total_time = time.perf_counter() - ingest_start
 

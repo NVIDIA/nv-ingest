@@ -120,26 +120,6 @@ def test_build_command_applies_page_plus_one_adapter(tmp_path: Path) -> None:
     assert "q,doc_name_1" in csv_contents
 
 
-def test_build_command_omits_query_csv_and_sets_skip_recall_when_unset(tmp_path: Path) -> None:
-    dataset_dir = tmp_path / "dataset"
-    dataset_dir.mkdir()
-
-    cfg = HarnessConfig(
-        dataset_dir=str(dataset_dir),
-        dataset_label="bo20",
-        preset="single_gpu",
-        query_csv=None,
-        recall_required=False,
-    )
-
-    cmd, runtime_dir, detection_file, effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
-
-    assert detection_file.parent == runtime_dir
-    assert effective_query_csv is None
-    assert "--skip-recall" in cmd
-    assert "--query-csv" not in cmd
-
-
 def test_normalize_recall_metric_key_removes_duplicate_prefix() -> None:
     assert _normalize_recall_metric_key("recall@1") == "recall_1"
     assert _normalize_recall_metric_key("recall@10") == "recall_10"
@@ -393,14 +373,15 @@ def test_run_single_writes_results_with_run_metadata(monkeypatch, tmp_path: Path
             "tuning": {field: getattr(cfg, field) for field in sorted(harness_run.TUNING_FIELDS)},
         },
         "metrics": {
-            "files": 0,
+            "files": None,
             "pages": None,
             "ingest_secs": 12.5,
             "pages_per_sec_ingest": None,
+            "rows_processed": 3181,
+            "rows_per_sec_ingest": 254.48,
             "recall_5": 0.9,
         },
         "summary_metrics": {
-            "files": 0,
             "pages": None,
             "ingest_secs": 12.5,
             "pages_per_sec_ingest": None,
@@ -474,12 +455,10 @@ def test_run_single_allows_missing_optional_summary_files(monkeypatch, tmp_path:
     assert result["success"] is True
     assert result["runtime_summary"] is None
     assert result["detection_summary"] is None
-    assert "rows_processed" not in result["metrics"]
-    assert "rows_per_sec_ingest" not in result["metrics"]
-    assert result["metrics"]["files"] == 0
+    assert result["metrics"]["rows_processed"] == 42
+    assert result["metrics"]["rows_per_sec_ingest"] == 3.5
     assert result["metrics"]["pages"] is None
     assert result["summary_metrics"] == {
-        "files": 0,
         "pages": None,
         "ingest_secs": 12.0,
         "pages_per_sec_ingest": None,
@@ -508,12 +487,11 @@ def test_resolve_summary_metrics_falls_back_to_dataset_page_count(monkeypatch, t
 
     summary = harness_run._resolve_summary_metrics(
         cfg,
-        {"files": None, "pages": None, "ingest_secs": 5.0, "pages_per_sec_ingest": None, "recall_5": 0.75},
+        {"pages": None, "ingest_secs": 5.0, "pages_per_sec_ingest": None, "recall_5": 0.75},
         runtime_summary=None,
     )
 
     assert summary == {
-        "files": 2,
         "pages": 10,
         "ingest_secs": 5.0,
         "pages_per_sec_ingest": 2.0,

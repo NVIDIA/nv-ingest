@@ -12,11 +12,7 @@ INGEST_ROWS_RE = re.compile(
     r"Ingestion complete\.\s+(?P<rows>\d+)\s+rows\s+proces+ed\s+in\s+(?P<secs>[0-9.]+)\s+seconds\.\s+"
     r"(?P<pps>[0-9.]+)\s+PPS"
 )
-TOTAL_PAGES_RE = re.compile(r"Total pages processed:\s*(?P<pages>\d+)\b")
-INGEST_TIME_RE = re.compile(r"Ingestion only time:\s*(?P<secs>[0-9.]+)s\b")
 PAGES_PER_SEC_RE = re.compile(r"Pages/sec \(ingest only; excludes Ray startup and recall\):\s*(?P<val>[0-9.]+)")
-INGEST_PPS_RE = re.compile(r"Ingestion only PPS:\s*(?P<val>[0-9.]+)")
-RECALL_HEADER_RE = re.compile(r"Recall metrics(?: \(matching nemo_retriever\.recall\.core\))?:")
 RECALL_RE = re.compile(r"(?P<metric>recall@\d+):\s*(?P<val>[0-9.]+)\s*$")
 
 
@@ -44,23 +40,11 @@ class StreamMetrics:
             self.ingest_secs = float(ingest_rows_match.group("secs"))
             self.rows_per_sec_ingest = float(ingest_rows_match.group("pps"))
 
-        total_pages_match = TOTAL_PAGES_RE.search(line)
-        if total_pages_match:
-            self.pages = int(total_pages_match.group("pages"))
-
-        ingest_time_match = INGEST_TIME_RE.search(line)
-        if ingest_time_match:
-            self.ingest_secs = float(ingest_time_match.group("secs"))
-
         pps_match = PAGES_PER_SEC_RE.search(line)
         if pps_match:
             self.pages_per_sec_ingest = float(pps_match.group("val"))
 
-        ingest_pps_match = INGEST_PPS_RE.search(line)
-        if ingest_pps_match:
-            self.pages_per_sec_ingest = float(ingest_pps_match.group("val"))
-
-        if RECALL_HEADER_RE.search(line):
+        if "Recall metrics (matching nemo_retriever.recall.core):" in line:
             self._in_recall_block = True
             return
 
