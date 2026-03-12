@@ -87,7 +87,7 @@ class LlamaNemotronEmbed1BV2Embedder:
         outs: List[torch.Tensor] = []
         with torch.inference_mode(), warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
-            with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+            with torch.autocast(device_type="cuda"):
                 for i in range(0, len(texts), max(1, int(batch_size))):
                     chunk = texts[i : i + max(1, int(batch_size))]
                     batch = self._tokenizer(

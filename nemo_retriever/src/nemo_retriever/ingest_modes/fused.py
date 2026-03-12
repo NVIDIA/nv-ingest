@@ -200,7 +200,7 @@ class FusedIngestor(BatchIngestor):
         pdf_extract_workers = int(kwargs.pop("pdf_extract_workers", max(1, self._num_cpus // 2)))
 
         kwargs.setdefault("extract_page_as_image", True)
-        kwargs.setdefault("dpi", 200)
+        kwargs.setdefault("dpi", 300)
 
         self._tasks.append(("extract", dict(kwargs)))
         self._fused_extract_flags = {
