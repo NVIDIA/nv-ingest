@@ -137,32 +137,56 @@ class ParakeetCTC1B1ASR:
 
     def transcribe(self, paths: List[str]) -> List[str]:
         """
-        Transcribe one or more audio files to text.
+        Transcribe one or more audio files to text (batched inference).
 
-        Each path is loaded and resampled to 16 kHz mono as required by the model.
-        Returns one string per path; empty string on load/transcribe failure.
+        Each path is loaded and resampled to 16 kHz mono; then all are processed
+        in a single model forward pass. Returns one string per path; empty string
+        on load/transcribe failure.
         <pad> tokens are removed via skip_special_tokens and/or post-processing.
         """
         self._ensure_loaded()
-        results: List[str] = []
+        audios: List[Optional[np.ndarray]] = []
         for path in paths:
             audio = _load_audio_16k(path)
-            if audio is None:
-                results.append("")
-                continue
-            results.append(self._transcribe_audio(audio) or "")
-        return results
+            audios.append(audio)
+        return self.transcribe_audios(audios)
 
-    def _transcribe_audio(self, audio: np.ndarray) -> str:
-        if self._model is None or self._processor is None:
-            return ""
+    def transcribe_audios(self, audios: List[Optional[np.ndarray]]) -> List[str]:
+        """
+        Transcribe a batch of audio arrays (16 kHz mono float32) in one forward pass.
+
+        Each element can be np.ndarray or None; None yields "" in the output.
+        Returns one string per input; empty string for None or on failure.
+        """
+        self._ensure_loaded()
+        valid: List[np.ndarray] = []
+        indices: List[int] = []
+        for i, audio in enumerate(audios):
+            if audio is not None and audio.size > 0:
+                valid.append(audio)
+                indices.append(i)
+        if not valid:
+            return [""] * len(audios)
+        try:
+            transcripts = self._transcribe_audio_batch(valid)
+        except Exception as e:
+            logger.warning("ASR (transformers) batch failed: %s", e)
+            transcripts = [""] * len(valid)
+        # Map back to original order; empty string for missing/failed
+        result = [""] * len(audios)
+        for idx, text in zip(indices, transcripts):
+            result[idx] = _strip_pad_from_transcript((text or "").strip())
+        return result
+
+    def _transcribe_audio_batch(self, audios: List[np.ndarray]) -> List[str]:
+        """Single forward pass for a list of audio arrays; returns one string per array."""
+        if self._model is None or self._processor is None or not audios:
+            return [""] * len(audios)
         try:
             import torch
 
-            # Single sample: wrap in list for processor
-            speech = [audio]
             inputs = self._processor(
-                speech,
+                audios,
                 sampling_rate=self._processor.feature_extractor.sampling_rate,
                 return_tensors="pt",
                 padding=True,
@@ -170,11 +194,13 @@ class ParakeetCTC1B1ASR:
             inputs = inputs.to(self._model.device, dtype=self._model.dtype)
             with torch.no_grad():
                 outputs = self._model.generate(**inputs)
-            # batch_decode with skip_special_tokens to drop pad tokens
             decoded = self._processor.batch_decode(outputs, skip_special_tokens=True)
-            text = decoded[0] if decoded else ""
-            # Fallback: strip any remaining <pad> and normalize spaces
-            return _strip_pad_from_transcript(text.strip())
+            return [t.strip() for t in decoded]
         except Exception as e:
-            logger.warning("ASR (transformers) failed: %s", e)
-            return ""
+            logger.warning("ASR (transformers) batch failed: %s", e)
+            return [""] * len(audios)
+
+    def _transcribe_audio(self, audio: np.ndarray) -> str:
+        """Single-sample path for API compatibility; delegates to batch."""
+        results = self._transcribe_audio_batch([audio])
+        return results[0] if results else ""
