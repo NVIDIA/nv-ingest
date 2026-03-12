@@ -413,13 +413,15 @@ def _greedy_wbf(
     merge_type: str = "biggest",
     conf_type: str = "max",
 ) -> tuple:
-    """Growing-cluster WBF matching the NIM container's weighted_boxes_fusion.
+    """Leader-based clustering WBF matching the NIM container's weighted_boxes_fusion.
 
-    Sorts by confidence descending.  Each box is compared against the current
-    *fused* representative of each existing cluster (not the original leader).
-    After a merge the representative is recalculated, so the cluster can grow
-    and absorb boxes that overlap the expanded representative even if they did
-    not overlap any original member — matching the container's snowball behaviour.
+    1. Sort by confidence descending.
+    2. Compute all-pairs IoU matrix.
+    3. Each unassigned box (highest-confidence first) becomes a cluster leader.
+    4. All unassigned same-class boxes overlapping the leader (IoU > iou_thr)
+       join its cluster.
+    5. NOT transitive — only direct overlap with the leader matters, so the
+       cluster does not snowball outward.
     """
     n = len(boxes)
     if n == 0:
@@ -431,36 +433,55 @@ def _greedy_wbf(
     scores = scores[order]
     labels = labels[order]
 
-    # Each cluster: (fused_box [4], label, list of (box, score) members)
-    clusters: list = []  # [(fused_box, label, [(box, score), ...])]
+    # All-pairs IoU matrix
+    iou = _iou_matrix(boxes)
 
+    # Leader-based clustering
+    cluster_ids = np.full(n, -1, dtype=np.int64)
+    num_clusters = 0
     for i in range(n):
-        matched = False
-        for c in clusters:
-            fused_box, c_label, members = c
-            if labels[i] != c_label:
-                continue
-            iou = _box_iou(boxes[i], fused_box)
-            if iou > iou_thr:
-                members.append((boxes[i], scores[i]))
-                # Recalculate representative
-                c[0] = _fuse_boxes(members, merge_type)
-                matched = True
-                break
-        if not matched:
-            clusters.append([boxes[i].copy(), labels[i], [(boxes[i], scores[i])]])
+        if cluster_ids[i] >= 0:
+            continue
+        cluster_ids[i] = num_clusters
+        unassigned = cluster_ids < 0
+        same_class = labels == labels[i]
+        overlapping = iou[i] > iou_thr
+        cluster_ids[unassigned & same_class & overlapping] = num_clusters
+        num_clusters += 1
 
+    # Merge each cluster
     fused_boxes = []
     fused_scores = []
     fused_labels = []
-    for fused_box, label, members in clusters:
-        member_scores = np.array([s for _, s in members])
-        fs = member_scores.max() if conf_type == "max" else member_scores.mean()
-        fused_boxes.append(fused_box)
+    for c in range(num_clusters):
+        mask = cluster_ids == c
+        members = list(zip(boxes[mask], scores[mask]))
+        member_scores = scores[mask]
+        fs = float(member_scores.max()) if conf_type == "max" else float(member_scores.mean())
+        fused_boxes.append(_fuse_boxes(members, merge_type))
         fused_scores.append(fs)
-        fused_labels.append(label)
+        fused_labels.append(int(labels[mask][0]))
 
     return np.array(fused_boxes), np.array(fused_scores), np.array(fused_labels, dtype=np.int64)
+
+
+def _iou_matrix(boxes: "np.ndarray") -> "np.ndarray":
+    """Compute all-pairs IoU matrix for boxes in (x1, y1, x2, y2) format."""
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    areas = (x2 - x1) * (y2 - y1)
+
+    # Intersection
+    ix1 = np.maximum(x1[:, None], x1[None, :])
+    iy1 = np.maximum(y1[:, None], y1[None, :])
+    ix2 = np.minimum(x2[:, None], x2[None, :])
+    iy2 = np.minimum(y2[:, None], y2[None, :])
+    inter = np.maximum(ix2 - ix1, 0.0) * np.maximum(iy2 - iy1, 0.0)
+
+    union = areas[:, None] + areas[None, :] - inter
+    return np.where(union > 0, inter / union, 0.0)
 
 
 def _box_iou(a: "np.ndarray", b: "np.ndarray") -> float:
@@ -830,9 +851,7 @@ def detect_page_elements_v3(
                 batch_size=len(pre_list),
                 label_names=label_names,
             )
-            # Apply container-internal WBF (iou=0.1, biggest, max) to fuse near-duplicates
-            per_image_dets = [_fuse_overlapping_same_class_boxes(dets) for dets in per_image_dets]
-            # Apply v3 postprocessing (box fusion, title matching, expansion, overlap removal)
+            # Apply v3 postprocessing (box fusion via WBF at iou=0.01, title matching, expansion, overlap removal)
             per_image_dets = [_apply_page_elements_v3_postprocess(dets) for dets in per_image_dets]
             # Apply per-class final score filtering AFTER WBF (matches NIM pipeline ordering)
             per_image_dets = [_apply_final_score_filter(dets) for dets in per_image_dets]
