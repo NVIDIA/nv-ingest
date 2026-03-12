@@ -93,10 +93,10 @@ version = {attr = "nemo_retriever.version.get_build_version"}
 nv-ingest = { path = "../src/", editable = true }
 nv-ingest-api = { path = "../api/", editable = true }
 nv-ingest-client = { path = "../client/", editable = true }
-nemotron-page-elements-v3 = { index = "test-pypi" }
-nemotron-graphic-elements-v1 = { index = "test-pypi" }
-nemotron-table-structure-v1 = { index = "test-pypi" }
-nemotron-ocr = { index = "test-pypi" }
+#nemotron-page-elements-v3 = { index = "test-pypi" }
+#nemotron-graphic-elements-v1 = { index = "test-pypi" }
+#nemotron-table-structure-v1 = { index = "test-pypi" }
+#nemotron-ocr = { index = "test-pypi" }
 torch = { index = "torch-cuda"}
 torchvision = { index ="torch-cuda"}
 
