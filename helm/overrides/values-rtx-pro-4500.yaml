@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-# GPU-specific overrides for A100 40GB (loaded by harness when --deployment-type helm --sku a100-40gb).
-# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.a100-40gb.yaml.
+# GPU-specific overrides for RTX Pro 4500 (loaded by harness when --deployment-type helm --sku rtx-pro-4500).
+# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.rtx-pro-4500.yaml.
 
 nimOperator:
   page_elements:
