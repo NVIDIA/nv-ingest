@@ -39,13 +39,13 @@ RUN chmod +x scripts/install_ffmpeg.sh \
 # For GPL-licensed components, we provide their source code in the container
 # via `apt-get source` below to satisfy GPL requirements.
 ARG GPL_LIBS="\
+    libfreetype6 \
     libltdl7 \
     libhunspell-1.7-0 \
     libhyphen0 \
     libdbus-1-3 \
 "
 ARG FORCE_REMOVE_PKGS="\
-    libfreetype6 \
     ucf \
     liblangtag-common \
     libjbig0 \
