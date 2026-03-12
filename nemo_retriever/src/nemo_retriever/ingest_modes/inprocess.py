@@ -45,6 +45,7 @@ except Exception as e:  # pragma: no cover
     pdfium = None  # type: ignore[assignment]
     _PDFIUM_IMPORT_ERROR = e
 
+from ..image.load import SUPPORTED_IMAGE_EXTENSIONS
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -1007,6 +1008,10 @@ class InProcessIngestor(Ingestor):
         if self._input_documents and all(f.lower().endswith(".html") for f in self._input_documents):
             html_params = HtmlChunkParams()
             return self.extract_html(params=html_params)
+        if self._input_documents and all(
+            os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTENSIONS for f in self._input_documents
+        ):
+            return self.extract_image_files(params=params, **kwargs)
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
             any(
