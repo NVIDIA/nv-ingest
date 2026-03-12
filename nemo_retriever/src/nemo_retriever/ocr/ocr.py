@@ -337,9 +337,9 @@ def _parse_ocr_result(preds: Any) -> List[Dict[str, Any]]:
 
 
 def _blocks_to_text(blocks: List[Dict[str, Any]]) -> str:
-    """Sort text blocks by reading order (y then x) and join with newlines."""
+    """Sort text blocks by reading order (y then x) and join with whitespace."""
     blocks.sort(key=lambda b: (b.get("sort_y", 0.0), b.get("sort_x", 0.0)))
-    return "\n".join(b["text"] for b in blocks if b.get("text"))
+    return " ".join(b["text"] for b in blocks if b.get("text"))
 
 
 def _blocks_to_pseudo_markdown(
