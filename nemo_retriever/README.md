@@ -332,6 +332,34 @@ If you want a separate detection file for ad hoc inspection, set `write_detectio
 `nemo_retriever/harness/test_configs.yaml`.
 When tags are supplied with `--tag`, they are persisted in `results.json` and in session rollups for sweep/nightly runs.
 
+### Observability artifacts (extracts/chunks)
+
+The harness can optionally persist run-wide JSONL shards for extracted page content and pre-embed
+chunk rows. This is intended for semantic comparison/debugging, and the format is not a
+legacy per-document dump.
+
+Enable in `nemo_retriever/harness/test_configs.yaml`:
+
+- `write_extract_artifacts: true`
+- `write_chunk_manifest: true`
+- `observability_archive_dir: null` (or set a durable mirror root)
+
+When enabled, `results.json -> artifacts` includes:
+
+- `extract_artifacts_dir`
+- `chunk_manifest_dir`
+- `ingest_errors_file`
+- optional `durable_extract_artifacts_dir` and `durable_chunk_manifest_dir`
+
+CLI overrides for one-off runs:
+
+```bash
+retriever harness run --dataset jp20 --preset single_gpu \
+  --override write_extract_artifacts=true \
+  --override write_chunk_manifest=true \
+  --override observability_archive_dir=/path/to/archive
+```
+
 `results.json` also includes a nested `run_metadata` block for lightweight environment context:
 
 - `host`
