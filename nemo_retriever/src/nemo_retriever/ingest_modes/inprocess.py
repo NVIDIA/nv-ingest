@@ -1002,16 +1002,10 @@ class InProcessIngestor(Ingestor):
         # (e.g. `extract_text`, `dpi`, etc). Downstream model stages do NOT necessarily
         # accept the same keyword arguments. Keep per-stage kwargs isolated.
         if self._input_documents and all(f.lower().endswith(".txt") for f in self._input_documents):
-            txt_params = TextChunkParams(
-                max_tokens=kwargs.pop("max_tokens", 1024),
-                overlap_tokens=kwargs.pop("overlap_tokens", 0),
-            )
+            txt_params = TextChunkParams()
             return self.extract_txt(params=txt_params)
         if self._input_documents and all(f.lower().endswith(".html") for f in self._input_documents):
-            html_params = HtmlChunkParams(
-                max_tokens=kwargs.pop("max_tokens", 1024),
-                overlap_tokens=kwargs.pop("overlap_tokens", 0),
-            )
+            html_params = HtmlChunkParams()
             return self.extract_html(params=html_params)
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
@@ -1301,13 +1295,12 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_txt().
         """
         from nemo_retriever.txt.ray_data import TxtSplitActor
+
         self._pipeline_type = "txt"
         resolved = _coerce_params(params, TextChunkParams, kwargs)
         self._extract_txt_kwargs = resolved.model_dump(mode="python")
-        text_split = TxtSplitActor(
-            params = params
-        )
-        self._tasks.append((text_split, self._extract_txt_kwargs))
+        text_split = TxtSplitActor(params=TextChunkParams(**self._extract_txt_kwargs))
+        self._tasks.append((text_split, {}))
         return self
 
     def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1318,13 +1311,14 @@ class InProcessIngestor(Ingestor):
         Do not call .extract() when using .extract_html().
         """
         from nemo_retriever.html.ray_data import HtmlSplitActor
+
         self._pipeline_type = "html"
         resolved = _coerce_params(params, HtmlChunkParams, kwargs)
         self._extract_html_kwargs = resolved.model_dump(mode="python")
         html_split = HtmlSplitActor(
-            params = params,
+            params=HtmlChunkParams(**self._extract_html_kwargs),
         )
-        self._tasks.append((html_split, self._extract_html_kwargs))
+        self._tasks.append((html_split, {}))
         return self
 
     def extract_audio(

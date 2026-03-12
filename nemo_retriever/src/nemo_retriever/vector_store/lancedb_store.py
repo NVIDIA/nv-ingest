@@ -171,6 +171,7 @@ def _build_lancedb_rows_from_df(rows: List[Dict[str, Any]]) -> List[Dict[str, An
                 "pdf_basename": pdf_basename,
                 "page_number": int(page_number),
                 "source": source_id,
+                "source_id": source_id,
                 "path": path,
                 "text": row.get("text", ""),
                 "metadata": str(meta),
