@@ -1,8 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-# GPU-specific overrides for L40S (loaded by harness when --deployment-type helm --sku l40s).
-# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.l40s.yaml.
+# GPU-specific overrides for RTX Pro 4500 (loaded by harness when --deployment-type helm --sku rtx-pro-4500).
+# Sets NIM_TRITON_MAX_BATCH_SIZE=1 per NIM to match docker-compose.rtx-pro-4500.yaml.
 
 nimOperator:
   page_elements:
@@ -89,12 +89,3 @@ nimOperator:
         value: "1"
       - name: NIM_TRITON_MAX_BATCH_SIZE
         value: "1"
-
-  nemotron_nano_12b_v2_vl:
-    env:
-      - name: NIM_HTTP_API_PORT
-        value: "8000"
-      - name: NIM_TRITON_LOG_VERBOSE
-        value: "1"
-      - name: NIM_ENABLE_KV_CACHE_REUSE
-        value: "0"
