@@ -69,8 +69,8 @@ nav:
         - Deploy (Helm Chart): extraction/helm.md
       - Developer Guide:
         - Notebooks: extraction/notebooks.md
-        - Use the CLI: extraction/nv-ingest_cli.md
-        - Use the API: extraction/nv-ingest-python-api.md
+        - Use the CLI: extraction/cli-reference.md
+        - Use the API: extraction/python-api-reference.md
         - Use the API (V2): extraction/v2-api-guide.md
         - Split Documents: extraction/chunking.md
         - Upload Data: extraction/data-store.md
@@ -92,7 +92,6 @@ nav:
         - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Environment Variables: extraction/environment-config.md
         - Metadata Reference: extraction/content-metadata.md
-        - API Reference: extraction/api-docs
       - Troubleshoot: extraction/troubleshoot.md
       - FAQ: extraction/faq.md
       - Contribute: extraction/contributing.md
@@ -128,6 +127,8 @@ plugins:
   - redirects:
       redirect_maps:
         'extraction/index.md': 'extraction/overview.md'
+        'extraction/nv-ingest_cli.md': 'extraction/cli-reference.md'
+        'extraction/nv-ingest-python-api.md': 'extraction/python-api-reference.md'
   - site-urls
 
 markdown_extensions:
