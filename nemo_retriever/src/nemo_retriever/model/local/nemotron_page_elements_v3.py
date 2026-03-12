@@ -218,7 +218,7 @@ class NemotronPageElementsV3(HuggingFaceModel):
                 "labels": "List[str] - class names",
                 "scores": "np.ndarray[N] - confidence scores",
             },
-            "classes": ["table", "chart", "infographic", "title", "text", "header_footer"],
+            "classes": ["table", "chart", "title", "infographic", "text", "header_footer"],
             "post_processing": {"conf_thresh": 0.01, "iou_thresh": 0.5},
         }
 

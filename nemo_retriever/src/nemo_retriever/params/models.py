@@ -164,9 +164,10 @@ class ExtractParams(_ParamsModel):
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
     use_graphic_elements: bool = False
-    dpi: int = 300
+    dpi: int = 200
     image_format: str = "jpeg"
     jpeg_quality: int = 100
+    render_mode: Literal["full_dpi", "fit_to_model"] = "fit_to_model"
     inference_batch_size: int = 8
     ocr_model_dir: Optional[str] = None
 
