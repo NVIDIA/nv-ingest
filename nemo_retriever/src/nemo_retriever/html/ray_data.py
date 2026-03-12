@@ -35,12 +35,14 @@ class HtmlSplitActor:
         out_dfs: List[pd.DataFrame] = []
         for _, row in batch_df.iterrows():
             raw = row.get("bytes")
+            text = row.get("text")
             path = row.get("path")
-            if raw is None or path is None:
+            if (raw is None and text is None) or path is None:
                 continue
             path_str = str(path) if path is not None else ""
             try:
-                chunk_df = html_bytes_to_chunks_df(raw, path_str, params=params)
+                payload = raw or text.encode("utf-8")
+                chunk_df = html_bytes_to_chunks_df(payload, path_str, params=params)
                 if not chunk_df.empty:
                     out_dfs.append(chunk_df)
             except Exception:
