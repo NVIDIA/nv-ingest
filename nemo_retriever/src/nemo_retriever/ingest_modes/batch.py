@@ -38,6 +38,7 @@ from nemo_retriever.utils.ray_resource_hueristics import (
 )
 from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
+from ..image.load import SUPPORTED_IMAGE_EXTENSIONS
 from ..ingestor import Ingestor
 from ..params import ASRParams
 from ..params import AudioChunkParams
@@ -317,6 +318,11 @@ class BatchIngestor(Ingestor):
                 overlap_tokens=kwargs.pop("overlap_tokens", 0),
             )
             return self.extract_txt(params=txt_params)
+
+        if self._input_documents and all(
+            os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTENSIONS for f in self._input_documents
+        ):
+            return self.extract_image_files(params=params, **kwargs)
 
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
