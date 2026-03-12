@@ -67,7 +67,7 @@ def test_txt_file_to_chunks_df(tmp_path: Path):
         params=TextChunkParams(max_tokens=512, overlap_tokens=0),
     )
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == ["text", "path", "page_number", "metadata"]
+    assert list(df.columns) == ["text", "content", "path", "page_number", "metadata"]
     assert len(df) >= 1
     assert df["path"].iloc[0] == str(f.resolve())
     assert df["page_number"].iloc[0] >= 1
