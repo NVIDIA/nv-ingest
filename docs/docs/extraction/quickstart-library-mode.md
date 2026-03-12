@@ -1,4 +1,4 @@
-# Library Mode for NeMo Retriever Library
+# NeMo Retriever Library
 
 !!! note
 
