@@ -34,10 +34,12 @@ try:
     from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
         postprocess_page_elements_v3,
         YOLOX_PAGE_V3_CLASS_LABELS,
+        YOLOX_PAGE_V3_FINAL_SCORE,
     )
 except ImportError:
     postprocess_page_elements_v3 = None  # type: ignore[assignment,misc]
     YOLOX_PAGE_V3_CLASS_LABELS = None  # type: ignore[assignment]
+    YOLOX_PAGE_V3_FINAL_SCORE = {}  # type: ignore[assignment]
 
 from nemo_retriever.nim.nim import invoke_page_elements_batches
 
@@ -123,6 +125,10 @@ def _decode_b64_image_to_np_array(image_b64: str) -> Tuple["np.array", Tuple[int
         im = im0.convert("RGB")
         w, h = im.size
         arr = np.array(im)
+        # The NIM container receives BGR images (PNG encoded from BGR numpy
+        # arrays) and decodes the raw channels as-is, so the model effectively
+        # runs on BGR input.  Match that here by reversing the channel order.
+        arr = arr[:, :, ::-1].copy()
 
     return arr, (int(h), int(w))
 
@@ -339,6 +345,25 @@ def _bounding_boxes_to_detections(
     return dets
 
 
+def _apply_final_score_filter(
+    dets: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Filter detections by per-class final score thresholds (YOLOX_PAGE_V3_FINAL_SCORE).
+
+    This should be applied **after** WBF post-processing to match the NIM pipeline ordering.
+    Maps retriever label "text" to API label "paragraph" for threshold lookup.
+    """
+    if not YOLOX_PAGE_V3_FINAL_SCORE or not dets:
+        return dets
+    filtered: List[Dict[str, Any]] = []
+    for d in dets:
+        api_name = _RETRIEVER_TO_API.get(d["label_name"], d["label_name"])
+        threshold = YOLOX_PAGE_V3_FINAL_SCORE.get(api_name, 0.0)
+        if d.get("score") is not None and d["score"] >= threshold:
+            filtered.append(d)
+    return filtered
+
+
 def _apply_page_elements_v3_postprocess(
     dets: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
@@ -495,7 +520,11 @@ def detect_page_elements_v3(
     if model is not None and hasattr(model, "thresholds_per_class"):
         thresholds_per_class = getattr(model, "thresholds_per_class")
     else:
-        thresholds_per_class = [0.0 for _ in label_names]
+        # Use the same per-class thresholds as the yolox pipeline.
+        # label_names uses "text" where yolox uses "paragraph"; _RETRIEVER_TO_API maps between them.
+        thresholds_per_class = [
+            YOLOX_PAGE_V3_FINAL_SCORE.get(_RETRIEVER_TO_API.get(name, name), 0.0) for name in label_names
+        ]
 
     for _, row in pages_df.iterrows():
         try:
@@ -671,6 +700,7 @@ def detect_page_elements_v3(
                     labels_list.append(torch.as_tensor(l_np, dtype=torch.int64))
                     scores_list.append(torch.as_tensor(s_np, dtype=torch.float32))
                 boxes, labels, scores = boxes_list, labels_list, scores_list
+
             per_image_dets = _postprocess_to_per_image_detections(
                 boxes=boxes,
                 labels=labels,
@@ -678,8 +708,10 @@ def detect_page_elements_v3(
                 batch_size=len(pre_list),
                 label_names=label_names,
             )
-            # Apply v3 postprocessing (box fusion, title matching, expansion, overlap removal)
+            # Apply v3 postprocessing (box fusion via WBF at iou=0.01, title matching, expansion, overlap removal)
             per_image_dets = [_apply_page_elements_v3_postprocess(dets) for dets in per_image_dets]
+            # Apply per-class final score filtering AFTER WBF (matches NIM pipeline ordering)
+            per_image_dets = [_apply_final_score_filter(dets) for dets in per_image_dets]
             for local_i, row_i in enumerate(chunk_idx):
                 dets = per_image_dets[local_i] if local_i < len(per_image_dets) else []
                 row_payloads[row_i] = {
