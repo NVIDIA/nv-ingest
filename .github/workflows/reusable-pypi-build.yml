@@ -114,7 +114,7 @@ jobs:
           PY
           RETRIEVER_RELEASE_TYPE=${{ inputs.release-type }} \
           RETRIEVER_VERSION=${{ steps.set-version.outputs.version }} \
-          RETRIEVER_BUILD_NUMBER=${{ github.run_number }} \
+          RETRIEVER_BUILD_NUMBER=${{ inputs.release-type == 'release' && '0' || github.run_number }} \
           RETRIEVER_GIT_SHA=${{ github.sha }} \
           python -m build
 
