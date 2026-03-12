@@ -371,13 +371,14 @@ def _blocks_to_pseudo_markdown(
     from sklearn.cluster import DBSCAN
 
     df = pd.DataFrame(valid)
+    df = df.sort_values("sort_y")
 
     y_vals = df["sort_y"].values
     crop_h = crop_hw[0] if crop_hw else 0
 
     if crop_h > 0:
         # Pixel-space clustering (matches nv-ingest eps=10).
-        y_pixels = y_vals * crop_h
+        y_pixels = (y_vals * crop_h).astype(int)
         eps = 10
     else:
         # Fallback: normalise to [0,1] when pixel dims are unknown.
