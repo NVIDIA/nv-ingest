@@ -39,6 +39,7 @@ def run_datasets(
     sku: str | None = None,
     dump_logs: bool = True,
     config_file: str | None = None,
+    minimize_vram: bool = False,
 ) -> int:
     """Run test for one or more datasets sequentially."""
     results = []
@@ -63,6 +64,11 @@ def run_datasets(
             print("Failed to start services")
             return 1
 
+        # When minimize_vram and e2e_recall: stop non-ingestion services before readiness check
+        # so only the ingestion stack must be ready (avoids VRAM contention blocking readiness)
+        if case == "e2e_recall" and minimize_vram:
+            service_manager.stop_non_ingestion_services()
+
         # Wait for readiness (skip Milvus check when using LanceDB)
         print("Checking service readiness...")
         check_milvus = first_config.vdb_backend == "milvus"
@@ -71,129 +77,288 @@ def run_datasets(
             service_manager.stop()
             return 1
 
-    # Run each dataset
-    for dataset_name in dataset_list:
-        print(f"\n{'='*60}")
-        print(f"Running {case} for dataset: {dataset_name}")
-        print(f"{'='*60}\n")
+    # Branch: e2e_recall with minimize_vram runs e2e then stop_ingestion then start_retrieval then recall per dataset
+    if case == "e2e_recall" and managed and minimize_vram:
+        from nv_ingest_harness.utils.recall import get_recall_collection_name
 
-        # Load config for this dataset (applies dataset-specific extraction configs)
-        try:
-            config = load_config(
-                config_file=config_file or "test_configs.yaml",
-                case=case,
-                dataset=dataset_name,
-                deployment_type=deployment_type,
-            )
-        except (FileNotFoundError, ValueError) as e:
-            print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
-            results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
-            continue
+        for idx, dataset_name in enumerate(dataset_list):
+            print(f"\n{'='*60}")
+            print(f"Running e2e_recall (minimize VRAM) for dataset: {dataset_name}")
+            print(f"{'='*60}\n")
 
-        # Determine artifact name
-        artifact_name = config.test_name
-        if not artifact_name:
-            artifact_name = os.path.basename(config.dataset_dir.rstrip("/"))
-
-        out_dir = get_artifact_path(
-            session_dir,
-            artifact_name,
-            base_dir=config.artifacts_dir,
-            deployment_type=deployment_type if managed else None,
-        )
-        stdout_path = os.path.join(out_dir, "stdout.txt")
-
-        print(f"Dataset: {config.dataset_dir}")
-        print(f"Artifacts: {out_dir}")
-        print()
-
-        # For recall case, validate recall_dataset and set collection_name
-        if case in ("recall", "e2e_recall"):
-            recall_dataset = getattr(config, "recall_dataset", None)
-            if not recall_dataset:
-                print(f"ERROR: Dataset '{dataset_name}' does not have recall_dataset configured", file=sys.stderr)
-                print(f"  This dataset cannot be used with --case={case}", file=sys.stderr)
-                print(
-                    "  Set recall_dataset in test_configs.yaml datasets section or use a different dataset",
-                    file=sys.stderr,
+            try:
+                config = load_config(
+                    config_file=config_file or "test_configs.yaml",
+                    case="e2e_recall",
+                    dataset=dataset_name,
+                    deployment_type=deployment_type,
                 )
+            except (FileNotFoundError, ValueError) as e:
+                print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
                 results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
                 continue
 
-            # Default to local reranker if not explicitly configured
+            recall_dataset = getattr(config, "recall_dataset", None)
+            if not recall_dataset:
+                print(f"ERROR: Dataset '{dataset_name}' does not have recall_dataset configured", file=sys.stderr)
+                results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
+                continue
+
             if not os.environ.get("RERANKER_NIM_ENDPOINT"):
                 os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8015/v1/ranking"
 
-            # Set collection_name from dataset if not set
-            if case == "recall" and not config.collection_name:
-                from nv_ingest_harness.utils.recall import get_recall_collection_name
+            test_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+            config.collection_name = get_recall_collection_name(test_name)
 
-                # Use same logic as recall.py: test_name from config, or basename of dataset_dir
-                test_name_for_collection = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
-                config.collection_name = get_recall_collection_name(test_name_for_collection)
+            artifact_name = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+            out_dir = get_artifact_path(
+                session_dir,
+                artifact_name,
+                base_dir=config.artifacts_dir,
+                deployment_type=deployment_type,
+            )
+            stdout_path = os.path.join(out_dir, "stdout.txt")
 
-        # Run the test case
-        if case in CASES:
-            rc = run_case(case, stdout_path, config, doc_analysis)
-        else:
-            print(f"Unknown case: {case}")
-            rc = 2
+            print(f"Dataset: {config.dataset_dir}")
+            print(f"Artifacts: {out_dir}\n")
 
-        # Consolidate runner metadata + test results into single results.json
-        consolidated = {
-            "case": case,
-            "timestamp": now_timestr(),
-            "latest_commit": last_commit(),
-            "infrastructure": "managed" if managed else "attach",
-            "api_version": config.api_version,
-            "pdf_split_page_count": config.pdf_split_page_count,
-            "return_code": rc,
-        }
+            # Step 1: Run e2e
+            rc = run_case("e2e", stdout_path, config, doc_analysis)
+            if rc != 0:
+                results.append({"dataset": dataset_name, "artifact_dir": str(out_dir), "rc": rc, "status": "failed"})
+                if idx < len(dataset_list) - 1:
+                    service_manager.start_ingestion_services()
+                continue
 
-        if managed:
-            consolidated["profiles"] = config.profiles
+            # Load e2e results before recall overwrites _test_results.json
+            e2e_results = {}
+            test_results_file = os.path.join(out_dir, "_test_results.json")
+            if os.path.exists(test_results_file):
+                try:
+                    with open(test_results_file) as f:
+                        e2e_data = json.load(f)
+                    e2e_results = {
+                        "test_config": e2e_data.get("test_config", {}),
+                        "results": e2e_data.get("results", {}),
+                    }
+                except (json.JSONDecodeError, IOError):
+                    pass
 
-        # Merge test results if available
-        test_results_file = os.path.join(out_dir, "_test_results.json")
-        if os.path.exists(test_results_file):
-            try:
-                with open(test_results_file) as f:
-                    test_data = json.load(f)
-                    consolidated.update(test_data)
-                # Clean up intermediate file
-                os.remove(test_results_file)
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Could not read test results: {e}")
+            # Step 2: Stop ingestion-only services
+            service_manager.stop_ingestion_services()
 
-        # Write consolidated results.json
-        results_path = os.path.join(out_dir, "results.json")
-        with open(results_path, "w") as f:
-            json.dump(consolidated, f, indent=2)
+            # Step 3: Start retrieval services (reranker) if config requires it
+            reranker_needed = getattr(config, "reranker_mode", "none") in ("with", "both")
+            service_manager.start_retrieval_services(reranker=reranker_needed)
+            if reranker_needed:
+                timeout = getattr(config, "readiness_timeout", 600)
+                if not service_manager.wait_for_reranker_readiness(timeout, verbose=True):
+                    print("Reranker did not become ready; skipping recall for this dataset.", file=sys.stderr)
+                    results.append(
+                        {"dataset": dataset_name, "artifact_dir": str(out_dir), "rc": 1, "status": "reranker_not_ready"}
+                    )
+                    if idx < len(dataset_list) - 1:
+                        service_manager.start_ingestion_services()
+                    continue
 
-        # Write artifact path to session directory for parent processes (e.g., nightly runner)
-        if session_dir:
-            artifact_paths_file = Path(session_dir) / ".artifact_paths.json"
-            artifact_paths = {}
-            if artifact_paths_file.exists():
-                with open(artifact_paths_file) as f:
-                    artifact_paths = json.load(f)
-            artifact_paths[dataset_name] = str(out_dir)
-            with open(artifact_paths_file, "w") as f:
-                json.dump(artifact_paths, f, indent=2)
+            # Step 4: Run recall
+            rc = run_case("recall", stdout_path, config, doc_analysis)
 
-        print(f"\n{'='*60}")
-        print(f"Results written to: {results_path}")
-        print(f"{'='*60}")
+            # Load recall results and build combined e2e_recall output
+            recall_results = {}
+            if os.path.exists(test_results_file):
+                try:
+                    with open(test_results_file) as f:
+                        recall_data = json.load(f)
+                    recall_results = recall_data.get("recall_results", {})
+                except (json.JSONDecodeError, IOError):
+                    pass
 
-        # Collect results
-        results.append(
-            {
-                "dataset": dataset_name,
-                "artifact_dir": str(out_dir),
-                "rc": rc,
-                "status": "success" if rc == 0 else "failed",
+            test_results = {
+                "test_type": "e2e_recall",
+                "test_config": {
+                    "test_name": test_name,
+                    "collection_name": config.collection_name,
+                    "recall_dataset": recall_dataset,
+                },
+                "ingestion_results": e2e_results.get("results", {}),
+                "recall_results": recall_results,
             }
-        )
+            for key in ["api_version", "dataset_dir", "hostname", "model_name", "dense_dim", "sparse", "gpu_search"]:
+                if key in e2e_results.get("test_config", {}):
+                    test_results["test_config"][key] = e2e_results["test_config"][key]
+
+            with open(test_results_file, "w") as f:
+                json.dump(test_results, f, indent=2)
+
+            consolidated = {
+                "case": "e2e_recall",
+                "timestamp": now_timestr(),
+                "latest_commit": last_commit(),
+                "infrastructure": "managed",
+                "api_version": config.api_version,
+                "pdf_split_page_count": getattr(config, "pdf_split_page_count", None),
+                "return_code": rc,
+            }
+            if managed:
+                consolidated["profiles"] = config.profiles
+            consolidated.update(test_results)
+
+            results_path = os.path.join(out_dir, "results.json")
+            with open(results_path, "w") as f:
+                json.dump(consolidated, f, indent=2)
+
+            if session_dir:
+                artifact_paths_file = Path(session_dir) / ".artifact_paths.json"
+                artifact_paths = {}
+                if artifact_paths_file.exists():
+                    with open(artifact_paths_file) as f:
+                        artifact_paths = json.load(f)
+                artifact_paths[dataset_name] = str(out_dir)
+                with open(artifact_paths_file, "w") as f:
+                    json.dump(artifact_paths, f, indent=2)
+
+            print(f"\n{'='*60}")
+            print(f"Results written to: {results_path}")
+            print(f"{'='*60}")
+
+            results.append(
+                {
+                    "dataset": dataset_name,
+                    "artifact_dir": str(out_dir),
+                    "rc": rc,
+                    "status": "success" if rc == 0 else "failed",
+                }
+            )
+
+            # Step 5: If more datasets, start ingestion services again for next e2e
+            if idx < len(dataset_list) - 1:
+                service_manager.start_ingestion_services()
+
+    else:
+        # Run each dataset (standard path)
+        for dataset_name in dataset_list:
+            print(f"\n{'='*60}")
+            print(f"Running {case} for dataset: {dataset_name}")
+            print(f"{'='*60}\n")
+
+            # Load config for this dataset (applies dataset-specific extraction configs)
+            try:
+                config = load_config(
+                    config_file=config_file or "test_configs.yaml",
+                    case=case,
+                    dataset=dataset_name,
+                    deployment_type=deployment_type,
+                )
+            except (FileNotFoundError, ValueError) as e:
+                print(f"Configuration error for {dataset_name}: {e}", file=sys.stderr)
+                results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
+                continue
+
+            # Determine artifact name
+            artifact_name = config.test_name
+            if not artifact_name:
+                artifact_name = os.path.basename(config.dataset_dir.rstrip("/"))
+
+            out_dir = get_artifact_path(
+                session_dir,
+                artifact_name,
+                base_dir=config.artifacts_dir,
+                deployment_type=deployment_type if managed else None,
+            )
+            stdout_path = os.path.join(out_dir, "stdout.txt")
+
+            print(f"Dataset: {config.dataset_dir}")
+            print(f"Artifacts: {out_dir}")
+            print()
+
+            # For recall case, validate recall_dataset and set collection_name
+            if case in ("recall", "e2e_recall"):
+                recall_dataset = getattr(config, "recall_dataset", None)
+                if not recall_dataset:
+                    print(f"ERROR: Dataset '{dataset_name}' does not have recall_dataset configured", file=sys.stderr)
+                    print(f"  This dataset cannot be used with --case={case}", file=sys.stderr)
+                    print(
+                        "  Set recall_dataset in test_configs.yaml datasets section or use a different dataset",
+                        file=sys.stderr,
+                    )
+                    results.append({"dataset": dataset_name, "status": "config_error", "rc": 1, "artifact_dir": "N/A"})
+                    continue
+
+                # Default to local reranker if not explicitly configured
+                if not os.environ.get("RERANKER_NIM_ENDPOINT"):
+                    os.environ["RERANKER_NIM_ENDPOINT"] = "http://localhost:8015/v1/ranking"
+
+                # Set collection_name from dataset if not set
+                if case == "recall" and not config.collection_name:
+                    from nv_ingest_harness.utils.recall import get_recall_collection_name
+
+                    # Use same logic as recall.py: test_name from config, or basename of dataset_dir
+                    test_name_for_collection = config.test_name or os.path.basename(config.dataset_dir.rstrip("/"))
+                    config.collection_name = get_recall_collection_name(test_name_for_collection)
+
+            # Run the test case
+            if case in CASES:
+                rc = run_case(case, stdout_path, config, doc_analysis)
+            else:
+                print(f"Unknown case: {case}")
+                rc = 2
+
+            # Consolidate runner metadata + test results into single results.json
+            consolidated = {
+                "case": case,
+                "timestamp": now_timestr(),
+                "latest_commit": last_commit(),
+                "infrastructure": "managed" if managed else "attach",
+                "api_version": config.api_version,
+                "pdf_split_page_count": config.pdf_split_page_count,
+                "return_code": rc,
+            }
+
+            if managed:
+                consolidated["profiles"] = config.profiles
+
+            # Merge test results if available
+            test_results_file = os.path.join(out_dir, "_test_results.json")
+            if os.path.exists(test_results_file):
+                try:
+                    with open(test_results_file) as f:
+                        test_data = json.load(f)
+                    consolidated.update(test_data)
+                    # Clean up intermediate file
+                    os.remove(test_results_file)
+                except (json.JSONDecodeError, IOError) as e:
+                    print(f"Warning: Could not read test results: {e}")
+
+            # Write consolidated results.json
+            results_path = os.path.join(out_dir, "results.json")
+            with open(results_path, "w") as f:
+                json.dump(consolidated, f, indent=2)
+
+            # Write artifact path to session directory for parent processes (e.g., nightly runner)
+            if session_dir:
+                artifact_paths_file = Path(session_dir) / ".artifact_paths.json"
+                artifact_paths = {}
+                if artifact_paths_file.exists():
+                    with open(artifact_paths_file) as f:
+                        artifact_paths = json.load(f)
+                artifact_paths[dataset_name] = str(out_dir)
+                with open(artifact_paths_file, "w") as f:
+                    json.dump(artifact_paths, f, indent=2)
+
+            print(f"\n{'='*60}")
+            print(f"Results written to: {results_path}")
+            print(f"{'='*60}")
+
+            # Collect results
+            results.append(
+                {
+                    "dataset": dataset_name,
+                    "artifact_dir": str(out_dir),
+                    "rc": rc,
+                    "status": "success" if rc == 0 else "failed",
+                }
+            )
 
     # Cleanup managed services
     if managed and service_manager:
@@ -339,6 +504,12 @@ def run_case(case_name: str, stdout_path: str, config, doc_analysis: bool = Fals
 )
 @click.option("--no-build", is_flag=True, help="Skip building Docker images (managed mode only)")
 @click.option("--keep-up", is_flag=True, help="Keep services running after test (managed mode only)")
+@click.option(
+    "--minimize-vram",
+    is_flag=True,
+    help="Between e2e and recall, stop ingestion-only services to free VRAM (e2e_recall + managed only; mutually "
+    "exclusive with --keep-up)",
+)
 @click.option("--doc-analysis", is_flag=True, help="Show per-document element breakdown")
 @click.option(
     "--session-dir",
@@ -378,6 +549,7 @@ def main(
     dataset,
     no_build,
     keep_up,
+    minimize_vram,
     doc_analysis,
     session_dir,
     session_name,
@@ -385,6 +557,9 @@ def main(
     dump_logs,
     test_config_path,
 ):
+    if keep_up and minimize_vram:
+        print("Error: --keep-up and --minimize-vram are mutually exclusive.", file=sys.stderr)
+        sys.exit(1)
 
     if not dataset:
         print("Error: --dataset is required. Use --dataset=<name> or --dataset=<name1>,<name2>", file=sys.stderr)
@@ -419,6 +594,7 @@ def main(
         sku=sku,
         dump_logs=dump_logs,
         config_file=test_config_path,
+        minimize_vram=minimize_vram,
     )
 
 
