@@ -210,10 +210,12 @@ ingestor = (
 
 All `ExtractParams` options (`extract_text`, `extract_tables`, `extract_charts`, `extract_infographics`) apply to image ingestion.
 
-### Render one document as markdown
+### Render results as markdown
 
-If you want a readable page-by-page markdown view of a single in-process result, pass the
-single-document result from `results[0]` to `nemo_retriever.io.to_markdown`.
+If you want a readable markdown view of extracted results, pass the full in-process result list
+to `nemo_retriever.io.to_markdown`. The helper now returns a `dict[str, str]` keyed by input
+filename, where each value is the document collapsed into one markdown string without per-page
+headers, so both single-document and multi-document runs follow the same contract.
 
 ```python
 from nemo_retriever import create_ingestor
@@ -230,11 +232,12 @@ ingestor = (
     )
 )
 results = ingestor.ingest()
-print(to_markdown(results[0]))
+markdown_docs = to_markdown(results)
+print(markdown_docs["multimodal_test.pdf"])
 ```
 
-Use `to_markdown_by_page(results[0])` when you want a `dict[int, str]` instead of one concatenated
-markdown document.
+Use `to_markdown_by_page(results)` when you want a nested
+`dict[str, dict[int, str]]` instead, where each filename maps to its per-page markdown strings.
 
 ## Benchmark harness
 

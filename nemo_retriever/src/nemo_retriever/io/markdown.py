@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
@@ -14,7 +15,6 @@ import pandas as pd
 
 from .dataframe import read_dataframe
 
-_DOCUMENT_TITLE = "Extracted Content"
 _UNKNOWN_PAGE = -1
 _RECORD_LIST_KEYS = ("records", "df_records", "extracted_df_records", "primitives")
 _PAGE_CONTENT_COLUMNS = (
@@ -39,9 +39,140 @@ class _PageContent:
         return next_value
 
 
-def to_markdown_by_page(results: object) -> dict[int, str]:
-    """Render a single document result as markdown grouped by page."""
-    records = _coerce_records(results)
+def to_markdown_by_page(results: object) -> dict[str, dict[int, str]]:
+    """Render results as markdown grouped by document, then by page."""
+    grouped_records = _coerce_documents(results)
+    rendered: dict[str, dict[int, str]] = {}
+
+    for document_name, records in grouped_records.items():
+        by_page = _pages_for_records(records)
+        rendered[document_name] = {
+            page_number: _render_page_content(page_content)
+            for page_number, page_content in sorted(by_page.items(), key=_page_sort_key)
+        }
+
+    return rendered
+
+
+def to_markdown(results: object) -> dict[str, str]:
+    """Render results as one collapsed markdown string per document."""
+    rendered: dict[str, str] = {}
+
+    for document_name, pages in to_markdown_by_page(results).items():
+        rendered[document_name] = "\n\n".join(page_markdown for page_markdown in pages.values() if page_markdown)
+
+    return rendered
+
+
+def _coerce_documents(results: object) -> dict[str, list[dict[str, Any]]]:
+    grouped_records: dict[str, list[dict[str, Any]]] = {}
+    _extend_documents(grouped_records, results)
+    return grouped_records
+
+
+def _extend_documents(
+    grouped_records: dict[str, list[dict[str, Any]]],
+    results: object,
+    explicit_document_name: str | None = None,
+) -> None:
+    if results is None:
+        return
+
+    dataset = getattr(results, "_rd_dataset", None)
+    if dataset is not None:
+        _extend_documents(grouped_records, dataset, explicit_document_name)
+        return
+
+    take_all = getattr(results, "take_all", None)
+    if callable(take_all):
+        _extend_documents(grouped_records, take_all(), explicit_document_name)
+        return
+
+    if isinstance(results, pd.DataFrame):
+        _add_records(grouped_records, results.to_dict(orient="records"), explicit_document_name)
+        return
+
+    if isinstance(results, Path):
+        payload, payload_document_name = _load_results_path(results)
+        _extend_documents(grouped_records, payload, explicit_document_name or payload_document_name)
+        return
+
+    if isinstance(results, str):
+        path = Path(results).expanduser()
+        if path.exists():
+            payload, payload_document_name = _load_results_path(path)
+            _extend_documents(grouped_records, payload, explicit_document_name or payload_document_name)
+            return
+        raise TypeError("String inputs must point to a saved results file.")
+
+    if isinstance(results, Mapping):
+        extracted = _extract_records_from_mapping(results)
+        if extracted is not None:
+            records, mapping_document_name = extracted
+            _add_records(grouped_records, records, explicit_document_name or mapping_document_name)
+            return
+
+        for key, value in results.items():
+            _extend_documents(grouped_records, value, str(key))
+        return
+
+    if isinstance(results, Iterable) and not isinstance(results, (bytes, bytearray)):
+        items = list(results)
+        if not items:
+            return
+        if all(isinstance(item, Mapping) and _looks_like_record(item) for item in items):
+            _add_records(grouped_records, [dict(item) for item in items], explicit_document_name)
+            return
+        for item in items:
+            _extend_documents(grouped_records, item, explicit_document_name=None)
+        return
+
+    raise TypeError(f"Unsupported results type for markdown rendering: {type(results)!r}")
+
+
+def _load_results_path(path: Path) -> tuple[object, str | None]:
+    suffix = path.suffix.lower()
+    if suffix == ".json":
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload, _document_name_from_mapping(payload) if isinstance(payload, Mapping) else None
+    if suffix == ".jsonl":
+        lines = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        if len(lines) == 1 and isinstance(lines[0], Mapping):
+            payload = lines[0]
+            return payload, _document_name_from_mapping(payload)
+        return lines, None
+    return read_dataframe(path), None
+
+
+def _extract_records_from_mapping(results: Mapping[str, Any]) -> tuple[list[dict[str, Any]], str | None] | None:
+    for key in _RECORD_LIST_KEYS:
+        value = results.get(key)
+        if isinstance(value, list) and all(isinstance(item, Mapping) for item in value):
+            return [dict(item) for item in value], _document_name_from_mapping(results)
+    if _looks_like_record(results):
+        return [dict(results)], None
+    return None
+
+
+def _add_records(
+    grouped_records: dict[str, list[dict[str, Any]]],
+    records: list[dict[str, Any]],
+    explicit_document_name: str | None = None,
+) -> None:
+    fallback_document_name = explicit_document_name or _next_unknown_document_name(grouped_records)
+    for record in records:
+        document_name = explicit_document_name or _document_name_for_record(record) or fallback_document_name
+        grouped_records.setdefault(document_name, []).append(record)
+
+
+def _next_unknown_document_name(grouped_records: Mapping[str, list[dict[str, Any]]]) -> str:
+    index = 1
+    while f"document_{index}" in grouped_records:
+        index += 1
+    return f"document_{index}"
+
+
+def _pages_for_records(records: Iterable[Mapping[str, Any]]) -> dict[int, _PageContent]:
     by_page: dict[int, _PageContent] = defaultdict(_PageContent)
 
     for record in records:
@@ -50,65 +181,60 @@ def to_markdown_by_page(results: object) -> dict[int, str]:
         else:
             _collect_page_record(by_page, record)
 
-    rendered: dict[int, str] = {}
-    for page_number, page_content in sorted(by_page.items(), key=_page_sort_key):
-        blocks = _dedupe_blocks(page_content.text_blocks + page_content.sections)
-        header = f"## Page {page_number}" if page_number != _UNKNOWN_PAGE else "## Page Unknown"
-        rendered[page_number] = header + ("\n\n" + "\n\n".join(blocks) if blocks else "\n")
-
-    return rendered
+    return by_page
 
 
-def to_markdown(results: object) -> str:
-    """Render a single document result as one markdown document."""
-    pages = to_markdown_by_page(results)
-    if not pages:
-        return f"# {_DOCUMENT_TITLE}\n\n_No content found._"
-    return f"# {_DOCUMENT_TITLE}\n\n" + "\n\n".join(pages.values())
+def _render_page_content(page_content: _PageContent) -> str:
+    return "\n\n".join(_dedupe_blocks(page_content.text_blocks + page_content.sections))
 
 
-def _coerce_records(results: object) -> list[dict[str, Any]]:
-    if results is None:
-        return []
-    if isinstance(results, pd.DataFrame):
-        return results.to_dict(orient="records")
-    if isinstance(results, Path):
-        return read_dataframe(results).to_dict(orient="records")
-    if isinstance(results, str):
-        path = Path(results).expanduser()
-        if path.exists():
-            return read_dataframe(path).to_dict(orient="records")
-        raise TypeError("String inputs must point to a saved results file.")
-    if isinstance(results, Mapping):
-        return _records_from_mapping(results)
-    if isinstance(results, Iterable) and not isinstance(results, (bytes, bytearray)):
-        return _records_from_iterable(results)
-    raise TypeError(f"Unsupported results type for markdown rendering: {type(results)!r}")
+def _document_name_from_mapping(results: Mapping[str, Any]) -> str | None:
+    metadata = results.get("metadata")
+    source_metadata = _nested_mapping(metadata, "source_metadata") if isinstance(metadata, Mapping) else {}
+    custom_content = _nested_mapping(metadata, "custom_content") if isinstance(metadata, Mapping) else {}
+
+    return _normalize_document_name(
+        results.get("filename"),
+        results.get("source_path"),
+        results.get("path"),
+        results.get("source_id"),
+        source_metadata.get("source_name"),
+        source_metadata.get("source_id"),
+        custom_content.get("path"),
+        custom_content.get("input_pdf"),
+        custom_content.get("pdf_path"),
+    )
 
 
-def _records_from_iterable(results: Iterable[Any]) -> list[dict[str, Any]]:
-    items = list(results)
-    if not items:
-        return []
-    if len(items) == 1:
-        first = items[0]
-        if not isinstance(first, Mapping):
-            return _coerce_records(first)
-        if not _looks_like_record(first):
-            return _records_from_mapping(first)
-    if all(isinstance(item, Mapping) for item in items):
-        return [dict(item) for item in items]
-    raise ValueError("Markdown rendering expects a single document result. Pass one document, such as results[0].")
+def _document_name_for_record(record: Mapping[str, Any]) -> str | None:
+    metadata = _metadata(record)
+    source_metadata = _nested_mapping(metadata, "source_metadata")
+    custom_content = _nested_mapping(metadata, "custom_content")
+
+    return _normalize_document_name(
+        record.get("filename"),
+        record.get("source_path"),
+        metadata.get("source_path"),
+        source_metadata.get("source_name"),
+        custom_content.get("path"),
+        custom_content.get("input_pdf"),
+        custom_content.get("pdf_path"),
+        record.get("path"),
+        source_metadata.get("source_id"),
+        record.get("source_id"),
+    )
 
 
-def _records_from_mapping(results: Mapping[str, Any]) -> list[dict[str, Any]]:
-    for key in _RECORD_LIST_KEYS:
-        value = results.get(key)
-        if isinstance(value, list) and all(isinstance(item, Mapping) for item in value):
-            return [dict(item) for item in value]
-    if _looks_like_record(results):
-        return [dict(results)]
-    raise ValueError("Markdown rendering expects a document row, row list, or saved results payload.")
+def _normalize_document_name(*candidates: Any) -> str | None:
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        normalized = candidate.strip()
+        if not normalized:
+            continue
+        name = Path(normalized).name
+        return name or normalized
+    return None
 
 
 def _looks_like_record(record: Mapping[str, Any]) -> bool:

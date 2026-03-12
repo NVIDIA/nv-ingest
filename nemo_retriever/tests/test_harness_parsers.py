@@ -48,9 +48,58 @@ Recall metrics (matching nemo_retriever.recall.core):
     }
 
 
+def test_parse_stream_text_extracts_current_run_summary_format() -> None:
+    stdout = """
+===== Run Summary - 2026-03-12 14:15:35 UTC =====
+Runtimes:
+    Total pages processed: 1940 from /datasets/nv-ingest/jp20
+    Ingestion only time: 107.62s / 0:01:47.621
+PPS:
+    Ingestion only PPS: 18.03
+Recall metrics:
+  recall@1: 0.6261
+  recall@5: 0.8261
+  recall@10: 0.8870
+Result: FAIL | return_code=98
+"""
+    metrics = parse_stream_text(stdout)
+    assert metrics.files is None
+    assert metrics.pages == 1940
+    assert metrics.ingest_secs == 107.62
+    assert metrics.pages_per_sec_ingest == 18.03
+    assert metrics.rows_processed is None
+    assert metrics.rows_per_sec_ingest is None
+    assert metrics.recall_metrics == {
+        "recall@1": 0.6261,
+        "recall@5": 0.8261,
+        "recall@10": 0.8870,
+    }
+
+
+def test_parse_stream_text_extracts_current_run_summary_when_recall_is_skipped() -> None:
+    stdout = """
+===== Run Summary - 2026-03-12 14:45:11 UTC =====
+Runtimes:
+    Total pages processed: 496 from /datasets/nv-ingest/bo20
+    Ingestion only time: 38.91s / 0:00:38.910
+    Recall time: skipped
+PPS:
+    Ingestion only PPS: 12.75
+    Recall QPS: skipped
+Recall metrics: skipped
+Result: PASS | return_code=0
+"""
+    metrics = parse_stream_text(stdout)
+    assert metrics.files is None
+    assert metrics.pages == 496
+    assert metrics.ingest_secs == 38.91
+    assert metrics.pages_per_sec_ingest == 12.75
+    assert metrics.recall_metrics == {}
+
+
 def test_stream_metrics_handles_non_recall_lines_after_recall_block() -> None:
     metrics = StreamMetrics()
-    metrics.consume("Recall metrics (matching nemo_retriever.recall.core):\n")
+    metrics.consume("Recall metrics:\n")
     metrics.consume("  recall@5: 0.9043\n")
     metrics.consume("Pages processed: 1933\n")
     metrics.consume("  recall@10: 0.9565\n")

@@ -216,13 +216,15 @@ def print_run_summary(
     ingest_only_total_time: float,
     ray_dataset_download_total_time: float,
     lancedb_write_total_time: float,
-    recall_total_time: float,
+    recall_total_time: Optional[float],
     recall_metrics: Dict[str, float],
 ) -> None:
     ingest_only_pps = processed_pages / ingest_only_total_time
     ingest_and_lancedb_write_pps = processed_pages / (ingest_only_total_time + lancedb_write_total_time)
-    recall_qps = processed_pages / recall_total_time
     total_pps = processed_pages / total_time
+    recall_qps = (
+        (processed_pages / recall_total_time) if recall_total_time is not None and recall_total_time > 0 else None
+    )
     utc_now = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     print(f"===== Run Summary - {utc_now} UTC =====")
@@ -238,14 +240,23 @@ def print_run_summary(
     print(f"\tIngestion only time: {_fmt_time(ingest_only_total_time)}")
     print(f"\tRay dataset download time: {_fmt_time(ray_dataset_download_total_time)}")
     print(f"\tLanceDB Write Time: {_fmt_time(lancedb_write_total_time)}")
-    print(f"\tRecall time: {_fmt_time(recall_total_time)}")
+    if recall_total_time is not None and recall_total_time > 0:
+        print(f"\tRecall time: {_fmt_time(recall_total_time)}")
+    else:
+        print("\tRecall time: skipped")
 
     print("PPS:")
     print(f"\tIngestion only PPS: {ingest_only_pps:.2f}")
     print(f"\tIngestion + LanceDB Write PPS: {ingest_and_lancedb_write_pps:.2f}")
-    print(f"\tRecall QPS: {recall_qps:.2f}")
+    if recall_qps is not None:
+        print(f"\tRecall QPS: {recall_qps:.2f}")
+    else:
+        print("\tRecall QPS: skipped")
     print(f"\tTotal - Processed: {processed_pages} pages in {_fmt_time(total_time)} @ {total_pps:.2f} PPS")
 
-    print("Recall metrics:")
-    for k, v in recall_metrics.items():
-        print(f"  {k}: {v:.4f}")
+    if recall_metrics:
+        print("Recall metrics:")
+        for k, v in recall_metrics.items():
+            print(f"  {k}: {v:.4f}")
+    else:
+        print("Recall metrics: skipped")
