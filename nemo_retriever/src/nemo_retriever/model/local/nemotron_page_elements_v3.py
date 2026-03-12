@@ -106,9 +106,8 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         # The upstream model returns a container where index [0] is the predictions.
         with torch.inference_mode():
-            with torch.autocast(device_type="cuda"):
-                out = self._model(input_data, orig_shape)
-                return out
+            out = self._model(input_data, orig_shape)
+            return out
         # preds0: Any
         # if isinstance(out, (list, tuple)) and len(out) > 0:
         #     preds0 = out[0]
@@ -139,8 +138,13 @@ class NemotronPageElementsV3(HuggingFaceModel):
         # may pass a *list* of per-image preds for batched inference, so handle both cases
         # and always return torch tensors (or lists of torch tensors).
 
+        # Use a zero threshold so all NMS survivors reach WBF before per-class
+        # filtering.  The real per-class gate is _apply_final_score_filter (after WBF),
+        # matching the NIM pipeline ordering.
+        passthrough_thresholds = {k: 0.0 for k in self._model.thresholds_per_class}
+
         def _one(p: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-            b_np, l_np, s_np = postprocess_preds_page_element(p, self._model.thresholds_per_class, self._model.labels)
+            b_np, l_np, s_np = postprocess_preds_page_element(p, passthrough_thresholds, self._model.labels)
             b = torch.as_tensor(b_np, dtype=torch.float32)
             l = torch.as_tensor(l_np, dtype=torch.int64)  # noqa: E741
             s = torch.as_tensor(s_np, dtype=torch.float32)
