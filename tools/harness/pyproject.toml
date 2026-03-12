@@ -10,15 +10,15 @@ dependencies = [
     "pyyaml>=6.0",
     "requests>=2.32.5",
     "pynvml>=11.5.0",
-    "nv-ingest==26.03.0-RC1",
-    "nv-ingest-api==26.03.0-RC1",
-    "nv-ingest-client==26.03.0-RC1",
+    "nv-ingest==26.03.0rc2",
+    "nv-ingest-api==26.03.0rc2",
+    "nv-ingest-client==26.03.0rc2",
     "milvus-lite==2.4.12",
     "pypdfium2>=4.30.0,<5.0.0",
-    "nemotron-page-elements-v3>=0.dev0",
-    "nemotron-graphic-elements-v1>=0.dev0",
-    "nemotron-table-structure-v1>=0.dev0",
-    "nemotron-ocr>=0.dev0",
+    "nemotron-page-elements-v3==3.0.1",
+    "nemotron-graphic-elements-v1==1.0.0",
+    "nemotron-table-structure-v1==1.0.0",
+    "nemotron-ocr==1.0.1",
 ]
 
 [project.scripts]
