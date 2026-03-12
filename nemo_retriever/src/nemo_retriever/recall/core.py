@@ -38,7 +38,7 @@ class RecallConfig:
     # nprobes=0 means "search all partitions" (exhaustive); refine_factor re-ranks
     # top candidates with full-precision vectors to eliminate SQ quantization error.
     nprobes: int = 0
-    refine_factor: int = 10
+    refine_factor: int = 50
     hybrid: bool = False
     # Local HF knobs (only used when endpoints are missing).
     local_hf_device: Optional[str] = None
@@ -187,7 +187,7 @@ def _search_lancedb(
     top_k: int,
     vector_column_name: str = "vector",
     nprobes: int = 0,
-    refine_factor: int = 10,
+    refine_factor: int = 50,
     query_texts: Optional[List[str]] = None,
     hybrid: bool = False,
 ) -> List[List[Dict[str, Any]]]:
