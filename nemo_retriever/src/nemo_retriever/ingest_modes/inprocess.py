@@ -1007,7 +1007,12 @@ class InProcessIngestor(Ingestor):
                 overlap_tokens=kwargs.pop("overlap_tokens", 0),
             )
             return self.extract_txt(params=txt_params)
-
+        if self._input_documents and all(f.lower().endswith(".html") for f in self._input_documents):
+            html_params = HtmlChunkParams(
+                max_tokens=kwargs.pop("max_tokens", 1024),
+                overlap_tokens=kwargs.pop("overlap_tokens", 0),
+            )
+            return self.extract_html(params=html_params)
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
             any(
