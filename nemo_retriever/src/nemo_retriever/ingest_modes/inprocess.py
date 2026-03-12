@@ -1300,9 +1300,11 @@ class InProcessIngestor(Ingestor):
         Use with .files("*.txt").extract_txt(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_txt().
         """
+        from nemo_retriever.txt.ray_data import TxtSplitActor
         self._pipeline_type = "txt"
         resolved = _coerce_params(params, TextChunkParams, kwargs)
         self._extract_txt_kwargs = resolved.model_dump(mode="python")
+        self._tasks.append((TxtSplitActor, self._extract_txt_kwargs))
         return self
 
     def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1312,9 +1314,11 @@ class InProcessIngestor(Ingestor):
         Use with .files("*.html").extract_html(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_html().
         """
+        from nemo_retriever.html.ray_data import HtmlSplitActor
         self._pipeline_type = "html"
         resolved = _coerce_params(params, HtmlChunkParams, kwargs)
         self._extract_html_kwargs = resolved.model_dump(mode="python")
+        self._tasks.append((HtmlSplitActor, self._extract_html_kwargs))
         return self
 
     def extract_audio(
