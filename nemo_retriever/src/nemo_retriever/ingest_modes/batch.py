@@ -38,6 +38,7 @@ from nemo_retriever.utils.ray_resource_hueristics import (
 )
 from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
+from ..image.load import SUPPORTED_IMAGE_EXTENSIONS
 from ..ingestor import Ingestor
 from ..params import ASRParams
 from ..params import AudioChunkParams
@@ -318,6 +319,11 @@ class BatchIngestor(Ingestor):
             )
             return self.extract_txt(params=txt_params)
 
+        if self._input_documents and all(
+            os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTENSIONS for f in self._input_documents
+        ):
+            return self.extract_image_files(params=params, **kwargs)
+
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
             any(
@@ -394,9 +400,36 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
 
+        self._apply_nemotron_parse_overrides(kwargs)
+
         self._append_detection_stages(kwargs)
 
         return self
+
+    def _apply_nemotron_parse_overrides(self, kwargs: dict[str, Any]) -> None:
+        """Update ``_requested_plan`` with user-provided Nemotron Parse resource overrides
+        and set ``_use_nemotron_parse_only``."""
+        nemotron_parse_workers = float(kwargs.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(kwargs.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(kwargs.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        self._use_nemotron_parse_only = kwargs.get("method") == "nemotron_parse" or (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
+
+        # Forward CLI overrides into the RequestedPlan so that downstream Ray
+        # actor pools (batch size, GPU fraction, pool size) honour them.
+        overrides: dict[str, Any] = {}
+        if nemotron_parse_workers > 0.0:
+            workers = int(nemotron_parse_workers)
+            overrides["nemotron_parse_initial_actors"] = workers
+            overrides["nemotron_parse_min_actors"] = workers
+            overrides["nemotron_parse_max_actors"] = workers
+        if gpu_nemotron_parse > 0.0:
+            overrides["nemotron_parse_gpus_per_actor"] = gpu_nemotron_parse
+        if nemotron_parse_batch_size > 0.0:
+            overrides["nemotron_parse_batch_size"] = int(nemotron_parse_batch_size)
+        if overrides:
+            self._requested_plan = self._requested_plan.model_copy(update=overrides)
 
     def _append_detection_stages(self, kwargs: dict[str, Any]) -> None:
         """Append downstream GPU detection stages (page elements, OCR, table/chart/infographic).
@@ -665,6 +698,7 @@ class BatchIngestor(Ingestor):
         )
 
         # Downstream detection stages (page elements, OCR, table/chart/infographic).
+        self._apply_nemotron_parse_overrides(kwargs)
         self._append_detection_stages(kwargs)
 
         return self

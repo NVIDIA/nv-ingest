@@ -44,7 +44,7 @@ def main(
     input_type: str = typer.Option(
         "pdf",
         "--input-type",
-        help="Input format: 'pdf', 'txt', 'html', or 'doc'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice).",  # noqa: E501
+        help="Input format: 'pdf', 'txt', 'html', 'doc', or 'image'. Use 'txt' for .txt, 'html' for .html (markitdown -> chunks), 'doc' for .docx/.pptx (converted to PDF via LibreOffice), 'image' for standalone image files (PNG, JPEG, BMP, TIFF, SVG).",  # noqa: E501
     ),
     query_csv: Path = typer.Option(
         "bo767_query_gt.csv",
@@ -95,25 +95,7 @@ def main(
     method: str = typer.Option(
         "pdfium",
         "--method",
-        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
-    ),
-    nemotron_parse_actors: float = typer.Option(
-        0.0,
-        "--nemotron-parse-actors",
-        min=0.0,
-        help="Enable Parse-only extraction path when > 0.0 with parse GPU/batch-size.",
-    ),
-    nemotron_parse_gpus_per_actor: float = typer.Option(
-        0.0,
-        "--nemotron-parse-gpus-per-actor",
-        min=0.0,
-        help="GPU allocation hint for Parse-only extraction path.",
-    ),
-    nemotron_parse_ray_batch_size: float = typer.Option(
-        0.0,
-        "--nemotron-parse-ray-batch-size",
-        min=0.0,
-        help="Parse stage batch size (enables Parse-only path when > 0.0 with parse workers/GPU).",
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), 'ocr' (OCR all pages), or 'nemotron_parse' (Nemotron Parse only).",  # noqa: E501
     ),
     embed_modality: str = typer.Option(
         "text",
@@ -204,6 +186,7 @@ def main(
             "txt": ["*.txt"],
             "html": ["*.html"],
             "doc": ["*.docx", "*.pptx"],
+            "image": ["*.png", "*.jpg", "*.jpeg", "*.bmp", "*.tiff", "*.tif", "*.svg"],
         }
         exts = ext_map.get(input_type, ["*.pdf"])
         file_patterns = [str(input_path / e) for e in exts]
@@ -225,6 +208,23 @@ def main(
                 overlap_tokens=text_chunk_overlap_tokens if text_chunk_overlap_tokens is not None else 150,
             )
         )
+    elif input_type == "image":
+        ingestor = ingestor.files(file_patterns).extract_image_files(
+            ExtractParams(
+                method=method,
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_infographics=False,
+                use_graphic_elements=use_graphic_elements,
+                graphic_elements_invoke_url=graphic_elements_invoke_url,
+                use_table_structure=use_table_structure,
+                table_output_format=table_output_format,
+                table_structure_invoke_url=table_structure_invoke_url,
+                page_elements_invoke_url=page_elements_invoke_url,
+                ocr_invoke_url=ocr_invoke_url,
+            )
+        )
     elif input_type == "doc":
         ingestor = ingestor.files(file_patterns).extract(
             ExtractParams(
@@ -240,11 +240,6 @@ def main(
                 table_structure_invoke_url=table_structure_invoke_url,
                 page_elements_invoke_url=page_elements_invoke_url,
                 ocr_invoke_url=ocr_invoke_url,
-                batch_tuning={
-                    "nemotron_parse_workers": float(nemotron_parse_actors),
-                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                },
             )
         )
     else:
@@ -262,11 +257,6 @@ def main(
                 table_structure_invoke_url=table_structure_invoke_url,
                 page_elements_invoke_url=page_elements_invoke_url,
                 ocr_invoke_url=ocr_invoke_url,
-                batch_tuning={
-                    "nemotron_parse_workers": float(nemotron_parse_actors),
-                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                },
             )
         )
 
