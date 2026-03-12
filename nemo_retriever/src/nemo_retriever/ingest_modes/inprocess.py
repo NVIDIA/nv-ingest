@@ -1304,7 +1304,10 @@ class InProcessIngestor(Ingestor):
         self._pipeline_type = "txt"
         resolved = _coerce_params(params, TextChunkParams, kwargs)
         self._extract_txt_kwargs = resolved.model_dump(mode="python")
-        self._tasks.append((TxtSplitActor, self._extract_txt_kwargs))
+        text_split = TxtSplitActor(
+            params = params
+        )
+        self._tasks.append((text_split, self._extract_txt_kwargs))
         return self
 
     def extract_html(self, params: HtmlChunkParams | None = None, **kwargs: Any) -> "InProcessIngestor":
@@ -1318,7 +1321,10 @@ class InProcessIngestor(Ingestor):
         self._pipeline_type = "html"
         resolved = _coerce_params(params, HtmlChunkParams, kwargs)
         self._extract_html_kwargs = resolved.model_dump(mode="python")
-        self._tasks.append((HtmlSplitActor, self._extract_html_kwargs))
+        html_split = HtmlSplitActor(
+            params = params,
+        )
+        self._tasks.append((html_split, self._extract_html_kwargs))
         return self
 
     def extract_audio(
