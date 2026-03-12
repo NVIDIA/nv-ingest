@@ -258,22 +258,28 @@ class OnlineIngestor(Ingestor):
                 )
             if resp.status_code == 200:
                 data = resp.json()
-                self._pending_jobs.append({
-                    "source_path": source_path,
-                    "job_id": data.get("job_id", ""),
-                })
+                self._pending_jobs.append(
+                    {
+                        "source_path": source_path,
+                        "job_id": data.get("job_id", ""),
+                    }
+                )
             else:
-                self._pending_jobs.append({
+                self._pending_jobs.append(
+                    {
+                        "source_path": source_path,
+                        "job_id": "",
+                        "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
+                    }
+                )
+        except Exception as e:
+            self._pending_jobs.append(
+                {
                     "source_path": source_path,
                     "job_id": "",
-                    "error": f"HTTP {resp.status_code}: {resp.text[:200]}",
-                })
-        except Exception as e:
-            self._pending_jobs.append({
-                "source_path": source_path,
-                "job_id": "",
-                "error": str(e),
-            })
+                    "error": str(e),
+                }
+            )
 
     def poll_results(
         self,
@@ -295,11 +301,13 @@ class OnlineIngestor(Ingestor):
         immediate_failures = [j for j in self._pending_jobs if not j.get("job_id")]
 
         for fail in immediate_failures:
-            results.append({
-                "ok": False,
-                "source_path": fail.get("source_path", ""),
-                "error": fail.get("error", "No job_id"),
-            })
+            results.append(
+                {
+                    "ok": False,
+                    "source_path": fail.get("source_path", ""),
+                    "error": fail.get("error", "No job_id"),
+                }
+            )
 
         deadline = time.monotonic() + timeout
         done_ids: set[str] = set()
@@ -311,9 +319,7 @@ class OnlineIngestor(Ingestor):
                     continue
                 try:
                     with httpx.Client(timeout=30.0) as client:
-                        status_resp = client.get(
-                            f"{self._base_url}/ingest/status/{job['job_id']}"
-                        )
+                        status_resp = client.get(f"{self._base_url}/ingest/status/{job['job_id']}")
                     if status_resp.status_code != 200:
                         still_pending.append(job)
                         continue
@@ -332,11 +338,13 @@ class OnlineIngestor(Ingestor):
                 time.sleep(poll_interval)
 
         for job in remaining:
-            results.append({
-                "ok": False,
-                "source_path": job.get("source_path", ""),
-                "error": f"Timed out after {timeout}s (job_id={job['job_id']})",
-            })
+            results.append(
+                {
+                    "ok": False,
+                    "source_path": job.get("source_path", ""),
+                    "error": f"Timed out after {timeout}s (job_id={job['job_id']})",
+                }
+            )
 
         self._pending_jobs.clear()
         return results
@@ -478,9 +486,7 @@ class OnlineIngestor(Ingestor):
                     continue
                 try:
                     with httpx.Client(timeout=30.0) as client:
-                        status_resp = client.get(
-                            f"{self._base_url}/ingest/status/{job['job_id']}"
-                        )
+                        status_resp = client.get(f"{self._base_url}/ingest/status/{job['job_id']}")
                     if status_resp.status_code != 200:
                         still_pending.append(job)
                         continue

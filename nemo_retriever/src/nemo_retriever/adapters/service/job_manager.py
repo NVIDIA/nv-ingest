@@ -84,9 +84,7 @@ class JobManager:
         async with self._semaphore:
             self._jobs[job_id]["status"] = "running"
             try:
-                ok, result = await asyncio.to_thread(
-                    self._run_fn, initial_df, source_path, file_category
-                )
+                ok, result = await asyncio.to_thread(self._run_fn, initial_df, source_path, file_category)
                 now = datetime.now(timezone.utc).isoformat()
                 self._jobs[job_id]["status"] = "completed" if ok else "failed"
                 self._jobs[job_id]["completed_at"] = now

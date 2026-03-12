@@ -145,13 +145,15 @@ if serve is not None:
             # Build the pipeline by configuring an InProcessIngestor.
             # PDF pipeline tasks: extract -> page_elements -> OCR -> embed -> VDB upload
             ingestor = InProcessIngestor()
-            ingestor.extract(ExtractParams(
-                method=extract_method,
-                extract_text=True,
-                extract_tables=True,
-                extract_charts=True,
-                extract_infographics=True,
-            ))
+            ingestor.extract(
+                ExtractParams(
+                    method=extract_method,
+                    extract_text=True,
+                    extract_tables=True,
+                    extract_charts=True,
+                    extract_infographics=True,
+                )
+            )
 
             embed_kwargs: dict[str, Any] = {}
             if embed_model:
@@ -160,12 +162,16 @@ if serve is not None:
                 embed_kwargs["embedding_endpoint"] = embed_endpoint
             ingestor.embed(EmbedParams(**embed_kwargs))
 
-            ingestor.vdb_upload(VdbUploadParams(lancedb={
-                "lancedb_uri": lancedb_uri,
-                "table_name": lancedb_table,
-                "overwrite": False,
-                "create_index": True,
-            }))
+            ingestor.vdb_upload(
+                VdbUploadParams(
+                    lancedb={
+                        "lancedb_uri": lancedb_uri,
+                        "table_name": lancedb_table,
+                        "overwrite": False,
+                        "create_index": True,
+                    }
+                )
+            )
 
             self._per_doc_tasks, self._post_tasks = ingestor.get_pipeline_tasks()
             self._run_pipeline = run_pipeline_tasks_on_df
@@ -174,8 +180,7 @@ if serve is not None:
             # are not appropriate (they include pdf_extraction). We keep a
             # trimmed version that has only GPU tasks (embed + VDB upload).
             self._non_pdf_per_doc_tasks = [
-                (f, k) for f, k in self._per_doc_tasks
-                if getattr(f, "__name__", "") != "pdf_extraction"
+                (f, k) for f, k in self._per_doc_tasks if getattr(f, "__name__", "") != "pdf_extraction"
             ]
 
             # Retriever for query endpoints
@@ -287,13 +292,19 @@ if serve is not None:
                     stages.append({"stage": stage_name, "duration_sec": dur})
 
                     row_count = len(current) if isinstance(current, pd.DataFrame) else 0
-                    line = json.dumps({
-                        "event": "stage_complete",
-                        "stage": stage_name,
-                        "duration_sec": dur,
-                        "rows": row_count,
-                        "source_path": source_path,
-                    }, ensure_ascii=False) + "\n"
+                    line = (
+                        json.dumps(
+                            {
+                                "event": "stage_complete",
+                                "stage": stage_name,
+                                "duration_sec": dur,
+                                "rows": row_count,
+                                "source_path": source_path,
+                            },
+                            ensure_ascii=False,
+                        )
+                        + "\n"
+                    )
                     yield line.encode("utf-8")
 
                 if self._post_tasks and current is not None:
@@ -306,13 +317,19 @@ if serve is not None:
                         stages.append({"stage": stage_name, "duration_sec": dur})
 
                         row_count = len(combined) if isinstance(combined, pd.DataFrame) else 0
-                        line = json.dumps({
-                            "event": "stage_complete",
-                            "stage": stage_name,
-                            "duration_sec": dur,
-                            "rows": row_count,
-                            "source_path": source_path,
-                        }, ensure_ascii=False) + "\n"
+                        line = (
+                            json.dumps(
+                                {
+                                    "event": "stage_complete",
+                                    "stage": stage_name,
+                                    "duration_sec": dur,
+                                    "rows": row_count,
+                                    "source_path": source_path,
+                                },
+                                ensure_ascii=False,
+                            )
+                            + "\n"
+                        )
                         yield line.encode("utf-8")
                     current = combined
 
@@ -334,26 +351,38 @@ if serve is not None:
                         yield (json.dumps(row_event, ensure_ascii=False) + "\n").encode("utf-8")
 
                 total_sec = round(time.perf_counter() - t0, 4)
-                line = json.dumps({
-                    "event": "complete",
-                    "ok": True,
-                    "source_path": source_path,
-                    "total_duration_sec": total_sec,
-                    "rows_written": rows_written,
-                    "stages": stages,
-                }, ensure_ascii=False) + "\n"
+                line = (
+                    json.dumps(
+                        {
+                            "event": "complete",
+                            "ok": True,
+                            "source_path": source_path,
+                            "total_duration_sec": total_sec,
+                            "rows_written": rows_written,
+                            "stages": stages,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
                 yield line.encode("utf-8")
 
             except Exception as exc:
                 total_sec = round(time.perf_counter() - t0, 4)
-                line = json.dumps({
-                    "event": "error",
-                    "ok": False,
-                    "source_path": source_path,
-                    "total_duration_sec": total_sec,
-                    "error": f"{type(exc).__name__}: {exc}",
-                    "stages": stages,
-                }, ensure_ascii=False) + "\n"
+                line = (
+                    json.dumps(
+                        {
+                            "event": "error",
+                            "ok": False,
+                            "source_path": source_path,
+                            "total_duration_sec": total_sec,
+                            "error": f"{type(exc).__name__}: {exc}",
+                            "stages": stages,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
                 yield line.encode("utf-8")
 
         # ------------------------------------------------------------------
@@ -392,10 +421,7 @@ if serve is not None:
                 )
 
             ok, result = self._run_ingest_pipeline(initial_df, filename, category)
-            stages = [
-                StageMetric(stage=s["stage"], duration_sec=s["duration_sec"])
-                for s in result.get("stages", [])
-            ]
+            stages = [StageMetric(stage=s["stage"], duration_sec=s["duration_sec"]) for s in result.get("stages", [])]
             return IngestResponse(
                 ok=ok,
                 source_path=result.get("source_path"),
@@ -437,9 +463,7 @@ if serve is not None:
                 )
 
             job_id = self._job_manager.create_job()
-            asyncio.create_task(
-                self._job_manager.submit(job_id, initial_df, filename, category)
-            )
+            asyncio.create_task(self._job_manager.submit(job_id, initial_df, filename, category))
             return AsyncIngestResponse(job_id=job_id)
 
         @app.post("/ingest/stream")
@@ -526,10 +550,7 @@ if serve is not None:
             if result is None:
                 raise HTTPException(500, detail=f"Job {job_id!r} has no result data.")
 
-            stages = [
-                StageMetric(stage=s["stage"], duration_sec=s["duration_sec"])
-                for s in result.get("stages", [])
-            ]
+            stages = [StageMetric(stage=s["stage"], duration_sec=s["duration_sec"]) for s in result.get("stages", [])]
             return IngestResponse(
                 ok=result.get("ok", False),
                 source_path=result.get("source_path"),
@@ -575,7 +596,6 @@ if serve is not None:
                 serializable_hits = _serialize_hits(hits)
                 results.append(QueryResponse(query=q, hits=serializable_hits))
             return QueriesResponse(results=results)
-
 
     def _serialize_hits(hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Best-effort conversion of LanceDB hit dicts to JSON-serializable form."""
