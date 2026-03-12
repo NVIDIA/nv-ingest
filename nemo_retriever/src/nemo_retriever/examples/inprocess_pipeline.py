@@ -95,25 +95,7 @@ def main(
     method: str = typer.Option(
         "pdfium",
         "--method",
-        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
-    ),
-    nemotron_parse_actors: float = typer.Option(
-        0.0,
-        "--nemotron-parse-actors",
-        min=0.0,
-        help="Enable Parse-only extraction path when > 0.0 with parse GPU/batch-size.",
-    ),
-    nemotron_parse_gpus_per_actor: float = typer.Option(
-        0.0,
-        "--nemotron-parse-gpus-per-actor",
-        min=0.0,
-        help="GPU allocation hint for Parse-only extraction path.",
-    ),
-    nemotron_parse_ray_batch_size: float = typer.Option(
-        0.0,
-        "--nemotron-parse-ray-batch-size",
-        min=0.0,
-        help="Parse stage batch size (enables Parse-only path when > 0.0 with parse workers/GPU).",
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), 'ocr' (OCR all pages), or 'nemotron_parse' (Nemotron Parse only).",  # noqa: E501
     ),
     embed_modality: str = typer.Option(
         "text",
@@ -240,11 +222,6 @@ def main(
                 table_structure_invoke_url=table_structure_invoke_url,
                 page_elements_invoke_url=page_elements_invoke_url,
                 ocr_invoke_url=ocr_invoke_url,
-                batch_tuning={
-                    "nemotron_parse_workers": float(nemotron_parse_actors),
-                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                },
             )
         )
     else:
@@ -262,11 +239,6 @@ def main(
                 table_structure_invoke_url=table_structure_invoke_url,
                 page_elements_invoke_url=page_elements_invoke_url,
                 ocr_invoke_url=ocr_invoke_url,
-                batch_tuning={
-                    "nemotron_parse_workers": float(nemotron_parse_actors),
-                    "gpu_nemotron_parse": float(nemotron_parse_gpus_per_actor),
-                    "nemotron_parse_batch_size": float(nemotron_parse_ray_batch_size),
-                },
             )
         )
 
