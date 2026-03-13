@@ -1,0 +1,29 @@
+nv\_ingest\_api.internal.extract.pptx package
+=============================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.extract.pptx.engines
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.pptx.pptx\_extractor module
+------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.pptx.pptx_extractor
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.pptx
+   :members:
+   :show-inheritance:
+   :undoc-members:
