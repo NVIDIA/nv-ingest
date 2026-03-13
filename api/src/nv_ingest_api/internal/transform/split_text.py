@@ -56,14 +56,8 @@ def _get_tokenizer(
         if cache_key in _tokenizer_cache:
             return _tokenizer_cache[cache_key]
 
-        from nemo_retriever.utils.hf_model_registry import get_hf_revision
-
         logger.info("Loading and caching tokenizer: %s", tokenizer_identifier)
-        tokenizer = AutoTokenizer.from_pretrained(
-            tokenizer_identifier,
-            revision=get_hf_revision(tokenizer_identifier),
-            token=token,
-        )
+        tokenizer = AutoTokenizer.from_pretrained(tokenizer_identifier, token=token)
         _tokenizer_cache[cache_key] = tokenizer
         return tokenizer
 

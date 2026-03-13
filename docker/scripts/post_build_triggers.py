@@ -4,30 +4,6 @@ import time
 
 from transformers import AutoTokenizer
 
-try:
-    from nemo_retriever.utils.hf_model_registry import get_hf_revision
-except ModuleNotFoundError:
-    # Fallback for Docker build stages where nemo_retriever isn't installed yet.
-    _REVISIONS = {
-        "meta-llama/Llama-3.2-1B": "4e20de362430cd3b72f300e6b0f18e50e7166e08",
-        "intfloat/e5-large-unsupervised": "15af9288f69a6291f37bfb89b47e71abc747b206",
-    }
-
-    def get_hf_revision(model_id, *, strict=True):  # type: ignore[misc]
-        revision = _REVISIONS.get(model_id)
-        if revision is not None:
-            return revision
-        msg = (
-            f"No pinned HuggingFace revision for model '{model_id}'. "
-            "Add an entry to _REVISIONS in post_build_triggers.py (and "
-            "HF_MODEL_REVISIONS in hf_model_registry.py) to pin it."
-        )
-        if strict:
-            raise ValueError(msg)
-        print(f"WARNING: {msg} Falling back to the default (main) branch.")
-        return None
-
-
 MAX_RETRIES = 5
 
 
@@ -36,7 +12,7 @@ def download_tokenizer(model_name, save_path, token=None):
 
     for attempt in range(MAX_RETRIES):
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_name, revision=get_hf_revision(model_name), token=token)
+            tokenizer = AutoTokenizer.from_pretrained(model_name, token=token)
             tokenizer.save_pretrained(save_path)
             return
         except Exception as e:
