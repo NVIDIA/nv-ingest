@@ -45,6 +45,7 @@ except Exception as e:  # pragma: no cover
     pdfium = None  # type: ignore[assignment]
     _PDFIUM_IMPORT_ERROR = e
 
+from ..image.load import SUPPORTED_IMAGE_EXTENSIONS
 from ..utils.convert import SUPPORTED_EXTENSIONS, convert_to_pdf_bytes
 from ..ingestor import Ingestor
 from ..params import ASRParams
@@ -1007,6 +1008,10 @@ class InProcessIngestor(Ingestor):
         if self._input_documents and all(f.lower().endswith(".html") for f in self._input_documents):
             html_params = HtmlChunkParams()
             return self.extract_html(params=html_params)
+        if self._input_documents and all(
+            os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTENSIONS for f in self._input_documents
+        ):
+            return self.extract_image_files(params=params, **kwargs)
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
             any(
@@ -1022,13 +1027,7 @@ class InProcessIngestor(Ingestor):
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = resolved.model_dump(mode="python")
-        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
-        nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
-        gpu_nemotron_parse = float(batch_tuning.get("gpu_nemotron_parse", 0.0) or 0.0)
-        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
-        use_nemotron_parse_only = (
-            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
-        )
+        use_nemotron_parse_only = kwargs.get("method") == "nemotron_parse"
         extract_kwargs = dict(kwargs)
         # Downstream in-process stages (page elements / table / chart / infographic) assume
         # `page_image.image_b64` exists. Ensure PDF extraction emits a page image unless
@@ -1056,9 +1055,6 @@ class InProcessIngestor(Ingestor):
 
         Shared by ``extract()`` (PDF) and ``extract_image_files()`` (standalone images).
         """
-        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
-        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
-
         # Common, optional knobs shared by our detect_* helpers.
         detect_passthrough_keys = {
             "inference_batch_size",
@@ -1104,7 +1100,6 @@ class InProcessIngestor(Ingestor):
                 parse_flags["extract_charts"] = True
             if kwargs.get("extract_infographics") is True:
                 parse_flags["extract_infographics"] = True
-            parse_flags["inference_batch_size"] = int(nemotron_parse_batch_size)
             parse_flags.update(_stage_remote_kwargs("nemotron_parse"))
             parse_invoke_url = kwargs.get(
                 "nemotron_parse_invoke_url", kwargs.get("ocr_invoke_url", kwargs.get("invoke_url", ""))
@@ -1261,13 +1256,7 @@ class InProcessIngestor(Ingestor):
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
         kwargs = resolved.model_dump(mode="python")
-        batch_tuning = kwargs.get("batch_tuning") if isinstance(kwargs.get("batch_tuning"), dict) else {}
-        nemotron_parse_workers = float(batch_tuning.get("nemotron_parse_workers", 0.0) or 0.0)
-        gpu_nemotron_parse = float(batch_tuning.get("gpu_nemotron_parse", 0.0) or 0.0)
-        nemotron_parse_batch_size = float(batch_tuning.get("nemotron_parse_batch_size", 0.0) or 0.0)
-        use_nemotron_parse_only = (
-            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
-        )
+        use_nemotron_parse_only = kwargs.get("method") == "nemotron_parse"
         self._pipeline_type = "image"
         self._append_detection_tasks(kwargs, use_nemotron_parse_only=use_nemotron_parse_only)
         return self

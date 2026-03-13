@@ -77,6 +77,29 @@ def run_datasets(
             service_manager.stop()
             return 1
 
+        # When recall/e2e_recall without minimize_vram: reranker is already up; wait for it once if any dataset uses it
+        if case in ("recall", "e2e_recall") and not minimize_vram:
+            reranker_needed = False
+            for dataset_name in dataset_list:
+                try:
+                    cfg = load_config(
+                        config_file=config_file or "test_configs.yaml",
+                        case=case,
+                        dataset=dataset_name,
+                        deployment_type=deployment_type,
+                    )
+                    if getattr(cfg, "reranker_mode", "none") in ("with", "both"):
+                        reranker_needed = True
+                        break
+                except (FileNotFoundError, ValueError):
+                    pass
+            if reranker_needed:
+                timeout = getattr(first_config, "readiness_timeout", 600)
+                if not service_manager.wait_for_reranker_readiness(timeout, verbose=True):
+                    print("Reranker did not become ready.", file=sys.stderr)
+                    service_manager.stop()
+                    return 1
+
     # Branch: e2e_recall with minimize_vram runs e2e then stop_ingestion then start_retrieval then recall per dataset
     if case == "e2e_recall" and managed and minimize_vram:
         from nv_ingest_harness.utils.recall import get_recall_collection_name

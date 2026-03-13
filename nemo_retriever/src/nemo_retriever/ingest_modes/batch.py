@@ -38,6 +38,7 @@ from nemo_retriever.utils.ray_resource_hueristics import (
 )
 from nemo_retriever.ingest_modes.inprocess import collapse_content_to_page_rows, explode_content_to_rows
 
+from ..image.load import SUPPORTED_IMAGE_EXTENSIONS
 from ..ingestor import Ingestor
 from ..params import ASRParams
 from ..params import AudioChunkParams
@@ -318,6 +319,11 @@ class BatchIngestor(Ingestor):
             )
             return self.extract_txt(params=txt_params)
 
+        if self._input_documents and all(
+            os.path.splitext(f)[1].lower() in SUPPORTED_IMAGE_EXTENSIONS for f in self._input_documents
+        ):
+            return self.extract_image_files(params=params, **kwargs)
+
         resolved = _coerce_params(params, ExtractParams, kwargs)
         if (
             any(
@@ -332,6 +338,7 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -351,10 +358,9 @@ class BatchIngestor(Ingestor):
 
         # 200 DPI is sufficient for both detection and OCR.  YOLOX resizes to
         # 1024x1024 internally, and NemotronOCR also resizes crops to 1024x1024,
-        # so resolution above ~1200px per side is wasted.  200 DPI (Letter =
-        # 1700x2200) gives enough detail while reducing extraction time and
-        # memory usage by ~30-40% vs 300 DPI.
-        kwargs.setdefault("dpi", 200)
+        # nv-ingest NIM uses 300 DPI for page-element detection; match that
+        # default here so local-model recall matches the container path.
+        kwargs.setdefault("dpi", 300)
         kwargs.setdefault("image_format", "jpeg")
         kwargs.setdefault("jpeg_quality", 100)
         self._pipeline_type = "pdf"
@@ -394,9 +400,36 @@ class BatchIngestor(Ingestor):
             compute=rd.TaskPoolStrategy(size=self._requested_plan.get_pdf_extract_tasks()),
         )
 
+        self._apply_nemotron_parse_overrides(kwargs)
+
         self._append_detection_stages(kwargs)
 
         return self
+
+    def _apply_nemotron_parse_overrides(self, kwargs: dict[str, Any]) -> None:
+        """Update ``_requested_plan`` with user-provided Nemotron Parse resource overrides
+        and set ``_use_nemotron_parse_only``."""
+        nemotron_parse_workers = float(kwargs.get("nemotron_parse_workers", 0.0) or 0.0)
+        gpu_nemotron_parse = float(kwargs.get("gpu_nemotron_parse", 0.0) or 0.0)
+        nemotron_parse_batch_size = float(kwargs.get("nemotron_parse_batch_size", 0.0) or 0.0)
+        self._use_nemotron_parse_only = kwargs.get("method") == "nemotron_parse" or (
+            nemotron_parse_workers > 0.0 and gpu_nemotron_parse > 0.0 and nemotron_parse_batch_size > 0.0
+        )
+
+        # Forward CLI overrides into the RequestedPlan so that downstream Ray
+        # actor pools (batch size, GPU fraction, pool size) honour them.
+        overrides: dict[str, Any] = {}
+        if nemotron_parse_workers > 0.0:
+            workers = int(nemotron_parse_workers)
+            overrides["nemotron_parse_initial_actors"] = workers
+            overrides["nemotron_parse_min_actors"] = workers
+            overrides["nemotron_parse_max_actors"] = workers
+        if gpu_nemotron_parse > 0.0:
+            overrides["nemotron_parse_gpus_per_actor"] = gpu_nemotron_parse
+        if nemotron_parse_batch_size > 0.0:
+            overrides["nemotron_parse_batch_size"] = int(nemotron_parse_batch_size)
+        if overrides:
+            self._requested_plan = self._requested_plan.model_copy(update=overrides)
 
     def _append_detection_stages(self, kwargs: dict[str, Any]) -> None:
         """Append downstream GPU detection stages (page elements, OCR, table/chart/infographic).
@@ -647,6 +680,7 @@ class BatchIngestor(Ingestor):
             and not resolved.api_key
         ):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = {
             **resolved.model_dump(mode="python", exclude={"remote_retry", "batch_tuning"}, exclude_none=True),
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
@@ -665,6 +699,7 @@ class BatchIngestor(Ingestor):
         )
 
         # Downstream detection stages (page elements, OCR, table/chart/infographic).
+        self._apply_nemotron_parse_overrides(kwargs)
         self._append_detection_stages(kwargs)
 
         return self
@@ -748,6 +783,8 @@ class BatchIngestor(Ingestor):
         Use with .files("mp3/*.mp3").extract_audio(...).embed().vdb_upload().ingest().
         Do not call .extract() when using .extract_audio().
         ASR requires a remote or self-deployed Parakeet/Riva gRPC endpoint (see ASRParams.audio_endpoints).
+        Optional kwargs: audio_chunk_batch_size (default 4), asr_batch_size (default 8),
+        asr_num_gpus (default 0.5; GPUs reserved per ASR actor for local Parakeet).
         """
         from nemo_retriever.audio import ASRActor
         from nemo_retriever.audio import MediaChunkActor
@@ -763,6 +800,7 @@ class BatchIngestor(Ingestor):
 
         audio_chunk_batch_size = kwargs.get("audio_chunk_batch_size", 4)
         asr_batch_size = kwargs.get("asr_batch_size", 8)
+        asr_num_gpus = kwargs.get("asr_num_gpus", 0.5)
 
         self._rd_dataset = self._rd_dataset.map_batches(
             MediaChunkActor,
@@ -776,6 +814,7 @@ class BatchIngestor(Ingestor):
             batch_size=asr_batch_size,
             batch_format="pandas",
             num_cpus=1,
+            num_gpus=asr_num_gpus,
             fn_constructor_kwargs={"params": ASRParams(**self._extract_audio_asr_kwargs)},
         )
         return self
@@ -816,6 +855,7 @@ class BatchIngestor(Ingestor):
         resolved = _coerce_params(params, EmbedParams, kwargs)
         if any((resolved.embedding_endpoint, resolved.embed_invoke_url)) and not resolved.api_key:
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
+
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
 
         # Remaining kwargs are forwarded to the actor constructor.

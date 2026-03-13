@@ -189,6 +189,12 @@ def main(
         "--debug/--no-debug",
         help="Enable debug-level logging for this full pipeline run.",
     ),
+    dpi: int = typer.Option(
+        300,
+        "--dpi",
+        min=72,
+        help="Render DPI for PDF page images (default: 300).",
+    ),
     input_path: Path = typer.Argument(
         ...,
         help="File or directory containing PDFs, .txt, .html, or .doc/.pptx files to ingest.",
@@ -284,7 +290,7 @@ def main(
     method: str = typer.Option(
         "pdfium",
         "--method",
-        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), or 'ocr' (OCR all pages).",  # noqa: E501
+        help="PDF text extraction method: 'pdfium' (native only), 'pdfium_hybrid' (native + OCR for scanned), 'ocr' (OCR all pages), or 'nemotron_parse' (Nemotron Parse only, auto-configured).",  # noqa: E501
     ),
     log_file: Optional[Path] = typer.Option(
         None,
@@ -617,6 +623,7 @@ def main(
                 "embed_workers": embed_actors,
                 "embed_batch_size": int(embed_batch_size),
                 "embed_cpus_per_actor": float(embed_cpus_per_actor),
+                "gpu_embed": float(embed_gpus_per_actor),
             },
         )
         # txt/html don't use embed_granularity from batch_tuning the same way,
@@ -653,6 +660,7 @@ def main(
         def _extract_params(batch_tuning: dict, **overrides: Any) -> ExtractParams:
             return ExtractParams(
                 method=method,
+                dpi=int(dpi),
                 extract_text=True,
                 extract_tables=True,
                 extract_charts=True,
