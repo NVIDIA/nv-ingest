@@ -101,7 +101,7 @@ def _rerank_via_endpoint(
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     texts = [{"text": d} for d in documents]
-    payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": "END"}
+    payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
 
     response = requests.post(url, json=payload, headers=headers, timeout=120)
     response.raise_for_status()
