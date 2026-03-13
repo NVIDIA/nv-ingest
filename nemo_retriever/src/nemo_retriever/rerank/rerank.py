@@ -73,7 +73,7 @@ def _rerank_via_endpoint(
     endpoint: str,
     model_name: str = _DEFAULT_MODEL,
     api_key: str = "",
-    top_n: Optional[int] = None,
+    truncate: str = "END",
 ) -> List[float]:
     """
     Call a vLLM / NIM ``/rerank`` REST endpoint and return per-document scores.
@@ -92,18 +92,16 @@ def _rerank_via_endpoint(
     """
     import requests
 
-    url = endpoint.rstrip("/") + "/rerank"
+    cleaned_endpoint = endpoint.rstrip("/")
     headers: Dict[str, str] = {"Content-Type": "application/json"}
+    if not cleaned_endpoint.endswith("/reranking"):
+        cleaned_endpoint = endpoint.rstrip("/") + "/v1/ranking"
+    url = cleaned_endpoint
+    headers = {"accept": "application/json", "Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-
-    payload: Dict[str, Any] = {
-        "model": model_name,
-        "query": query,
-        "documents": documents,
-    }
-    if top_n is not None:
-        payload["top_n"] = top_n
+    texts = [{"text": d} for d in documents]
+    payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
 
     response = requests.post(url, json=payload, headers=headers, timeout=120)
     response.raise_for_status()
@@ -111,9 +109,9 @@ def _rerank_via_endpoint(
 
     # Build score list aligned with input document order.
     scores = [float("-inf")] * len(documents)
-    for item in data.get("results", []):
+    for item in data.get("rankings", []):
         idx = item.get("index")
-        score = item.get("relevance_score")
+        score = item.get("logit")
         if idx is not None and score is not None:
             scores[idx] = float(score)
     return scores
