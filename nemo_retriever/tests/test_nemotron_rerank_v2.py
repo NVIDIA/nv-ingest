@@ -407,9 +407,9 @@ class TestRerankViaEndpoint:
 
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
-            "results": [
-                {"index": 0, "relevance_score": 0.9},
-                {"index": 1, "relevance_score": 0.3},
+            "rankings": [
+                {"index": 0, "logit": 0.9},
+                {"index": 1, "logit": 0.3},
             ]
         }
         mock_resp.raise_for_status = MagicMock()
@@ -424,9 +424,9 @@ class TestRerankViaEndpoint:
 
         mock_post.assert_called_once()
         call_kwargs = mock_post.call_args
-        assert call_kwargs[0][0] == "http://localhost:8000/rerank"
-        assert call_kwargs[1]["json"]["query"] == "What is ML?"
-        assert len(call_kwargs[1]["json"]["documents"]) == 2
+        assert call_kwargs[0][0] == "http://localhost:8000/v1/ranking"
+        assert call_kwargs[1]["json"]["query"] == {"text": "What is ML?"}
+        assert len(call_kwargs[1]["json"]["passages"]) == 2
 
         assert scores == [0.9, 0.3]
 
@@ -436,10 +436,10 @@ class TestRerankViaEndpoint:
         # Server returns results in reversed order
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
-            "results": [
-                {"index": 2, "relevance_score": 0.1},
-                {"index": 0, "relevance_score": 0.8},
-                {"index": 1, "relevance_score": 0.5},
+            "rankings": [
+                {"index": 2, "logit": 0.1},
+                {"index": 0, "logit": 0.8},
+                {"index": 1, "logit": 0.5},
             ]
         }
         mock_resp.raise_for_status = MagicMock()
@@ -484,20 +484,7 @@ class TestRerankViaEndpoint:
             _rerank_via_endpoint("q", ["d"], endpoint="http://localhost:8000/")
 
         url = mock_post.call_args[0][0]
-        assert url == "http://localhost:8000/rerank"
-
-    def test_top_n_sent_in_payload_when_specified(self):
-        from nemo_retriever.rerank.rerank import _rerank_via_endpoint
-
-        mock_resp = MagicMock()
-        mock_resp.json.return_value = {"results": [{"index": 0, "relevance_score": 0.5}]}
-        mock_resp.raise_for_status = MagicMock()
-
-        with patch("requests.post", return_value=mock_resp) as mock_post:
-            _rerank_via_endpoint("q", ["d"], endpoint="http://localhost:8000", top_n=5)
-
-        payload = mock_post.call_args[1]["json"]
-        assert payload["top_n"] == 5
+        assert url == "http://localhost:8000/v1/ranking"
 
     def test_top_n_not_in_payload_when_not_specified(self):
         from nemo_retriever.rerank.rerank import _rerank_via_endpoint

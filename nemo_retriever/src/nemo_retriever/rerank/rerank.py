@@ -73,7 +73,6 @@ def _rerank_via_endpoint(
     endpoint: str,
     model_name: str = _DEFAULT_MODEL,
     api_key: str = "",
-    top_n: Optional[int] = None,
 ) -> List[float]:
     """
     Call a vLLM / NIM ``/rerank`` REST endpoint and return per-document scores.
@@ -84,6 +83,22 @@ def _rerank_via_endpoint(
         POST {endpoint}/rerank
         {"model": ..., "query": ..., "documents": [...], "top_n": N}
 
+    Parameters
+    ----------
+    query:
+        The search query string.
+    documents:
+        List of document strings to score against the query.
+    endpoint:
+        Base URL of the reranking endpoint (e.g. ``http://localhost:8015
+        ``).  The function will append ``/v1/ranking`` if the URL does not
+        already end with ``/reranking``.
+    model_name:
+        Model identifier sent to the remote endpoint (default
+        ``"nvidia/llama-nemotron-rerank-1b-v2"``).
+    api_key:
+        Bearer token for the remote endpoint (if required).
+
     Returns
     -------
     List[float]
@@ -92,28 +107,28 @@ def _rerank_via_endpoint(
     """
     import requests
 
-    url = endpoint.rstrip("/") + "/rerank"
-    headers: Dict[str, str] = {"Content-Type": "application/json"}
+    cleaned_endpoint = endpoint.rstrip("/")
+    if not cleaned_endpoint.endswith("/reranking"):
+        cleaned_endpoint = endpoint.rstrip("/") + "/v1/ranking"
+    url = cleaned_endpoint
+    headers = {"accept": "application/json", "Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-
-    payload: Dict[str, Any] = {
+    texts = [{"text": d} for d in documents]
+    payload = {
         "model": model_name,
-        "query": query,
-        "documents": documents,
+        "query": {"text": query},
+        "passages": texts,
+        "truncate": "END",
     }
-    if top_n is not None:
-        payload["top_n"] = top_n
-
-    response = requests.post(url, json=payload, headers=headers, timeout=120)
+    response = requests.post(url, json=payload, headers=headers)
     response.raise_for_status()
     data = response.json()
-
     # Build score list aligned with input document order.
     scores = [float("-inf")] * len(documents)
-    for item in data.get("results", []):
+    for item in data.get("rankings", []):
         idx = item.get("index")
-        score = item.get("relevance_score")
+        score = item.get("logit")
         if idx is not None and score is not None:
             scores[idx] = float(score)
     return scores
@@ -182,7 +197,6 @@ def rerank_hits(
         return hits
 
     documents = [str(h.get(text_key) or "") for h in hits]
-
     if invoke_url:
         scores = _rerank_via_endpoint(
             query,
