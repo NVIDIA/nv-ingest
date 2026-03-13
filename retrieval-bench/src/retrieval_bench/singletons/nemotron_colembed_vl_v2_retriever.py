@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import math
 import os
 import time
 import threading
@@ -38,8 +39,6 @@ except ImportError as e:  # pragma: no cover
         "Required dependencies not installed for Nemotron ColEmbed-VL v2 retriever. "
         "Please install at least: torch (and for actual retrieval: transformers, optionally flash-attn)."
     ) from e
-
-from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
 
 
 def _set_tiling_knobs_if_present(model: Any, *, max_input_tiles: int, use_thumbnail: bool) -> None:
@@ -74,13 +73,21 @@ def _set_tiling_knobs_if_present(model: Any, *, max_input_tiles: int, use_thumbn
             pass
 
 
+def _balanced_chunk_size(num_items: int, max_chunk: int) -> int:
+    if num_items <= max_chunk:
+        return num_items
+    k = math.ceil(num_items / max_chunk)
+    return math.ceil(num_items / k)
+
+
 class _NemotronColEmbedVLV2State:
     def __init__(
         self,
         *,
         model_id: str,
         device: str,
-        corpus_chunk_size: int,
+        max_scoring_batch_size: int,
+        scoring_chunk_size: int,
         corpus_batch_size: int,
         top_k: int,
         cache_dir: Path,
@@ -89,7 +96,8 @@ class _NemotronColEmbedVLV2State:
     ) -> None:
         self.model_id = str(model_id)
         self.device = str(device)
-        self.corpus_chunk_size = int(corpus_chunk_size)
+        self.max_scoring_batch_size = int(max_scoring_batch_size)
+        self.scoring_chunk_size = int(scoring_chunk_size)
         self.corpus_batch_size = int(corpus_batch_size)
         self.top_k = int(top_k)
         self.cache_dir = cache_dir
@@ -156,11 +164,7 @@ class _NemotronColEmbedVLV2State:
     def _corpus_cache_path(self, dataset_name: str) -> Path:
         dataset_slug = str(dataset_name).replace("/", "__")
         model_slug = self.model_id.split("/")[-1].replace("/", "__")
-        key = (
-            f"{dataset_name}::{self.model_id}::images"
-            f"::max_input_tiles={int(self.max_input_tiles)}"
-            f"::use_thumbnail={bool(self.use_thumbnail)}"
-        )
+        key = f"{dataset_name}::{self.model_id}::images::max_input_tiles={int(self.max_input_tiles)}::use_thumbnail={bool(self.use_thumbnail)}"
         key_hash = hashlib.sha256(key.encode("utf-8")).hexdigest()[:10]
         filename = f"corpus_image_embeddings__{dataset_slug}__{model_slug}__{key_hash}.pt"
         return self.cache_dir / filename
@@ -242,54 +246,68 @@ class _NemotronColEmbedVLV2State:
         return emb, lengths
 
     def _embed_query(self, query: str) -> torch.Tensor:
-        # Returns CPU tensor [q_seq, dim]
         with torch.no_grad():
-            q_emb = self.model.forward_queries([str(query)], batch_size=1).detach().to("cpu")
+            q_emb = self.model.forward_queries([str(query)], batch_size=1).detach()
         if not isinstance(q_emb, torch.Tensor) or q_emb.ndim != 3 or q_emb.shape[0] != 1:
             raise RuntimeError(f"Unexpected query embedding shape: {getattr(q_emb, 'shape', None)}")
-        return q_emb[0]
+        return q_emb[0].to(self.device)
 
-    def _score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        if self.corpus_embeddings_cpu is None:
-            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
-        if self.corpus_token_lengths_cpu is None:
-            raise RuntimeError("corpus_token_lengths_cpu is not set; call init() first")
+    def _score_maxsim_block(
+        self,
+        emb_block: torch.Tensor,
+        len_block: torch.Tensor,
+        q_t: torch.Tensor,
+        device: str,
+    ) -> torch.Tensor:
+        token_sims = torch.matmul(emb_block, q_t)  # [block, c_seq, q_seq]
+        c_seq = int(token_sims.shape[1])
+        pos = torch.arange(c_seq, device=device).unsqueeze(0)
+        valid = pos < len_block.unsqueeze(1)
+        token_sims = token_sims.masked_fill(~valid.unsqueeze(-1), float("-inf"))
+        return token_sims.max(dim=1).values.float().sum(dim=1)
 
-        num_corpus = self.corpus_embeddings_cpu.shape[0]
-        scores_cpu = torch.empty((num_corpus,), dtype=torch.float32, device="cpu")
+    def _score_query(self, query_embedding: torch.Tensor) -> torch.Tensor:
+        emb_gpu = self.corpus_embeddings_gpu
+        emb_cpu = self.corpus_embeddings_cpu
+        len_gpu = self.corpus_token_lengths_gpu
+        len_cpu = self.corpus_token_lengths_cpu
+        if emb_gpu is None and emb_cpu is None:
+            raise RuntimeError("No corpus embeddings available.")
+        if len_gpu is None and len_cpu is None:
+            raise RuntimeError("No corpus token lengths available.")
 
-        chunk = max(1, int(self.corpus_chunk_size))
+        source = emb_gpu if emb_gpu is not None else emb_cpu
+        num_corpus = source.shape[0]
         device = str(self.device)
+        scores = torch.empty((num_corpus,), dtype=torch.float32, device=device)
 
         with torch.no_grad():
-            q_gpu = query_embedding_cpu.to(device, non_blocking=True)  # [q_seq, dim]
-            q_t = q_gpu.transpose(0, 1)  # [dim, q_seq]
+            q_t = query_embedding.transpose(0, 1)  # [dim, q_seq]
 
-            for c_start in range(0, num_corpus, chunk):
-                c_end = min(c_start + chunk, num_corpus)
+            if emb_gpu is not None:
+                scores[:] = self._score_maxsim_block(emb_gpu, len_gpu, q_t, device)
+            else:
+                transfer_chunk = _balanced_chunk_size(num_corpus, max(1, int(self.max_scoring_batch_size)))
+                score_chunk = max(1, int(self.scoring_chunk_size))
 
-                if self.corpus_embeddings_gpu is not None:
-                    c_gpu = self.corpus_embeddings_gpu[c_start:c_end]
-                else:
-                    c_gpu = self.corpus_embeddings_cpu[c_start:c_end].to(device, non_blocking=True)
+                for t_start in range(0, num_corpus, transfer_chunk):
+                    t_end = min(t_start + transfer_chunk, num_corpus)
+                    t_emb = emb_cpu[t_start:t_end].to(device)
+                    t_len = len_cpu[t_start:t_end].to(device)
 
-                if self.corpus_token_lengths_gpu is not None:
-                    len_gpu = self.corpus_token_lengths_gpu[c_start:c_end]
-                else:
-                    len_gpu = self.corpus_token_lengths_cpu[c_start:c_end].to(device, non_blocking=True)
+                    for s_start in range(0, t_emb.shape[0], score_chunk):
+                        s_end = min(s_start + score_chunk, t_emb.shape[0])
+                        block_scores = self._score_maxsim_block(
+                            t_emb[s_start:s_end],
+                            t_len[s_start:s_end],
+                            q_t,
+                            device,
+                        )
+                        scores[t_start + s_start : t_start + s_end] = block_scores
 
-                # c_gpu: [chunk, c_seq, dim]
-                # q_t:   [dim, q_seq]
-                token_sims = torch.matmul(c_gpu, q_t)  # [chunk, c_seq, q_seq]
-                # Mask padded tokens so they can never win the max.
-                c_seq = int(token_sims.shape[1])
-                pos = torch.arange(c_seq, device=device).unsqueeze(0)  # [1, c_seq]
-                valid = pos < len_gpu.to(device=device).unsqueeze(1)  # [chunk, c_seq]
-                token_sims = token_sims.masked_fill(~valid.unsqueeze(-1), float("-inf"))
-                chunk_scores = token_sims.max(dim=1).values.float().sum(dim=1)  # [chunk]
-                scores_cpu[c_start:c_end] = chunk_scores.detach().to("cpu")
+                    del t_emb, t_len
 
-        return scores_cpu
+        return scores
 
     def retrieve_one(
         self,
@@ -298,35 +316,35 @@ class _NemotronColEmbedVLV2State:
         return_markdown: bool = False,
         excluded_ids: Optional[Sequence[str]] = None,
     ) -> Union[Dict[str, float], Tuple[Dict[str, float], Dict[str, str]]]:
-        if self.corpus_ids is None or self.corpus_embeddings_cpu is None:
+        if self.corpus_ids is None or (self.corpus_embeddings_gpu is None and self.corpus_embeddings_cpu is None):
             raise RuntimeError("Retriever not initialized. Call retriever.init(...) first.")
 
-        q_emb_cpu = self._embed_query(str(query))
-        scores_cpu = self._score_query(q_emb_cpu)
+        q_emb = self._embed_query(str(query))
+        scores = self._score_query(q_emb)
 
-        # Apply per-query excluded ids BEFORE top-k selection (BRIGHT semantics).
         if excluded_ids and self.corpus_id_to_idx:
+            excluded_indices = []
             for did in set(str(x) for x in excluded_ids):
                 if did == "N/A":
                     continue
                 idx = self.corpus_id_to_idx.get(did, None)
-                if idx is None:
-                    continue
-                try:
-                    scores_cpu[int(idx)] = float("-inf")
-                except Exception:
-                    pass
+                if idx is not None:
+                    excluded_indices.append(int(idx))
+            if excluded_indices:
+                scores[torch.tensor(excluded_indices, device=scores.device)] = float("-inf")
 
         k = min(int(self.top_k), len(self.corpus_ids))
-        topk_scores, topk_indices = torch.topk(scores_cpu, k)
+        topk_scores, topk_indices = torch.topk(scores, k)
         ids = self.corpus_ids
-        run = {ids[int(idx)]: float(score) for idx, score in zip(topk_indices.tolist(), topk_scores.tolist())}
+        topk_indices_cpu = topk_indices.cpu().tolist()
+        topk_scores_cpu = topk_scores.cpu().tolist()
+        run = {ids[int(idx)]: float(score) for idx, score in zip(topk_indices_cpu, topk_scores_cpu)}
 
         if not return_markdown:
             return run
 
         md = self.corpus_markdown or [""] * len(ids)
-        markdown_by_id = {ids[int(idx)]: str(md[int(idx)]) for idx in topk_indices.tolist()}
+        markdown_by_id = {ids[int(idx)]: str(md[int(idx)]) for idx in topk_indices_cpu}
         return run, markdown_by_id
 
 
@@ -348,10 +366,10 @@ class NemotronColEmbedVLV2SingletonRetriever:
         model_id: str = "nvidia/nemotron-colembed-vl-8b-v2",
         device: str = "cuda",
         top_k: int = 100,
-        corpus_batch_size: int = 8,
-        corpus_chunk_size: int = 256,
+        corpus_batch_size: int = 32,
+        max_scoring_batch_size: int = 3000,
+        scoring_chunk_size: int = 1311,
         cache_dir: str | Path = "cache/nemotron_colembed_vl_v2",
-        preload_corpus_to_gpu: bool = False,
         max_input_tiles: int = 8,
         use_thumbnail: bool = True,
     ) -> None:
@@ -366,7 +384,8 @@ class NemotronColEmbedVLV2SingletonRetriever:
                 self._state = _NemotronColEmbedVLV2State(
                     model_id=str(model_id),
                     device=str(device),
-                    corpus_chunk_size=int(corpus_chunk_size),
+                    max_scoring_batch_size=int(max_scoring_batch_size),
+                    scoring_chunk_size=int(scoring_chunk_size),
                     corpus_batch_size=int(corpus_batch_size),
                     top_k=int(top_k),
                     cache_dir=cache_dir_p,
@@ -377,7 +396,8 @@ class NemotronColEmbedVLV2SingletonRetriever:
                 # Update tunables.
                 self._state.top_k = int(top_k)
                 self._state.corpus_batch_size = int(corpus_batch_size)
-                self._state.corpus_chunk_size = int(corpus_chunk_size)
+                self._state.max_scoring_batch_size = int(max_scoring_batch_size)
+                self._state.scoring_chunk_size = int(scoring_chunk_size)
                 self._state.cache_dir = cache_dir_p
                 self._state.max_input_tiles = int(max_input_tiles)
                 self._state.use_thumbnail = bool(use_thumbnail)
@@ -390,18 +410,14 @@ class NemotronColEmbedVLV2SingletonRetriever:
                 and self._state.corpus_embeddings_cpu is not None
                 and self._state.corpus_token_lengths_cpu is not None
             ):
-                # Only adjust GPU preload.
-                if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
-                        self._state.corpus_embeddings_cpu, self._state.device
-                    )
-                if preload_corpus_to_gpu and self._state.corpus_token_lengths_gpu is None:
-                    self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
-                        self._state.device, non_blocking=True
-                    )
-                if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
+                should_be_on_gpu = len(corpus_ids) <= self._state.max_scoring_batch_size
+                if should_be_on_gpu and self._state.corpus_embeddings_gpu is None:
+                    self._state.corpus_embeddings_gpu = self._state.corpus_embeddings_cpu.to(self._state.device)
+                if should_be_on_gpu and self._state.corpus_token_lengths_gpu is None:
+                    self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(self._state.device)
+                if (not should_be_on_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
-                if (not preload_corpus_to_gpu) and self._state.corpus_token_lengths_gpu is not None:
+                if (not should_be_on_gpu) and self._state.corpus_token_lengths_gpu is not None:
                     self._state.corpus_token_lengths_gpu = None
                 return
 
@@ -424,11 +440,9 @@ class NemotronColEmbedVLV2SingletonRetriever:
 
             self._state.corpus_embeddings_gpu = None
             self._state.corpus_token_lengths_gpu = None
-            if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu, self._state.device)
-                self._state.corpus_token_lengths_gpu = self._state.corpus_token_lengths_cpu.to(
-                    self._state.device, non_blocking=True
-                )
+            if emb_cpu.shape[0] <= self._state.max_scoring_batch_size:
+                self._state.corpus_embeddings_gpu = emb_cpu.to(self._state.device)
+                self._state.corpus_token_lengths_gpu = lengths_cpu.to(self._state.device)
 
     def retrieve(
         self,

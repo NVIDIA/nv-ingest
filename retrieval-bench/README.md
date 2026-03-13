@@ -65,7 +65,7 @@ Backend-specific overrides can be passed via `--pipeline-args` JSON:
 retrieval-bench evaluate dense-retrieval \
   --dataset-name bright/biology \
   --backend llama-nv-embed-reasoning-3b \
-  --pipeline-args '{"model_id":"~/checkpoints/my_model","scoring_batch_size":2048}'
+  --pipeline-args '{"model_id":"~/checkpoints/my_model","max_scoring_batch_size":2048}'
 ```
 
 ## Agentic retrieval

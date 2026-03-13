@@ -41,8 +41,7 @@ _BACKEND_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "pooling": "mean",
         "score_scale": 100.0,
         "corpus_batch_size": 1,
-        "scoring_batch_size": 4096,
-        "preload_corpus_to_gpu": False,
+        "max_scoring_batch_size": 4096,
         "query_prefix_fallback": (
             "Instruct: Given the following post, retrieve relevant passages that help answer the post.\nQuery:"
         ),
@@ -51,8 +50,7 @@ _BACKEND_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "model_id": "nvidia/llama-nemoretriever-colembed-3b-v1",
         "batch_size": 32,
         "corpus_batch_size": 32,
-        "corpus_chunk_size": 256,
-        "preload_corpus_to_gpu": True,
+        "max_scoring_batch_size": 256,
     },
     "llama-nemotron-embed-vl-1b-v2": {
         "model_id": "nvidia/llama-nemotron-embed-vl-1b-v2",
@@ -60,17 +58,16 @@ _BACKEND_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "doc_modality": "image_text",
         "doc_max_length": "auto",
         "query_max_length": 10240,
-        "corpus_batch_size": 4,
-        "corpus_chunk_size": 4096,
-        "preload_corpus_to_gpu": False,
+        "corpus_batch_size": 32,
+        "max_scoring_batch_size": 4096,
         "max_input_tiles": 6,
         "use_thumbnail": True,
     },
     "nemotron-colembed-vl-8b-v2": {
         "model_id": "nvidia/nemotron-colembed-vl-8b-v2",
-        "corpus_batch_size": 8,
-        "corpus_chunk_size": 256,
-        "preload_corpus_to_gpu": False,
+        "corpus_batch_size": 32,
+        "max_scoring_batch_size": 3000,
+        "scoring_chunk_size": 1311,
         "max_input_tiles": 8,
         "use_thumbnail": True,
         "cache_dir": "cache/nemotron_colembed_vl_v2",
@@ -170,8 +167,10 @@ def init_backend(
         max_length = int(cfg.pop("max_length", 8192))
         score_scale = float(cfg.pop("score_scale", 100.0))
         corpus_batch_size = int(cfg.pop("corpus_batch_size", 1))
-        scoring_batch_size = int(cfg.pop("scoring_batch_size", 4096))
-        preload_corpus_to_gpu = bool(cfg.pop("preload_corpus_to_gpu", False))
+        max_scoring_batch_size = int(cfg.pop("max_scoring_batch_size", 4096))
+
+        if cfg:
+            raise ValueError(f"Unknown pipeline arg(s) for backend {backend!r}: {', '.join(sorted(cfg))}")
 
         retriever.init(
             dataset_name=dataset_name,
@@ -188,9 +187,8 @@ def init_backend(
             score_scale=score_scale,
             batch_size=1,
             corpus_batch_size=corpus_batch_size,
-            scoring_batch_size=scoring_batch_size,
+            max_scoring_batch_size=max_scoring_batch_size,
             cache_dir="cache/hf_dense",
-            preload_corpus_to_gpu=preload_corpus_to_gpu,
         )
         init_info.update(
             {
@@ -208,8 +206,10 @@ def init_backend(
     elif backend == "llama-nemoretriever-colembed-3b-v1":
         batch_size = int(cfg.pop("batch_size", 32))
         corpus_batch_size = int(cfg.pop("corpus_batch_size", 32))
-        corpus_chunk_size = int(cfg.pop("corpus_chunk_size", 256))
-        preload_corpus_to_gpu = bool(cfg.pop("preload_corpus_to_gpu", True))
+        max_scoring_batch_size = int(cfg.pop("max_scoring_batch_size", 256))
+
+        if cfg:
+            raise ValueError(f"Unknown pipeline arg(s) for backend {backend!r}: {', '.join(sorted(cfg))}")
 
         retriever.init(
             dataset_name=dataset_name,
@@ -219,9 +219,8 @@ def init_backend(
             top_k=top_k,
             batch_size=batch_size,
             corpus_batch_size=corpus_batch_size,
-            corpus_chunk_size=corpus_chunk_size,
+            max_scoring_batch_size=max_scoring_batch_size,
             cache_dir="cache",
-            preload_corpus_to_gpu=preload_corpus_to_gpu,
         )
         init_info.update({"model_id": model_id})
         return retriever, model_id, init_info
@@ -233,15 +232,17 @@ def init_backend(
 
         # Auto-detect: fall back to text-only when the corpus has no images
         # (e.g. BRIGHT text-only datasets).
-        if doc_modality != "text" and not any("image" in doc for doc in corpus[:5]):
+        if doc_modality != "text" and not any(doc.get("image") is not None for doc in corpus[:5]):
             doc_modality = "text"
 
         query_max_length = int(cfg.pop("query_max_length", 10240))
         corpus_batch_size = int(cfg.pop("corpus_batch_size", 4))
-        corpus_chunk_size = int(cfg.pop("corpus_chunk_size", 4096))
-        preload_corpus_to_gpu = bool(cfg.pop("preload_corpus_to_gpu", False))
+        max_scoring_batch_size = int(cfg.pop("max_scoring_batch_size", 4096))
         max_input_tiles = int(cfg.pop("max_input_tiles", 6))
         use_thumbnail = bool(cfg.pop("use_thumbnail", True))
+
+        if cfg:
+            raise ValueError(f"Unknown pipeline arg(s) for backend {backend!r}: {', '.join(sorted(cfg))}")
 
         retriever.init(
             dataset_name=dataset_name,
@@ -254,9 +255,8 @@ def init_backend(
             doc_max_length=doc_max_length,
             query_max_length=query_max_length,
             corpus_batch_size=corpus_batch_size,
-            corpus_chunk_size=corpus_chunk_size,
+            max_scoring_batch_size=max_scoring_batch_size,
             cache_dir="cache/nemotron_vl_dense",
-            preload_corpus_to_gpu=preload_corpus_to_gpu,
             max_input_tiles=max_input_tiles,
             use_thumbnail=use_thumbnail,
         )
@@ -270,20 +270,22 @@ def init_backend(
                 "max_input_tiles": max_input_tiles,
                 "use_thumbnail": use_thumbnail,
                 "corpus_batch_size": corpus_batch_size,
-                "corpus_chunk_size": corpus_chunk_size,
-                "preload_corpus_to_gpu": preload_corpus_to_gpu,
+                "max_scoring_batch_size": max_scoring_batch_size,
             }
         )
         active = _NemotronEmbedVLAdapter(retriever)
         return active, model_id, init_info
 
     else:  # nemotron-colembed-vl-8b-v2
-        corpus_batch_size = int(cfg.pop("corpus_batch_size", 8))
-        corpus_chunk_size = int(cfg.pop("corpus_chunk_size", 256))
-        preload_corpus_to_gpu = bool(cfg.pop("preload_corpus_to_gpu", False))
+        corpus_batch_size = int(cfg.pop("corpus_batch_size", 32))
+        max_scoring_batch_size = int(cfg.pop("max_scoring_batch_size", 3000))
+        scoring_chunk_size = int(cfg.pop("scoring_chunk_size", 1311))
         max_input_tiles = int(cfg.pop("max_input_tiles", 8))
         use_thumbnail = bool(cfg.pop("use_thumbnail", True))
         cache_dir = str(cfg.pop("cache_dir", "cache/nemotron_colembed_vl_v2"))
+
+        if cfg:
+            raise ValueError(f"Unknown pipeline arg(s) for backend {backend!r}: {', '.join(sorted(cfg))}")
 
         retriever.init(
             dataset_name=str(dataset_name),
@@ -293,9 +295,9 @@ def init_backend(
             device="cuda",
             top_k=top_k,
             corpus_batch_size=corpus_batch_size,
-            corpus_chunk_size=corpus_chunk_size,
+            max_scoring_batch_size=max_scoring_batch_size,
+            scoring_chunk_size=scoring_chunk_size,
             cache_dir=cache_dir,
-            preload_corpus_to_gpu=preload_corpus_to_gpu,
             max_input_tiles=max_input_tiles,
             use_thumbnail=use_thumbnail,
         )
