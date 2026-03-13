@@ -1,0 +1,21 @@
+/* theme: light */
+body[data-md-color-scheme="light"] .jupyter-notebook {
+  --jp-cell-editor-background: #f7f7f7;
+  --jp-cell-editor-border-color: #cfcfcf;
+  --jp-cell-prompt-fg-color: #303030;
+  --jp-cell-prompt-bg-color: #f0f0f0;
+  --jp-notebook-background: #ffffff;
+  --jp-layout-color1: #ffffff;
+  --jp-content-font-color1: #000000;
+}
+
+/* theme: dark */
+body[data-md-color-scheme="dark"] .jupyter-notebook {
+  --jp-cell-editor-background: #2b2b2b;
+  --jp-cell-editor-border-color: #464646;
+  --jp-cell-prompt-fg-color: #d7d7d7;
+  --jp-cell-prompt-bg-color: #333333;
+  --jp-notebook-background: #1e1e1e;
+  --jp-layout-color1: #1e1e1e;
+  --jp-content-font-color1: #d4d4d4;
+}

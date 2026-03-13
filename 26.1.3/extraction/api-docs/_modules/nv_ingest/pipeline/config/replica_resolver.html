@@ -1,0 +1,710 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.pipeline.config.replica_resolver &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=933278ad" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/autodoc_pydantic.css?v=a0a71c94" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/pipeline/config/replica_resolver';</script>
+
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+
+
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.interface.html">nv_ingest_api.interface package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.html">nv_ingest_api.internal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.enums.html">nv_ingest_api.internal.enums package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.extract.html">nv_ingest_api.internal.extract package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.meta.html">nv_ingest_api.internal.meta package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.mutate.html">nv_ingest_api.internal.mutate package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.primitives.html">nv_ingest_api.internal.primitives package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.schemas.html">nv_ingest_api.internal.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.store.html">nv_ingest_api.internal.store package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.internal.transform.html">nv_ingest_api.internal.transform package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.html">nv_ingest_api.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.control_message.html">nv_ingest_api.util.control_message package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.converters.html">nv_ingest_api.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.dataloader.html">nv_ingest_api.util.dataloader package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.detectors.html">nv_ingest_api.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.exception_handlers.html">nv_ingest_api.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.image_processing.html">nv_ingest_api.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.imports.html">nv_ingest_api.util.imports package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.introspection.html">nv_ingest_api.util.introspection package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.logging.html">nv_ingest_api.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.message_brokers.html">nv_ingest_api.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.metadata.html">nv_ingest_api.util.metadata package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.multi_processing.html">nv_ingest_api.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.nim.html">nv_ingest_api.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.pdf.html">nv_ingest_api.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.schema.html">nv_ingest_api.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.service_clients.html">nv_ingest_api.util.service_clients package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.string_processing.html">nv_ingest_api.util.string_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.util.system.html">nv_ingest_api.util.system package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.vdb.html">nv_ingest_client.util.vdb package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v2.html">nv_ingest.api.v2 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.html">nv_ingest.framework package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.orchestration.html">nv_ingest.framework.orchestration package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.schemas.html">nv_ingest.framework.schemas package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.framework.util.html">nv_ingest.framework.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.pipeline.html">nv_ingest.pipeline package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.pipeline.config.html">nv_ingest.pipeline.config package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.pipeline.config.replica_resolver</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.pipeline.config.replica_resolver</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Runtime replica resolution for static scaling mode.</span>
+
+<span class="sd">This module provides functionality to resolve replica counts for stages using</span>
+<span class="sd">non-static strategies when dynamic scaling is disabled, ensuring total memory</span>
+<span class="sd">consumption stays within the static_memory_threshold.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">copy</span><span class="w"> </span><span class="kn">import</span> <span class="n">deepcopy</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.pipeline.pipeline_schema</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">PipelineConfigSchema</span><span class="p">,</span>
+    <span class="n">StageConfig</span><span class="p">,</span>
+    <span class="n">ReplicaCalculationStrategy</span><span class="p">,</span>
+    <span class="n">ReplicaStrategyConfig</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_api.util.system.hardware_info</span><span class="w"> </span><span class="kn">import</span> <span class="n">SystemResourceProbe</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="resolve_static_replicas">
+<a class="viewcode-back" href="../../../../nv-ingest/nv_ingest.pipeline.config.html#nv_ingest.pipeline.config.replica_resolver.resolve_static_replicas">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">resolve_static_replicas</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PipelineConfigSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Resolve static replica counts for all stages when dynamic scaling is disabled.</span>
+
+<span class="sd">    This function calculates the static replica counts for stages using non-static</span>
+<span class="sd">    strategies, ensuring the total memory consumption stays within the configured</span>
+<span class="sd">    static_memory_threshold. If the total exceeds the threshold, all non-static</span>
+<span class="sd">    stages are scaled down proportionally (minimum 1 replica each).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pipeline_config : PipelineConfigSchema</span>
+<span class="sd">        The pipeline configuration with potentially unresolved replica strategies.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    PipelineConfigSchema</span>
+<span class="sd">        A new pipeline configuration with all static replica counts resolved.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Only resolve if dynamic scaling is disabled</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">pipeline_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">disable_dynamic_scaling</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Dynamic scaling enabled, skipping static replica resolution&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">pipeline_config</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Resolving static replica counts for disabled dynamic scaling mode&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Create a deep copy to avoid modifying the original config</span>
+    <span class="n">resolved_config</span> <span class="o">=</span> <span class="n">deepcopy</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">)</span>
+
+    <span class="c1"># Get system resource information</span>
+    <span class="n">system_probe</span> <span class="o">=</span> <span class="n">SystemResourceProbe</span><span class="p">()</span>
+    <span class="n">total_memory_mb</span> <span class="o">=</span> <span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span>
+    <span class="n">available_memory_mb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">total_memory_mb</span> <span class="o">*</span> <span class="n">resolved_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">static_memory_threshold</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;System memory: </span><span class="si">{</span><span class="n">total_memory_mb</span><span class="si">}</span><span class="s2">MB, available for static replicas: </span><span class="si">{</span><span class="n">available_memory_mb</span><span class="si">}</span><span class="s2">MB &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(threshold: </span><span class="si">{</span><span class="n">resolved_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">static_memory_threshold</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">)&quot;</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Find stages with non-static strategies and calculate their baseline replica counts</span>
+    <span class="n">non_static_stages</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">total_memory_demand_mb</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">resolved_config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span> <span class="ow">and</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">,</span> <span class="n">ReplicaStrategyConfig</span><span class="p">):</span>
+                <span class="n">strategy_config</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span>
+                <span class="n">baseline_replicas</span> <span class="o">=</span> <span class="n">_calculate_baseline_static_replicas</span><span class="p">(</span>
+                    <span class="n">stage</span><span class="p">,</span> <span class="n">strategy_config</span><span class="p">,</span> <span class="n">system_probe</span><span class="p">,</span> <span class="n">resolved_config</span><span class="o">.</span><span class="n">pipeline</span><span class="o">.</span><span class="n">static_memory_threshold</span>
+                <span class="p">)</span>
+
+                <span class="n">memory_per_replica_mb</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span> <span class="ow">or</span> <span class="mi">0</span>
+                <span class="n">stage_memory_demand</span> <span class="o">=</span> <span class="n">baseline_replicas</span> <span class="o">*</span> <span class="n">memory_per_replica_mb</span>
+
+                <span class="n">non_static_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                    <span class="p">{</span>
+                        <span class="s2">&quot;stage&quot;</span><span class="p">:</span> <span class="n">stage</span><span class="p">,</span>
+                        <span class="s2">&quot;strategy_config&quot;</span><span class="p">:</span> <span class="n">strategy_config</span><span class="p">,</span>
+                        <span class="s2">&quot;baseline_replicas&quot;</span><span class="p">:</span> <span class="n">baseline_replicas</span><span class="p">,</span>
+                        <span class="s2">&quot;memory_per_replica_mb&quot;</span><span class="p">:</span> <span class="n">memory_per_replica_mb</span><span class="p">,</span>
+                        <span class="s2">&quot;baseline_memory_demand_mb&quot;</span><span class="p">:</span> <span class="n">stage_memory_demand</span><span class="p">,</span>
+                    <span class="p">}</span>
+                <span class="p">)</span>
+
+                <span class="n">total_memory_demand_mb</span> <span class="o">+=</span> <span class="n">stage_memory_demand</span>
+
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span>
+                    <span class="sa">f</span><span class="s2">&quot;Stage &#39;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">baseline_replicas</span><span class="si">}</span><span class="s2"> replicas × &quot;</span>
+                    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">memory_per_replica_mb</span><span class="si">}</span><span class="s2">MB = </span><span class="si">{</span><span class="n">stage_memory_demand</span><span class="si">}</span><span class="s2">MB&quot;</span>
+                <span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">non_static_stages</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No stages with non-static strategies found&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">resolved_config</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total baseline memory demand: </span><span class="si">{</span><span class="n">total_memory_demand_mb</span><span class="si">}</span><span class="s2">MB from </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">non_static_stages</span><span class="p">)</span><span class="si">}</span><span class="s2"> stages&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Optional bypass of global memory-based scale down via environment variable</span>
+    <span class="n">bypass_env</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">getenv</span><span class="p">(</span><span class="s2">&quot;NV_INGEST_BYPASS_STATIC_MEMORY_SCALE_DOWN&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+    <span class="n">bypass_scale_down</span> <span class="o">=</span> <span class="n">bypass_env</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="s2">&quot;true&quot;</span><span class="p">,</span> <span class="s2">&quot;yes&quot;</span><span class="p">,</span> <span class="s2">&quot;on&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Check if we need to scale down (unless bypassed)</span>
+    <span class="k">if</span> <span class="n">bypass_scale_down</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="s2">&quot;Bypassing static memory-based replica scale-down due to NV_INGEST_BYPASS_STATIC_MEMORY_SCALE_DOWN&quot;</span>
+        <span class="p">)</span>
+        <span class="n">scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="k">elif</span> <span class="n">total_memory_demand_mb</span> <span class="o">&lt;=</span> <span class="n">available_memory_mb</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Memory demand within threshold, applying baseline replica counts&quot;</span><span class="p">)</span>
+        <span class="n">scaling_factor</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Calculate scaling factor to fit within memory threshold</span>
+        <span class="n">scaling_factor</span> <span class="o">=</span> <span class="n">available_memory_mb</span> <span class="o">/</span> <span class="n">total_memory_demand_mb</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Memory demand exceeds threshold by </span><span class="si">{</span><span class="p">((</span><span class="n">total_memory_demand_mb</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">available_memory_mb</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">%, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;scaling down by factor of </span><span class="si">{</span><span class="n">scaling_factor</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="c1"># Apply the resolved replica counts</span>
+    <span class="n">total_actual_memory_mb</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">stage_info</span> <span class="ow">in</span> <span class="n">non_static_stages</span><span class="p">:</span>
+        <span class="n">stage</span> <span class="o">=</span> <span class="n">stage_info</span><span class="p">[</span><span class="s2">&quot;stage&quot;</span><span class="p">]</span>
+        <span class="n">baseline_replicas</span> <span class="o">=</span> <span class="n">stage_info</span><span class="p">[</span><span class="s2">&quot;baseline_replicas&quot;</span><span class="p">]</span>
+        <span class="n">memory_per_replica_mb</span> <span class="o">=</span> <span class="n">stage_info</span><span class="p">[</span><span class="s2">&quot;memory_per_replica_mb&quot;</span><span class="p">]</span>
+
+        <span class="c1"># Calculate scaled replica count (minimum 1)</span>
+        <span class="n">scaled_replicas</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">baseline_replicas</span> <span class="o">*</span> <span class="n">scaling_factor</span><span class="p">))</span>
+        <span class="n">actual_memory_mb</span> <span class="o">=</span> <span class="n">scaled_replicas</span> <span class="o">*</span> <span class="n">memory_per_replica_mb</span>
+        <span class="n">total_actual_memory_mb</span> <span class="o">+=</span> <span class="n">actual_memory_mb</span>
+
+        <span class="c1"># Replace the strategy config with a static replica count</span>
+        <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span> <span class="o">=</span> <span class="n">scaled_replicas</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Stage &#39;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;: </span><span class="si">{</span><span class="n">baseline_replicas</span><span class="si">}</span><span class="s2"> → </span><span class="si">{</span><span class="n">scaled_replicas</span><span class="si">}</span><span class="s2"> replicas &quot;</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">actual_memory_mb</span><span class="si">}</span><span class="s2">MB)&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">&quot;Total actual memory allocation: </span><span class="si">{</span><span class="n">total_actual_memory_mb</span><span class="si">}</span><span class="s2">MB &quot;</span>
+        <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="p">(</span><span class="n">total_actual_memory_mb</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">total_memory_mb</span><span class="p">)</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">100</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">% of system memory)&quot;</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">resolved_config</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_calculate_baseline_static_replicas</span><span class="p">(</span>
+    <span class="n">stage</span><span class="p">:</span> <span class="n">StageConfig</span><span class="p">,</span>
+    <span class="n">strategy_config</span><span class="p">:</span> <span class="n">ReplicaStrategyConfig</span><span class="p">,</span>
+    <span class="n">system_probe</span><span class="p">:</span> <span class="n">SystemResourceProbe</span><span class="p">,</span>
+    <span class="n">static_memory_threshold</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.75</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate the baseline static replica count for a stage based on its strategy.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    stage : StageConfig</span>
+<span class="sd">        The stage configuration.</span>
+<span class="sd">    strategy_config : ReplicaStrategyConfig</span>
+<span class="sd">        The replica strategy configuration.</span>
+<span class="sd">    system_probe : SystemResourceProbe</span>
+<span class="sd">        System resource information.</span>
+<span class="sd">    static_memory_threshold : float, optional</span>
+<span class="sd">        The global static memory threshold (default: 0.75).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    int</span>
+<span class="sd">        The calculated baseline replica count.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">strategy</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">strategy</span>
+
+    <span class="k">if</span> <span class="n">strategy</span> <span class="o">==</span> <span class="n">ReplicaCalculationStrategy</span><span class="o">.</span><span class="n">STATIC</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">value</span> <span class="ow">or</span> <span class="mi">1</span>
+
+    <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="n">ReplicaCalculationStrategy</span><span class="o">.</span><span class="n">CPU_PERCENTAGE</span><span class="p">:</span>
+        <span class="n">cpu_percent</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">cpu_percent</span> <span class="ow">or</span> <span class="mf">0.5</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="n">system_probe</span><span class="o">.</span><span class="n">cpu_count</span>
+        <span class="n">calculated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">system_probe</span><span class="o">.</span><span class="n">cpu_count</span> <span class="o">*</span> <span class="n">cpu_percent</span><span class="p">))</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">calculated</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="n">ReplicaCalculationStrategy</span><span class="o">.</span><span class="n">MEMORY_THRESHOLDING</span><span class="p">:</span>
+        <span class="c1"># For memory thresholding, use a conservative approach for static mode</span>
+        <span class="n">memory_per_replica_mb</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span> <span class="ow">or</span> <span class="mi">1000</span>
+        <span class="n">available_memory_mb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span> <span class="o">*</span> <span class="mf">0.7</span><span class="p">)</span>  <span class="c1"># Conservative 70%</span>
+        <span class="n">calculated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">available_memory_mb</span> <span class="o">//</span> <span class="n">memory_per_replica_mb</span><span class="p">)</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="n">calculated</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">calculated</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+
+    <span class="k">elif</span> <span class="n">strategy</span> <span class="o">==</span> <span class="n">ReplicaCalculationStrategy</span><span class="o">.</span><span class="n">MEMORY_STATIC_GLOBAL_PERCENT</span><span class="p">:</span>
+        <span class="c1"># Use the global static memory threshold for calculation</span>
+        <span class="n">memory_per_replica_mb</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span> <span class="ow">or</span> <span class="mi">1000</span>
+        <span class="n">available_memory_mb</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">system_probe</span><span class="o">.</span><span class="n">total_memory_mb</span> <span class="o">*</span> <span class="n">static_memory_threshold</span><span class="p">)</span>
+        <span class="n">calculated</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">available_memory_mb</span> <span class="o">//</span> <span class="n">memory_per_replica_mb</span><span class="p">)</span>
+        <span class="n">limit</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">limit</span> <span class="ow">or</span> <span class="n">calculated</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="n">calculated</span><span class="p">,</span> <span class="n">limit</span><span class="p">)</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unknown replica strategy &#39;</span><span class="si">{</span><span class="n">strategy</span><span class="si">}</span><span class="s2">&#39; for stage &#39;</span><span class="si">{</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39;, defaulting to 1 replica&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="get_memory_intensive_stages">
+<a class="viewcode-back" href="../../../../nv-ingest/nv_ingest.pipeline.config.html#nv_ingest.pipeline.config.replica_resolver.get_memory_intensive_stages">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_memory_intensive_stages</span><span class="p">(</span><span class="n">pipeline_config</span><span class="p">:</span> <span class="n">PipelineConfigSchema</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Identify stages that are memory-intensive and may need special handling.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    pipeline_config : PipelineConfigSchema</span>
+<span class="sd">        The pipeline configuration.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    List[str]</span>
+<span class="sd">        List of stage names that are memory-intensive.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">memory_intensive_stages</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">stage</span> <span class="ow">in</span> <span class="n">pipeline_config</span><span class="o">.</span><span class="n">stages</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span> <span class="ow">and</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span><span class="p">,</span> <span class="n">ReplicaStrategyConfig</span><span class="p">):</span>
+                <span class="n">strategy_config</span> <span class="o">=</span> <span class="n">stage</span><span class="o">.</span><span class="n">replicas</span><span class="o">.</span><span class="n">static_replicas</span>
+                <span class="n">memory_per_replica_mb</span> <span class="o">=</span> <span class="n">strategy_config</span><span class="o">.</span><span class="n">memory_per_replica_mb</span> <span class="ow">or</span> <span class="mi">0</span>
+
+                <span class="c1"># Consider stages using &gt;5GB per replica as memory-intensive</span>
+                <span class="k">if</span> <span class="n">memory_per_replica_mb</span> <span class="o">&gt;</span> <span class="mi">5000</span><span class="p">:</span>
+                    <span class="n">memory_intensive_stages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">stage</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">memory_intensive_stages</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
