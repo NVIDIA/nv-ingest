@@ -76,6 +76,41 @@ def test_build_command_uses_hidden_detection_file_by_default(tmp_path: Path) -> 
     assert effective_query_csv == query_csv
 
 
+def test_build_command_uses_zero_sentinels_for_auto_tuning_fields(tmp_path: Path) -> None:
+    dataset_dir = tmp_path / "dataset"
+    dataset_dir.mkdir()
+    query_csv = tmp_path / "query.csv"
+    query_csv.write_text("q,s,p\nx,y,1\n", encoding="utf-8")
+
+    cfg = HarnessConfig(
+        dataset_dir=str(dataset_dir),
+        dataset_label="jp20",
+        preset="auto_workers",
+        query_csv=str(query_csv),
+        pdf_extract_workers=None,
+        page_elements_workers=None,
+        ocr_workers=None,
+        embed_workers=None,
+    )
+    cmd, _runtime_dir, _detection_file, _effective_query_csv = _build_command(cfg, tmp_path, run_id="r1")
+
+    def _value_for(flag: str) -> str:
+        return cmd[cmd.index(flag) + 1]
+
+    assert _value_for("--pdf-extract-tasks") == "0"
+    assert _value_for("--pdf-extract-cpus-per-task") == "2.0"
+    assert _value_for("--pdf-extract-batch-size") == "4"
+    assert _value_for("--page-elements-batch-size") == "4"
+    assert _value_for("--page-elements-actors") == "0"
+    assert _value_for("--ocr-actors") == "0"
+    assert _value_for("--ocr-batch-size") == "16"
+    assert _value_for("--embed-actors") == "0"
+    assert _value_for("--embed-batch-size") == "256"
+    assert _value_for("--page-elements-gpus-per-actor") == "0.1"
+    assert _value_for("--ocr-gpus-per-actor") == "0.1"
+    assert _value_for("--embed-gpus-per-actor") == "0.25"
+
+
 def test_build_command_uses_top_level_detection_file_when_enabled(tmp_path: Path) -> None:
     dataset_dir = tmp_path / "dataset"
     dataset_dir.mkdir()
@@ -525,3 +560,19 @@ def test_cli_run_accepts_repeated_tags(monkeypatch) -> None:
 
     assert result.exit_code == 0
     assert captured["tags"] == ["nightly", "candidate"]
+
+
+def test_cli_sweep_dry_run_uses_preset_override(monkeypatch) -> None:
+    monkeypatch.setattr(
+        harness_run,
+        "load_runs_config",
+        lambda _path: [{"name": "jp20_single", "dataset": "jp20", "preset": "single_gpu"}],
+    )
+
+    result = RUNNER.invoke(
+        harness_app,
+        ["sweep", "--runs-config", "nightly.yaml", "--preset", "auto_workers", "--dry-run"],
+    )
+
+    assert result.exit_code == 0
+    assert "preset=auto_workers" in result.stdout

@@ -16,16 +16,11 @@ active:
   write_detection_file: false
 
 presets:
-  single_gpu:
-    pdf_extract_workers: 8
+  fixed_common:
     pdf_extract_num_cpus: 2.0
     pdf_extract_batch_size: 4
     pdf_split_batch_size: 1
-    page_elements_batch_size: 4
-    page_elements_workers: 3
-    ocr_workers: 3
     ocr_batch_size: 16
-    embed_workers: 3
     embed_batch_size: 256
     page_elements_cpus_per_actor: 1.0
     ocr_cpus_per_actor: 1.0
@@ -34,23 +29,30 @@ presets:
     gpu_ocr: 0.1
     gpu_embed: 0.25
 
+  single_gpu:
+    extends: fixed_common
+    pdf_extract_workers: 8
+    page_elements_batch_size: 4
+    page_elements_workers: 3
+    ocr_workers: 3
+    embed_workers: 3
+
   dgx_8gpu:
+    extends: single_gpu
     pdf_extract_workers: 64
-    pdf_extract_num_cpus: 2.0
-    pdf_extract_batch_size: 4
-    pdf_split_batch_size: 1
     page_elements_batch_size: 32
     page_elements_workers: 24
     ocr_workers: 24
-    ocr_batch_size: 16
     embed_workers: 24
-    embed_batch_size: 256
-    page_elements_cpus_per_actor: 1.0
-    ocr_cpus_per_actor: 1.0
-    embed_cpus_per_actor: 1.0
-    gpu_page_elements: 0.1
-    gpu_ocr: 0.1
-    gpu_embed: 0.25
+
+  # Keep the same conservative single-GPU batch sizes, but let batch mode
+  # discover actor/task counts from the current Ray GPU inventory.
+  auto_workers:
+    extends: single_gpu
+    pdf_extract_workers: auto
+    page_elements_workers: auto
+    ocr_workers: auto
+    embed_workers: auto
 
 datasets:
   bo20:

@@ -156,6 +156,11 @@ retriever local stage6 run --input-dir <dir>
   - `recall_adapter: page_plus_one` (convert zero-indexed `page` CSVs to `pdf_page`)
   - `recall_adapter: financebench_json` (convert FinanceBench JSON to `query,expected_pdf`)
   - `recall_match_mode: pdf_page|pdf_only` controls recall matching mode.
+- Harness presets support `extends:` inheritance so common tuning can live in one base preset.
+- Worker-count tuning fields can be set to `auto` in a preset to defer those counts to the batch
+  runtime heuristics.
+- The built-in `auto_workers` preset keeps the conservative `single_gpu` batch sizes while letting
+  worker/task counts scale from the detected Ray GPU inventory.
 - Dataset presets configured under `/datasets/nv-ingest/...` will fall back to `/raid/$USER/...` when the dataset is not present in `/datasets`.
 - Relative `query_csv` entries in harness YAML resolve from the config file directory first, then fall back to the repo root.
 - The default `financebench` dataset preset now points at `data/financebench_train.json` and enables recall out of the box.
@@ -259,6 +264,9 @@ Preset dataset name
 ```bash
 # Dataset preset from test_configs.yaml (recall-required example)
 retriever harness run --dataset jp20 --preset single_gpu
+
+# Keep the same single-GPU-style batch sizes but let worker counts auto-scale
+retriever harness run --dataset jp20 --preset auto_workers
 ```
 or
 
@@ -345,6 +353,25 @@ When tags are supplied with `--tag`, they are persisted in `results.json` and in
 These fields use best-effort discovery and fall back to `null` or `"unknown"` rather than failing a run.
 
 Sweep/nightly sessions additionally write:
+
+6. Presets and heuristic sizing
+
+Use fixed presets such as `single_gpu` and `dgx_8gpu` when you want repeatable, pinned worker counts.
+Use `auto_workers` when you want the harness to preserve the same high-level tuning shape but let the
+batch runtime discover worker/task counts from the currently available GPUs.
+
+Today, `auto` is intentionally limited to worker/task count fields in
+`nemo_retriever/harness/test_configs.yaml`, such as:
+
+- `pdf_extract_workers`
+- `page_elements_workers`
+- `ocr_workers`
+- `embed_workers`
+
+When one of those fields is set to `auto`, the harness serializes the batch CLI sentinel value and
+`nemo_retriever.examples.batch_pipeline` falls back to its existing `resolve_requested_plan()`
+heuristics at runtime. Batch sizes, CPU-per-task values, and GPU shares remain explicit so the
+preset behavior stays easy to reason about for new users.
 
 The `runtime_metrics/` directory contains:
 

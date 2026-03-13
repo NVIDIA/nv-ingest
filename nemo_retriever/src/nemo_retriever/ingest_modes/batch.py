@@ -84,6 +84,79 @@ def _runtime_env_vars() -> dict[str, str]:
     return {key: value for key, value in env_vars.items() if isinstance(value, str)}
 
 
+def _normalize_requested_plan_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        normalized = int(value)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0 else None
+
+
+def _normalize_requested_plan_float(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError):
+        return None
+    return normalized if normalized > 0.0 else None
+
+
+def _batch_tuning_to_requested_plan_overrides(batch_tuning: dict[str, Any]) -> dict[str, int | float | None]:
+    overrides: dict[str, int | float | None] = {}
+
+    if "pdf_extract_workers" in batch_tuning:
+        overrides["override_pdf_extract_tasks"] = _normalize_requested_plan_int(batch_tuning.get("pdf_extract_workers"))
+    if "pdf_extract_num_cpus" in batch_tuning:
+        overrides["override_pdf_extract_cpus_per_task"] = _normalize_requested_plan_float(
+            batch_tuning.get("pdf_extract_num_cpus")
+        )
+    if "pdf_extract_batch_size" in batch_tuning:
+        overrides["override_pdf_extract_batch_size"] = _normalize_requested_plan_int(
+            batch_tuning.get("pdf_extract_batch_size")
+        )
+    if "page_elements_batch_size" in batch_tuning:
+        overrides["override_page_elements_batch_size"] = _normalize_requested_plan_int(
+            batch_tuning.get("page_elements_batch_size")
+        )
+    if "embed_batch_size" in batch_tuning:
+        overrides["override_embed_batch_size"] = _normalize_requested_plan_int(batch_tuning.get("embed_batch_size"))
+
+    ocr_batch_size = batch_tuning.get("ocr_batch_size", batch_tuning.get("detect_batch_size"))
+    if "ocr_batch_size" in batch_tuning or "detect_batch_size" in batch_tuning:
+        overrides["override_ocr_batch_size"] = _normalize_requested_plan_int(ocr_batch_size)
+
+    actor_count_fields = {
+        "page_elements_workers": "page_elements",
+        "ocr_workers": "ocr",
+        "detect_workers": "ocr",
+        "embed_workers": "embed",
+    }
+    for field_name, stage_name in actor_count_fields.items():
+        if field_name not in batch_tuning:
+            continue
+        actor_count = _normalize_requested_plan_int(batch_tuning.get(field_name))
+        overrides[f"override_{stage_name}_initial_actors"] = actor_count
+        overrides[f"override_{stage_name}_min_actors"] = actor_count
+        overrides[f"override_{stage_name}_max_actors"] = actor_count
+
+    gpu_fields = {
+        "gpu_page_elements": "page_elements",
+        "gpu_ocr": "ocr",
+        "gpu_embed": "embed",
+    }
+    for field_name, stage_name in gpu_fields.items():
+        if field_name not in batch_tuning:
+            continue
+        overrides[f"override_{stage_name}_gpus_per_actor"] = _normalize_requested_plan_float(
+            batch_tuning.get(field_name)
+        )
+
+    return overrides
+
+
 class _LanceDBWriteActor:
     """Ray Data actor that streams batches into LanceDB as they arrive.
 
@@ -242,6 +315,7 @@ class BatchIngestor(Ingestor):
         # 2. Resolve requested plan for the Ray DAG that will be built
         self._requested_plan = resolve_requested_plan(cluster_resources=self._cluster_resources)
         logger.info(self._requested_plan)
+        self._requested_plan_overrides: dict[str, int | float | None] = {}
 
         # Builder-style task configuration recorded for later execution.
         # Keep backwards-compatibility with code that inspects `Ingestor._documents`
@@ -254,6 +328,18 @@ class BatchIngestor(Ingestor):
         self._extract_txt_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._extract_html_kwargs: Dict[str, Any] = {}  # noqa: F821
         self._use_nemotron_parse_only: bool = False
+
+    def _refresh_requested_plan(self, batch_tuning: dict[str, Any]) -> None:
+        requested_plan_overrides = _batch_tuning_to_requested_plan_overrides(batch_tuning)
+        if not requested_plan_overrides:
+            return
+
+        self._requested_plan_overrides.update(requested_plan_overrides)
+        self._requested_plan = resolve_requested_plan(
+            cluster_resources=self._cluster_resources,
+            **self._requested_plan_overrides,
+        )
+        logger.info(self._requested_plan)
 
     def files(self, documents: Union[str, List[str]]) -> "BatchIngestor":
         """
@@ -344,6 +430,7 @@ class BatchIngestor(Ingestor):
             **resolved.remote_retry.model_dump(mode="python", exclude_none=True),
             **resolved.batch_tuning.model_dump(mode="python", exclude_none=True),
         }
+        self._refresh_requested_plan(kwargs)
 
         # -- Pop resource-tuning kwargs before forwarding to actors --
         def _endpoint_count(raw: Any) -> int:
@@ -857,6 +944,7 @@ class BatchIngestor(Ingestor):
             resolved = resolved.model_copy(update={"api_key": resolve_remote_api_key()})
 
         kwargs = build_embed_kwargs(resolved, include_batch_tuning=True)
+        self._refresh_requested_plan(kwargs)
 
         # Remaining kwargs are forwarded to the actor constructor.
         embed_modality = resolved.embed_modality

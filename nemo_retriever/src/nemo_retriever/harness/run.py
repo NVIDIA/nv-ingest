@@ -188,6 +188,12 @@ def _resolve_lancedb_uri(cfg: HarnessConfig, artifact_dir: Path) -> str:
     return str(p)
 
 
+def _command_worker_count_value(value: int | None) -> str:
+    if value is not None:
+        return str(value)
+    return "0"
+
+
 def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple[list[str], Path, Path, Path]:
     runtime_dir = artifact_dir / "runtime_metrics"
     runtime_dir.mkdir(parents=True, exist_ok=True)
@@ -215,7 +221,7 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         cfg.recall_match_mode,
         "--no-recall-details",
         "--pdf-extract-tasks",
-        str(cfg.pdf_extract_workers),
+        _command_worker_count_value(cfg.pdf_extract_workers),
         "--pdf-extract-cpus-per-task",
         str(cfg.pdf_extract_num_cpus),
         "--pdf-extract-batch-size",
@@ -225,13 +231,13 @@ def _build_command(cfg: HarnessConfig, artifact_dir: Path, run_id: str) -> tuple
         "--page-elements-batch-size",
         str(cfg.page_elements_batch_size),
         "--page-elements-actors",
-        str(cfg.page_elements_workers),
+        _command_worker_count_value(cfg.page_elements_workers),
         "--ocr-actors",
-        str(cfg.ocr_workers),
+        _command_worker_count_value(cfg.ocr_workers),
         "--ocr-batch-size",
         str(cfg.ocr_batch_size),
         "--embed-actors",
-        str(cfg.embed_workers),
+        _command_worker_count_value(cfg.embed_workers),
         "--embed-batch-size",
         str(cfg.embed_batch_size),
         "--page-elements-cpus-per-actor",
@@ -554,9 +560,10 @@ def sweep_command(
         typer.echo("Sweep dry run:")
         for idx, run in enumerate(runs):
             tag_text = f" tags={normalized_tags}" if normalized_tags else ""
+            effective_preset = preset if preset is not None else run.get("preset")
             plan_line = (
                 f"  {idx + 1:03d}: name={run.get('name')} "
-                f"dataset={run.get('dataset')} preset={run.get('preset')}{tag_text}"
+                f"dataset={run.get('dataset')} preset={effective_preset}{tag_text}"
             )
             typer.echo(plan_line)
         raise typer.Exit(code=0)

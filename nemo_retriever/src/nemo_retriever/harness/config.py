@@ -16,6 +16,12 @@ REPO_ROOT = NEMO_RETRIEVER_ROOT.parent
 DEFAULT_TEST_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "test_configs.yaml"
 DEFAULT_NIGHTLY_CONFIG_PATH = NEMO_RETRIEVER_ROOT / "harness" / "nightly_config.yaml"
 VALID_RECALL_ADAPTERS = {"none", "page_plus_one", "financebench_json"}
+AUTO_WORKER_FIELDS = {
+    "pdf_extract_workers",
+    "page_elements_workers",
+    "ocr_workers",
+    "embed_workers",
+}
 DEFAULT_NIGHTLY_SLACK_METRIC_KEYS = [
     "pages",
     "ingest_secs",
@@ -62,15 +68,15 @@ class HarnessConfig:
     embed_model_name: str = "nvidia/llama-nemotron-embed-1b-v2"
     write_detection_file: bool = False
 
-    pdf_extract_workers: int = 8
+    pdf_extract_workers: int | None = 8
     pdf_extract_num_cpus: float = 2.0
     pdf_extract_batch_size: int = 4
     pdf_split_batch_size: int = 1
     page_elements_batch_size: int = 4
-    page_elements_workers: int = 3
-    ocr_workers: int = 3
+    page_elements_workers: int | None = 3
+    ocr_workers: int | None = 3
     ocr_batch_size: int = 16
-    embed_workers: int = 3
+    embed_workers: int | None = 3
     embed_batch_size: int = 256
     page_elements_cpus_per_actor: float = 1.0
     ocr_cpus_per_actor: float = 1.0
@@ -103,10 +109,16 @@ class HarnessConfig:
 
         for name in TUNING_FIELDS:
             val = getattr(self, name)
+            if val is None and name in AUTO_WORKER_FIELDS:
+                continue
             if name.startswith("gpu_") and float(val) < 0.0:
                 errors.append(f"{name} must be >= 0.0")
             elif name.endswith("_workers") and int(val) < 1:
                 errors.append(f"{name} must be >= 1")
+            elif name.endswith("_batch_size") and int(val) < 1:
+                errors.append(f"{name} must be >= 1")
+            elif name.endswith("_num_cpus") and float(val) <= 0.0:
+                errors.append(f"{name} must be > 0.0")
 
         return errors
 
@@ -118,6 +130,12 @@ def _parse_bool(value: str) -> bool:
 def _parse_number(value: str) -> int | float:
     if "." in value:
         return float(value)
+    return int(value)
+
+
+def _parse_auto_worker_value(value: str) -> int | None:
+    if str(value).strip().lower() == "auto":
+        return None
     return int(value)
 
 
@@ -139,6 +157,39 @@ def _read_yaml_mapping(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise ValueError(f"YAML config must be a mapping/object at top-level: {path}")
     return data
+
+
+def _resolve_preset_values(
+    presets: dict[str, Any], preset_name: str, *, resolution_stack: tuple[str, ...] = ()
+) -> dict[str, Any]:
+    preset_key = str(preset_name)
+    if preset_key not in presets:
+        return {}
+
+    raw_preset = presets[preset_key]
+    if not isinstance(raw_preset, dict):
+        raise ValueError(f"Preset '{preset_key}' must be a mapping")
+
+    if preset_key in resolution_stack:
+        cycle = " -> ".join((*resolution_stack, preset_key))
+        raise ValueError(f"Preset inheritance cycle detected: {cycle}")
+
+    preset_values = dict(raw_preset)
+    parent_name = preset_values.pop("extends", None)
+    if parent_name is None:
+        return preset_values
+    if not isinstance(parent_name, str) or not parent_name.strip():
+        raise ValueError(f"Preset '{preset_key}' has invalid extends value: {parent_name!r}")
+    if parent_name not in presets:
+        raise ValueError(f"Preset '{preset_key}' extends unknown preset '{parent_name}'")
+
+    resolved_parent = _resolve_preset_values(
+        presets,
+        parent_name,
+        resolution_stack=(*resolution_stack, preset_key),
+    )
+    resolved_parent.update(preset_values)
+    return resolved_parent
 
 
 def _resolve_path_like(value: str | None, base_path: Path = REPO_ROOT) -> str | None:
@@ -210,7 +261,8 @@ def _apply_env_overrides(config_dict: dict[str, Any]) -> None:
     }
 
     for key in TUNING_FIELDS:
-        env_map[f"HARNESS_{key.upper()}"] = (key, _parse_number)
+        parser = _parse_auto_worker_value if key in AUTO_WORKER_FIELDS else _parse_number
+        env_map[f"HARNESS_{key.upper()}"] = (key, parser)
 
     for env_key, (cfg_key, parser) in env_map.items():
         raw = os.getenv(env_key)
@@ -239,6 +291,27 @@ def _parse_cli_overrides(overrides: list[str] | None) -> dict[str, Any]:
             except ValueError:
                 parsed[key] = raw_val
     return parsed
+
+
+def _normalize_tuning_values(config_dict: dict[str, Any]) -> None:
+    for name in AUTO_WORKER_FIELDS:
+        if name not in config_dict:
+            continue
+
+        value = config_dict[name]
+        if value is None:
+            config_dict[name] = None
+            continue
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if raw.lower() == "auto" or raw == "":
+                config_dict[name] = None
+                continue
+            value = int(raw)
+
+        normalized = int(value)
+        config_dict[name] = None if normalized == 0 else normalized
 
 
 def load_harness_config(
@@ -292,13 +365,14 @@ def load_harness_config(
             dataset_label = Path(str(dataset_ref)).name
             merged["dataset_dir"] = str(dataset_ref)
 
-    preset_values = dict(presets.get(str(preset_ref), {}))
+    preset_values = _resolve_preset_values(presets, str(preset_ref))
     merged.update(preset_values)
     merged.update({k: v for k, v in sweep_data.items() if k not in {"dataset", "preset"}})
     merged.update(cli_override_map)
     if cli_recall_required is not None:
         merged["recall_required"] = cli_recall_required
     _apply_env_overrides(merged)
+    _normalize_tuning_values(merged)
 
     dataset_dir = merged.get("dataset_dir")
     if dataset_dir is None:
