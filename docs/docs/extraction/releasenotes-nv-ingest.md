@@ -6,7 +6,15 @@ This documentation contains the release notes for [NeMo Retriever Library](overv
 
     NVIDIA Ingest (nv-ingest) has been renamed to the NeMo Retriever Library.
 
+    
+
 ## 26.03 Release Notes (in progress)
+
+The NeMo Retriever Library 26.03 release adds new hardware and software support, and other improvements.
+
+To upgrade the Helm Charts for this version, refer to [NeMo Retriever Library Helm Charts](https://github.com/NVIDIA/NeMo-Retriever/blob/release/26.3.0-RC1/helm/README.md).
+
+Updates and enhancements in the 26.03 release include the following:
 
 - NV-Ingest github repo renamed to NeMo-Retriever 
 - NeMo Retriever Extraction pipeline renamed to NeMo Retriever Library
@@ -19,8 +27,6 @@ This documentation contains the release notes for [NeMo Retriever Library](overv
 
 
 NeMo Retriever Library currently does not support image captioning via VLM. It will be added in the next release.
-
-
 
 ## Release Notes for Previous Versions
 
