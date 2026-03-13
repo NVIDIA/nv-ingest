@@ -12,6 +12,7 @@ from importlib.metadata import PackageNotFoundError, version as dist_version
 from pathlib import Path
 import os
 import subprocess
+import tempfile
 
 try:
     from ._build_info import BUILD_DATE as _PACKAGE_BUILD_DATE
@@ -23,6 +24,7 @@ except ImportError:
 
 _PKG_NAME = "nemo-retriever"
 _UNKNOWN = "unknown"
+_BUILD_STAMP = Path(tempfile.gettempdir()) / ".nemo_retriever_build_stamp"
 
 
 def _utc_now() -> datetime:
@@ -57,7 +59,28 @@ def _build_datetime() -> datetime:
         except ValueError:
             pass
 
-    return _utc_now()
+    # Stamp file in the system temp dir makes the timestamp deterministic
+    # across the two separate subprocesses pip spawns during a PEP 517 build
+    # (metadata + wheel).  We use tempdir rather than the source tree because
+    # pip may copy the source to different locations for each step.
+    if _BUILD_STAMP.exists():
+        try:
+            cached = _BUILD_STAMP.read_text().strip()
+            if cached:
+                ts = float(cached)
+                # Only reuse if less than 60 s old to avoid stale stamps.
+                if abs(_utc_now().timestamp() - ts) < 60:
+                    return datetime.fromtimestamp(ts, tz=timezone.utc)
+            _BUILD_STAMP.unlink(missing_ok=True)
+        except (OSError, ValueError):
+            pass
+
+    now = _utc_now()
+    try:
+        _BUILD_STAMP.write_text(str(now.timestamp()))
+    except OSError:
+        pass
+    return now
 
 
 @lru_cache(maxsize=1)
