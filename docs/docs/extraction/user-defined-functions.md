@@ -77,7 +77,7 @@ nemo-retriever \
 ### 3. Submit via Python Client
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 # Create an Ingestor instance with default client
 ingestor = Ingestor()

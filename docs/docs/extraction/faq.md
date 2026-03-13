@@ -76,12 +76,11 @@ For more information, refer to [Extract Specific Elements from PDFs](python-api-
 ```python
 Ingestor(client=client)
     .files("data/multimodal_test.pdf")
-    .extract(              
+    .extract(
         extract_text=True,
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
         extract_infographics=True,
         text_depth="page"
     )

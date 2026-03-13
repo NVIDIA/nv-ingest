@@ -82,7 +82,8 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 import time
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest_client.client import Ingestor, NemoRetrieverClient
+from nv_ingest_client.client.interface import Ingestor
+from nv_ingest_client.client import NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
@@ -90,7 +91,7 @@ def main():
     # Start the pipeline subprocess for library mode
     run_pipeline(block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
-    client = NemoRetrieverClient(
+    client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
         message_client_hostname="localhost",
@@ -356,8 +357,8 @@ import time
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest_client.client import Ingestor
-from nv_ingest_client.client import NemoRetrieverClient
+from nv_ingest_client.client.interface import Ingestor
+from nv_ingest_client.client import NvIngestClient
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -374,7 +375,7 @@ def run_ingestor():
     Set up and run the ingestion process to send traffic against the pipeline.
     """
     logger.info("Setting up Ingestor client...")
-    client = NemoRetrieverClient(
+    client = NvIngestClient(
         message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="localhost"
     )
 

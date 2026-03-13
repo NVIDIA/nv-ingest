@@ -44,6 +44,7 @@ This includes the following:
 NeMo Retriever Library supports the following GPU hardware.
 
 - [RTX Pro 6000 Blackwell Server Edition](https://www.nvidia.com/en-us/data-center/rtx-pro-6000-blackwell-server-edition/)
+- [RTX PRO 4500 Blackwell](https://www.nvidia.com/en-us/products/workstations/professional-desktop-gpus/rtx-pro-4500/)
 - [DGX B200](https://www.nvidia.com/en-us/data-center/dgx-b200/)
 - [H200 NVL](https://www.nvidia.com/en-us/data-center/h200/)
 - [H100 Tensor Core GPU](https://www.nvidia.com/en-us/data-center/h100/)
@@ -54,23 +55,29 @@ NeMo Retriever Library supports the following GPU hardware.
 
 The following are the hardware requirements to run NeMo Retriever Library.
 
-|Feature         | GPU Option                | RTX Pro 6000  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB     | A10G          | L40S   |
-|----------------|---------------------------|---------------|---------------|---------------|-------------|-------------|---------------|---------------|--------|
-| GPU            | Memory                    | 96GB          | 180GB         | 141GB         | 80GB        | 80GB        | 40GB          | 24GB          | 48GB   |
-| Core Features  | Total GPUs                | 1             | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
-| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB        | ~150GB        | ~150GB |
-| Audio          | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
-| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB         | ~37GB         | ~37GB  |
-| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported | Not supported | 1           | 1           | 1             | 1             | 1      |
-| nemotron-parse | Additional Disk Space     | Not supported | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB         | ~16GB         | ~16GB  |
-| VLM            | Additional Dedicated GPUs | 1             | 1             | 1             | 1           | 1           | Not supported | Not supported | 1      |
-| VLM            | Additional Disk Space     | ~16GB         | ~16GB         | ~16GB         | ~16GB       | ~16GB       | Not supported | Not supported | ~16GB  |
-| Reranker       | With Core Pipeline        | Yes           | Yes           | Yes           | Yes         | Yes         | No*           | No*           | No*    |
-| Reranker       | Standalone (recall only)  | Yes           | Yes           | Yes           | Yes         | Yes         | Yes           | Yes           | Yes    |
+|Feature         | GPU Option                | RTX Pro 6000  | RTX PRO 4500  | B200          | H200 NVL      | H100        | A100 80GB   | A100 40GB     | A10G          | L40S   |
+|----------------|---------------------------|---------------|---------------|---------------|---------------|-------------|-------------|---------------|---------------|--------|
+| GPU            | Memory                    | 96GB          | 32GB          | 180GB         | 141GB         | 80GB        | 80GB        | 40GB          | 24GB          | 48GB   |
+| Core Features  | Total GPUs                | 1             | 1             | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
+| Core Features  | Total Disk Space          | ~150GB        | ~150GB        | ~150GB        | ~150GB        | ~150GB      | ~150GB      | ~150GB        | ~150GB        | ~150GB |
+| Audio          | Additional Dedicated GPUs | 1             | 1†            | 1             | 1             | 1           | 1           | 1             | 1             | 1      |
+| Audio          | Additional Disk Space     | ~37GB         | ~37GB         | ~37GB         | ~37GB         | ~37GB       | ~37GB       | ~37GB         | ~37GB         | ~37GB  |
+| nemotron-parse | Additional Dedicated GPUs | Not supported | Not supported‡| Not supported | Not supported | 1           | 1           | 1             | 1             | 1      |
+| nemotron-parse | Additional Disk Space     | Not supported | Not supported | Not supported | Not supported | ~16GB       | ~16GB       | ~16GB         | ~16GB         | ~16GB  |
+| VLM            | Additional Dedicated GPUs | 1             | Not supported§| 1             | 1             | 1           | 1           | Not supported | Not supported | 1      |
+| VLM            | Additional Disk Space     | ~16GB         | Not supported | ~16GB         | ~16GB         | ~16GB       | ~16GB       | Not supported | Not supported | ~16GB  |
+| Reranker       | With Core Pipeline        | Yes           | No*           | Yes           | Yes           | Yes         | Yes         | No*           | No*           | No*    |
+| Reranker       | Standalone (recall only)  | Yes           | Yes           | Yes           | Yes           | Yes         | Yes         | Yes           | Yes           | Yes    |
 
 \* GPUs with less than 80GB VRAM cannot run the reranker concurrently with the core pipeline. 
 To perform recall testing with the reranker on these GPUs, shut down the core pipeline NIM microservices 
 and run only the embedder, reranker, and your vector database.
+
+† Audio (Parakeet) runs but requires a runtime engine build — no pre-defined model profile for this GPU. Dev team to confirm official support status.
+
+‡ Nemotron Parse fails to start on 32GB despite being supported on A10G (24GB). Pending engineering investigation — may be Blackwell architecture compatibility issue (see related bug).
+
+§ VLM (nemotron-nano-12b-v2-vl) fails to load on 32GB, consistent with "Not supported" on A100-40GB (40GB). 32GB is below the threshold.
 
 
 

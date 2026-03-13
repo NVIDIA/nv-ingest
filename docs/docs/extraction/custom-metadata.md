@@ -60,7 +60,7 @@ For more information about the `Ingestor` class, see [Use the NeMo Retriever Lib
 For more information about the `vdb_upload` method, see [Upload Data](data-store.md).
 
 ```python
-from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 hostname="localhost"
 collection_name = "nemo_retriever_collection"
