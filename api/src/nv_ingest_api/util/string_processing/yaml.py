@@ -41,9 +41,9 @@ def _replacer(match: re.Match) -> str:
     var_name = match.group("braced") or match.group("named")
     default_val = match.group("braced_default") or match.group("named_default")
 
-    # First try the primary env var
+    # First try the primary env var (treat empty string as unset so default is used)
     value = os.environ.get(var_name)
-    if value is not None:
+    if value is not None and value != "":
         return _quote_if_needed(value)
 
     # If primary is missing, try the default.
