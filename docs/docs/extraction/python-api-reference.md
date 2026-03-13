@@ -80,7 +80,7 @@ The caption task can call a vision-language model (VLM) with the following optio
 
 Example:
 ```python
-from nemo_retriever.client.interface import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -224,7 +224,7 @@ The `extract` method enables different types of data to be extracted.
 Use the following code to extract a single PDF file.
 
 ```python
-from nemo_retriever.client.interface import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 # Initialize Ingestor with a local PDF file
 ingestor = Ingestor().files("path/to/document.pdf")
@@ -527,7 +527,7 @@ The caption task can call a VLM with optional prompt and system prompt overrides
 
 Example:
 ```python
-from nemo_retriever.client.interface import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 ingestor = (
     Ingestor()
@@ -662,7 +662,7 @@ For more information on environment variables, refer to [Environment Variables](
 Use the following code to extract mp3 audio content.
 
 ```python
-from nemo_retriever.client import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 ingestor = Ingestor().files("audio_file.mp3")
 
