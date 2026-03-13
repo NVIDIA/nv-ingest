@@ -45,8 +45,11 @@ results = ingestor.files(["large_document.pdf"]) \
     .pdf_split_config(pages_per_chunk=64) \
     .ingest()
 
-print(f"Processed {results['metadata']['total_pages']} pages")
+# ingest() returns a list of document results (not a dict).
+print(f"Processed {len(results)} documents")
 ```
+
+> **Note:** The Python API's `ingest()` returns a **list** of document results. The HTTP API (REST) returns a JSON object with top-level keys such as `data`, `trace`, `annotations`, and `metadata` (including `total_pages`). Do not use `results['metadata']` when using the Python client.
 
 ### CLI Usage
 
@@ -552,7 +555,7 @@ A: Only when `page_count > pages_per_chunk`. Smaller PDFs are processed as singl
 A: Yes! Top-level `data`, `trace`, and `annotations` fields are identical. Additional metadata is added under `metadata` (which V1 parsers ignore).
 
 **Q: How do I know if splitting occurred?**  
-A: Check `len(result["metadata"].get("chunks", [])) > 0` or look for server logs: `"Splitting PDF ... into ... chunks"`.
+A: When using the **HTTP API** directly, check the response body: `len(response["metadata"].get("chunks", [])) > 0`. When using the **Python client**, `ingest()` returns a list of document results (no `metadata` key); use server logs (`"Splitting PDF ... into ... chunks"`) or inspect the number of results.
 
 **Q: What happens if one chunk fails?**  
 A: Other chunks still return results. Check `metadata.failed_subjobs[]` for details. The job returns `status: "failed"` but includes partial results.

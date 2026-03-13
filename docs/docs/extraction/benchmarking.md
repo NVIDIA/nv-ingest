@@ -68,16 +68,18 @@ active:
   test_name: null  # Auto-generated if null
   
   # API Configuration
-  api_version: v1  # v1 or v2
+  api_version: v2  # v1 or v2
   pdf_split_page_count: null  # V2 only: pages per chunk (null = default 32)
   
   # Infrastructure
   hostname: localhost
   readiness_timeout: 600
-  profiles: [retrieval]
+  compose:
+    profiles:
+      - retrieval
   
   # Runtime
-  sparse: true
+  sparse: false
   gpu_search: false
   embedding_model: auto
   
@@ -123,7 +125,7 @@ datasets:
     extract_tables: true
     extract_charts: true
     extract_images: true
-    extract_infographics: false
+    extract_infographics: true
     recall_dataset: null  # bo20 does not have recall
   
   earnings:
@@ -159,7 +161,7 @@ uv run nemo-retriever-bench --case=e2e --dataset=/custom/path
 |---------|------|--------|--------|--------|--------------|--------|
 | `bo767` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
 | `earnings` | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ |
-| `bo20` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| `bo20` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 | `financebench` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `single` | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
 
@@ -173,7 +175,7 @@ Settings are applied in order of priority:
 
 Example:
 ```bash
-# YAML active section has api_version: v1
+# YAML active section has api_version: v2
 # Dataset bo767 has extract_images: false
 # Override via environment variable (highest priority)
 EXTRACT_IMAGES=true API_VERSION=v2 uv run nemo-retriever-bench --case=e2e --dataset=bo767
@@ -655,21 +657,21 @@ This provides:
 - `test_configs.yaml` - Structured configuration file
   - Active test configuration (edit directly)
   - Dataset shortcuts for quick access
-- `src/nemo_retriever_harness/config.py` - Configuration management
+- `src/nv_ingest_harness/config.py` - Configuration management
   - YAML loading and parsing
   - Type-safe config dataclass
   - Validation logic with helpful errors
   - Environment variable override support
 
 **2. Test Runner**
-- `src/nemo_retriever_harness/cli/run.py` - Main orchestration
+- `src/nv_ingest_harness/cli/run.py` - Main orchestration
   - Configuration loading with precedence chain
   - Docker service management (managed mode)
   - Test case execution with config injection
   - Artifact collection and consolidation
 
 **3. Test Cases**
-- `src/nemo_retriever_harness/cases/e2e.py` - Primary E2E test (✅ YAML-based)
+- `src/nv_ingest_harness/cases/e2e.py` - Primary E2E test (✅ YAML-based)
   - Accepts config object directly
   - Type-safe parameter access
   - Full pipeline validation (extract → embed → VDB → retrieval)
@@ -677,19 +679,19 @@ This provides:
 - `cases/e2e_with_llm_summary.py` - E2E with LLM (✅ YAML-based)
   - Adds UDF-based LLM summarization
   - Same config-based architecture as e2e.py
-- `src/nemo_retriever_harness/cases/recall.py` - Recall evaluation (✅ YAML-based)
+- `src/nv_ingest_harness/cases/recall.py` - Recall evaluation (✅ YAML-based)
   - Evaluates retrieval accuracy against existing collections
   - Requires `recall_dataset` in config (from dataset config or env var)
   - Supports reranker comparison modes (none, with, both)
   - Multimodal-only evaluation against `{test_name}_multimodal` collection
-- `src/nemo_retriever_harness/cases/e2e_recall.py` - E2E + Recall (✅ YAML-based)
+- `src/nv_ingest_harness/cases/e2e_recall.py` - E2E + Recall (✅ YAML-based)
   - Combines ingestion (via e2e.py) with recall evaluation (via recall.py)
   - Automatically creates collection during ingestion
   - Requires `recall_dataset` in config (from dataset config or env var)
   - Merges ingestion and recall metrics in results
 
 **4. Shared Utilities**
-- `src/nemo_retriever_harness/utils/interact.py` - Common testing utilities
+- `src/nv_ingest_harness/utils/interact.py` - Common testing utilities
   - `embed_info()` - Embedding model detection
   - `milvus_chunks()` - Vector database statistics
   - `segment_results()` - Result categorization by type
