@@ -34,8 +34,6 @@ except ImportError as e:  # pragma: no cover
         "Please install at least: torch (and for actual retrieval: transformers, optionally flash-attn)."
     ) from e
 
-from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
-
 
 class _ColEmbedState:
     def __init__(
@@ -43,7 +41,7 @@ class _ColEmbedState:
         *,
         model_id: str,
         device: str,
-        corpus_chunk_size: int,
+        max_scoring_batch_size: int,
         batch_size: int,
         corpus_batch_size: int,
         top_k: int,
@@ -51,7 +49,7 @@ class _ColEmbedState:
     ) -> None:
         self.model_id = model_id
         self.device = device
-        self.corpus_chunk_size = corpus_chunk_size
+        self.max_scoring_batch_size = max_scoring_batch_size
         self.batch_size = batch_size
         self.corpus_batch_size = corpus_batch_size
         self.top_k = top_k
@@ -149,6 +147,8 @@ class _ColEmbedState:
                 return emb
             except Exception:
                 logger.debug("Cache load failed for %s, recomputing", cache_path, exc_info=True)
+                # fall through to recompute
+                pass
 
         t0 = time.time()
         emb = self._embed_corpus_batched(corpus)
@@ -160,58 +160,60 @@ class _ColEmbedState:
         return emb
 
     def _embed_query(self, query: str) -> torch.Tensor:
-        # Returns CPU tensor [seq_len, embed_dim]
         with torch.no_grad():
-            q_emb = self.model.forward_queries([query], batch_size=1).cpu()
-        return q_emb[0]  # [seq_len, dim]
+            q_emb = self.model.forward_queries([query], batch_size=1).detach()
+        return q_emb[0].to(self.device)  # [seq_len, dim] on GPU
 
-    def _score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        if self.corpus_embeddings_cpu is None:
-            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
+    def _score_query(self, query_embedding: torch.Tensor) -> torch.Tensor:
+        emb_gpu = self.corpus_embeddings_gpu
+        emb_cpu = self.corpus_embeddings_cpu
+        if emb_gpu is None and emb_cpu is None:
+            raise RuntimeError("No corpus embeddings available.")
 
-        num_corpus = self.corpus_embeddings_cpu.shape[0]
-        scores_cpu = torch.empty(num_corpus, dtype=torch.float32, device="cpu")
-        chunk = self.corpus_chunk_size
+        num_corpus = (emb_gpu if emb_gpu is not None else emb_cpu).shape[0]
         device = self.device
+        scores = torch.empty(num_corpus, dtype=torch.float32, device=device)
+
+        chunk = max(1, int(self.max_scoring_batch_size))
 
         with torch.no_grad():
-            q_gpu = query_embedding_cpu.to(device, non_blocking=True)  # [q_seq, dim]
-            q_t = q_gpu.transpose(0, 1)  # [dim, q_seq]
+            q_t = query_embedding.transpose(0, 1)  # [dim, q_seq]
 
             for c_start in range(0, num_corpus, chunk):
                 c_end = min(c_start + chunk, num_corpus)
-
-                if self.corpus_embeddings_gpu is not None:
-                    c_gpu = self.corpus_embeddings_gpu[c_start:c_end]
-                else:
-                    c_gpu = self.corpus_embeddings_cpu[c_start:c_end].to(device, non_blocking=True)
-
-                token_sims = torch.matmul(c_gpu, q_t)  # [chunk, c_seq, q_seq]
+                c_chunk = emb_gpu[c_start:c_end] if emb_gpu is not None else emb_cpu[c_start:c_end].to(device)
+                token_sims = torch.matmul(c_chunk, q_t)  # [chunk, c_seq, q_seq]
                 chunk_scores = token_sims.max(dim=1).values.float().sum(dim=1)  # [chunk]
-                scores_cpu[c_start:c_end] = chunk_scores.cpu()
+                scores[c_start:c_end] = chunk_scores
 
-        return scores_cpu
+        return scores
 
     def retrieve_one(
         self, query: str, *, return_markdown: bool = False
     ) -> Union[Dict[str, float], Tuple[Dict[str, float], Dict[str, str]]]:
-        if self.corpus_ids is None or self.corpus_embeddings_cpu is None or self.corpus_markdown is None:
+        if (
+            self.corpus_ids is None
+            or (self.corpus_embeddings_gpu is None and self.corpus_embeddings_cpu is None)
+            or self.corpus_markdown is None
+        ):
             raise RuntimeError("Retriever not initialized. Call retriever.init(...) first.")
 
-        query_embedding_cpu = self._embed_query(query)
-        scores_cpu = self._score_query(query_embedding_cpu)
+        q_emb = self._embed_query(query)
+        scores = self._score_query(q_emb)
 
         k = min(self.top_k, len(self.corpus_ids))
-        topk_scores, topk_indices = torch.topk(scores_cpu, k)
+        topk_scores, topk_indices = torch.topk(scores, k)
 
         corpus_ids = self.corpus_ids
-        run = {corpus_ids[int(idx)]: float(score) for idx, score in zip(topk_indices.tolist(), topk_scores.tolist())}
+        topk_indices_cpu = topk_indices.cpu().tolist()
+        topk_scores_cpu = topk_scores.cpu().tolist()
+        run = {corpus_ids[int(idx)]: float(score) for idx, score in zip(topk_indices_cpu, topk_scores_cpu)}
 
         if not return_markdown:
             return run
 
         corpus_markdown = self.corpus_markdown
-        markdown_by_id = {corpus_ids[int(idx)]: corpus_markdown[int(idx)] for idx in topk_indices.tolist()}
+        markdown_by_id = {corpus_ids[int(idx)]: corpus_markdown[int(idx)] for idx in topk_indices_cpu}
         return run, markdown_by_id
 
 
@@ -238,9 +240,8 @@ class ColEmbedSingletonRetriever:
         top_k: int = 100,
         batch_size: int = 32,
         corpus_batch_size: int = 32,
-        corpus_chunk_size: int = 256,
+        max_scoring_batch_size: int = 256,
         cache_dir: str | Path = "cache",
-        preload_corpus_to_gpu: bool = True,
     ) -> None:
         """
         Initialize (or re-initialize) the singleton for a given dataset/corpus.
@@ -259,7 +260,7 @@ class ColEmbedSingletonRetriever:
                 self._state = _ColEmbedState(
                     model_id=model_id,
                     device=device,
-                    corpus_chunk_size=corpus_chunk_size,
+                    max_scoring_batch_size=max_scoring_batch_size,
                     batch_size=batch_size,
                     corpus_batch_size=corpus_batch_size,
                     top_k=top_k,
@@ -270,7 +271,7 @@ class ColEmbedSingletonRetriever:
                 self._state.top_k = top_k
                 self._state.batch_size = batch_size
                 self._state.corpus_batch_size = corpus_batch_size
-                self._state.corpus_chunk_size = corpus_chunk_size
+                self._state.max_scoring_batch_size = max_scoring_batch_size
                 self._state.cache_dir = cache_dir
 
             # If already initialized for the same dataset with same corpus_ids length, keep as-is.
@@ -294,12 +295,9 @@ class ColEmbedSingletonRetriever:
             self._state.corpus_markdown = corpus_markdown
             self._state.corpus_embeddings_cpu = corpus_embeddings_cpu
 
-            # Optional preload to GPU for faster repeated retrieval.
             self._state.corpus_embeddings_gpu = None
-            if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
-                    corpus_embeddings_cpu, self._state.device
-                )
+            if corpus_embeddings_cpu.shape[0] <= self._state.max_scoring_batch_size:
+                self._state.corpus_embeddings_gpu = corpus_embeddings_cpu.to(self._state.device)
 
     def retrieve(
         self, query: str, *, return_markdown: bool = False

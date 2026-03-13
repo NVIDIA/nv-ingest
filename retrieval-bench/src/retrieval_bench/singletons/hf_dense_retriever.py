@@ -39,9 +39,18 @@ try:
 except ImportError as e:  # pragma: no cover
     raise ImportError("Required dependencies not installed for HF dense retriever. Install: torch") from e
 
-from retrieval_bench.singletons._shared import hash_corpus_ids10 as _hash_corpus_ids10
-from retrieval_bench.singletons._shared import slugify as _slugify
-from retrieval_bench.singletons._shared import try_preload_corpus_to_gpu as _try_preload_corpus_to_gpu
+
+def _hash_corpus_ids10(corpus_ids: Sequence[str]) -> str:
+    h = hashlib.sha256()
+    for cid in corpus_ids:
+        h.update(str(cid).encode("utf-8"))
+        h.update(b"\n")
+    return h.hexdigest()[:10]
+
+
+def _slugify(value: str) -> str:
+    v = (value or "").strip().replace("/", "__")
+    return v or "unnamed"
 
 
 def _last_token_pool(last_hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
@@ -139,7 +148,7 @@ class _HfDenseState:
         score_scale: float,
         batch_size: int,
         corpus_batch_size: int,
-        scoring_batch_size: int,
+        max_scoring_batch_size: int,
         top_k: int,
         cache_dir: Path,
     ) -> None:
@@ -153,7 +162,7 @@ class _HfDenseState:
         self.score_scale = float(score_scale)
         self.batch_size = int(batch_size)
         self.corpus_batch_size = int(corpus_batch_size)
-        self.scoring_batch_size = int(scoring_batch_size)
+        self.max_scoring_batch_size = int(max_scoring_batch_size)
         self.top_k = int(top_k)
         self.cache_dir = cache_dir
 
@@ -322,6 +331,7 @@ class _HfDenseState:
                 return emb
             except Exception:
                 logger.debug("Cache load failed for %s, recomputing", emb_path, exc_info=True)
+                pass
 
         # Build from scratch.
         emb_path.parent.mkdir(parents=True, exist_ok=True)
@@ -345,36 +355,40 @@ class _HfDenseState:
             q = str(self.query_prefix) + str(query_text)
         else:
             q = _wrap_instruct(self.task_description, str(query_text))
-        emb = self._embed_texts_batched([q], batch_size=1)
-        if emb.ndim != 2 or emb.shape[0] != 1:
-            raise RuntimeError(f"Unexpected query embedding shape: {tuple(emb.shape)}")
-        return emb[0]  # [dim] on CPU
 
-    def score_query(self, query_embedding_cpu: torch.Tensor) -> torch.Tensor:
-        if self.corpus_embeddings_cpu is None:
-            raise RuntimeError("corpus_embeddings_cpu is not set; call init() first")
-        num_docs = self.corpus_embeddings_cpu.shape[0]
-        scores_cpu = torch.empty((num_docs,), dtype=torch.float32, device="cpu")
+        with torch.no_grad():
+            batch = self._tokenize([q])
+            outputs = self.model(**batch)
+            pooled = self._pool(outputs.last_hidden_state, batch["attention_mask"])
+            mode = str(self.pooling or "last_token").strip().lower()
+            if mode not in ("mean", "avg", "average"):
+                pooled = F.normalize(pooled, p=2, dim=1)
 
-        chunk = max(1, int(self.scoring_batch_size))
+        return pooled[0].detach()  # [dim], stays on GPU
+
+    def score_query(self, query_embedding: torch.Tensor) -> torch.Tensor:
+        emb_gpu = self.corpus_embeddings_gpu
+        emb_cpu = self.corpus_embeddings_cpu
+        if emb_gpu is None and emb_cpu is None:
+            raise RuntimeError("No corpus embeddings available.")
+
+        num_docs = (emb_gpu if emb_gpu is not None else emb_cpu).shape[0]
+        device = str(self.device)
+        scores = torch.empty((num_docs,), dtype=torch.float32, device=device)
+
+        chunk = max(1, int(self.max_scoring_batch_size))
         scale = float(self.score_scale)
 
         with torch.no_grad():
-            q_gpu = query_embedding_cpu.to(self.device, non_blocking=True)  # [dim]
-            q_gpu = q_gpu.unsqueeze(1)  # [dim, 1]
+            q_col = query_embedding.unsqueeze(1)  # [dim, 1]
 
             for c_start in range(0, num_docs, chunk):
                 c_end = min(c_start + chunk, num_docs)
-                if self.corpus_embeddings_gpu is not None:
-                    c_gpu = self.corpus_embeddings_gpu[c_start:c_end]
-                else:
-                    c_gpu = self.corpus_embeddings_cpu[c_start:c_end].to(self.device, non_blocking=True)
+                c_chunk = emb_gpu[c_start:c_end] if emb_gpu is not None else emb_cpu[c_start:c_end].to(device)
+                chunk_scores = torch.matmul(c_chunk, q_col).squeeze(1).float() * scale
+                scores[c_start:c_end] = chunk_scores
 
-                # [chunk, dim] @ [dim, 1] -> [chunk, 1]
-                chunk_scores = torch.matmul(c_gpu, q_gpu).squeeze(1).float() * scale
-                scores_cpu[c_start:c_end] = chunk_scores.to("cpu")
-
-        return scores_cpu
+        return scores
 
     def retrieve_one(
         self,
@@ -383,38 +397,40 @@ class _HfDenseState:
         return_markdown: bool = False,
         excluded_ids: Optional[Sequence[str]] = None,
     ) -> Union[Dict[str, float], Tuple[Dict[str, float], Dict[str, str]]]:
-        if self.corpus_ids is None or self.corpus_embeddings_cpu is None or self.corpus_markdown is None:
+        if (
+            self.corpus_ids is None
+            or (self.corpus_embeddings_gpu is None and self.corpus_embeddings_cpu is None)
+            or self.corpus_markdown is None
+        ):
             raise RuntimeError("Retriever not initialized. Call retriever.init(...) first.")
 
-        q_emb_cpu = self.embed_query(query)
-        scores_cpu = self.score_query(q_emb_cpu)
+        q_emb = self.embed_query(query)
+        scores = self.score_query(q_emb)
 
-        # Apply per-query excluded ids BEFORE top-k selection (BRIGHT semantics).
-        # This prevents excluded docs from "stealing" slots in top-k.
         if excluded_ids and self.corpus_id_to_idx:
+            excluded_indices = []
             for did in set(str(x) for x in excluded_ids):
                 if did == "N/A":
                     continue
                 idx = self.corpus_id_to_idx.get(did, None)
-                if idx is None:
-                    continue
-                try:
-                    scores_cpu[int(idx)] = float("-inf")
-                except Exception:
-                    # Ignore malformed indices; keep scoring robust.
-                    pass
+                if idx is not None:
+                    excluded_indices.append(int(idx))
+            if excluded_indices:
+                scores[torch.tensor(excluded_indices, device=scores.device)] = float("-inf")
 
         k = min(int(self.top_k), len(self.corpus_ids))
-        topk_scores, topk_indices = torch.topk(scores_cpu, k)
+        topk_scores, topk_indices = torch.topk(scores, k)
 
         ids = self.corpus_ids
-        run = {ids[int(idx)]: float(score) for idx, score in zip(topk_indices.tolist(), topk_scores.tolist())}
+        topk_indices_cpu = topk_indices.cpu().tolist()
+        topk_scores_cpu = topk_scores.cpu().tolist()
+        run = {ids[int(idx)]: float(score) for idx, score in zip(topk_indices_cpu, topk_scores_cpu)}
 
         if not return_markdown:
             return run
 
         md = self.corpus_markdown
-        markdown_by_id = {ids[int(idx)]: md[int(idx)] for idx in topk_indices.tolist()}
+        markdown_by_id = {ids[int(idx)]: md[int(idx)] for idx in topk_indices_cpu}
         return run, markdown_by_id
 
 
@@ -444,9 +460,8 @@ class HfDenseSingletonRetriever:
         score_scale: float = 100.0,
         batch_size: int = 1,
         corpus_batch_size: int = 1,
-        scoring_batch_size: int = 4096,
+        max_scoring_batch_size: int = 4096,
         cache_dir: str | Path = "cache/hf_dense",
-        preload_corpus_to_gpu: bool = False,
     ) -> None:
         """
         Initialize (or re-initialize) the singleton for a given dataset/corpus.
@@ -476,7 +491,7 @@ class HfDenseSingletonRetriever:
                     score_scale=float(score_scale),
                     batch_size=int(batch_size),
                     corpus_batch_size=int(corpus_batch_size),
-                    scoring_batch_size=int(scoring_batch_size),
+                    max_scoring_batch_size=int(max_scoring_batch_size),
                     top_k=int(top_k),
                     cache_dir=cache_dir,
                 )
@@ -485,7 +500,7 @@ class HfDenseSingletonRetriever:
                 self._state.top_k = int(top_k)
                 self._state.batch_size = int(batch_size)
                 self._state.corpus_batch_size = int(corpus_batch_size)
-                self._state.scoring_batch_size = int(scoring_batch_size)
+                self._state.max_scoring_batch_size = int(max_scoring_batch_size)
                 self._state.cache_dir = cache_dir
                 self._state.task_description = str(task_description)
                 self._state.query_prefix = str(query_prefix) if isinstance(query_prefix, str) else None
@@ -502,12 +517,10 @@ class HfDenseSingletonRetriever:
                 and _hash_corpus_ids10(self._state.corpus_ids) == corpus_ids_hash10
                 and self._state.corpus_embeddings_cpu is not None
             ):
-                # Already initialized for the same corpus; only (possibly) update GPU preload.
-                if preload_corpus_to_gpu and self._state.corpus_embeddings_gpu is None:
-                    self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(
-                        self._state.corpus_embeddings_cpu, self._state.device
-                    )
-                if (not preload_corpus_to_gpu) and self._state.corpus_embeddings_gpu is not None:
+                should_be_on_gpu = len(corpus_ids_list) <= self._state.max_scoring_batch_size
+                if should_be_on_gpu and self._state.corpus_embeddings_gpu is None:
+                    self._state.corpus_embeddings_gpu = self._state.corpus_embeddings_cpu.to(self._state.device)
+                if (not should_be_on_gpu) and self._state.corpus_embeddings_gpu is not None:
                     self._state.corpus_embeddings_gpu = None
                 return
 
@@ -524,8 +537,8 @@ class HfDenseSingletonRetriever:
             self._state.corpus_embeddings_cpu = emb_cpu
 
             self._state.corpus_embeddings_gpu = None
-            if preload_corpus_to_gpu:
-                self._state.corpus_embeddings_gpu = _try_preload_corpus_to_gpu(emb_cpu, self._state.device)
+            if emb_cpu.shape[0] <= self._state.max_scoring_batch_size:
+                self._state.corpus_embeddings_gpu = emb_cpu.to(self._state.device)
 
     def retrieve(
         self, query: str, *, return_markdown: bool = False, excluded_ids: Optional[Sequence[str]] = None
