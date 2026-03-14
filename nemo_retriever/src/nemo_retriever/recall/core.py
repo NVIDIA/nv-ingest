@@ -198,10 +198,6 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
             if page_number is not None and source:
                 filename = Path(source).stem
                 keys.append(f"{filename}_{str(page_number)}")
-            # if res.get("page_number") is not None and source.get("source_id"):
-            if page_number is not None and source:
-                filename = Path(source).stem
-                keys.append(f"{filename}_{str(page_number)}")
             else:
                 logger.warning(
                     "Skipping hit with missing page_number or source_id: metadata=%s source=%s",
