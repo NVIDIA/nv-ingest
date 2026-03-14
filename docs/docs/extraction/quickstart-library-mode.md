@@ -216,7 +216,7 @@ client = OpenAI(
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-  model="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
+  model="nvidia/nemotron-nano-12b-v2-vl",
   messages=[{"role":"user","content": prompt}],
 )
 response = completion.choices[0].message.content
@@ -448,9 +448,9 @@ The `run_pipeline` function accepts the following parameters.
 
 | Parameter                | Type                   | Default | Required? | Description                                     |
 |--------------------------|------------------------|---------|-----------|-------------------------------------------------|
-| pipeline_config            | PipelineConfigSchema | —       | Yes       | A configuration object that specifies how the pipeline should be constructed. |
-| run_in_subprocess        | bool                   | False   | Yes       | `True` to launch the pipeline in a separate Python subprocess. `False` to run in the current process. |
-| block                    | bool                   | True    | Yes       | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
+| pipeline_config            | PipelineConfigSchema | —       | No        | A configuration object that specifies how the pipeline should be constructed. Default `None`; auto-loaded when `libmode=True`. |
+| run_in_subprocess        | bool                   | False   | No        | `True` to launch the pipeline in a separate Python subprocess. `False` to run in the current process. |
+| block                    | bool                   | True    | No        | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
 | disable_dynamic_scaling  | bool                   | None    | No        | `True` to disable autoscaling regardless of global settings. `None` to use the global default behavior. |
 | dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
 | stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
@@ -464,7 +464,7 @@ The `run_pipeline` function returns the following values, depending on the param
 - **run_in_subprocess=False and block=True**  — The function returns a `float` that represents the elapsed time in seconds.
 - **run_in_subprocess=False and block=False** — The function returns a `RayPipelineInterface` object.
 - **run_in_subprocess=True  and block=True**  — The function returns `0.0`.
-- **run_in_subprocess=True  and block=False** — The function returns a `RayPipelineInterface` object.
+- **run_in_subprocess=True  and block=False** — The function returns a `RayPipelineSubprocessInterface` object.
 
 
 The `run_pipeline` throws the following errors:

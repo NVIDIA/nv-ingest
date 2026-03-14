@@ -36,8 +36,8 @@ NeMo Retriever Library currently does not support image captioning via VLM. It w
 | [25.6.2](https://docs.nvidia.com/nemo/retriever/25.6.2/extraction/releasenotes-nv-ingest/) 
 | [25.4.2](https://docs.nvidia.com/nemo/retriever/25.4.2/extraction/releasenotes-nv-ingest/) 
 | [25.3.0](https://docs.nvidia.com/nemo/retriever/25.3.0/extraction/releasenotes-nv-ingest/) 
-| [24.12.1](https://docs.nvidia.com/nemo/retriever/25.3.0/extraction/releasenotes-nv-ingest/) 
-| [24.12.0](https://docs.nvidia.com/nemo/retriever/25.3.0/extraction/releasenotes-nv-ingest/) 
+| [24.12.1](https://docs.nvidia.com/nemo/retriever/24.12.1/extraction/releasenotes-nv-ingest/)
+| [24.12.0](https://docs.nvidia.com/nemo/retriever/24.12.0/extraction/releasenotes-nv-ingest/)
 |
 
 

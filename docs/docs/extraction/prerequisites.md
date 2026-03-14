@@ -37,7 +37,7 @@ For additional hardware details, refer to [Support Matrix](support-matrix.md).
 
 - **System Memory**: At least 256 GB RAM
 - **CPU Cores**: At least 32 CPU cores
-- **GPU**: NVIDIA GPU with at least 24 GB VRAM (e.g., A100, V100, or equivalent)
+- **GPU**: NVIDIA GPU with at least 24 GB VRAM. See the [Support Matrix](support-matrix.md) for supported GPUs (e.g., A100, A10G, L40S).
 
 !!! note
 

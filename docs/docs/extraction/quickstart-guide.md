@@ -81,7 +81,18 @@ g. When core services have fully started, `nvidia-smi` should show processes lik
 h. Run the command `docker ps`. You should see output similar to the following. Confirm that the status of the containers is `Up`.
 
     ```
-    CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS            NAMES
+    CONTAINER ID  IMAGE                                            COMMAND                 CREATED         STATUS                  PORTS                    NAMES
+    a1b2c3d4e5f6  nvcr.io/.../page-elements:latest                  "..."                   10 minutes ago  Up 10 minutes            0.0.0.0:8002->8002/tcp   nemo-retriever-page-elements-1
+    b2c3d4e5f6a1  nvcr.io/.../ocr:latest                            "..."                   10 minutes ago  Up 10 minutes            0.0.0.0:8001->8001/tcp   nemo-retriever-ocr-1
+    c3d4e5f6a1b2  nvcr.io/.../nv-ingest-ms-runtime:latest           "..."                   10 minutes ago  Up 10 minutes            0.0.0.0:5000->5000/tcp   nemo-retriever-ms-runtime-1
+    d4e5f6a1b2c3  nvcr.io/.../milvus:latest                         "..."                   12 minutes ago  Up 12 minutes            0.0.0.0:19530->19530/tcp nemo-retriever-milvus-1
+    ```
+
+## Step 2: Install the Client
+
+Install the NeMo Retriever Library client on your host so you can send requests to the services you started in Step 1. Using a virtual environment is recommended:
+
+```bash
 uv venv --python 3.12 nv-ingest-dev
 source nv-ingest-dev/bin/activate
 uv pip install nv-ingest==26.3.0-RC4 nv-ingest-api==26.3.0-RC4 nv-ingest-client==26.3.0-RC4
@@ -89,7 +100,7 @@ uv pip install nv-ingest==26.3.0-RC4 nv-ingest-api==26.3.0-RC4 nv-ingest-client=
 
 !!! tip
 
-    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nemo_retriever` in the result. You can do this before any pip or python command that you run.
+    To confirm that you have activated your virtual environment, run `which pip` and `which python`, and confirm that you see `nv-ingest-dev` in the result. You can do this before any pip or python command that you run.
 
 
 !!! note
@@ -101,10 +112,10 @@ To work inside the container, run the following code.
 ```bash
 docker exec -it nemo-retriever-ms-runtime-1 bash
 ```
-This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-activated `nemo_retriever_runtime` conda environment includes all necessary Python client libraries. You should see a prompt similar to the following.
+This command opens a shell in the `/workspace` directory, where the `DATASET_ROOT` from your `.env` file is mounted at `./data`. The pre-configured Python environment in the container includes all necessary Python client libraries. You should see a prompt similar to the following.
 
 ```bash
-(nemo_retriever_runtime) root@your-computer-name:/workspace#
+root@your-computer-name:/workspace#
 ```
 From this prompt, you can run the `nemo-retriever` CLI and Python examples.
 
@@ -284,8 +295,7 @@ You should see output that indicates the document processing status followed by 
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to
-[nltk_data]     /raid/jdyer/miniforge3/envs/nemo-retriever-
-[nltk_data]     dev/lib/python3.10/site-
+[nltk_data]     /path/to/nv-ingest-dev/lib/python3.12/site-
 [nltk_data]     packages/llama_index/core/_static/nltk_cache...
 [nltk_data]   Package punkt_tab is already up-to-date!
 INFO:nemo_retriever.cli:Processing 1 documents.
@@ -400,7 +410,7 @@ You can specify multiple `--profile` options.
 | `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](audio.md). | 
 | `nemotron-parse`      | Advanced | Use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Advanced Visual Parsing](nemoretriever-parse.md). | 
-| `vlm`                 | Advanced | Use [llama 3.1 Nemotron 8B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images). | 
+| `vlm`                 | Advanced | Use [Nemotron Nano 12B v2 VL](https://build.nvidia.com/nvidia/nemotron-nano-12b-v2-vl/modelcard) for experimental image captioning of unstructured images. You can also configure other VLMs for your specific use cases. For more information, refer to [Extract Captions from Images](python-api-reference.md#extract-captions-from-images). | 
 
 
 ## Docker Compose override files
@@ -469,7 +479,7 @@ Set `resources.requests` and `resources.limits` to the name of the MIG resource 
 nemo_retriever:
   nvidiaNim:
     nemoretrieverPageElements:
-      modelName: "meta/llama3-8b-instruct"        # Example NIM model
+      modelName: "nvidia/nemotron-page-elements-v3"   # Page-elements NIM model
       resources:
         limits:
           nvidia.com/mig-3g.20gb: 1               # MIG profile resource

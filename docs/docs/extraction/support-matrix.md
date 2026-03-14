@@ -74,4 +74,4 @@ and run only the embedder, reranker, and your vector database.
 - [Prerequisites](prerequisites.md)
 - [Release Notes](releasenotes-nv-ingest.md)
 - [NVIDIA NIM for Vision Language Models Support Matrix](https://docs.nvidia.com/nim/vision-language-models/latest/support-matrix.html)
-- [NVIDIA NVIDIA Riva Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix/support-matrix.html)
+- [NVIDIA Riva Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix/support-matrix.html)

@@ -40,7 +40,7 @@ Before you change the `-u` setting, consider the following:
 - For `-u` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
 
 ```bash
-ulimit -u 10,000
+ulimit -u 10000
 ```
 
 
@@ -89,7 +89,7 @@ Before you change the `-n` setting, consider the following:
 - For `-n` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
 
 ```bash
-ulimit -n 10,000
+ulimit -n 10000
 ```
 
 
