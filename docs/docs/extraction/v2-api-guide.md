@@ -30,7 +30,7 @@ The V2 API automatically splits large PDFs into smaller chunks before processing
 ### Minimal Example
 
 ```python
-from nemo_retriever.client import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 # Two-step configuration
 ingestor = Ingestor(
@@ -432,7 +432,7 @@ For test scripts like `tools/harness/src/nemo_retriever_harness/cases/e2e.py`:
 
 ```python
 import os
-from nemo_retriever.client import Ingestor
+from nv_ingest_client.client.interface import Ingestor
 
 # Read from environment
 api_version = os.getenv("API_VERSION", "v1")

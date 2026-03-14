@@ -203,7 +203,7 @@ nemo-retriever \
 To submit a .pdf file with both a splitting task and an extraction task, run the following code.
 
 !!! note
-    Currently, `split` only works for pdfium, nemotron-parse, and Unstructured.io.
+    Currently, `split` only works for pdfium and nemotron-parse.
 
 ```bash
 nemo-retriever \
