@@ -191,14 +191,7 @@ def _hits_to_keys(raw_hits: List[List[Dict[str, Any]]]) -> List[List[str]]:
         for h in hits:
             page_number = h["page_number"]
             source = h["source"]
-            page_number = h["page_number"]
-            source = h["source"]
             # Prefer explicit `pdf_page` column; fall back to derived form.
-            # if res.get("page_number") is not None and source.get("source_id"):
-            if page_number is not None and source:
-                filename = Path(source).stem
-                keys.append(f"{filename}_{str(page_number)}")
-            # if res.get("page_number") is not None and source.get("source_id"):
             if page_number is not None and source:
                 filename = Path(source).stem
                 keys.append(f"{filename}_{str(page_number)}")
