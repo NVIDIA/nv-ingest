@@ -975,7 +975,12 @@ def test_resolved_ingest_plan_runs_through_workflow(monkeypatch, tmp_path) -> No
             ),
             embed=ingest_plan.IngestEmbedOptions(
                 local_ingest_embed_backend="hf",
-                batch=ingest_plan.IngestEmbedBatchOptions(embed_gpus_per_actor=0.5),
+                batch=ingest_plan.IngestEmbedBatchOptions(
+                    embed_workers_min=1,
+                    embed_workers_initial=4,
+                    embed_workers_max=8,
+                    embed_gpus_per_actor=0.5,
+                ),
             ),
         )
     )
@@ -1002,6 +1007,9 @@ def test_resolved_ingest_plan_runs_through_workflow(monkeypatch, tmp_path) -> No
     assert isinstance(embed_params, EmbedParams)
     assert embed_params.local_ingest_embed_backend == "hf"
     assert embed_params.batch_tuning.gpu_embed == 0.5
+    assert embed_params.batch_tuning.embed_workers_min == 1
+    assert embed_params.batch_tuning.embed_workers_initial == 4
+    assert embed_params.batch_tuning.embed_workers_max == 8
 
 
 def test_build_ingest_pipeline_attaches_store_after_embed_with_tuning(monkeypatch, tmp_path) -> None:

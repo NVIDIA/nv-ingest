@@ -435,6 +435,29 @@ def test_batch_tuning_to_node_overrides_auto_cpu_only_when_no_gpus(ocr_version: 
     assert overrides["NemotronParseActor"]["concurrency"] == 2
 
 
+def test_batch_tuning_to_node_overrides_builds_elastic_embed_pool() -> None:
+    from nemo_retriever.graph.ingestor_runtime import default_concurrency_node_names
+
+    embed_params = EmbedParams(
+        model_name="nvidia/llama-nemotron-embed-1b-v2",
+        batch_tuning=BatchTuningParams(
+            embed_workers_min=1,
+            embed_workers_initial=4,
+            embed_workers_max=8,
+            gpu_embed=0.5,
+        ),
+    )
+
+    overrides = batch_tuning_to_node_overrides(
+        extract_params=None,
+        embed_params=embed_params,
+    )
+
+    assert overrides["_BatchEmbedActor"]["concurrency"] == (1, 8, 4)
+    assert overrides["_BatchEmbedActor"]["num_gpus"] == 0.5
+    assert "_BatchEmbedActor" not in default_concurrency_node_names(None, embed_params, None, None)
+
+
 def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> None:
     cluster = ClusterResources(
         total_resources=Resources(cpu_count=224, gpu_count=8),

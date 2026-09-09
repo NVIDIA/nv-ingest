@@ -85,6 +85,9 @@ def build_embed_option_kwargs(
     structured_elements_modality: str | None = None,
     embed_granularity: str | None = None,
     embed_workers: int | None = None,
+    embed_workers_min: int | None = None,
+    embed_workers_initial: int | None = None,
+    embed_workers_max: int | None = None,
     embed_batch_size: int | None = None,
     embed_cpus_per_actor: float | None = None,
     embed_gpus_per_actor: float | None = None,
@@ -116,6 +119,9 @@ def build_embed_option_kwargs(
         embed_kwargs["embed_granularity"] = embed_granularity
     embed_tuning = _build_embed_batch_tuning(
         embed_workers=embed_workers,
+        embed_workers_min=embed_workers_min,
+        embed_workers_initial=embed_workers_initial,
+        embed_workers_max=embed_workers_max,
         embed_batch_size=embed_batch_size,
         embed_cpus_per_actor=embed_cpus_per_actor,
         embed_gpus_per_actor=embed_gpus_per_actor,
@@ -128,6 +134,9 @@ def build_embed_option_kwargs(
 def _build_embed_batch_tuning(
     *,
     embed_workers: int | None,
+    embed_workers_min: int | None,
+    embed_workers_initial: int | None,
+    embed_workers_max: int | None,
     embed_batch_size: int | None,
     embed_cpus_per_actor: float | None,
     embed_gpus_per_actor: float | None,
@@ -138,6 +147,9 @@ def _build_embed_batch_tuning(
         key: value
         for key, value in {
             "embed_workers": embed_workers,
+            "embed_workers_min": embed_workers_min,
+            "embed_workers_initial": embed_workers_initial,
+            "embed_workers_max": embed_workers_max,
             "embed_batch_size": embed_batch_size,
             "embed_cpus_per_actor": embed_cpus_per_actor,
             "gpu_embed": embed_gpus_per_actor,

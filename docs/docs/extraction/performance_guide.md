@@ -77,6 +77,60 @@ Related batch-size, CPU, and GPU-per-actor flags are documented in the [CLI inge
 
 Use the Ray dashboard to verify the available-resource snapshot and the planned worker allocation when you tune throughput.
 
+### Use an elastic embedding worker range
+
+Use an elastic embedding actor pool when embedding can use resources that another pipeline stage releases. This option is disabled by default. Continue to set `embed_workers` when you need a fixed embedding pool.
+
+Set all three elastic worker fields together. Do not combine them with `embed_workers`. Each value must be a positive integer, and the values must satisfy `embed_workers_min <= embed_workers_initial <= embed_workers_max`.
+
+The following Python example starts with four embedding actors, keeps a minimum of four actors, and lets Ray grow the pool to eight actors:
+
+```python
+chunks = (
+    create_ingestor(run_mode="batch")
+    .files(documents)
+    .extract()
+    .embed(
+        batch_tuning=BatchTuningParams(
+            embed_workers_min=4,
+            embed_workers_initial=4,
+            embed_workers_max=8,
+            embed_cpus_per_actor=0.5,
+            gpu_embed=0.5,
+        )
+    )
+    .ingest()
+)
+```
+
+The fields control the Ray Data actor pool as follows:
+
+| Field | Behavior |
+| --- | --- |
+| `embed_workers_min` | Sets the lower bound for the active actor pool. |
+| `embed_workers_initial` | Sets the actor count that Ray requests when the pool starts and that resource preflight includes in the initial plan. |
+| `embed_workers_max` | Sets the upper bound that Ray can grow toward while embedding work is queued and resources are available. |
+
+Retriever harness runfiles expose the same range under `ingest.embed.batch`. The following `set` object applies the preceding example:
+
+```json
+{
+  "set": {
+    "ingest.embed.batch.embed_workers_min": 4,
+    "ingest.embed.batch.embed_workers_initial": 4,
+    "ingest.embed.batch.embed_workers_max": 8,
+    "ingest.embed.batch.embed_cpus_per_actor": 0.5,
+    "ingest.embed.batch.embed_gpus_per_actor": 0.5
+  }
+}
+```
+
+The root CLI currently exposes only the fixed `--embed-workers` option. Use `BatchTuningParams` or a harness runfile to configure an elastic range.
+
+Ray CPU and GPU resource values are logical scheduling units. For example, `gpu_embed=0.5` permits two embedding actors to share one logical GPU, but it does not limit each actor to half of the GPU memory. NeMo Retriever Library does not validate model memory, batch memory, or the safe number of colocated actors. Profile GPU memory before increasing the maximum actor count.
+
+An elastic range does not pin actors to devices or wait for named upstream stages to finish. Ray can add actors whenever it has queued embedding work and the requested logical resources. Verify the actor count, device placement, queue backlog, and GPU memory in a representative run before using the range for larger workloads.
+
 ## Tune remote OCR request batching
 
 Remote OCR batches cropped regions across the page rows supplied to one OCR actor call. This behavior applies to in-process, batch, and service ingestion with a remote OCR NIM. It preserves page and region output order.
