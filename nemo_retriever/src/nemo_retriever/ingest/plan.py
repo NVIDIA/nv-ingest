@@ -183,12 +183,12 @@ class IngestChunkOptions:
 @dataclass(frozen=True)
 class IngestEmbedBatchOptions:
     embed_workers: int | None = None
-    embed_workers_min: int | None = None
-    embed_workers_initial: int | None = None
-    embed_workers_max: int | None = None
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
+    embed_workers_min: int | None = None
+    embed_workers_initial: int | None = None
+    embed_workers_max: int | None = None
 
 
 @dataclass(frozen=True)

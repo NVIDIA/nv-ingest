@@ -948,6 +948,18 @@ def test_root_ingest_rejects_dedup_threshold_without_enabling_dedup(
     fake_ingestor.embed.assert_not_called()
 
 
+def test_embed_batch_options_preserve_existing_positional_arguments() -> None:
+    options = ingest_plan.IngestEmbedBatchOptions(4, 32, 0.5, 0.35)
+
+    assert options.embed_workers == 4
+    assert options.embed_batch_size == 32
+    assert options.embed_cpus_per_actor == 0.5
+    assert options.embed_gpus_per_actor == 0.35
+    assert options.embed_workers_min is None
+    assert options.embed_workers_initial is None
+    assert options.embed_workers_max is None
+
+
 def test_resolved_ingest_plan_runs_through_workflow(monkeypatch, tmp_path) -> None:
     fake_ingestor = _make_fake_ingestor()
     document = tmp_path / "programmatic-plan.pdf"
