@@ -521,9 +521,7 @@ class BatchTuningParams(_ParamsModel):
                 "embed_workers_initial, or embed_workers_max."
             )
         if configured_elastic_workers and len(configured_elastic_workers) != len(elastic_workers):
-            raise ValueError(
-                "embed_workers_min, embed_workers_initial, and embed_workers_max must be set together."
-            )
+            raise ValueError("embed_workers_min, embed_workers_initial, and embed_workers_max must be set together.")
         if configured_elastic_workers:
             minimum, initial, maximum = (int(value) for value in elastic_workers if value is not None)
             if minimum < 1 or initial < 1 or maximum < 1:
