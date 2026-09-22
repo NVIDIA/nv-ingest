@@ -79,11 +79,11 @@ Use the Ray dashboard to verify the available-resource snapshot and the planned 
 
 ### Use an elastic embedding worker range
 
-Use an elastic embedding actor pool when embedding can use resources that another pipeline stage releases. This option is disabled by default. Continue to set `embed_workers` when you need a fixed embedding pool.
+Use an elastic embedding actor pool to let Ray Data adjust the embedding actor count within explicit bounds. This option is disabled by default. It uses Ray's native actor-pool scheduling, not an adaptive policy that NeMo Retriever Library enables automatically. Continue to set `embed_workers` when you need a fixed embedding pool.
 
 Set all three elastic worker fields together. Do not combine them with `embed_workers`. Each value must be a positive integer, and the values must satisfy `embed_workers_min <= embed_workers_initial <= embed_workers_max`.
 
-The following Python example starts with four embedding actors, keeps a minimum of four actors, and lets Ray grow the pool to eight actors:
+The following Python example requests four initial embedding actors, sets a minimum of four actors, and permits growth to eight actors. These values illustrate the controls, not a recommended allocation for every workload:
 
 ```python
 chunks = (
@@ -111,6 +111,8 @@ The fields control the Ray Data actor pool as follows:
 | `embed_workers_initial` | Sets the actor count that Ray requests when the pool starts and that resource preflight includes in the initial plan. |
 | `embed_workers_max` | Sets the upper bound that Ray can grow toward while embedding work is queued and resources are available. |
 
+Preflight budgets the initial actors alongside other pipeline stages and required task reservations. It does not reserve capacity for the maximum actor count or guarantee that the pool reaches that count. Each additional actor must obtain its requested logical CPU and GPU resources at runtime.
+
 Retriever harness runfiles expose the same range under `ingest.embed.batch`. The following `set` object applies the preceding example:
 
 ```json
@@ -129,7 +131,11 @@ The root CLI currently exposes only the fixed `--embed-workers` option. Use `Bat
 
 Ray CPU and GPU resource values are logical scheduling units. For example, `gpu_embed=0.5` permits two embedding actors to share one logical GPU, but it does not limit each actor to half of the GPU memory. NeMo Retriever Library does not validate model memory, batch memory, or the safe number of colocated actors. Profile GPU memory before increasing the maximum actor count.
 
-An elastic range does not pin actors to devices or wait for named upstream stages to finish. Ray can add actors whenever it has queued embedding work and the requested logical resources. Verify the actor count, device placement, queue backlog, and GPU memory in a representative run before using the range for larger workloads.
+An elastic range does not pin actors to devices, wait for named upstream stages to finish, or guarantee when upstream actors release resources. Ray controls pool growth and shrinkage. Additional actors incur startup costs, including model loading for local inference, so growth does not guarantee an end-to-end speedup. Verify the actor count, device placement, queue backlog, and GPU memory in a representative run before using the range for larger workloads.
+
+To isolate the effect of embedding concurrency, compare fixed and elastic pools using the same frozen extracted chunks, stable chunk identifiers, modalities, and embedding inputs. Keep model revisions, precision, embedding settings, and index and retrieval settings unchanged. Changing extraction outputs between runs prevents attributing a quality difference to the worker range alone.
+
+Check retrieval quality with the same queries and relevance labels. Compare per-query results and metrics, not only aggregate scores or output row counts. A worker-range setting alone does not establish quality invariance. Measure end-to-end latency, including actor startup, under controlled cache and startup conditions before choosing a range for your deployment.
 
 ## Tune remote OCR request batching
 
