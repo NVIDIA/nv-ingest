@@ -8,6 +8,7 @@ from typing import Any
 
 import pandas as pd
 
+from nemo_retriever.common.nvtx import batch_phase
 from nemo_retriever.operators.abstract_operator import AbstractOperator
 from nemo_retriever.operators.gpu_operator import GPUOperator
 from nemo_retriever.models.nim.nim import NIMClient
@@ -22,6 +23,7 @@ class PageElementDetectionActor(AbstractOperator, GPUOperator):
       ds = ds.map_batches(PageElementDetectionActor, fn_constructor_kwargs={...}, batch_format="pandas")
     """
 
+    @batch_phase("page_elements.startup")
     def __init__(self, **detect_kwargs: Any) -> None:
         super().__init__(**detect_kwargs)
         self.detect_kwargs = dict(detect_kwargs)
@@ -46,6 +48,7 @@ class PageElementDetectionActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @batch_phase("page_elements.batch")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return detect_page_elements_v3(
             data,

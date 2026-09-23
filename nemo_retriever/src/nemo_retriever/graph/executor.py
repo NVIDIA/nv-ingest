@@ -13,6 +13,8 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 import pandas as pd
 
+from nemo_retriever.common.nvtx import batch_phase
+
 if TYPE_CHECKING:
     import ray.data
 
@@ -133,6 +135,7 @@ def arrow_table_to_pandas(table: Any) -> pd.DataFrame:
     return _normalize_object_tensor_columns(_materialize_row_unsafe_columns(table, frame))
 
 
+@batch_phase("ray.materialize")
 def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     """Materialize a Ray Dataset without returning malformed Arrow arrays.
 
@@ -161,6 +164,13 @@ def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     schema = dataset.schema()
     names = getattr(schema, "names", None)
     return pd.DataFrame(columns=list(names) if names is not None else None)
+
+
+@batch_phase("result.concat")
+def _concat_terminal_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    """Concatenate retained terminal batches under one low-cardinality range."""
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def call_pandas_function_on_arrow(
@@ -692,7 +702,7 @@ class RayDataExecutor(AbstractExecutor):
             return ray_dataset_to_pandas(downstream)
 
         if terminal_frames:
-            return pd.concat(terminal_frames, ignore_index=True)
+            return _concat_terminal_frames(terminal_frames)
         schema = dataset.schema()
         names = getattr(schema, "names", None)
         return pd.DataFrame(columns=list(names) if names is not None else None)

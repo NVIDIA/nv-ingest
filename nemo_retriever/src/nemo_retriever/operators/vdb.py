@@ -11,6 +11,7 @@ from typing import Any
 
 import pandas as pd
 
+from nemo_retriever.common.nvtx import batch_phase
 from nemo_retriever.common.vdb.adt_vdb import CollectionWriteContext, UnsupportedVDBOperation, VDB
 from nemo_retriever.common.vdb.factory import get_vdb_op_cls
 from nemo_retriever.common.vdb.records import (
@@ -173,8 +174,9 @@ class IngestVdbOperator(AbstractOperator):
 
         return bool(getattr(self._vdb, "supports_stream_ingest", False))
 
+    @batch_phase("pipeline.terminal_stream")
     def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> None:
-        """Lazily convert executor batches and delegate one backend stream."""
+        """Lazily execute upstream batches and delegate one backend stream."""
 
         if not self._supports_stream_ingest():
             raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not implement stream_ingest()")

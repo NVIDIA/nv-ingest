@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-"""Lightweight NVTX helpers for GPU inference profiling.
+"""Lightweight NVTX helpers for GPU inference and batch profiling.
 
 Usage::
 
@@ -10,6 +10,9 @@ Usage::
     with gpu_inference_range("NemotronOCRv1", batch_size=8):
         result = self._model(input_data)
 
+Use :func:`batch_phase` to add a stable, low-cardinality range around a
+batch-level function. Batch ranges use the ``nrl.batch::`` prefix.
+
 When ``nsys`` is launched with ``--capture-range=nvtx --nvtx-capture=gpu_inference``,
 only the code inside these blocks is captured.  When no profiler is attached the
 overhead is near-zero (a pair of C-level push/pop calls).
@@ -17,9 +20,43 @@ overhead is near-zero (a pair of C-level push/pop calls).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from contextlib import contextmanager
+from functools import wraps
+from typing import ParamSpec, TypeVar
 
 import torch.cuda.nvtx as _nvtx
+
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def batch_phase(label: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
+    """Mark a semantic batch boundary without synchronizing CUDA.
+
+    The range is a no-op when PyTorch was built without NVTX support.
+    """
+
+    range_name = f"nrl.batch::{label}"
+
+    def decorate(function: Callable[_P, _R]) -> Callable[_P, _R]:
+        @wraps(function)
+        def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+            try:
+                _nvtx.range_push(range_name)
+            except RuntimeError as exc:
+                if "NVTX functions not installed" not in str(exc):
+                    raise
+                return function(*args, **kwargs)
+            try:
+                return function(*args, **kwargs)
+            finally:
+                _nvtx.range_pop()
+
+        return wrapped
+
+    return decorate
 
 
 @contextmanager

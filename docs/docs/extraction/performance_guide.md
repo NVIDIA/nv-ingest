@@ -77,6 +77,57 @@ Related batch-size, CPU, and GPU-per-actor flags are documented in the [CLI inge
 
 Use the Ray dashboard to verify the available-resource snapshot and the planned worker allocation when you tune throughput.
 
+## Profile batch ingestion with Nsight Systems
+
+Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray
+actor processes. Use NVIDIA Nsight Systems to correlate these semantic stages
+with CUDA and operating system activity. Start with a representative, bounded
+input because profiler tracing can increase runtime and report size.
+
+Run a batch ingest under `nsys profile` as follows:
+
+```bash
+nsys profile \
+  --trace=nvtx,cuda,osrt \
+  --sample=none \
+  --wait=all \
+  --output=nrl-batch-profile \
+  -- retriever ingest batch /path/to/your/pdfs
+```
+
+The command writes `nrl-batch-profile.nsys-rep`. Open the report in the Nsight
+Systems graphical interface, or run `nsys-ui nrl-batch-profile.nsys-rep` on a
+workstation with the interface installed. Search the timeline for
+`nrl.batch::` to find the following ranges.
+
+| Range | Interpretation |
+| --- | --- |
+| `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::page_elements.batch` | One Page Elements actor processing call. |
+| `nrl.batch::ocr.startup` | One OCR actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::ocr.batch` | One OCR actor processing call. |
+| `nrl.batch::embedding.startup` | One embedding actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::embedding.batch` | One embedding actor processing call. |
+| `nrl.batch::ray.materialize` | Materialization of a terminal Ray dataset into a pandas DataFrame. This range can include lazy upstream execution. |
+| `nrl.batch::pipeline.terminal_stream` | Consumption of the lazy upstream pipeline and streaming of its records to the vector database backend. This range is not pure vector database time. |
+| `nrl.batch::result.concat` | Concatenation of retained terminal frames when the caller requests full results. This range is absent or trivial on paths that do not retain full results. |
+
+Ranges from concurrent Ray actors can overlap. Their durations include CPU
+preparation, waits, and calls into inference backends. They do not represent
+CUDA kernel time by themselves. In the timeline, compare range boundaries with
+the CUDA activity rows to identify the stage that remains active near pipeline
+completion and to find idle gaps between batches.
+
+You can also print an aggregate NVTX summary:
+
+```bash
+nsys stats --report nvtx_sum nrl-batch-profile.nsys-rep
+```
+
+The summary adds durations from all matching ranges. With concurrent actors,
+the summed duration can exceed wall-clock time, so use the timeline to reason
+about overlap and the critical path.
+
 ## Tune remote OCR request batching
 
 Remote OCR batches cropped regions across the page rows supplied to one OCR actor call. This behavior applies to in-process, batch, and service ingestion with a remote OCR NIM. It preserves page and region output order.
