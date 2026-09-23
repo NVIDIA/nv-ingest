@@ -132,6 +132,29 @@ def test_build_embed_option_kwargs_records_elastic_embed_workers():
     assert tuning.embed_workers_max == 8
 
 
+def test_build_embed_option_kwargs_preserves_existing_positional_arguments():
+    kwargs = build_embed_option_kwargs(
+        None, "test-model", "vllm", None, None, "text", None, None, "element", 4, 32, 0.5, 0.35, "pinned-revision"
+    )
+
+    tuning = kwargs["batch_tuning"]
+    assert tuning.embed_workers == 4
+    assert tuning.embed_batch_size == 32
+    assert tuning.embed_cpus_per_actor == 0.5
+    assert tuning.gpu_embed == 0.35
+    assert tuning.embed_workers_min is None
+    assert tuning.embed_workers_initial is None
+    assert tuning.embed_workers_max is None
+    assert kwargs["embed_model_revision"] == "pinned-revision"
+
+
+def test_elastic_embed_worker_fields_have_schema_descriptions():
+    properties = BatchTuningParams.model_json_schema()["properties"]
+
+    for name in ("embed_workers_min", "embed_workers_initial", "embed_workers_max"):
+        assert properties[name]["description"]
+
+
 @pytest.mark.parametrize(
     "kwargs, message",
     [

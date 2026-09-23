@@ -85,15 +85,45 @@ def build_embed_option_kwargs(
     structured_elements_modality: str | None = None,
     embed_granularity: str | None = None,
     embed_workers: int | None = None,
-    embed_workers_min: int | None = None,
-    embed_workers_initial: int | None = None,
-    embed_workers_max: int | None = None,
     embed_batch_size: int | None = None,
     embed_cpus_per_actor: float | None = None,
     embed_gpus_per_actor: float | None = None,
     embed_model_revision: str | None = None,
+    *,
+    embed_workers_min: int | None = None,
+    embed_workers_initial: int | None = None,
+    embed_workers_max: int | None = None,
 ) -> Dict[str, Any]:
-    """Build ``EmbedParams`` kwargs from CLI/request option values."""
+    """Build normalized ``EmbedParams`` kwargs from CLI/request options.
+
+    Args:
+        embed_invoke_url: Remote embedding endpoint, or None to omit it.
+        embed_model_name: Embedding model identifier, or None to omit it.
+        local_ingest_embed_backend: Local inference backend, such as "vllm".
+        embed_api_key: Credential for the remote embedding endpoint.
+        embed_model_provider_prefix: Provider prefix for remote model routing.
+        embed_modality: Default modality to embed.
+        text_elements_modality: Modality override for text elements.
+        structured_elements_modality: Modality override for structured elements.
+        embed_granularity: Embedding unit, such as "element" or "page".
+        embed_workers: Fixed batch embedding actor count; excludes elastic bounds.
+        embed_batch_size: Target number of rows in an embedding batch.
+        embed_cpus_per_actor: Logical CPU resources requested per actor.
+        embed_gpus_per_actor: Logical GPU resources requested per actor, not a VRAM limit.
+        embed_model_revision: Pinned model revision for local inference.
+        embed_workers_min: Keyword-only lower bound of a native Ray actor pool.
+        embed_workers_initial: Keyword-only initial actor count used by preflight.
+        embed_workers_max: Keyword-only upper bound, not reserved capacity.
+
+    Returns:
+        Normalized keyword arguments for ``EmbedParams``. Optional None values
+        are omitted; ``batch_tuning`` is included only when tuning is supplied.
+
+    Raises:
+        ValueError: If batch tuning is invalid, including an incomplete elastic
+            range, mixing fixed and elastic counts, non-positive elastic counts,
+            or a range that does not satisfy minimum <= initial <= maximum.
+    """
     embed_kwargs: Dict[str, Any] = {}
     if embed_invoke_url is not None:
         embed_kwargs["embed_invoke_url"] = embed_invoke_url

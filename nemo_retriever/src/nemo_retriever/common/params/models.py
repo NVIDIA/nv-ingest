@@ -492,9 +492,24 @@ class BatchTuningParams(_ParamsModel):
     table_structure_batch_size: Optional[int] = None
     table_structure_cpus_per_actor: float = 1
     embed_workers: Optional[int] = None
-    embed_workers_min: Optional[int] = None
-    embed_workers_initial: Optional[int] = None
-    embed_workers_max: Optional[int] = None
+    embed_workers_min: Optional[int] = Field(
+        default=None,
+        description=(
+            "Minimum native Ray batch embedding actor count. Set with initial and maximum; excludes embed_workers."
+        ),
+    )
+    embed_workers_initial: Optional[int] = Field(
+        default=None,
+        description=(
+            "Initial native Ray batch embedding actor count requested at startup and budgeted by resource preflight."
+        ),
+    )
+    embed_workers_max: Optional[int] = Field(
+        default=None,
+        description=(
+            "Maximum native Ray batch embedding actor count; does not reserve capacity or guarantee VRAM safety."
+        ),
+    )
     embed_batch_size: int = 32
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
