@@ -195,6 +195,18 @@ class NemotronParseV12(BaseModel):
         making this significantly faster than sequential single-image calls
         for large batches.
         """
+        return [text.strip() for text, _ in self.invoke_batch_with_finish_reasons(inputs, task_prompt=task_prompt)]
+
+    def invoke_batch_with_finish_reasons(
+        self,
+        inputs: Sequence[ImageInput],
+        task_prompt: Optional[str] = None,
+    ) -> List[tuple[str, str]]:
+        """Run a batch and return each unstripped completion with its vLLM finish reason.
+
+        A finish reason other than ``"stop"``, such as ``"length"``, means the
+        generation ended before the model completed the page.
+        """
         prompt = task_prompt or self._task_prompt
         prompts = [
             {
@@ -207,7 +219,7 @@ class NemotronParseV12(BaseModel):
             for img in inputs
         ]
         outputs = self._llm.generate(prompts, self._sampling_params)
-        return [out.outputs[0].text.strip() for out in outputs]
+        return [(out.outputs[0].text, str(out.outputs[0].finish_reason or "unknown")) for out in outputs]
 
     def __call__(
         self,

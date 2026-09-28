@@ -72,6 +72,7 @@ _PARSE_CLASS_TO_CHANNEL: Dict[str, str] = {
 def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
     return {
         "timing": None,
+        "raw_output": None,
         "error": {
             "stage": str(stage),
             "type": exc.__class__.__name__,
@@ -336,7 +337,7 @@ def nemotron_parse_pages(
     all_chart: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_infographic: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_text: List[Optional[str]] = [None] * n_rows
-    all_meta: List[Dict[str, Any]] = [{"timing": None, "error": None} for _ in range(n_rows)]
+    all_meta: List[Dict[str, Any]] = [{"timing": None, "raw_output": None, "error": None} for _ in range(n_rows)]
 
     t0_total = time.perf_counter()
 
@@ -358,6 +359,7 @@ def nemotron_parse_pages(
         except Exception as e:
             all_meta[idx] = {
                 "timing": None,
+                "raw_output": None,
                 "error": {
                     "stage": "nemotron_parse_pages_decode",
                     "type": e.__class__.__name__,
@@ -368,6 +370,7 @@ def nemotron_parse_pages(
 
     # -- Phase 2: run model inference in a single batch ------------------
     raw_texts: List[str] = [""] * len(batch_indices)
+    local_finish_reasons: List[Optional[str]] = [None] * len(batch_indices)
     uses_tool_call_routing = False
     contract: _ResolvedNemotronParseContract | None = None
     native_parse = False
@@ -446,11 +449,21 @@ def nemotron_parse_pages(
                     raw_texts = [_extract_parse_text(item) for item in response_items]
             else:
                 # Local vLLM model (v1.2): uses task_prompt, returns tagged text.
-                invoke_batch = getattr(model, "invoke_batch", None)
-                if invoke_batch is not None:
-                    raw_texts = [str(t or "").strip() for t in invoke_batch(batch_images, task_prompt=task_prompt)]
+                invoke_with_finish_reasons = getattr(model, "invoke_batch_with_finish_reasons", None)
+                if callable(invoke_with_finish_reasons):
+                    local_results = list(invoke_with_finish_reasons(batch_images, task_prompt=task_prompt))
+                    if len(local_results) != len(batch_images):
+                        raise RuntimeError(
+                            "Local Nemotron Parse returned a different number of completions than page images"
+                        )
+                    raw_texts = [str(text or "") for text, _ in local_results]
+                    local_finish_reasons = [str(finish_reason or "unknown") for _, finish_reason in local_results]
                 else:
-                    raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "").strip() for img in batch_images]
+                    invoke_batch = getattr(model, "invoke_batch", None)
+                    if invoke_batch is not None:
+                        raw_texts = [str(t or "") for t in invoke_batch(batch_images, task_prompt=task_prompt)]
+                    else:
+                        raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "") for img in batch_images]
         except BaseException as e:
             if (
                 contract is not None
@@ -476,13 +489,14 @@ def nemotron_parse_pages(
                 "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
             }
             for i in batch_indices:
-                all_meta[i] = {"timing": None, "error": err}
+                all_meta[i] = {"timing": None, "raw_output": None, "error": err}
             raw_texts = []
 
     # -- Phase 3: route parsed elements into content channels ------------
     route_fn = _route_tool_call_elements if uses_tool_call_routing else _route_parsed_elements
     for pos, raw_text in enumerate(raw_texts):
         idx = batch_indices[pos]
+        all_meta[idx]["raw_output"] = raw_text
         try:
             if native_parse and not extract_classes_bboxes(raw_text)[0]:
                 # Only complete bounding-box/class sequences select the tagged
@@ -502,9 +516,17 @@ def nemotron_parse_pages(
             all_infographic[idx] = fp_infographics
             if fp_text is not None:
                 all_text[idx] = fp_text
+            finish_reason = local_finish_reasons[pos]
+            if finish_reason is not None and finish_reason.lower() != "stop":
+                all_meta[idx]["error"] = {
+                    "stage": "nemotron_parse_pages_finish_reason",
+                    "type": "IncompleteModelOutputError",
+                    "message": (f"Local Nemotron Parse ended with finish_reason={finish_reason!r}"),
+                }
         except BaseException as e:
             all_meta[idx] = {
                 "timing": None,
+                "raw_output": raw_text,
                 "error": {
                     "stage": "nemotron_parse_pages_route",
                     "type": e.__class__.__name__,

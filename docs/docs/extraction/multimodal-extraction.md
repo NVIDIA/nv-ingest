@@ -210,6 +210,10 @@ To disable all image deduplication through the Python API, call `.dedup(DedupPar
 
 Extracted objects follow the schema and field descriptions in the [Metadata reference](content-metadata.md). Use that page for tables, types, and per-field notes.
 
+With `method="nemotron_parse"`, each page row in the returned extraction `DataFrame` includes a `nemotron_parse_v1_2` metadata dictionary. Its `raw_output` field contains the model response passed to element routing. A value of `None` means that no model response was available; an empty response is stored as `""`. This additive metadata does not change routing into the existing `text`, `table`, `chart`, and `infographic` fields.
+
+For bundled local v1.2 inference, any vLLM finish reason other than `stop` records a structured error in `nemotron_parse_v1_2.error`. Its `type` is `IncompleteModelOutputError`, and its `stage` is `nemotron_parse_pages_finish_reason`. NeMo Retriever Library still routes any returned prefix into content fields. Consumers that require complete pages must check `error`; they can use `raw_output` for diagnostics.
+
 ## Extraction limitations and quality { #extraction-limitations-and-quality }
 
 Hosted Page Elements, Table Structure, and Graphic Elements NIM endpoints cap inline base64 image payloads at about **180,000 characters** (roughly 180 KB). The NeMo Retriever pipeline downscales large page renders before remote NIM calls. Direct API integrations must keep inline payloads under that cap. Hosted Page Elements does not accept NVCF Asset API references. For limits, plus `dpi` and `render_mode` tuning, refer to [Hosted Page Elements NIM image size limits](troubleshoot.md#hosted-page-elements-nim-image-size-limits).

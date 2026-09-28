@@ -7,6 +7,7 @@
 import os
 import tomllib
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from packaging.requirements import Requirement
@@ -41,3 +42,35 @@ def test_applies_vllm_startup_defaults_before_constructing_llm(monkeypatch):
         patch("vllm.SamplingParams"),
     ):
         mod.NemotronParseV12()
+
+
+def _local_wrapper(outputs):
+    from nemo_retriever.models.local.nemotron_parse_v1_2 import NemotronParseV12
+
+    with patch.object(NemotronParseV12, "__init__", return_value=None):
+        model = NemotronParseV12()
+
+    model._task_prompt = "prompt"
+    model._sampling_params = object()
+    model.preprocess = MagicMock(side_effect=lambda image: image)
+    model._llm = MagicMock()
+    model._llm.generate.return_value = outputs
+    return model
+
+
+def test_local_wrapper_retains_finish_reason_without_changing_legacy_text_contract() -> None:
+    raw_output = "\n<x_0><y_0>Hello<x_1><y_1><class_Text>\t"
+    model = _local_wrapper([SimpleNamespace(outputs=[SimpleNamespace(text=raw_output, finish_reason="length")])])
+
+    assert model.invoke_batch_with_finish_reasons(["image"], task_prompt="prompt") == [(raw_output, "length")]
+    assert model.invoke_batch(["image"], task_prompt="prompt") == [raw_output.strip()]
+
+
+def test_local_wrapper_never_shifts_results_when_a_completion_is_missing() -> None:
+    model = _local_wrapper(
+        [SimpleNamespace(outputs=[]), SimpleNamespace(outputs=[SimpleNamespace(text="page", finish_reason="stop")])]
+    )
+
+    with pytest.raises(IndexError):
+        model.invoke_batch(["first", "second"])
+
