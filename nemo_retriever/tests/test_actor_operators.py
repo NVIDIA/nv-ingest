@@ -538,6 +538,51 @@ class TestNemotronParseActor:
         assert metadata["error"]["type"] == "IncompleteModelOutputError"
         assert "length" in metadata["error"]["message"]
 
+    @pytest.mark.parametrize(
+        ("finish_reason", "expected_error_type"), [("stop", None), (None, "IncompleteModelOutputError")]
+    )
+    def test_local_finish_reason_only_accepts_stop(self, finish_reason, expected_error_type):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", finish_reason)]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+            )
+
+        error = result.at[0, "nemotron_parse_v1_2"]["error"]
+        assert (error or {}).get("type") == expected_error_type
+        if expected_error_type is not None:
+            assert "'unknown'" in error["message"]
+
+    def test_local_completion_count_mismatch_fails_batch(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", "stop")]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}, {"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+            )
+
+        for metadata in result["nemotron_parse_v1_2"]:
+            assert metadata["raw_output"] is None
+            assert metadata["error"]["stage"] == "nemotron_parse_pages"
+            assert "different number of completions" in metadata["error"]["message"]
+
     def test_route_error_retains_raw_output(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
 
