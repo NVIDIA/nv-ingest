@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Ensure core ingest imports never load ``tritonclient`` at import time.
+"""Ensure core ingest imports never load local inference or gRPC dependencies.
 
 Remote-NIM and slim installs omit ``tritonclient``; gRPC code paths import it lazily.
 """
@@ -22,6 +22,8 @@ _real_import = builtins.__import__
 
 
 def _guard(name, globals=None, locals=None, fromlist=(), level=0):
+    if name == "torch" or name.startswith("torch."):
+        raise ModuleNotFoundError("torch import blocked (core-only contract)", name=name)
     if name == "tritonclient" or (
         isinstance(name, str) and name.startswith("tritonclient.")
     ):
@@ -33,6 +35,13 @@ builtins.__import__ = _guard
 
 from nemo_retriever.models.nim.util import create_inference_client  # noqa: F401
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor  # noqa: F401
+from nemo_retriever.common.nvtx import batch_phase
+
+@batch_phase("pipeline.terminal_stream")
+def instrumented():
+    return 42
+
+assert instrumented() == 42
 
 print("slim_imports_ok")
 """

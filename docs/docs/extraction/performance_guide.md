@@ -80,7 +80,9 @@ Use the Ray dashboard to verify the available-resource snapshot and the planned 
 ## Profile batch ingestion with Nsight Systems
 
 Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray
-actor processes. Use NVIDIA Nsight Systems to correlate these semantic stages
+actor processes when PyTorch with NVTX support is installed. If PyTorch or its
+NVTX support is unavailable, batch-phase instrumentation is a no-op.
+Use NVIDIA Nsight Systems to correlate these semantic stages
 with CUDA and operating system activity. Start with a representative, bounded
 input because profiler tracing can increase runtime and report size.
 
