@@ -43,6 +43,7 @@ from nemo_retriever.common.input_files import (
 from nemo_retriever.ingest.index_mode import (
     RequestedIngestIndexMode,
     inspect_existing_lancedb_mode,
+    lancedb_index_mode_kwargs,
     resolve_ingest_index_mode,
     validate_requested_index_mode,
 )
@@ -711,11 +712,8 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         "table_name": storage.table_name,
         "overwrite": bool(storage.overwrite),
     }
-    # Keep dense ingest kwargs unchanged unless the index mode needs additional LanceDB behavior.
-    if resolved_index_mode == "sparse":
-        vdb_upload_kwargs["sparse"] = True
-    elif resolved_index_mode == "hybrid":
-        vdb_upload_kwargs["hybrid"] = True
+    # Pass the resolved mode explicitly so the upload does not resolve ``auto`` again.
+    vdb_upload_kwargs.update(lancedb_index_mode_kwargs(resolved_index_mode))
     if embedding_model_name is not None:
         vdb_upload_kwargs["embedding_model_name"] = embedding_model_name
         if embed.embed_model_name is not None:

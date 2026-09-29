@@ -26,7 +26,9 @@ from nemo_retriever.common.params import (
     NO_API_KEY,
     RemoteRetryParams,
     TextChunkParams,
+    VdbUploadParams,
 )
+from nemo_retriever.operators.vdb import IngestVdbOperator
 
 
 class _InlineTextTokenizer:
@@ -1140,3 +1142,23 @@ def test_batch_ingest_finalization_skips_unrelated_arrow_extension_columns(
     result = _run_graph_ingest_with_result(ingestor, batch_df, monkeypatch)
 
     assert result is batch_df
+
+
+def _vdb_sink(graph):
+    node = graph.roots[0]
+    while not isinstance(node.operator, IngestVdbOperator):
+        node = node.children[0]
+    return node.operator._vdb
+
+
+def test_lancedb_sink_resolves_index_mode_each_time_the_graph_is_built(tmp_path: Path) -> None:
+    import lancedb
+
+    params = VdbUploadParams(vdb_kwargs={"uri": str(tmp_path), "table_name": "docs", "overwrite": False})
+
+    def build():
+        return build_graph(extraction_mode="pdf", extract_params=ExtractParams(), vdb_upload_params=params)
+
+    assert _vdb_sink(build()).hybrid is True
+    lancedb.connect(str(tmp_path)).create_table("docs", data=[{"vector": [0.1, 0.2], "text": "alpha"}])
+    assert _vdb_sink(build()).hybrid is False
