@@ -1162,3 +1162,15 @@ def test_lancedb_sink_resolves_index_mode_each_time_the_graph_is_built(tmp_path:
     assert _vdb_sink(build()).hybrid is True
     lancedb.connect(str(tmp_path)).create_table("docs", data=[{"vector": [0.1, 0.2], "text": "alpha"}])
     assert _vdb_sink(build()).hybrid is False
+
+
+def test_lancedb_sink_records_the_embed_stage_model(tmp_path: Path) -> None:
+    graph = build_graph(
+        extraction_mode="pdf",
+        extract_params=ExtractParams(),
+        embed_params=EmbedParams(),
+        vdb_upload_params=VdbUploadParams(vdb_kwargs={"uri": str(tmp_path)}),
+        stage_order=("embed",),
+    )
+
+    assert _vdb_sink(graph).embedding_model_name == "nvidia/nemotron-3-embed-1b"

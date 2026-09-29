@@ -611,7 +611,7 @@ def _append_ordered_transform_stages(
     if vdb_upload_params is not None:
         graph = graph >> IngestVdbOperator(
             vdb_op=vdb_upload_params.vdb_op,
-            vdb_kwargs=resolve_vdb_upload_kwargs(vdb_upload_params),
+            vdb_kwargs=resolve_vdb_upload_kwargs(vdb_upload_params, embed_params),
         )
 
     if webhook_params is not None and getattr(webhook_params, "endpoint_url", None):
