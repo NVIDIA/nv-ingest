@@ -140,6 +140,61 @@ Check when additional actors start processing and whether their startup cost
 offsets the time saved processing the remaining OCR work. A lazily loaded
 model can perform initialization inside its first batch range.
 
+### Allocate a PDF pipeline across four L40S GPUs
+
+The following allocation was measured on the full BO767 corpus with 4 NVIDIA
+L40S GPUs, each with 48 GB of memory, and 32 logical CPUs. Use it as an opt-in
+starting point for local-model batch ingestion on comparable hardware.
+It does not change library defaults or reproduce the benchmark's storage and
+retrieval evaluation. Replace `data/pdfs` with your PDF directory.
+
+```python
+from pathlib import Path
+
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import BatchTuningParams
+
+documents = [str(path) for path in sorted(Path("data/pdfs").glob("*.pdf"))]
+
+chunks = (
+    create_ingestor(run_mode="batch")
+    .files(documents)
+    .extract(
+        batch_tuning=BatchTuningParams(
+            pdf_extract_workers=11,
+            page_elements_workers=2,
+            page_elements_cpus_per_actor=0.5,
+            gpu_page_elements=0.5,
+            ocr_min_workers=2,
+            ocr_initial_workers=2,
+            ocr_max_workers=4,
+            ocr_cpus_per_actor=0.5,
+            gpu_ocr=0.5,
+        )
+    )
+    .embed(
+        embed_model_name="nvidia/nemotron-3-embed-1b",
+        batch_tuning=BatchTuningParams(
+            embed_workers=2,
+            embed_cpus_per_actor=0.5,
+            gpu_embed=0.5,
+        ),
+    )
+    .ingest()
+)
+```
+
+The two embedding actors can share one GPU, leaving capacity for OCR to grow
+on another GPU while Page Elements continues. Ray determines placement; these
+settings do not pin stages to GPU indices. Each `0.5` GPU request is a logical
+scheduling reservation, not a utilization percentage or GPU memory limit.
+CPU requests also control admission, not the number of inference threads.
+
+The example retains the default batch sizes and Ray Data autoscaling policy.
+Measure runtime, retrieval quality, GPU memory, and actor startup activity on
+your corpus before adopting it. Model memory and workload balance can require
+different worker counts or reservations on other hardware.
+
 ## Profile batch ingestion with Nsight Systems
 
 Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray
