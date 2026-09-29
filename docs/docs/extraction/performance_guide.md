@@ -117,6 +117,11 @@ decides whether to grow the OCR pool within these bounds. Growth depends on
 queued work, its autoscaling policy, and available scheduling resources. An
 idle GPU or an upstream actor exiting does not guarantee immediate growth.
 
+Ray Data can also shrink the pool toward `ocr_min_workers` as demand falls.
+After OCR consumes all its inputs, Ray Data retires its actors as their work
+completes, including actors at the minimum size. The minimum does not keep
+OCR models resident until the rest of the pipeline finishes.
+
 CPU and GPU requests are logical scheduling reservations. A fractional GPU
 request does not assign that percentage of physical GPU utilization or limit
 model memory. Pool growth creates actors with the configured per-actor
