@@ -96,6 +96,8 @@ def default_concurrency_node_names(
         names.update(
             name for name, field in worker_fields.items() if not _positive(getattr(extract_tuning, field, None))
         )
+    if getattr(extract_tuning, "ocr_min_workers", None) is not None:
+        names.discard(resolve_ocr_archetype(extract_params).__name__)
     embed_tuning = _batch_tuning(embed_params)
     if embed_params is not None and not _positive(getattr(embed_tuning, "embed_workers", None)):
         names.add(_BatchEmbedActor.__name__)
@@ -257,7 +259,7 @@ def batch_tuning_to_node_overrides(
             )
 
     extract_tuning = _batch_tuning(extract_params)
-    ocr_concurrency: int = 0
+    ocr_concurrency: int | tuple[int, int, int] = 0
     ocr_cpus: float = 1.0
     page_elements_concurrency: int = 0
     page_elements_cpus: float = 1.0
@@ -277,6 +279,12 @@ def batch_tuning_to_node_overrides(
             )
             or 0
         )
+        if getattr(extract_tuning, "ocr_min_workers", None) is not None:
+            ocr_concurrency = (
+                extract_tuning.ocr_min_workers,
+                extract_tuning.ocr_max_workers,
+                extract_tuning.ocr_initial_workers,
+            )
         _set(ocr_actor_name, "concurrency", ocr_concurrency or None)
         ocr_cpus = (
             _resolve(

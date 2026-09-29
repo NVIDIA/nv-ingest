@@ -103,6 +103,9 @@ class IngestExtractBatchOptions:
     page_elements_cpus_per_actor: float | None = None
     page_elements_gpus_per_actor: float | None = None
     ocr_workers: int | None = None
+    ocr_min_workers: int | None = None
+    ocr_initial_workers: int | None = None
+    ocr_max_workers: int | None = None
     ocr_batch_size: int | None = None
     ocr_cpus_per_actor: float | None = None
     ocr_gpus_per_actor: float | None = None
@@ -547,6 +550,9 @@ def _build_extract_batch_tuning(batch: IngestExtractBatchOptions) -> BatchTuning
             "page_elements_cpus_per_actor": batch.page_elements_cpus_per_actor,
             "gpu_page_elements": batch.page_elements_gpus_per_actor,
             "ocr_workers": batch.ocr_workers,
+            "ocr_min_workers": batch.ocr_min_workers,
+            "ocr_initial_workers": batch.ocr_initial_workers,
+            "ocr_max_workers": batch.ocr_max_workers,
             "ocr_inference_batch_size": batch.ocr_batch_size,
             "ocr_cpus_per_actor": batch.ocr_cpus_per_actor,
             "gpu_ocr": batch.ocr_gpus_per_actor,
