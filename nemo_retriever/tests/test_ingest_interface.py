@@ -1174,3 +1174,19 @@ def test_lancedb_sink_records_the_embed_stage_model(tmp_path: Path) -> None:
     )
 
     assert _vdb_sink(graph).embedding_model_name == "nvidia/nemotron-3-embed-1b"
+
+
+def test_directory_inputs_expand_to_supported_files(tmp_path: Path) -> None:
+    (tmp_path / "nested.pdf").mkdir()
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "a.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "nested.pdf" / "b.txt").write_text("b")
+    (tmp_path / "notes.xyz").write_text("unsupported")
+    expected = [str((tmp_path / "a.pdf").resolve()), str((tmp_path / "nested.pdf" / "b.txt").resolve())]
+
+    assert GraphIngestor().files(str(tmp_path))._documents == expected
+    assert GraphIngestor().files(str(tmp_path / "nested.pdf"))._documents == expected[1:]
+    assert create_ingestor(documents=[str(tmp_path)])._documents == expected
+    assert GraphIngestor(documents=str(tmp_path / "a.pdf"))._documents == [str(tmp_path / "a.pdf")]
+    with pytest.raises(FileNotFoundError, match="No supported ingest files found under directory"):
+        GraphIngestor().files(str(tmp_path / "empty"))

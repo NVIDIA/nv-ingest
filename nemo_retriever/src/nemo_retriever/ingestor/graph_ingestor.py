@@ -79,6 +79,7 @@ from nemo_retriever.common.params import (
 from nemo_retriever.common.input_files import (
     PDF_DOCUMENT_INPUT_TYPES,
     _is_explicit_glob_path,
+    expand_input_directories,
     expand_input_file_patterns,
     input_type_for_path,
 )
@@ -491,7 +492,8 @@ class GraphIngestor(ingestor):
         show_progress: bool = True,
         error_policy: str = "raise",
     ) -> None:
-        super().__init__(documents=documents)
+        super().__init__()
+        self.files(documents or [])
         if run_mode not in {"batch", "inprocess"}:
             raise ValueError(f"run_mode must be 'batch' or 'inprocess', got {run_mode!r}")
         if error_policy not in {"raise", "collect"}:
@@ -537,8 +539,8 @@ class GraphIngestor(ingestor):
     # ------------------------------------------------------------------
 
     def files(self, documents: Union[str, List[str]]) -> "GraphIngestor":
-        """Set the input file paths or glob patterns."""
-        self._documents = [documents] if isinstance(documents, str) else list(documents)
+        """Set the input file paths, glob patterns, or directories (expanded to their supported files)."""
+        self._documents = expand_input_directories([documents] if isinstance(documents, str) else list(documents))
         return self
 
     def texts(self, texts: Union[str, Sequence[str]]) -> Self:

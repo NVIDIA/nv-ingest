@@ -37,8 +37,8 @@ from nemo_retriever.common.params import (
 from nemo_retriever.common.input_files import (
     AUTO_INPUT_EXTENSIONS,
     INPUT_TYPE_EXTENSIONS,
+    expand_input_directories,
     expand_input_file_patterns,
-    resolve_input_files,
 )
 from nemo_retriever.ingest.index_mode import (
     RequestedIngestIndexMode,
@@ -276,18 +276,7 @@ def validate_ingest_document_types(documents: Sequence[str], *, input_type: Inge
 
 
 def expand_ingest_documents(documents: Sequence[str], *, input_type: IngestInputTypeValue = "auto") -> list[str]:
-    inputs: list[str] = []
-    for document in documents:
-        raw_document = str(document)
-        path = Path(raw_document).expanduser()
-        if path.is_dir():
-            directory_files = resolve_input_files(path, input_type)
-            if not directory_files:
-                raise FileNotFoundError(f"No supported ingest files found under directory: {path}")
-            inputs.extend(str(file) for file in directory_files)
-        else:
-            inputs.append(raw_document)
-
+    inputs = expand_input_directories([str(document) for document in documents], input_type=input_type)
     document_list = expand_input_file_patterns(inputs)
     validate_ingest_document_types(document_list, input_type=input_type)
     return document_list

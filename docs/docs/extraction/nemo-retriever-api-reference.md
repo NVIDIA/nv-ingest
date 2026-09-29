@@ -42,6 +42,11 @@ A nonempty optional glob passed to `.files()` also counts as a configured
 source. If it matches no files, `.ingest()` can return an empty result, and the
 streaming methods can yield no results.
 
+In the `inprocess` and `batch` run modes, `.files()` and
+`create_ingestor(documents=...)` also accept directories, which expand
+recursively to their supported files. A directory that contains no supported
+files raises `FileNotFoundError`.
+
 ### Select a supported extraction method
 
 `ExtractParams` validates `method` when you construct the model. For PDF
