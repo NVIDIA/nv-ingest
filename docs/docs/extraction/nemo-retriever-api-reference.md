@@ -46,7 +46,12 @@ streaming methods can yield no results.
 
 `ExtractParams` validates `method` when you construct the model. For PDF
 extraction, use `pdfium`, `pdfium_hybrid`, `ocr`, or `nemotron_parse`. The
-`audio` value remains available for the legacy params-driven audio path. For
+default, `pdfium_hybrid`, uses native PDF text and OCR for pages that it detects
+as scanned. It also runs page-element detection and OCR for text-only
+configurations, and it OCRs image inputs. To use native PDF text only, set
+`method="pdfium"`.
+
+The `audio` value remains available for the legacy params-driven audio path. For
 new audio pipelines, use [`GraphIngestor.extract_audio()`](#graph-ingestor)
 instead.
 

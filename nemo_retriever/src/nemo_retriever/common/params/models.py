@@ -528,7 +528,7 @@ class ExtractParams(_ParamsModel):
 
     # Extraction options
     method: Literal["pdfium", "pdfium_hybrid", "ocr", "nemotron_parse", "audio"] = Field(
-        default="pdfium",
+        default="pdfium_hybrid",
         description=(
             "Extraction method. PDF extraction supports 'pdfium', 'pdfium_hybrid', 'ocr', and "
             "'nemotron_parse'; 'audio' is retained for the legacy params-driven audio path."
