@@ -123,3 +123,21 @@ def test_resolve_vdb_upload_kwargs_records_the_embed_model(tmp_path, embed_param
     resolved = resolve_vdb_upload_kwargs(params, embed_params)
 
     assert {key: value for key, value in resolved.items() if key.startswith("embedding_model")} == expected
+
+
+@pytest.mark.parametrize(
+    ("embed_params", "vdb_kwargs", "expected_dim"),
+    [
+        (EmbedParams(), {}, "unset"),
+        (EmbedParams(model_name=LLAMA, embed_model_revision="abc123"), {}, None),
+        (EmbedParams(embed_model_name=LLAMA), {}, None),
+        (EmbedParams(dimensions=512), {}, None),
+        (EmbedParams(model_name=LLAMA, embed_model_revision="abc123"), {"vector_dim": 1024}, 1024),
+    ],
+)
+def test_resolve_vdb_upload_kwargs_infers_vector_dim_for_named_models(
+    tmp_path, embed_params, vdb_kwargs, expected_dim
+) -> None:
+    params = VdbUploadParams(vdb_kwargs={"uri": str(tmp_path), **vdb_kwargs})
+
+    assert resolve_vdb_upload_kwargs(params, embed_params).get("vector_dim", "unset") == expected_dim
