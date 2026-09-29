@@ -41,9 +41,12 @@ from nemo_retriever.graph.ingestor_runtime import (
     default_concurrency_node_names,
 )
 from nemo_retriever.ingestor.manifest import (
+    DEFAULT_AUDIO_SPLIT_INTERVAL,
+    DEFAULT_VIDEO_FRAME_FPS,
     ExtractionBranchPlan,
     ResolvedExtractionInputs,
     build_input_manifest,
+    default_asr_params,
     format_branch_summary,
     plan_extraction_branches,
     resolve_branch_extraction_inputs,
@@ -441,6 +444,15 @@ def _coerce(params: Any, kwargs: dict[str, Any], *, default_factory: Callable[[]
     return params
 
 
+def _coerce_audio_chunk_params(params: Any, kwargs: dict[str, Any]) -> Any:
+    """Build audio chunk params; size splits default to ``DEFAULT_AUDIO_SPLIT_INTERVAL``."""
+    if kwargs.get("split_type", "size") != "size":
+        return _coerce(params, kwargs, default_factory=AudioChunkParams)
+    return _coerce(
+        params, kwargs, default_factory=lambda: AudioChunkParams(split_interval=DEFAULT_AUDIO_SPLIT_INTERVAL)
+    )
+
+
 class GraphIngestor(ingestor):
     """Ingestor that constructs and executes operator graphs directly.
 
@@ -667,8 +679,8 @@ class GraphIngestor(ingestor):
     ) -> "GraphIngestor":
         """Configure audio extraction (extraction_mode='audio')."""
         self._extraction_mode = "audio"
-        self._audio_chunk_params = _coerce(params, kwargs, default_factory=AudioChunkParams)
-        self._asr_params = asr_params or ASRParams()
+        self._audio_chunk_params = _coerce_audio_chunk_params(params, kwargs)
+        self._asr_params = asr_params or default_asr_params()
         self._apply_split_config(split_config)
         self._record_stage("extract")
         return self
@@ -703,9 +715,9 @@ class GraphIngestor(ingestor):
         directly with that file.
         """
         self._extraction_mode = "auto"
-        self._audio_chunk_params = _coerce(params, kwargs, default_factory=AudioChunkParams)
-        self._asr_params = asr_params or ASRParams()
-        self._video_frame_params = video_frame_params or VideoFrameParams()
+        self._audio_chunk_params = _coerce_audio_chunk_params(params, kwargs)
+        self._asr_params = asr_params or default_asr_params()
+        self._video_frame_params = video_frame_params or VideoFrameParams(fps=DEFAULT_VIDEO_FRAME_FPS)
         self._video_text_dedup_params = video_text_dedup_params or VideoFrameTextDedupParams()
         self._av_fuse_params = av_fuse_params or AudioVisualFuseParams()
         if extract_params is not None:

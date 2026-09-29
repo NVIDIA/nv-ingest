@@ -1190,3 +1190,20 @@ def test_directory_inputs_expand_to_supported_files(tmp_path: Path) -> None:
     assert GraphIngestor(documents=str(tmp_path / "a.pdf"))._documents == [str(tmp_path / "a.pdf")]
     with pytest.raises(FileNotFoundError, match="No supported ingest files found under directory"):
         GraphIngestor().files(str(tmp_path / "empty"))
+
+
+def test_explicit_media_methods_use_the_shared_media_defaults() -> None:
+    from nemo_retriever.ingestor.manifest import (
+        DEFAULT_AUDIO_SPLIT_INTERVAL,
+        DEFAULT_VIDEO_FRAME_FPS,
+        default_asr_params,
+    )
+
+    audio = GraphIngestor().extract_audio()
+    video = GraphIngestor().extract_video()
+
+    assert audio._audio_chunk_params.split_interval == DEFAULT_AUDIO_SPLIT_INTERVAL
+    assert audio._asr_params == video._asr_params == default_asr_params()
+    assert video._video_frame_params.fps == DEFAULT_VIDEO_FRAME_FPS
+    # Other split types keep the model's interval.
+    assert GraphIngestor().extract_audio(split_type="time")._audio_chunk_params.split_interval == 450

@@ -24,8 +24,8 @@ from nemo_retriever.common.input_files import _is_explicit_glob_path, input_type
 from nemo_retriever.common.inline_text import is_inline_text_source
 
 
-_AUDIO_SPLIT_INTERVAL = 500000
-_VIDEO_FRAME_FPS = 0.5
+DEFAULT_AUDIO_SPLIT_INTERVAL = 500000
+DEFAULT_VIDEO_FRAME_FPS = 0.5
 
 
 @dataclass(frozen=True)
@@ -181,20 +181,20 @@ def resolve_branch_extraction_inputs(
     elif family == "audio":
         audio_chunk_params = audio_chunk_params or AudioChunkParams(
             split_type="size",
-            split_interval=_AUDIO_SPLIT_INTERVAL,
+            split_interval=DEFAULT_AUDIO_SPLIT_INTERVAL,
         )
-        asr_params = asr_params or _default_asr_params()
+        asr_params = asr_params or default_asr_params()
     elif family == "video":
         extract_params = extract_params or ExtractParams()
         audio_chunk_params = audio_chunk_params or AudioChunkParams(
             enabled=True,
             split_type="size",
-            split_interval=_AUDIO_SPLIT_INTERVAL,
+            split_interval=DEFAULT_AUDIO_SPLIT_INTERVAL,
         )
-        asr_params = asr_params or _default_asr_params()
+        asr_params = asr_params or default_asr_params()
         video_frame_params = video_frame_params or VideoFrameParams(
             enabled=True,
-            fps=_VIDEO_FRAME_FPS,
+            fps=DEFAULT_VIDEO_FRAME_FPS,
             dedup=True,
         )
         video_text_dedup_params = video_text_dedup_params or VideoFrameTextDedupParams(
@@ -216,7 +216,15 @@ def resolve_branch_extraction_inputs(
     )
 
 
-def _default_asr_params() -> ASRParams:
+def default_asr_params() -> ASRParams:
+    """Return the default ASR params for audio and video inputs.
+
+    Returns
+    -------
+    ASRParams
+        Params from ``asr_params_from_env()`` (for example ``AUDIO_GRPC_ENDPOINT``), with
+        ``segment_audio`` off.
+    """
     from nemo_retriever.operators.extract.audio.asr_actor import asr_params_from_env
 
     return asr_params_from_env().model_copy(update={"segment_audio": False})

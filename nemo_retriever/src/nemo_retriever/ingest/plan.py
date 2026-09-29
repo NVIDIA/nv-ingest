@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Literal, Sequence, cast
 
 from nemo_retriever.ingestor.manifest import (
+    DEFAULT_AUDIO_SPLIT_INTERVAL,
+    DEFAULT_VIDEO_FRAME_FPS,
     ExtractionBranchPlan,
     build_input_manifest,
     plan_extraction_branches,
@@ -72,8 +74,6 @@ _SUPPORTED_INPUT_TYPES: tuple[IngestInputTypeValue, ...] = (
     "audio",
     "video",
 )
-_AUDIO_SPLIT_INTERVAL = 500000
-_VIDEO_FRAME_FPS = 0.5
 _VIDEO_TEXT_DEDUP_MAX_DROPPED_FRAMES = 2
 _DEFAULT_TEXT_CHUNK_MAX_TOKENS = 1024
 _DEFAULT_TEXT_CHUNK_OVERLAP_TOKENS = 150
@@ -393,7 +393,7 @@ def _resolve_media_params(
         return None, _build_asr_params(segment_audio=media.segment_audio, needed=False), None, None, None
 
     split_interval = (
-        int(media.audio_split_interval) if media.audio_split_interval is not None else _AUDIO_SPLIT_INTERVAL
+        int(media.audio_split_interval) if media.audio_split_interval is not None else DEFAULT_AUDIO_SPLIT_INTERVAL
     )
     audio_chunk_params = AudioChunkParams(
         enabled=bool(media.video_extract_audio) if media.video_extract_audio is not None and needs_video else True,
@@ -407,7 +407,7 @@ def _resolve_media_params(
 
     video_frame_params = VideoFrameParams(
         enabled=bool(media.video_extract_frames) if media.video_extract_frames is not None else True,
-        fps=float(media.video_frame_fps) if media.video_frame_fps is not None else _VIDEO_FRAME_FPS,
+        fps=float(media.video_frame_fps) if media.video_frame_fps is not None else DEFAULT_VIDEO_FRAME_FPS,
         dedup=bool(media.video_frame_dedup) if media.video_frame_dedup is not None else True,
     )
     video_text_dedup_params = VideoFrameTextDedupParams(
