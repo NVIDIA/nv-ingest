@@ -18,10 +18,9 @@ These tests pin the chart-side fix:
 
 * ``values.yaml`` carries a chart-wide ``nimOperator.modelProfile``
   default plus a per-NIM ``nimOperator.<key>.modelProfile`` override
-  for every NIMCache the chart provisions. Existing extraction NIMs
-  default their per-NIM override to ``{}``; ``answer_llm`` is the
-  intentional exception because its Super-49B default pins the bundled
-  two-GPU profile by default.
+  for every NIMCache the chart provisions. Every NIM defaults its
+  per-NIM override to ``{}`` so the NIM Operator can select a compatible
+  profile.
 * A ``helm template`` with **no overrides** renders no ``model:``
   block on default-empty-profile NIMCaches (preserves operator default).
 * ``--set nimOperator.modelProfile.gpus[0]...`` renders an identical
@@ -59,8 +58,7 @@ _CHART_DIR = _REPO_ROOT / "nemo_retriever/helm"
 
 # Per-NIM keys whose NIMCache modelProfile values intentionally default
 # to ``{}``, preserving pre-fix operator behaviour unless an operator
-# opts into GPU/profile filtering. answer_llm is tracked separately because
-# its Super-49B default ships with a pinned profile for the bundled two-GPU NIM.
+# opts into GPU/profile filtering.
 _EMPTY_MODEL_PROFILE_NIM_KEYS: tuple[str, ...] = (
     "page_elements",
     "table_structure",
@@ -70,10 +68,9 @@ _EMPTY_MODEL_PROFILE_NIM_KEYS: tuple[str, ...] = (
     "nemotron_parse",
     "nemotron_3_nano_omni_30b_a3b_reasoning",
     "audio",
+    "answer_llm",
 )
-_ANSWER_LLM_NIM_KEY = "answer_llm"
-_SUPER49B_DEFAULT_PROFILE = "1146f49f84dff5dea09f5aa633cc70b92d7d972223d67878c841cd0fbccad4fb"
-_ALL_NIM_KEYS: tuple[str, ...] = _EMPTY_MODEL_PROFILE_NIM_KEYS + (_ANSWER_LLM_NIM_KEY,)
+_ALL_NIM_KEYS: tuple[str, ...] = _EMPTY_MODEL_PROFILE_NIM_KEYS
 
 
 def _read_required_file(path: Path) -> str:
@@ -109,6 +106,8 @@ def _helm_template(extra_args: Sequence[str] = ()) -> subprocess.CompletedProces
         "nimOperator.nemotron_parse.enabled=true",
         "--set",
         "nimOperator.nemotron_3_nano_omni_30b_a3b_reasoning.enabled=true",
+        "--set",
+        "nimOperator.answer_llm.enabled=true",
         "--api-versions",
         "apps.nvidia.com/v1alpha1",
     ]
@@ -186,15 +185,6 @@ class NimCacheModelProfileTests(TestCase):
                         "so the chart's behaviour is unchanged unless the "
                         "operator opts in.",
                     )
-
-    def test_answer_llm_exposes_intentional_default_super49b_model_profile(self) -> None:
-        """Super-49B pins its bundled two-GPU NIM profile by default."""
-        values = _read_required_file(_VALUES_YAML)
-        loaded = yaml.safe_load(values)
-        self.assertEqual(
-            loaded["nimOperator"][_ANSWER_LLM_NIM_KEY]["modelProfile"],
-            {"profiles": [_SUPER49B_DEFAULT_PROFILE]},
-        )
 
     # ------------------------------------------------------------------
     # README — operator-facing documentation
@@ -295,8 +285,7 @@ class NimCacheModelProfileTests(TestCase):
 
         This is the exact customer ask for the existing extraction NIMs:
         one --set flag makes each rendered cache download only the H100
-        profile. Super-49B is covered separately because it intentionally
-        pins its bundled default profile.
+        profile, including the optional answer LLM.
         """
         proc = _helm_template(
             extra_args=(
@@ -488,9 +477,13 @@ class AnswerLLMRuntimeProfileTests(TestCase):
 
     def test_runtime_profile_matches_effective_cache_configuration(self) -> None:
         cases = [
-            ("default", {}, _SUPER49B_DEFAULT_PROFILE),
+            ("default", {}, None),
             ("changed", {"answer_llm.modelProfile.profiles": ["changed-profile"]}, "changed-profile"),
-            ("per_nim_wins", {"modelProfile.profiles": ["global"]}, _SUPER49B_DEFAULT_PROFILE),
+            (
+                "per_nim_wins",
+                {"answer_llm.modelProfile.profiles": ["local"], "modelProfile.profiles": ["global"]},
+                "local",
+            ),
             ("global", {"answer_llm.modelProfile": None, "modelProfile.profiles": ["global"]}, "global"),
             ("unpinned", {"answer_llm.modelProfile": None}, None),
             ("empty_profiles", {"answer_llm.modelProfile.profiles": []}, None),

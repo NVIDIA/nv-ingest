@@ -154,7 +154,7 @@ python3 build_report.py /tmp/runs/agenteval_claude_skill_<ts> --no-judge
 | `run_dirs` | *(required, 1+)* | One or more run directories. >1 → also writes `comparison.md`/`json`. |
 | `--manifest` | each run's `source_manifest` | Gold manifest. Override if it moved. |
 | `--judge` / `--no-judge` | on if `$NVIDIA_API_KEY` set | Enable/disable LLM-as-judge. |
-| `--judge-model` | `nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5` | Judge model. |
+| `--judge-model` | `nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b` | Judge model. |
 | `--judge-api-base` | `https://integrate.api.nvidia.com/v1` | Judge endpoint. |
 | `--judge-api-key-env` | `NVIDIA_API_KEY` | Env var holding the judge API key. |
 | `--out` | parent of first run dir | Where `comparison.md`/`json` are written. |
@@ -385,7 +385,7 @@ python3 eval_functional.py \
 | `--out` | `<run-dir>/functional_eval.json` | Verdicts output. |
 | `--min-rows` | `1` | rows>0 gate threshold for ingest tests. |
 | `--judge` / `--no-judge` | on if `$NVIDIA_API_KEY` set | Enable/disable the LLM rubric. |
-| `--judge-model` | `nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5` | Judge model. |
+| `--judge-model` | `nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b` | Judge model. |
 | `--judge-api-base` | `https://integrate.api.nvidia.com/v1` | Judge endpoint. |
 | `--judge-api-key-env` | `NVIDIA_API_KEY` | Env var holding the judge key. |
 | `--judge-concurrency` | `8` | Concurrent judge calls. |

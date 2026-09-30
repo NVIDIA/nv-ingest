@@ -22,8 +22,8 @@ retrieval:
 # Any model can serve as generator or judge.
 # api_base is any OpenAI-compatible endpoint (NIM, vLLM, Ollama, etc.).
 models:
-  nemotron-super-49b:
-    model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+  nemotron-lightning:
+    model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
 
   generator-b:
@@ -35,8 +35,8 @@ models:
     model: "nvidia_nim/nvidia/nemotron-3-nano-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
 
-  nemotron-super-judge:
-    model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+  nemotron-lightning-judge:
+    model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
     temperature: 0.1
     max_tokens: 4096
@@ -44,17 +44,17 @@ models:
 # Each evaluation picks a generator + judge by name.
 # "runs" is optional (defaults to execution.runs, then 1).
 evaluations:
-  - generator: "nemotron-nano-30b"
-    judge: "nemotron-super-judge"
+  - generator: "nemotron-lightning"
+    judge: "nemotron-lightning-judge"
     runs: 1
 
   # Uncomment below to add more evaluations to the sweep.
   # - generator: "generator-b"
-  #   judge: "nemotron-super-judge"
+  #   judge: "nemotron-lightning-judge"
   #   runs: 2
   #
-  # - generator: "nemotron-super-49b"
-  #   judge: "nemotron-super-judge"
+  # - generator: "nemotron-nano-30b"
+  #   judge: "nemotron-lightning-judge"
   #   runs: 5
 
 execution:

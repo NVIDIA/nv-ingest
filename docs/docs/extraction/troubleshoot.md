@@ -640,9 +640,9 @@ For value paths and a rename example, refer to [Use externally managed Secrets](
 
 The CLI then exits with `Agentic retrieval failed (llm_call_failed)`.
 
-The Helm `answer_llm` Super-49B NIM is not tool-call ready by default. Add `--enable-auto-tool-choice --tool-call-parser llama3_json` to `NIM_PASSTHROUGH_ARGS` and set `serviceConfig.agentic` for service mode. NVIDIA-hosted Build endpoints do not need this change. `POST /v1/answer` is a separate path and does not require tool calling.
+For the Helm `answer_llm` Nemotron 3.5 Lightning NIM, add `--enable-auto-tool-choice --tool-call-parser qwen3_coder` to `NIM_PASSTHROUGH_ARGS`, retaining `--reasoning-parser nemotron_v3`, and set `serviceConfig.agentic` for service mode. `POST /v1/answer` is a separate path and does not require tool calling.
 
-For the copy-paste Helm values and CLI command, refer to [Self-hosted Helm Super-49B](workflow-agentic-retrieval.md#self-hosted-helm-super-49b).
+For the copy-paste Helm values and CLI command, refer to [Self-hosted Helm Nemotron 3.5 Lightning](workflow-agentic-retrieval.md#self-hosted-helm-lightning).
 
 ## Related Topics { #related-topics }
 
@@ -653,5 +653,5 @@ For the copy-paste Helm values and CLI command, refer to [Self-hosted Helm Super
 - [Deploy with Helm](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/helm/README.md)
 - [Changing a NIM image repository or tag](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/helm/README.md#changing-nim-image-repository-or-tag)
 - [Use externally managed Secrets](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/helm/README.md#use-externally-managed-secrets)
-- [Workflow: Agentic retrieval](workflow-agentic-retrieval.md#self-hosted-helm-super-49b)
+- [Workflow: Agentic retrieval](workflow-agentic-retrieval.md#self-hosted-helm-lightning)
 - [About getting started](getting-started-about.md) (prerequisites and deployment)

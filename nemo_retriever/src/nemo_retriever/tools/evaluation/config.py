@@ -19,18 +19,18 @@ schema lets you define models once and compose generator/judge combos
 with per-combo run counts::
 
     models:
-      nemotron-super:
-        model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      nemotron-lightning:
+        model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
         api_key: "${NVIDIA_API_KEY}"
-      nemotron-super-judge:
-        model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      nemotron-lightning-judge:
+        model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
         api_key: "${NVIDIA_API_KEY}"
         temperature: 0.1
         max_tokens: 4096
 
     evaluations:
-      - generator: "nemotron-super"
-        judge: "nemotron-super-judge"
+      - generator: "nemotron-lightning"
+        judge: "nemotron-lightning-judge"
         runs: 5
 
     execution:
@@ -42,11 +42,11 @@ auto-normalised internally::
 
     generators:
       - name: "nemotron"
-        model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+        model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
         api_key: "${NVIDIA_API_KEY}"
 
     judge:
-      model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+      model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
       api_key: "${NVIDIA_API_KEY}"
       temperature: 0.1
       max_tokens: 4096

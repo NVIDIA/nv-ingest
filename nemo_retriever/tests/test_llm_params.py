@@ -489,9 +489,9 @@ class TestLLMJudgeConstruction:
         from nemo_retriever.models.llm.clients import LLMJudge
         from nemo_retriever.common.params.models import LLMRemoteClientParams
 
-        transport = LLMRemoteClientParams(model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
+        transport = LLMRemoteClientParams(model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
         judge = LLMJudge(transport=transport)
-        assert judge.model == "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+        assert judge.model == "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
         assert judge.sampling.temperature == 0.1
         assert judge.sampling.max_tokens == 32768
 
@@ -540,6 +540,7 @@ class TestLLMJudgeConstruction:
 
         judge = LLMJudge.from_kwargs()
         assert judge.model == LLMJudge._DEFAULT_MODEL
+        assert judge.model == "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
 
     @patch("litellm.completion")
     def test_judge_returns_perfect_score(self, mock_completion):
@@ -677,8 +678,8 @@ class TestBackCompatCallSites:
     def test_judging_operator_constructs_cleanly(self):
         from nemo_retriever.tools.evaluation.judging import JudgingOperator
 
-        op = JudgingOperator(model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
-        assert op._judge.model == "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+        op = JudgingOperator(model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
+        assert op._judge.model == "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
         assert op._judge.sampling.temperature == 0.1
         assert op._judge.sampling.max_tokens == 32768
 
@@ -693,7 +694,7 @@ class TestBackCompatCallSites:
         from nemo_retriever.tools.evaluation.judging import JudgingOperator
 
         op = JudgingOperator(
-            model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
             num_retries=7,
         )
         assert op._judge.transport.num_retries == 7
@@ -713,7 +714,7 @@ class TestBackCompatCallSites:
         builder = RetrieverPipelineBuilder(retriever, top_k=5)
 
         judge = LLMJudge.from_kwargs(
-            model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
             num_retries=7,
         )
         builder.judge(judge)
@@ -734,7 +735,7 @@ class TestBackCompatCallSites:
         retriever.top_k = 5
         builder = RetrieverPipelineBuilder(retriever, top_k=5)
 
-        builder.judge(model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
+        builder.judge(model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
 
         judging_ops = [s for s in builder._steps if isinstance(s, JudgingOperator)]
         assert len(judging_ops) == 1
@@ -861,6 +862,7 @@ class TestLiteLLMDefaultModel:
 
         client = LiteLLMClient.from_kwargs()
         assert client.model == LiteLLMClient._DEFAULT_MODEL
+        assert client.model == "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
 
     def test_default_model_is_a_non_empty_string(self):
         from nemo_retriever.models.llm.clients import LiteLLMClient

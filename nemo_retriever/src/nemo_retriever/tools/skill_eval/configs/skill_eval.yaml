@@ -99,11 +99,12 @@ conditions:
 #
 # For the local judge helper, run from the repository root:
 #   docker compose -f nemo_retriever/dev/compose/judge.compose.yaml up -d judge
-# Then point ``api_base`` at the localhost line below instead of the NVIDIA-hosted default.
+# For localhost, set both ``model`` and ``api_base`` to the commented values below.
 judge:
   enabled: true
-  model: nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
+  model: nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b
   api_base: https://integrate.api.nvidia.com/v1
+  # model: openai/nvidia/nemotron-3.5-lightning-30b-a3b
   # api_base: http://localhost:8000/v1
   api_key_env: NVIDIA_API_KEY
   temperature: 0.1

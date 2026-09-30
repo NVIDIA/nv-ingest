@@ -138,7 +138,7 @@ class SubQueryGeneratorOperator(AbstractOperator, CPUOperator):
         from nemo_retriever.operators.graph_ops.subquery_operator import SubQueryGeneratorOperator
 
         op = SubQueryGeneratorOperator(
-            llm_model="nvidia/llama-3.3-nemotron-super-49b-v1",
+            llm_model="nvidia/nemotron-3.5-lightning-30b-a3b",
             invoke_url="https://integrate.api.nvidia.com/v1/chat/completions",
             max_subqueries=5,
         )

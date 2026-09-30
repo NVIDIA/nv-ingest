@@ -312,12 +312,12 @@ retriever eval run --from-env
 | `QA_MAX_WORKERS` | `4` | Concurrent API calls |
 | `QA_LIMIT` | `0` (all) | Evaluate only first N queries |
 | `RESULTS_DIR` | `data/eval` | Directory for auto-timestamped result JSONs |
-| `GEN_MODEL` | `nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5` | Generator (single) |
+| `GEN_MODEL` | `nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b` | Generator (single) |
 | `GEN_MODEL_NAME` | `generator` | Short label for the generator |
 | `GEN_API_BASE` | _(unset)_ | Override endpoint URL for the generator |
 | `GEN_MODELS` | _(unset)_ | Multi-model sweep: `name:model,...` (overrides `GEN_MODEL`) |
 | `GEN_TEMPERATURE` | `0.0` | Sampling temperature for generator |
-| `JUDGE_MODEL` | `nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5` | Judge model |
+| `JUDGE_MODEL` | `nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b` | Judge model |
 | `JUDGE_API_BASE` | _(unset)_ | Override endpoint URL for the judge |
 | `JUDGE_TEMPERATURE` | `0.1` | Sampling temperature for judge |
 | `JUDGE_MAX_TOKENS` | `4096` | Max tokens for judge JSON output |
@@ -364,6 +364,8 @@ retriever eval run --config nemo_retriever/examples/eval_sweep.yaml
 The config defines models once and composes evaluation combos with per-combo run counts. An example config is provided at `nemo_retriever/examples/eval_sweep.yaml`. See [Eval Config File](#eval-config-file-yaml--json) for the full schema.
 
 ### Results (March 2026 -- full-page markdown, bo767_annotations.csv)
+
+This historical run predates the Nemotron 3.5 Lightning default. Its scores do not measure the current generator.
 
 ```
 1005 queries evaluated (Nemotron Super 49B generator, Mixtral 8x22B judge)
@@ -522,8 +524,8 @@ from nemo_retriever.evaluation.scoring_operator import ScoringOperator
 
 graph = (
     RetrievalLoaderOperator(retrieval_json="retrieval.json", ground_truth_csv="gt.csv")
-    >> QAGenerationOperator(model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
-    >> JudgingOperator(model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
+    >> QAGenerationOperator(model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
+    >> JudgingOperator(model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
     >> ScoringOperator()
 )
 result_df = graph.execute(None)
@@ -646,7 +648,7 @@ retrieval:
 
 models:
   generator-a:
-    model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
 
   generator-b:
@@ -654,19 +656,19 @@ models:
     api_base: "https://your-openai-compatible-endpoint/v1"
     api_key: "${GEN_API_KEY}"
 
-  nemotron-super-judge:
-    model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+  nemotron-lightning-judge:
+    model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
     temperature: 0.1
     max_tokens: 4096
 
 evaluations:
   - generator: "generator-b"
-    judge: "nemotron-super-judge"
+    judge: "nemotron-lightning-judge"
     runs: 2
 
   - generator: "generator-a"
-    judge: "nemotron-super-judge"
+    judge: "nemotron-lightning-judge"
     runs: 5
 
 execution:
@@ -701,13 +703,13 @@ same judge.
 ```yaml
 generators:
   - name: "nemotron"
-    model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     api_key: "${NVIDIA_API_KEY}"
     temperature: 0.0
     max_tokens: 4096
 
 judge:
-  model: "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+  model: "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
   api_key: "${NVIDIA_API_KEY}"
   temperature: 0.1
   max_tokens: 4096
@@ -736,7 +738,7 @@ LiteLLM routes by prefix:
 
 | Prefix | Provider | Example |
 |--------|----------|---------|
-| `nvidia_nim/` | NVIDIA NIM (build.nvidia.com) | `nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5` |
+| `nvidia_nim/` | NVIDIA NIM (build.nvidia.com) | `nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b` |
 | `openai/` | OpenAI or any OpenAI-compatible server | `openai/gpt-4o` |
 | `huggingface/` | HuggingFace Inference Endpoints | `huggingface/meta-llama/Llama-3-70b-instruct` |
 
@@ -840,7 +842,7 @@ llm = LiteLLMClient.from_kwargs(
 )
 
 judge = LLMJudge.from_kwargs(
-    model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
     temperature=0.1,
     max_tokens=4096,
 )
@@ -1120,7 +1122,7 @@ across all modalities (text, table, chart, infographic) for 767 bo767 PDFs.
 
 3. **Full-page markdown recommended**: Sub-page chunks may split structured content (tables, charts) across multiple records. The full-page markdown pipeline (step 2 in reproduction) reconstructs complete pages, matching the research team's approach and improving generation accuracy.
 
-4. **Reasoning model truncation**: Models with extended thinking (e.g., Nemotron Super) may spend their token budget reasoning and never produce a final answer. The pipeline detects this (`thinking_truncated`) and nullifies the score.
+4. **Reasoning model truncation**: Models with extended thinking (for example, Nemotron 3.5 Lightning) may spend their token budget reasoning and never produce a final answer. The pipeline detects this (`thinking_truncated`) and nullifies the score.
 
 5. **Model refusal failures**: The model sometimes responds "no information found" even when the answer is in the retrieved chunks. The failure breakdown splits these into `refused_missing_context` (answer genuinely absent -- retrieval problem) vs `refused_with_context` (answer present but model refused -- generator problem). Together they account for ~13% of queries in the reference run.
 

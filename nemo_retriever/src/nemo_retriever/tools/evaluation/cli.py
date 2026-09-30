@@ -109,10 +109,10 @@ def _on_run(result: dict, total_queries: int) -> None:
 # ---------------------------------------------------------------------------
 
 _ENV_DEFAULTS = {
-    "GEN_MODEL": "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "GEN_MODEL": "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
     "GEN_MODEL_NAME": "generator",
     "GEN_TEMPERATURE": "0.0",
-    "JUDGE_MODEL": "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    "JUDGE_MODEL": "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
     "JUDGE_TEMPERATURE": "0.1",
     "JUDGE_MAX_TOKENS": "4096",
     "QA_TOP_K": "5",

@@ -384,7 +384,7 @@ def main(argv=None) -> int:
     ap.add_argument("--min-rows", type=int, default=1)
     ap.add_argument("--judge", dest="judge", action="store_true", default=True)
     ap.add_argument("--no-judge", dest="judge", action="store_false")
-    ap.add_argument("--judge-model", default="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
+    ap.add_argument("--judge-model", default="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
     ap.add_argument("--judge-api-base", default="https://integrate.api.nvidia.com/v1")
     ap.add_argument("--judge-api-key-env", default="NVIDIA_API_KEY")
     ap.add_argument(

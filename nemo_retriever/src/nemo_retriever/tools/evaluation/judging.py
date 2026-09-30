@@ -29,7 +29,7 @@ class JudgingOperator(EvalOperator):
 
     def __init__(
         self,
-        model: str = "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        model: str = "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
         *,
         api_base: Optional[str] = None,
         api_key: Optional[str] = None,

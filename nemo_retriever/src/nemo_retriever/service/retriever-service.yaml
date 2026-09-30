@@ -98,15 +98,15 @@ local_models:
     batch_size: 32
 
 # Remote LLM endpoint used by POST /v1/answer. Helm auto-wires these
-# fields when the Super-49B NIM is enabled.
+# fields when the answer LLM NIM is enabled.
 llm:
   enabled: false
-  model: "openai/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+  model: "openai/nvidia/nemotron-3.5-lightning-30b-a3b"
   api_base: null
   api_key: null
   temperature: 0.0
   top_p: null
-  max_tokens: 512
+  max_tokens: 4096
   extra_params: {}
   num_retries: 3
   timeout: 180.0

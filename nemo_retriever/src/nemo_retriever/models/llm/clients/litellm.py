@@ -69,7 +69,7 @@ class LiteLLMClient:
     Use :meth:`from_kwargs` for a flat, backwards-compatible constructor.
     """
 
-    _DEFAULT_MODEL: str = "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    _DEFAULT_MODEL: str = "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     supports_concurrent_calls: bool = True
 
     def __init__(

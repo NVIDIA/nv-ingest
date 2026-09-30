@@ -19,10 +19,10 @@ _CHART_DIR = _REPO_ROOT / "nemo_retriever/helm"
 
 _ANSWER_LLM_KEY = "  answer_llm:"
 _ANSWER_LLM_SERVICE = "answer-llm"
-_SUPER49B_REPOSITORY = "nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
-_SUPER49B_TAG = "2.0.5"
-_SUPER49B_MODEL = "openai/nvidia/llama-3.3-nemotron-super-49b-v1.5"
-_SUPER49B_PROFILE = "1146f49f84dff5dea09f5aa633cc70b92d7d972223d67878c841cd0fbccad4fb"
+_LIGHTNING_REPOSITORY = "nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b"
+_LIGHTNING_TAG = "2.0.9-variant"
+_LIGHTNING_MODEL = "openai/nvidia/nemotron-3.5-lightning-30b-a3b"
+_LIGHTNING_SERVED_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b"
 _NANO_SERVICE = "nemotron-3-nano"
 _NANO_REPOSITORY = "nvcr.io/nim/nvidia/nemotron-3-nano"
 _NANO_TAG = "1.7.0-variant"
@@ -66,7 +66,7 @@ def _assert_helm_ok(self: TestCase, proc: subprocess.CompletedProcess[str]) -> N
 
 
 class HelmAnswerLLMGenerationTests(TestCase):
-    def test_values_define_generic_answer_llm_with_super49b_defaults(self) -> None:
+    def test_values_define_generic_answer_llm_with_lightning_defaults(self) -> None:
         values = _read_required_file(_VALUES_YAML)
 
         self.assertIn(_ANSWER_LLM_KEY, values)
@@ -74,12 +74,15 @@ class HelmAnswerLLMGenerationTests(TestCase):
         block = values[start : values.index("\n  rerankqa:", start)]
         self.assertIn("enabled: false", block)
         self.assertIn(f"nimServiceName: {_ANSWER_LLM_SERVICE}", block)
-        self.assertIn(f"repository: {_SUPER49B_REPOSITORY}", block)
-        self.assertIn(f'tag: "{_SUPER49B_TAG}"', block)
-        self.assertIn(f'model: "{_SUPER49B_MODEL}"', block)
-        self.assertIn("nvidia.com/gpu: 2", block)
+        self.assertIn(f"repository: {_LIGHTNING_REPOSITORY}", block)
+        self.assertIn(f'tag: "{_LIGHTNING_TAG}"', block)
+        self.assertIn(f'model: "{_LIGHTNING_MODEL}"', block)
+        self.assertIn("resources: {}", block)
+        self.assertIn("modelProfile: {}", block)
+        self.assertIn(_LIGHTNING_SERVED_MODEL, block)
+        self.assertIn("NIM_MODEL_NAME", block)
+        self.assertIn("--reasoning-parser nemotron_v3", block)
         self.assertIn('size: "250Gi"', block)
-        self.assertIn(_SUPER49B_PROFILE, block)
         self.assertIn("reasoningEnabled: true", values)
         self.assertIn('ragSystemPromptPrefix: ""', block)
 
@@ -93,23 +96,26 @@ class HelmAnswerLLMGenerationTests(TestCase):
         self.assertIn("api_base: null", proc.stdout)
         self.assertNotIn("NEMO_RETRIEVER_LLM_API_KEY", proc.stdout)
 
-    def test_answer_llm_opt_in_renders_default_super49b_nim_and_autowires_llm_config(self) -> None:
+    def test_answer_llm_opt_in_renders_default_lightning_nim_and_autowires_llm_config(self) -> None:
         proc = _helm_template(extra_args=("--set", "nimOperator.answer_llm.enabled=true"))
         _assert_helm_ok(self, proc)
 
         self.assertIn(f"name: {_ANSWER_LLM_SERVICE}", proc.stdout)
-        self.assertIn(f"repository: {_SUPER49B_REPOSITORY}", proc.stdout)
-        self.assertIn(f"tag: {_SUPER49B_TAG}", proc.stdout)
-        self.assertIn("nvidia.com/gpu: 2", proc.stdout)
-        self.assertIn("profiles:", proc.stdout)
-        self.assertIn(_SUPER49B_PROFILE, proc.stdout)
+        self.assertIn(f"repository: {_LIGHTNING_REPOSITORY}", proc.stdout)
+        self.assertIn(f"tag: {_LIGHTNING_TAG}", proc.stdout)
+        self.assertIn("nvidia.com/gpu: 1", proc.stdout)
+        self.assertNotIn("NIM_MODEL_PROFILE", proc.stdout)
+        self.assertIn("NIM_MODEL_NAME", proc.stdout)
+        self.assertIn("NIM_SERVED_MODEL_NAME", proc.stdout)
+        self.assertIn(_LIGHTNING_SERVED_MODEL, proc.stdout)
         self.assertIn("NIM_PASSTHROUGH_ARGS", proc.stdout)
-        self.assertIn("--disable-custom-all-reduce", proc.stdout)
-        self.assertIn("NCCL_IB_DISABLE", proc.stdout)
-        self.assertIn("NCCL_P2P_DISABLE", proc.stdout)
+        self.assertIn("--reasoning-parser nemotron_v3", proc.stdout)
+        self.assertNotIn("NCCL_IB_DISABLE", proc.stdout)
+        self.assertNotIn("NCCL_P2P_DISABLE", proc.stdout)
         self.assertIn(f'api_base: "http://{_ANSWER_LLM_SERVICE}:8000/v1"', proc.stdout)
-        self.assertIn(f'model: "{_SUPER49B_MODEL}"', proc.stdout)
+        self.assertIn(f'model: "{_LIGHTNING_MODEL}"', proc.stdout)
         self.assertIn("reasoning_enabled: true", proc.stdout)
+        self.assertIn("max_tokens: 4096", proc.stdout)
         self.assertIn("rag_system_prompt_prefix: null", proc.stdout)
         self.assertIn("enabled: true", proc.stdout)
         self.assertIn("NEMO_RETRIEVER_LLM_API_KEY", proc.stdout)
@@ -182,7 +188,6 @@ class HelmAnswerLLMGenerationTests(TestCase):
         self.assertIn("NIM_TENSOR_PARALLEL_SIZE", proc.stdout)
         self.assertIn(_NANO_A100_PROFILE, proc.stdout)
         self.assertIn("nvidia.com/gpu: 1", proc.stdout)
-        self.assertNotIn(_SUPER49B_PROFILE, proc.stdout)
         self.assertIn(f'api_base: "http://{_NANO_SERVICE}:8000/v1"', proc.stdout)
         self.assertIn(f'model: "{_NANO_MODEL}"', proc.stdout)
         self.assertIn("rag_system_prompt_prefix: null", proc.stdout)

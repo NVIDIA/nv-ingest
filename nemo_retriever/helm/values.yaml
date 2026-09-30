@@ -644,7 +644,7 @@ serviceConfig:
       optional: false
     temperature: 0.0
     topP: null
-    maxTokens: 512
+    maxTokens: 4096
     extraParams: {}
     numRetries: 3
     timeout: 180.0
@@ -1064,7 +1064,7 @@ nimOperator:
   #                                                 ≈ 62 GiB BF16 weights;
   #                                                 auto-wires caption URL)
   #     - answer_llm                               (OpenAI-compatible answer LLM,
-  #                                                 Super-49B defaults;
+  #                                                 Nemotron 3.5 Lightning defaults;
   #                                                 auto-wires llm.apiBase)
   #     - audio                                    (Parakeet ASR; still
   #                                                 requires explicit
@@ -1310,8 +1310,8 @@ nimOperator:
   # Generic OpenAI-compatible answer-generation LLM NIM.
   #
   # Disabled by default because answer LLMs are larger than the core
-  # extraction NIMs. The default image/model is Super-49B and requests
-  # two GPUs. Override `image.repository`, `image.tag`, `model`,
+  # extraction NIMs. The default image/model is Nemotron 3.5 Lightning and
+  # requests one GPU. Override `image.repository`, `image.tag`, `model`,
   # `nimServiceName`, `resources`, `modelProfile`, and `env` to swap in
   # another compatible LLM NIM such as Nemotron 3 Nano.
   answer_llm:
@@ -1321,15 +1321,15 @@ nimOperator:
     # LiteLLM/OpenAI model id rendered into retriever-service.yaml when
     # this operator-managed LLM is enabled and serviceConfig.llm.model is
     # left empty.
-    model: "openai/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    model: "openai/nvidia/nemotron-3.5-lightning-30b-a3b"
     # Optional prompt prefix to apply when this operator-managed LLM
     # auto-wires /v1/answer. Leave empty to keep the LLM deployment and
     # prompt defaults model-neutral; use serviceConfig.llm.reasoningEnabled
     # for the portable request-level reasoning toggle.
     ragSystemPromptPrefix: ""
     image:
-      repository: nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5
-      tag: "2.0.5"
+      repository: nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b
+      tag: "2.0.9-variant"
       pullPolicy: IfNotPresent
       # Empty inherits ngcImagePullSecret.name. Non-empty REPLACES the
       # chart-wide pull secret name(s) for this NIM only.
@@ -1339,17 +1339,12 @@ nimOperator:
     authSecret: ""
     # Per-NIM NIMCache GPU/profile filter. See `nimOperator.modelProfile`
     # above for the shape; non-empty REPLACES the chart-wide default.
-    # Cache only the default BF16 2-GPU profile used by the Super-49B
-    # default resources. Override this when deploying a different model,
-    # profile, or GPU topology.
-    # A single explicit profile in the effective cache configuration also
-    # selects the runtime profile. Empty/filter-only/multiple-profile
-    # configurations preserve automatic runtime selection. An explicit
-    # NIM_MODEL_PROFILE env entry overrides this runtime selection.
-    # Set profiles: [] to remove the bundled pin.
-    modelProfile:
-      profiles:
-        - "1146f49f84dff5dea09f5aa633cc70b92d7d972223d67878c841cd0fbccad4fb"
+    # Leave empty so the NIM Operator selects a profile compatible with
+    # the target GPU. Set a profile explicitly for deterministic caching.
+    # A single explicit profile also selects the runtime profile unless
+    # NIM_MODEL_PROFILE is set in env. Filter-only or multiple-profile
+    # configurations preserve automatic runtime selection.
+    modelProfile: {}
     storage:
       pvc:
         create: true
@@ -1357,12 +1352,8 @@ nimOperator:
         size: "250Gi"
         volumeAccessMode: ReadWriteOnce
     replicas: 1
-    # The Super-49B default uses a 2-GPU tensor-parallel profile. This
-    # non-empty resources block intentionally replaces
-    # nimOperator.nimServiceGpuLimit. Override for smaller LLM NIMs.
-    resources:
-      limits:
-        nvidia.com/gpu: 2
+    # Empty inherits nimOperator.nimServiceGpuLimit (one GPU by default).
+    resources: {}
     nodeSelector: {}
     tolerations: []
     expose:
@@ -1373,18 +1364,14 @@ nimOperator:
     env:
       - name: NIM_HTTP_API_PORT
         value: "8000"
+      - name: NIM_MODEL_NAME
+        value: "nvidia/nemotron-3.5-lightning-30b-a3b"
+      - name: NIM_SERVED_MODEL_NAME
+        value: "nvidia/nemotron-3.5-lightning-30b-a3b"
       - name: NIM_TENSOR_PARALLEL_SIZE
-        value: "2"
-      # Conservative tensor-parallel startup default; override when your
-      # deployment fabric has been validated with custom all-reduce enabled.
+        value: "1"
       - name: NIM_PASSTHROUGH_ARGS
-        value: "--disable-custom-all-reduce"
-      # Conservative single-pod tensor-parallel defaults that avoid
-      # transport assumptions across GPU fabrics.
-      - name: NCCL_IB_DISABLE
-        value: "1"
-      - name: NCCL_P2P_DISABLE
-        value: "1"
+        value: "--reasoning-parser nemotron_v3"
 
   # Llama Nemotron rerank VL 1B v2 — multimodal reranking NIM.
   #

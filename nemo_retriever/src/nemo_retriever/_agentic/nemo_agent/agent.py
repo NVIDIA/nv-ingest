@@ -294,9 +294,7 @@ class Agent(_BaseAgentLoop):
             citations = fn_kwargs.get("citations")
             if isinstance(citations, list):
                 cited_ids = {
-                    citation.strip()
-                    for citation in citations
-                    if isinstance(citation, str) and citation.strip()
+                    citation.strip() for citation in citations if isinstance(citation, str) and citation.strip()
                 }
                 unknown = sorted(cited_ids - state.retrieved_docs)
                 if unknown:

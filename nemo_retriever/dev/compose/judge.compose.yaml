@@ -4,9 +4,9 @@
 
 services:
   judge:
-    # Nemotron-Super-49B-v1.5 NIM, used as the LLM-as-judge for
+    # Nemotron 3.5 Lightning NIM, used as the LLM-as-judge for
     # `retriever skill-eval` when the run config points at localhost.
-    image: ${JUDGE_IMAGE:-nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5}:${JUDGE_TAG:-2.0.5}
+    image: ${JUDGE_IMAGE:-nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b}:${JUDGE_TAG:-2.0.9-variant}
     shm_size: 16gb
     ports:
       - "${JUDGE_HTTP_PORT:-8000}:8000"
@@ -14,8 +14,10 @@ services:
       - "8000"
     environment:
       - NIM_HTTP_API_PORT=8000
+      - NIM_MODEL_NAME=nvidia/nemotron-3.5-lightning-30b-a3b
+      - NIM_SERVED_MODEL_NAME=nvidia/nemotron-3.5-lightning-30b-a3b
+      - NIM_PASSTHROUGH_ARGS=--reasoning-parser nemotron_v3 --enable-auto-tool-choice --tool-call-parser qwen3_coder
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:?NGC_API_KEY or NIM_NGC_API_KEY must be set}}
-    command: ["--tool-call-parser", "llama3_json", "--enable-auto-tool-choice"]
     deploy:
       resources:
         reservations:

@@ -797,7 +797,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument("--judge", dest="judge", action="store_true", default=None)
     ap.add_argument("--no-judge", dest="judge", action="store_false")
-    ap.add_argument("--judge-model", default="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5")
+    ap.add_argument("--judge-model", default="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b")
     ap.add_argument("--judge-api-base", default="https://integrate.api.nvidia.com/v1")
     ap.add_argument("--judge-api-key-env", default="NVIDIA_API_KEY")
     ap.add_argument("--out", type=Path, default=None, help="Dir for the comparison report (default: first run dir).")

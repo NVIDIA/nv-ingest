@@ -32,6 +32,11 @@ def test_llm_config_defaults_to_reasoning_enabled_for_external_provider_safety()
     assert LLMConfig().reasoning_enabled is True
 
 
+def test_llm_config_defaults_to_lightning() -> None:
+    assert LLMConfig().model == "openai/nvidia/nemotron-3.5-lightning-30b-a3b"
+    assert LLMConfig().max_tokens == 4096
+
+
 def test_llm_config_allows_empty_model_when_disabled_for_helm_default() -> None:
     assert LLMConfig(enabled=False, model="").model == ""
 
@@ -70,8 +75,8 @@ def app_with_answer_config(monkeypatch: pytest.MonkeyPatch, tmp_path):
         ),
         llm=LLMConfig(
             enabled=True,
-            model="openai/nvidia/llama-3.3-nemotron-super-49b-v1.5",
-            api_base="http://llama-3-3-nemotron-super-49b-v1-5:8000/v1",
+            model="openai/nvidia/nemotron-3.5-lightning-30b-a3b",
+            api_base="http://answer-llm:8000/v1",
             api_key="not-needed",
             max_tokens=128,
             timeout=180.0,
@@ -83,10 +88,15 @@ def app_with_answer_config(monkeypatch: pytest.MonkeyPatch, tmp_path):
         yield client
 
 
+@pytest.mark.parametrize("use_defaults", [True, False])
 def test_answer_retrieves_from_vectordb_and_generates_with_configured_llm(
     app_with_answer_config: TestClient,
     monkeypatch: pytest.MonkeyPatch,
+    use_defaults: bool,
 ) -> None:
+    if use_defaults:
+        app_with_answer_config.app.state.config.llm.max_tokens = LLMConfig().max_tokens
+        app_with_answer_config.app.state.config.llm.reasoning_enabled = LLMConfig().reasoning_enabled
     requests: list[dict[str, Any]] = []
 
     class _FakeResponse:
@@ -96,7 +106,11 @@ def test_answer_retrieves_from_vectordb_and_generates_with_configured_llm(
                 "results": [
                     {
                         "hits": [
-                            {"text": "Super-49B is the answer generator.", "source": "doc.pdf", "page_number": 1},
+                            {
+                                "text": "Nemotron 3.5 Lightning is the answer generator.",
+                                "source": "doc.pdf",
+                                "page_number": 1,
+                            },
                             {"text": "NRL queries LanceDB before generation.", "source": "doc.pdf", "page_number": 2},
                         ]
                     }
@@ -127,7 +141,7 @@ def test_answer_retrieves_from_vectordb_and_generates_with_configured_llm(
         generate=lambda query, chunks, *, reasoning_enabled=None: GenerationResult(
             answer=f"{query}: {len(chunks)} chunks",
             latency_s=0.25,
-            model="openai/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            model="openai/nvidia/nemotron-3.5-lightning-30b-a3b",
         )
     )
 
@@ -142,7 +156,10 @@ def test_answer_retrieves_from_vectordb_and_generates_with_configured_llm(
     assert body["query"] == "What generates answers?"
     assert body["answer"] == "What generates answers?: 2 chunks"
     assert body["chunk_count"] == 2
-    assert body["chunks"] == ["Super-49B is the answer generator.", "NRL queries LanceDB before generation."]
+    assert body["chunks"] == [
+        "Nemotron 3.5 Lightning is the answer generator.",
+        "NRL queries LanceDB before generation.",
+    ]
     assert body["metadata"] == [
         {"source": "doc.pdf", "page_number": 1},
         {"source": "doc.pdf", "page_number": 2},
@@ -156,18 +173,18 @@ def test_answer_retrieves_from_vectordb_and_generates_with_configured_llm(
         }
     ]
     from_kwargs.assert_called_once_with(
-        model="openai/nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        api_base="http://llama-3-3-nemotron-super-49b-v1-5:8000/v1",
+        model="openai/nvidia/nemotron-3.5-lightning-30b-a3b",
+        api_base="http://answer-llm:8000/v1",
         api_key="not-needed",
         temperature=0.0,
         top_p=None,
-        max_tokens=128,
+        max_tokens=4096 if use_defaults else 128,
         extra_params={},
         num_retries=3,
         timeout=180.0,
         rag_system_prompt=None,
         rag_system_prompt_prefix=None,
-        reasoning_enabled=False,
+        reasoning_enabled=use_defaults,
     )
 
 
@@ -634,8 +651,8 @@ def test_answer_scores_with_opt_in_judge(
     assert body["chunks"] is None
     assert body["metadata"] is None
     judge_from_kwargs.assert_called_once_with(
-        model="openai/nvidia/llama-3.3-nemotron-super-49b-v1.5",
-        api_base="http://llama-3-3-nemotron-super-49b-v1-5:8000/v1",
+        model="openai/nvidia/nemotron-3.5-lightning-30b-a3b",
+        api_base="http://answer-llm:8000/v1",
         api_key="not-needed",
         extra_params={},
         num_retries=3,
@@ -679,7 +696,7 @@ def test_answer_returns_502_when_llm_generation_fails(
         generate=lambda query, chunks, *, reasoning_enabled=None: GenerationResult(
             answer="",
             latency_s=0.0,
-            model="openai/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+            model="openai/nvidia/nemotron-3.5-lightning-30b-a3b",
             error="connection refused",
         )
     )

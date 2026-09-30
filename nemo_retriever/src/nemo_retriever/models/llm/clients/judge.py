@@ -234,7 +234,7 @@ class LLMJudge:
     Use :meth:`from_kwargs` for a flat, backwards-compatible constructor.
     """
 
-    _DEFAULT_MODEL: str = "nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5"
+    _DEFAULT_MODEL: str = "nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b"
     # max_tokens must accommodate the Nemotron reasoning block + the final
     # {"rating": X}; NVIDIA's llm-judge recipe uses 32768. 4096 truncated mid-think.
     _DEFAULT_SAMPLING: LLMInferenceParams = LLMInferenceParams(temperature=0.1, max_tokens=32768)

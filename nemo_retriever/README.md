@@ -388,15 +388,6 @@ CUDA_VISIBLE_DEVICES=0 retriever query "Given their activities, which animal is 
   --table-name nemo-retriever
 ```
 
-```bash
-CUDA_VISIBLE_DEVICES=0,1 retriever query "Given their activities, which animal is responsible for the typos in my documents?" \
-  --agentic \
-  --agentic-llm-model super-49b \
-  --agentic-local-tensor-parallel-size 2 \
-  --lancedb-uri lancedb \
-  --table-name nemo-retriever
-```
-
 When the first ``tensor_parallel_size`` CUDA-visible GPUs are not
 NVLink-connected (typical dual-GPU PCIe workstations), tensor-parallel
 startup automatically sets `NCCL_NVLS_ENABLE=0` and
@@ -413,17 +404,17 @@ is required and is sent as the remote model ID.
 ```bash
 retriever query "What is RAG?" \
   --agentic \
-  --agentic-llm-model nvidia/llama-3.3-nemotron-super-49b-v1.5 \
+  --agentic-llm-model nvidia/nemotron-3.5-lightning-30b-a3b \
   --agentic-invoke-url http://localhost:9000/v1/chat/completions \
   --lancedb-uri lancedb \
   --table-name nemo-retriever
 ```
 
-The Helm `answer_llm` Super-49B NIM is not tool-call ready by default.
-Add `--enable-auto-tool-choice --tool-call-parser llama3_json` to
-`NIM_PASSTHROUGH_ARGS` before you point `--agentic-invoke-url` at that
-endpoint. Refer to
-[Agentic retrieval (self-hosted Super-49B)](helm/README.md#agentic-retrieval-llm)
+The Helm `answer_llm` Nemotron 3.5 Lightning NIM is not tool-call ready by default.
+Add `--enable-auto-tool-choice --tool-call-parser qwen3_coder` to
+`NIM_PASSTHROUGH_ARGS`, retaining `--reasoning-parser nemotron_v3`, before
+you point `--agentic-invoke-url` at that endpoint. Refer to
+[Agentic retrieval (self-hosted Nemotron 3.5 Lightning)](helm/README.md#agentic-retrieval-llm)
 in the Helm chart README.
 
 Agentic CLI output is not the five-field dense projection (`modality`,
@@ -518,7 +509,7 @@ retriever = Retriever(
     top_k=5,
 )
 llm = LiteLLMClient.from_kwargs(
-    model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key="os.environ/NVIDIA_API_KEY",
     temperature=0.0,
     max_tokens=512,
@@ -541,7 +532,7 @@ Live RAG with scoring and an LLM judge (requires a ground-truth `reference`):
 from nemo_retriever.models.llm import LLMJudge
 
 judge = LLMJudge.from_kwargs(
-    model="nvidia_nim/nvidia/llama-3.3-nemotron-super-49b-v1.5",
+    model="nvidia_nim/nvidia/nemotron-3.5-lightning-30b-a3b",
     api_key="os.environ/NVIDIA_API_KEY",
     temperature=0.1,
     max_tokens=4096,

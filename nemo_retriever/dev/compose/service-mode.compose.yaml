@@ -213,23 +213,23 @@ services:
   nim-answer:
     <<: *nim-service
     profiles: [nim-answer]
-    image: ${NIM_ANSWER_IMAGE:-nvcr.io/nim/nvidia/llama-3.3-nemotron-super-49b-v1.5}:${NIM_ANSWER_TAG:-2.0.5}
+    image: ${NIM_ANSWER_IMAGE:-nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b}:${NIM_ANSWER_TAG:-2.0.9-variant}
     ports: ["${NIM_ANSWER_HOST_PORT:-8008}:8000"]
     environment:
       <<: *nim-environment
       NIM_HTTP_API_PORT: "8000"
       NIM_OTEL_SERVICE_NAME: answer-llm
-      NIM_TENSOR_PARALLEL_SIZE: ${NIM_ANSWER_TENSOR_PARALLEL_SIZE:-2}
-      NIM_PASSTHROUGH_ARGS: ${NIM_ANSWER_PASSTHROUGH_ARGS:---disable-custom-all-reduce}
-      NCCL_IB_DISABLE: "1"
-      NCCL_P2P_DISABLE: "1"
+      NIM_MODEL_NAME: nvidia/nemotron-3.5-lightning-30b-a3b
+      NIM_SERVED_MODEL_NAME: nvidia/nemotron-3.5-lightning-30b-a3b
+      NIM_TENSOR_PARALLEL_SIZE: ${NIM_ANSWER_TENSOR_PARALLEL_SIZE:-1}
+      NIM_PASSTHROUGH_ARGS: "${NIM_ANSWER_PASSTHROUGH_ARGS:---reasoning-parser nemotron_v3}"
     volumes: ["nim_answer_cache:${NIM_ANSWER_CACHE_PATH:-/opt/nim/.cache}"]
     deploy:
       resources:
         reservations:
           devices:
             - <<: *nim-gpu
-              device_ids: ["${NIM_ANSWER_GPU_ID_0:-7}", "${NIM_ANSWER_GPU_ID_1:-8}"]
+              device_ids: ["${NIM_ANSWER_GPU_ID_0:-7}"]
 
   nim-audio:
     <<: *nim-service
@@ -312,12 +312,12 @@ configs:
           enabled: ${LOCAL_ASR_ENABLED:-true}
       llm:
         enabled: ${ANSWER_LLM_ENABLED:-false}
-        model: "${ANSWER_LLM_MODEL:-openai/nvidia/llama-3.3-nemotron-super-49b-v1.5}"
+        model: "${ANSWER_LLM_MODEL:-openai/nvidia/nemotron-3.5-lightning-30b-a3b}"
         api_base: ${ANSWER_LLM_API_BASE_YAML:-null}
         api_key: null
         temperature: ${ANSWER_LLM_TEMPERATURE:-0.0}
         top_p: ${ANSWER_LLM_TOP_P:-null}
-        max_tokens: ${ANSWER_LLM_MAX_TOKENS:-512}
+        max_tokens: ${ANSWER_LLM_MAX_TOKENS:-4096}
         extra_params: ${ANSWER_LLM_EXTRA_PARAMS:-{}}
         num_retries: ${ANSWER_LLM_NUM_RETRIES:-3}
         timeout: ${ANSWER_LLM_TIMEOUT:-180.0}
