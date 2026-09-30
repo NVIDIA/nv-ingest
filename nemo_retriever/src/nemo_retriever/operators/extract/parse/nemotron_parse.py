@@ -24,7 +24,6 @@ import re
 import time
 import traceback
 
-import numpy as np
 import pandas as pd
 
 from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import (
@@ -276,11 +275,15 @@ def _route_tool_call_elements(
     return table_items, chart_items, infographic_items, page_text
 
 
-def _decode_page_image(page_image_b64: str) -> np.ndarray:
-    """Decode a base64 page image to an HWC uint8 numpy array."""
+def _decode_page_image(page_image_b64: str) -> "Image.Image":
+    """Decode a base64 page image to a loaded RGB PIL image."""
     raw = base64.b64decode(page_image_b64)
     with Image.open(io.BytesIO(raw)) as im:
-        return np.asarray(im.convert("RGB"), dtype=np.uint8).copy()
+        image = im.convert("RGB")
+    # The previous NumPy handoff dropped file metadata such as EXIF orientation; later
+    # normalization (vLLM's exif_transpose) must see the same image as before.
+    image.info.clear()
+    return image
 
 
 # ---------------------------------------------------------------------------
@@ -343,7 +346,7 @@ def nemotron_parse_pages(
 
     # -- Phase 1: collect page images that need inference ----------------
     batch_indices: List[int] = []  # index into batch_df
-    batch_images: List[Any] = []  # numpy arrays (local) or b64 strings (remote)
+    batch_images: List[Any] = []  # RGB PIL images (local) or b64 strings (remote)
 
     for idx, row in enumerate(batch_df.itertuples(index=False)):
         page_image = getattr(row, "page_image", None) or {}

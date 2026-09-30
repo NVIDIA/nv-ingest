@@ -583,6 +583,78 @@ class TestNemotronParseActor:
             assert metadata["error"]["stage"] == "nemotron_parse_pages"
             assert "different number of completions" in metadata["error"]["message"]
 
+    @pytest.mark.parametrize("mode", ["RGB", "RGBA", "P", "L", "LA", "I;16"])
+    def test_page_decode_yields_the_same_rgb_pixels_as_numpy(self, mode):
+        import base64
+        import io
+
+        import numpy as np
+        from PIL import Image
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import _decode_page_image
+
+        pixels = np.random.default_rng(0).integers(0, 256, size=(37, 53, 4), dtype=np.uint8)
+        source = Image.fromarray(pixels, "RGBA").convert(mode)
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode()
+
+        decoded = _decode_page_image(encoded)
+        with Image.open(io.BytesIO(buffer.getvalue())) as reference:
+            expected = np.asarray(reference.convert("RGB"), dtype=np.uint8)
+
+        assert decoded.mode == "RGB"
+        assert decoded.size == (53, 37)
+        assert np.array_equal(np.asarray(decoded), expected)
+
+    def test_page_decode_drops_exif_orientation_like_the_numpy_path(self):
+        import base64
+        import io
+
+        import numpy as np
+        from PIL import Image, ImageOps
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import _decode_page_image
+
+        exif = Image.Exif()
+        exif[0x0112] = 6  # rotate 90 degrees on display
+        buffer = io.BytesIO()
+        Image.fromarray(np.zeros((37, 53, 3), dtype=np.uint8)).save(buffer, format="PNG", exif=exif)
+
+        decoded = _decode_page_image(base64.b64encode(buffer.getvalue()).decode())
+
+        assert decoded.info == {}
+        assert ImageOps.exif_transpose(decoded).size == (53, 37)
+
+    def test_undecodable_page_is_recorded_and_other_pages_still_parse(self):
+        import base64
+        import io
+
+        from PIL import Image
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (8, 8), "white").save(buffer, format="PNG")
+        valid = base64.b64encode(buffer.getvalue()).decode()
+        truncated = base64.b64encode(buffer.getvalue()[:41]).decode()
+        seen = []
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                seen.extend(images)
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", "stop")] * len(images)
+
+        result = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": truncated}, {"image_b64": valid}]}),
+            model=_FakeModel(),
+        )
+
+        assert [image.mode for image in seen] == ["RGB"]
+        assert result.at[0, "nemotron_parse_v1_2"]["error"]["stage"] == "nemotron_parse_pages_decode"
+        assert result.at[1, "nemotron_parse_v1_2"]["error"] is None
+        assert result.at[1, "nemotron_parse_v1_2"]["raw_output"] == "<x_0><y_0>Hello<x_1><y_1><class_Text>"
+
     def test_route_error_retains_raw_output(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
 
