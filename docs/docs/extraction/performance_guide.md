@@ -112,7 +112,7 @@ workstation with the interface installed. Search the timeline for
 | `nrl.batch::embedding.batch` | One embedding actor processing call. |
 | `nrl.batch::ray.materialize` | Materialization of a terminal Ray dataset into a pandas DataFrame. This range can include lazy upstream execution. |
 | `nrl.batch::pipeline.terminal_stream` | Consumption of the lazy upstream pipeline and streaming of its records to the vector database backend. This range is not pure vector database time. |
-| `nrl.batch::result.concat` | Concatenation of retained terminal frames when the caller requests full results. This range is absent or trivial on paths that do not retain full results. |
+| `nrl.batch::result.concat` | Concatenation of retained frames when the graph ends at a streaming vector database sink and at least one batch was consumed. This range is absent when the sink has downstream nodes or the input has no batches. |
 
 Ranges from concurrent Ray actors can overlap. Their durations include CPU
 preparation, waits, and calls into inference backends. They do not represent

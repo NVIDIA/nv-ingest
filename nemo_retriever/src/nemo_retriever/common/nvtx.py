@@ -43,9 +43,21 @@ def _get_nvtx() -> ModuleType | None:
 
 
 def batch_phase(label: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
-    """Mark a semantic batch boundary without synchronizing CUDA.
+    """Decorate a function with a stable NVTX range for a batch phase.
 
-    The range is a no-op when PyTorch or its NVTX support is unavailable.
+    The range is a no-op when PyTorch or its NVTX support is unavailable. A
+    CPU-only PyTorch NVTX stub is also treated as unavailable. Unexpected NVTX
+    errors propagate to the caller; exceptions raised by the decorated function
+    propagate after the range is closed.
+
+    Args:
+        label: Low-cardinality phase name appended to the ``nrl.batch::`` prefix.
+
+    Returns:
+        A decorator that wraps a function with the named NVTX range.
+
+    Raises:
+        RuntimeError: If the NVTX backend raises an unexpected runtime error.
     """
 
     range_name = f"nrl.batch::{label}"
