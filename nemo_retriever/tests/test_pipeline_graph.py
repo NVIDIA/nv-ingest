@@ -1774,6 +1774,87 @@ class TestRayDataExecutor:
         assert input_dataset.context.batch_to_block_arrow_format
         assert input_dataset.context.enable_tensor_extension_casting
 
+    @pytest.fixture
+    def repartition_calls_and_dataset(self, monkeypatch):
+        import sys
+        from types import SimpleNamespace
+
+        calls: list[tuple[str, Any]] = []
+
+        class FakeDataContext:
+            enable_rich_progress_bars = False
+            use_ray_tqdm = True
+
+            @classmethod
+            def get_current(cls):
+                return cls()
+
+        class FakeDataset:
+            context = FakeDataContext()
+
+            def repartition(self, **kwargs):
+                calls.append(("repartition", kwargs))
+                return self
+
+            def map_batches(self, operator_class, **kwargs):
+                calls.append(("map_batches", kwargs["batch_size"]))
+                return self
+
+        fake_ray_data = SimpleNamespace(Dataset=FakeDataset, DataContext=FakeDataContext)
+        fake_ray = SimpleNamespace(is_initialized=lambda: True, init=lambda **kwargs: None, data=fake_ray_data)
+        monkeypatch.setitem(sys.modules, "ray", fake_ray)
+        monkeypatch.setitem(sys.modules, "ray.data", fake_ray_data)
+        monkeypatch.setattr(
+            "nemo_retriever.graph.executor.gather_cluster_resources",
+            lambda _ray: SimpleNamespace(available_gpu_count=lambda: 0),
+        )
+        monkeypatch.setattr("nemo_retriever.graph.executor.resolve_graph", lambda graph, cluster: graph)
+        return calls, FakeDataset()
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected"),
+        [
+            ({"target_num_rows_per_block": 128}, {"target_num_rows_per_block": 128}),
+            (
+                {"target_num_rows_per_block": 128, "strict_rows_per_block": True},
+                {"target_num_rows_per_block": 128, "strict": True},
+            ),
+            ({"target_num_rows_per_block": 128, "strict_rows_per_block": False}, {"target_num_rows_per_block": 128}),
+        ],
+    )
+    def test_build_dataset_repartitions_strictly_only_when_requested(
+        self, repartition_calls_and_dataset, overrides, expected
+    ):
+        calls, dataset = repartition_calls_and_dataset
+        graph = Graph() >> UDFOperator(lambda frame: frame)
+        executor = RayDataExecutor(graph, node_overrides={"UDFOperator": {"batch_size": 128, **overrides}})
+        executor._resources_preflight_complete = True
+        executor.build_dataset(dataset)
+        assert calls == [("repartition", expected), ("map_batches", 128)]
+
+    @pytest.mark.parametrize(
+        ("overrides", "message"),
+        [
+            ({"strict_rows_per_block": True}, "requires a positive integer target_num_rows_per_block"),
+            (
+                {"strict_rows_per_block": True, "target_num_rows_per_block": 0},
+                "requires a positive integer target_num_rows_per_block",
+            ),
+            (
+                {"strict_rows_per_block": True, "target_num_rows_per_block": True},
+                "requires a positive integer target_num_rows_per_block",
+            ),
+            ({"strict_rows_per_block": "false", "target_num_rows_per_block": 128}, "must be True or False"),
+        ],
+    )
+    def test_strict_rows_per_block_rejects_invalid_settings(self, repartition_calls_and_dataset, overrides, message):
+        _calls, dataset = repartition_calls_and_dataset
+        graph = Graph() >> UDFOperator(lambda frame: frame)
+        executor = RayDataExecutor(graph, node_overrides={"UDFOperator": overrides})
+        executor._resources_preflight_complete = True
+        with pytest.raises(ValueError, match=message):
+            executor.build_dataset(dataset)
+
     def test_node_overrides_stored(self):
 
         g = Graph()

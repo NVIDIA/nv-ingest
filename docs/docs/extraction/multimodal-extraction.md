@@ -214,6 +214,8 @@ With `method="nemotron_parse"`, each page row in the returned extraction `DataFr
 
 For bundled local v1.2 inference, any vLLM finish reason other than `stop` records a structured error in `nemotron_parse_v1_2.error`. Its `type` is `IncompleteModelOutputError`, and its `stage` is `nemotron_parse_pages_finish_reason`. NeMo Retriever Library still routes any returned prefix into content fields, and `get_error_rows()` and `return_failures=True` report these pages because `error` is populated. Remote responses do not report a finish reason, so this check applies only to local inference. Consumers that require complete pages must check `error`; they can use `raw_output` for diagnostics.
 
+In a custom Ray graph, a node's `node_overrides` entry can set `target_num_rows_per_block` to a positive integer and `strict_rows_per_block=True` to request blocks of exactly that many rows, except the final block. Pair it with the same `batch_size` so the node receives full batches instead of a small remainder after each bundle. `strict_rows_per_block` defaults to `False`; strict blocks buffer up to one block of rows, which can delay the first call.
+
 ## Extraction limitations and quality { #extraction-limitations-and-quality }
 
 Hosted Page Elements, Table Structure, and Graphic Elements NIM endpoints cap inline base64 image payloads at about **180,000 characters** (roughly 180 KB). The NeMo Retriever pipeline downscales large page renders before remote NIM calls. Direct API integrations must keep inline payloads under that cap. Hosted Page Elements does not accept NVCF Asset API references. For limits, plus `dpi` and `render_mode` tuning, refer to [Hosted Page Elements NIM image size limits](troubleshoot.md#hosted-page-elements-nim-image-size-limits).

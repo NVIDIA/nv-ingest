@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 # Reuses the same baseline constant as the batch ingest mode.
 _DEFAULT_GPU_OPERATOR_NUM_GPUS = OCR_GPUS_PER_ACTOR
 _STREAM_INGEST_PREFETCH_BATCHES = 1
+STRICT_ROWS_PER_BLOCK = "strict_rows_per_block"
 _DatasetSegment = Literal["all", "before_stream_ingest", "after_stream_ingest"]
 
 # Ray can briefly report stale available resources after a Dataset releases its
@@ -522,6 +523,14 @@ class RayDataExecutor(AbstractExecutor):
     full preprocess → process → postprocess pipeline.
 
     Only linear (single-root, no fan-out) graphs are currently supported.
+
+    ``node_overrides`` maps a node name to ``map_batches`` options for that node.
+    Two keys shape its input blocks instead: ``target_num_rows_per_block`` asks
+    Ray to repartition into blocks of at most that many rows, and
+    ``strict_rows_per_block`` (default False) makes every block except the last
+    hold exactly that many rows. With ``batch_size`` equal to the target, the
+    node then receives full batches rather than a small remainder after each
+    bundle; the cost is buffering up to one block of rows before it is emitted.
     """
 
     def __init__(
@@ -863,6 +872,13 @@ class RayDataExecutor(AbstractExecutor):
         for node in nodes:
             overrides = dict(self._node_overrides.get(node.name, {}))
             target_num_rows_per_block = overrides.pop("target_num_rows_per_block", None)
+            strict_rows_per_block = overrides.pop(STRICT_ROWS_PER_BLOCK, False)
+            if not isinstance(strict_rows_per_block, bool):
+                raise ValueError(f"{node.name}: {STRICT_ROWS_PER_BLOCK} must be True or False")
+            if strict_rows_per_block and not (type(target_num_rows_per_block) is int and target_num_rows_per_block > 0):
+                raise ValueError(
+                    f"{node.name}: {STRICT_ROWS_PER_BLOCK} requires a positive integer target_num_rows_per_block"
+                )
             batch_size = overrides.pop("batch_size", self._default_batch_size)
             batch_format = overrides.pop("batch_format", self._default_batch_format)
             num_cpus = overrides.pop("num_cpus", self._default_num_cpus)
@@ -905,7 +921,10 @@ class RayDataExecutor(AbstractExecutor):
                 else:
                     ds = ds.repartition(num_blocks=1)
             elif target_num_rows_per_block is not None and int(target_num_rows_per_block) > 0:
-                ds = ds.repartition(target_num_rows_per_block=int(target_num_rows_per_block))
+                # Strict blocks hold exactly the target row count (except the last), so a
+                # map_batches stage with the same batch_size never receives a small remainder.
+                strict = {"strict": True} if strict_rows_per_block else {}
+                ds = ds.repartition(target_num_rows_per_block=int(target_num_rows_per_block), **strict)
 
             map_operator_class = node.operator_class
             map_batch_format = batch_format
