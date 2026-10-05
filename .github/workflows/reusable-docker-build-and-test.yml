@@ -259,6 +259,8 @@ jobs:
           # Use uv so pyproject uv sources are honored for nightly Nemotron packages.
           if [ "${{ inputs.test-selection }}" = "full" ]; then
             CMD="set -euo pipefail; source /opt/retriever_runtime/bin/activate; uv pip install -e \"./nemo_retriever[all,dev]\" && uv pip install pytest pytest-cov && python -m pytest -m \"$MARKERS\" $COV_ARGS nemo_retriever/tests"
+            # Run the CPU-only Ray integration check separately from the mocked unit suite.
+            CMD="$CMD && python -m pytest -m integration nemo_retriever/tests/test_pipeline_graph.py::TestRayDataExecutor::test_strict_blocks_produce_full_batches_with_real_ray"
           else
             N="${{ inputs.random-count }}"
             # Read node IDs into an array instead of word-splitting the file, so
