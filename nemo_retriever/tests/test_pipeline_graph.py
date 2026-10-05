@@ -1832,6 +1832,7 @@ class TestRayDataExecutor:
         executor.build_dataset(dataset)
         assert calls == [("repartition", expected), ("map_batches", 128)]
 
+    @pytest.mark.integration
     def test_strict_blocks_produce_full_batches_with_real_ray(self, monkeypatch):
         from tempfile import TemporaryDirectory
 
