@@ -68,10 +68,10 @@ _PARSE_CLASS_TO_CHANNEL: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
+def _error_payload(*, stage: str, exc: BaseException, raw_output: Optional[str] = None) -> Dict[str, Any]:
     return {
         "timing": None,
-        "raw_output": None,
+        "raw_output": raw_output,
         "error": {
             "stage": str(stage),
             "type": exc.__class__.__name__,
@@ -360,16 +360,7 @@ def nemotron_parse_pages(
                 batch_images.append(_decode_page_image(page_image_b64))
             batch_indices.append(idx)
         except Exception as e:
-            all_meta[idx] = {
-                "timing": None,
-                "raw_output": None,
-                "error": {
-                    "stage": "nemotron_parse_pages_decode",
-                    "type": e.__class__.__name__,
-                    "message": str(e),
-                    "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-                },
-            }
+            all_meta[idx] = _error_payload(stage="nemotron_parse_pages_decode", exc=e)
 
     # -- Phase 2: run model inference in a single batch ------------------
     raw_texts: List[str] = [""] * len(batch_indices)
@@ -485,14 +476,9 @@ def nemotron_parse_pages(
                 hint.__cause__ = e
                 e = hint
             print(f"Warning: Nemotron Parse batch failed: {type(e).__name__}: {e}")
-            err = {
-                "stage": "nemotron_parse_pages",
-                "type": e.__class__.__name__,
-                "message": str(e),
-                "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-            }
+            payload = _error_payload(stage="nemotron_parse_pages", exc=e)
             for i in batch_indices:
-                all_meta[i] = {"timing": None, "raw_output": None, "error": err}
+                all_meta[i] = dict(payload)
             raw_texts = []
 
     # -- Phase 3: route parsed elements into content channels ------------
@@ -527,16 +513,7 @@ def nemotron_parse_pages(
                     "message": (f"Local Nemotron Parse ended with finish_reason={finish_reason!r}"),
                 }
         except BaseException as e:
-            all_meta[idx] = {
-                "timing": None,
-                "raw_output": raw_text,
-                "error": {
-                    "stage": "nemotron_parse_pages_route",
-                    "type": e.__class__.__name__,
-                    "message": str(e),
-                    "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-                },
-            }
+            all_meta[idx] = _error_payload(stage="nemotron_parse_pages_route", exc=e, raw_output=raw_text)
 
     elapsed = time.perf_counter() - t0_total
     for meta in all_meta:
