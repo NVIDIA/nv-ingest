@@ -9,9 +9,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+import nvtx
 import pandas as pd
 
-from nemo_retriever.common.nvtx import batch_phase
 from nemo_retriever.common.vdb.adt_vdb import CollectionWriteContext, UnsupportedVDBOperation, VDB
 from nemo_retriever.common.vdb.factory import get_vdb_op_cls
 from nemo_retriever.common.vdb.records import (
@@ -174,7 +174,7 @@ class IngestVdbOperator(AbstractOperator):
 
         return bool(getattr(self._vdb, "supports_stream_ingest", False))
 
-    @batch_phase("pipeline.terminal_stream")
+    @nvtx.annotate("nrl.batch::pipeline.terminal_stream", color="blue")
     def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> None:
         """Lazily execute upstream batches and delegate one backend stream."""
 

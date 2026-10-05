@@ -35,13 +35,13 @@ builtins.__import__ = _guard
 
 from nemo_retriever.models.nim.util import create_inference_client  # noqa: F401
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor  # noqa: F401
-from nemo_retriever.common.nvtx import batch_phase
+from nemo_retriever.graph.executor import ray_dataset_to_pandas
+from types import SimpleNamespace
+import pandas as pd
 
-@batch_phase("pipeline.terminal_stream")
-def instrumented():
-    return 42
-
-assert instrumented() == 42
+frame = pd.DataFrame({"value": [42]})
+dataset = SimpleNamespace(iter_batches=lambda **kwargs: iter([frame]))
+assert ray_dataset_to_pandas(dataset).equals(frame)
 
 print("slim_imports_ok")
 """

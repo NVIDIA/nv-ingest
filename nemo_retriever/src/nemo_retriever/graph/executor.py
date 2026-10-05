@@ -11,9 +11,8 @@ from collections.abc import Iterator
 import math
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
+import nvtx
 import pandas as pd
-
-from nemo_retriever.common.nvtx import batch_phase
 
 if TYPE_CHECKING:
     import ray.data
@@ -135,7 +134,7 @@ def arrow_table_to_pandas(table: Any) -> pd.DataFrame:
     return _normalize_object_tensor_columns(_materialize_row_unsafe_columns(table, frame))
 
 
-@batch_phase("ray.materialize")
+@nvtx.annotate("nrl.batch::ray.materialize", color="blue")
 def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     """Materialize a Ray Dataset without returning malformed Arrow arrays.
 
@@ -166,7 +165,7 @@ def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     return pd.DataFrame(columns=list(names) if names is not None else None)
 
 
-@batch_phase("result.concat")
+@nvtx.annotate("nrl.batch::result.concat", color="blue")
 def _concat_terminal_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
     """Concatenate retained terminal batches under one low-cardinality range."""
 
