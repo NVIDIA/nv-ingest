@@ -65,6 +65,9 @@ on:
       HF_ACCESS_TOKEN:
         required: false
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ${{ inputs.runner }}
