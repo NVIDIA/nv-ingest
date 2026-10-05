@@ -367,6 +367,17 @@ class TestNode:
         node = Node(ParamsHolderOperator({"value": 9}))
         assert node.operator_kwargs == {"params": {"value": 9}}
 
+    def test_node_preserves_annotated_embedding_constructor(self):
+        from ray import cloudpickle
+
+        from nemo_retriever.operators.embed.gpu_operator import _BatchEmbedActor
+
+        params = EmbedParams(embed_invoke_url="http://unused")
+        node = Node(_BatchEmbedActor(params=params))
+        assert node.operator_kwargs == {"params": params}
+        actor_class, kwargs = cloudpickle.loads(cloudpickle.dumps((node.operator_class, node.operator_kwargs)))
+        assert actor_class(**kwargs)._params == params
+
     def test_node_rejects_non_operator(self):
         with pytest.raises(TypeError, match="operator must be an AbstractOperator"):
             Node("not_an_operator")
