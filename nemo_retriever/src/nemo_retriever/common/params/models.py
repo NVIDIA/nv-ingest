@@ -485,9 +485,15 @@ class BatchTuningParams(_ParamsModel):
     ocr_inference_batch_size: Optional[int] = None
     page_elements_workers: Optional[int] = None
     ocr_workers: Optional[int] = None
-    ocr_min_workers: Optional[int] = Field(default=None, gt=0, strict=True)
-    ocr_initial_workers: Optional[int] = Field(default=None, gt=0, strict=True)
-    ocr_max_workers: Optional[int] = Field(default=None, gt=0, strict=True)
+    ocr_min_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Minimum number of OCR actors in a bounded pool"
+    )
+    ocr_initial_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Initial number of OCR actors in a bounded pool"
+    )
+    ocr_max_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Maximum number of OCR actors in a bounded pool"
+    )
     detect_workers: Optional[int] = None
     page_elements_cpus_per_actor: float = 1
     ocr_cpus_per_actor: float = 1

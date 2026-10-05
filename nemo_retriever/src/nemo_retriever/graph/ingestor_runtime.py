@@ -147,6 +147,9 @@ def batch_tuning_to_node_overrides(
     Final actor-pool sizing is reconciled after graph resolution by the executor
     resource preflight.
     """
+    extract_tuning = _batch_tuning(extract_params)
+    if getattr(extract_tuning, "ocr_min_workers", None) is not None and extraction_mode not in (None, "pdf"):
+        raise ValueError("Bounded OCR workers require the dedicated PDF batch extraction graph")
     auto_allow_no_gpu = bool(cluster_resources is not None and cluster_resources.total_gpu_count() == 0)
     effective_allow_no_gpu = allow_no_gpu if allow_no_gpu is not None else auto_allow_no_gpu
     plan = (

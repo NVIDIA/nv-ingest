@@ -79,11 +79,17 @@ Use the Ray dashboard to verify the available-resource snapshot and the planned 
 
 ### Allow the OCR actor pool to grow
 
-In batch mode, you can give Ray Data bounds for the OCR actor pool. Set all
-3 fields, `ocr_min_workers`, `ocr_initial_workers`, and `ocr_max_workers`, in
-`BatchTuningParams`. Each value must be a positive integer, with
+In batch mode, you can give Ray Data bounds for the OCR actor pool in the
+dedicated PDF extraction graph. Set all 3 fields, `ocr_min_workers`,
+`ocr_initial_workers`, and `ocr_max_workers`, in `BatchTuningParams`. Each
+value must be a positive integer, with
 `ocr_min_workers <= ocr_initial_workers <= ocr_max_workers`. Do not combine
 these fields with `ocr_workers`.
+
+Use these bounds when extraction resolves to the dedicated PDF graph. PDF-only
+inputs infer this mode, or you can set `extraction_mode="pdf"` explicitly.
+Batch `auto`, image, HTML, audio, and other extraction graphs do not have this
+OCR actor pool and reject the bounds with a `ValueError`.
 
 The following example starts with 2 OCR actors and allows Ray Data to grow
 the pool to 4 actors when work and resources are available.
@@ -96,6 +102,7 @@ chunks = (
     create_ingestor(run_mode="batch")
     .files(["data/multimodal_test.pdf"])
     .extract(
+        extraction_mode="pdf",
         batch_tuning=BatchTuningParams(
             ocr_min_workers=2,
             ocr_initial_workers=2,
