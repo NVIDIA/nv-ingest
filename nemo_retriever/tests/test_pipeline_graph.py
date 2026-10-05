@@ -1832,6 +1832,51 @@ class TestRayDataExecutor:
         executor.build_dataset(dataset)
         assert calls == [("repartition", expected), ("map_batches", 128)]
 
+    def test_strict_blocks_produce_full_batches_with_real_ray(self, monkeypatch):
+        from tempfile import TemporaryDirectory
+
+        ray = pytest.importorskip("ray", minversion="2.56.1")
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+        monkeypatch.setenv("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
+        assert not ray.is_initialized(), "Run this test without an existing Ray connection"
+
+        def tag_batch(frame: pd.DataFrame) -> pd.DataFrame:
+            return frame.assign(batch_start=int(frame["page"].min()))
+
+        # Uneven source blocks reproduce the small intermediate batches seen with PDF inputs.
+        bounds = [0, 7, 50, 51, 100, 132, 133, 261, 300, 460]
+        frames = [pd.DataFrame({"page": range(start, end)}) for start, end in zip(bounds, bounds[1:])]
+        with TemporaryDirectory(prefix="nrl-blocks-") as temp_dir:
+            ray.init(
+                address="local",
+                num_cpus=2,
+                num_gpus=0,
+                include_dashboard=False,
+                object_store_memory=256 * 1024**2,
+                _temp_dir=temp_dir,
+            )
+            try:
+                source = ray.data.from_pandas(frames)
+                source.context.execution_options.preserve_order = True
+                assert source.num_blocks() == len(frames)
+                for batch_size in (64, 128):
+                    executor = RayDataExecutor(
+                        Graph() >> UDFOperator(tag_batch),
+                        node_overrides={
+                            "UDFOperator": {
+                                "batch_size": batch_size,
+                                "target_num_rows_per_block": batch_size,
+                                "strict_rows_per_block": True,
+                            }
+                        },
+                    )
+                    result = pd.DataFrame(executor.build_dataset(source).take_all())
+                    assert sorted(result["page"]) == list(range(bounds[-1]))
+                    full_batches, remainder = divmod(bounds[-1], batch_size)
+                    assert result.groupby("batch_start").size().tolist() == [batch_size] * full_batches + [remainder]
+            finally:
+                ray.shutdown()
+
     @pytest.mark.parametrize(
         ("overrides", "message"),
         [

@@ -206,6 +206,26 @@ class NemotronParseV12(BaseModel):
 
         A finish reason other than ``"stop"``, such as ``"length"``, means the
         generation ended before the model completed the page.
+        Errors from image preprocessing or vLLM generation propagate unchanged.
+
+        Args:
+            inputs: Sequence of PIL images, image paths (strings or ``Path``
+                objects), tensors, or NumPy arrays, normalized to RGB images.
+                Tensors and arrays must be CHW or HWC, optionally with a leading
+                batch dimension of size 1.
+            task_prompt: Decoder prompt for every image. ``None`` or an empty
+                string uses the prompt configured on this model.
+
+        Returns:
+            A list of ``(text, finish_reason)`` tuples in input order. Text keeps
+            its original whitespace. A missing or empty finish reason becomes
+            ``"unknown"``.
+
+        Raises:
+            TypeError: An input type is unsupported.
+            ValueError: A tensor or array has an unsupported shape.
+            OSError: An image file cannot be opened or decoded.
+            IndexError: vLLM returns a request without a completion.
         """
         prompt = task_prompt or self._task_prompt
         prompts = [
