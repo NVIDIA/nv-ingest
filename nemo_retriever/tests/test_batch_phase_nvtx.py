@@ -5,6 +5,7 @@
 """Contract tests for semantic batch NVTX instrumentation."""
 
 from collections.abc import Callable
+from contextlib import contextmanager
 import subprocess
 import sys
 from pathlib import Path
@@ -17,11 +18,17 @@ from nemo_retriever.common import nvtx
 
 def _record_ranges(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, ...]]:
     events: list[tuple[str, ...]] = []
-    backend = SimpleNamespace(
-        push_range=lambda label: events.append(("push", label)),
-        pop_range=lambda: events.append(("pop",)),
-    )
-    monkeypatch.setattr(nvtx, "_nvtx", backend)
+
+    @contextmanager
+    def annotate(label: str, *, color: str):
+        assert color == "blue"
+        events.append(("push", label))
+        try:
+            yield
+        finally:
+            events.append(("pop",))
+
+    monkeypatch.setattr(nvtx, "_nvtx", SimpleNamespace(annotate=annotate))
     return events
 
 
@@ -71,11 +78,11 @@ def test_gpu_inference_ranges_preserve_labels_and_balance(monkeypatch: pytest.Mo
 
 
 def test_unexpected_nvtx_failure_is_not_hidden(monkeypatch: pytest.MonkeyPatch) -> None:
-    def unavailable(_label: str) -> None:
+    def unavailable(_label: str, *, color: str) -> None:
         raise RuntimeError("unexpected profiler failure")
 
     function: Callable[[], int] = lambda: 7
-    monkeypatch.setattr(nvtx, "_nvtx", SimpleNamespace(push_range=unavailable))
+    monkeypatch.setattr(nvtx, "_nvtx", SimpleNamespace(annotate=unavailable))
 
     with pytest.raises(RuntimeError, match="unexpected profiler failure"):
         nvtx.batch_phase("embedding.batch")(function)()

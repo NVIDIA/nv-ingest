@@ -53,11 +53,8 @@ def batch_phase(label: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     def decorate(function: Callable[_P, _R]) -> Callable[_P, _R]:
         @wraps(function)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            _nvtx.push_range(range_name)
-            try:
+            with _nvtx.annotate(range_name, color="blue"):
                 return function(*args, **kwargs)
-            finally:
-                _nvtx.pop_range()
 
         return wrapped
 
@@ -79,10 +76,5 @@ def gpu_inference_range(model_name: str, batch_size: int = -1, **extra):
     for k, v in extra.items():
         parts.append(f"{k}={v}")
     label = " | ".join(parts)
-    _nvtx.push_range("gpu_inference")
-    _nvtx.push_range(label)
-    try:
+    with _nvtx.annotate("gpu_inference", color="blue"), _nvtx.annotate(label, color="blue"):
         yield
-    finally:
-        _nvtx.pop_range()
-        _nvtx.pop_range()
