@@ -22,33 +22,21 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import contextmanager
-from functools import cache, wraps
-from types import ModuleType
+from functools import wraps
 from typing import ParamSpec, TypeVar
+
+import nvtx as _nvtx
 
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
-@cache
-def _get_nvtx() -> ModuleType | None:
-    """Resolve the optional backend only when an instrumented function runs."""
-    try:
-        import torch.cuda.nvtx as nvtx
-    except ModuleNotFoundError as exc:
-        if exc.name not in {"torch", "torch.cuda", "torch.cuda.nvtx"}:
-            raise
-        return None
-    return nvtx
-
-
 def batch_phase(label: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     """Decorate a function with a stable NVTX range for a batch phase.
 
-    The range is a no-op when PyTorch or its NVTX support is unavailable. A
-    CPU-only PyTorch NVTX stub is also treated as unavailable. Unexpected NVTX
-    errors propagate to the caller; exceptions raised by the decorated function
-    propagate after the range is closed.
+    Uses the standalone NVTX package without importing PyTorch or synchronizing
+    CUDA. Exceptions raised by the decorated function propagate after the range
+    is closed.
 
     Args:
         label: Low-cardinality phase name appended to the ``nrl.batch::`` prefix.
@@ -65,19 +53,11 @@ def batch_phase(label: str) -> Callable[[Callable[_P, _R]], Callable[_P, _R]]:
     def decorate(function: Callable[_P, _R]) -> Callable[_P, _R]:
         @wraps(function)
         def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-            nvtx = _get_nvtx()
-            if nvtx is None:
-                return function(*args, **kwargs)
-            try:
-                nvtx.range_push(range_name)
-            except RuntimeError as exc:
-                if "NVTX functions not installed" not in str(exc):
-                    raise
-                return function(*args, **kwargs)
+            _nvtx.push_range(range_name)
             try:
                 return function(*args, **kwargs)
             finally:
-                nvtx.range_pop()
+                _nvtx.pop_range()
 
         return wrapped
 
@@ -93,20 +73,16 @@ def gpu_inference_range(model_name: str, batch_size: int = -1, **extra):
     The inner range carries the human-readable label visible in
     the Nsight Systems timeline (e.g. ``NemotronOCRv1 | bs=8``).
     """
-    nvtx = _get_nvtx()
-    if nvtx is None:
-        yield
-        return
     parts = [model_name]
     if batch_size >= 0:
         parts.append(f"bs={batch_size}")
     for k, v in extra.items():
         parts.append(f"{k}={v}")
     label = " | ".join(parts)
-    nvtx.range_push("gpu_inference")
-    nvtx.range_push(label)
+    _nvtx.push_range("gpu_inference")
+    _nvtx.push_range(label)
     try:
         yield
     finally:
-        nvtx.range_pop()
-        nvtx.range_pop()
+        _nvtx.pop_range()
+        _nvtx.pop_range()
