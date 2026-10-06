@@ -597,15 +597,17 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
-    def _ensure_model(self) -> None:
-        """Load the local vLLM model on first use (i.e. on the worker, not the driver)."""
-        if self._model is not None or self._invoke_url:
-            return
+    def _ensure_model(self) -> Any:
+        """Load the local vLLM model on first use (i.e. on the worker, not the driver) and return it."""
+        model = self._model
+        if model is not None or self._invoke_url:
+            return model
         with self._model_lock:
             if self._model is None:
                 from nemo_retriever.models.local import NemotronParseV12
 
                 self._model = NemotronParseV12(task_prompt=self._task_prompt, async_engine=self._async_engine)
+            return self._model
 
     @classmethod
     def supports_concurrent_calls(cls, operator_kwargs: dict[str, Any]) -> bool:
@@ -622,9 +624,11 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
     def close(self) -> None:
         """Release the local model and the GPU memory its engine holds.
 
-        Safe to call more than once; a later batch loads the model again.
+        Safe to call more than once and from any thread. Batches already running
+        on the async engine are cancelled; a later batch loads the model again.
         """
-        model, self._model = getattr(self, "_model", None), None
+        with self._model_lock:
+            model, self._model = getattr(self, "_model", None), None
         if model is not None:
             model.close()
 
@@ -632,10 +636,10 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
     __del__ = close
 
     def process(self, data: Any, **kwargs: Any) -> Any:
-        self._ensure_model()
+        model = self._ensure_model()
         return nemotron_parse_pages(
             data,
-            model=self._model,
+            model=model,
             invoke_url=self._invoke_url,
             nemotron_parse_model=self._nemotron_parse_model,
             api_key=self._api_key,

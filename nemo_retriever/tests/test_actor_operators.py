@@ -454,6 +454,26 @@ class TestNemotronParseActor:
         del actor
         assert model.close.call_count == 2
 
+    def test_process_keeps_the_model_it_loaded_when_close_runs_before_parsing(self, monkeypatch):
+        from nemo_retriever.operators.extract.parse import nemotron_parse
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        model = MagicMock()
+        actor = NemotronParseGPUActor(async_engine=True)
+        actor._model = model
+        load = NemotronParseGPUActor._ensure_model
+
+        def load_then_close(self):
+            loaded = load(self)
+            self.close()
+            return loaded
+
+        monkeypatch.setattr(NemotronParseGPUActor, "_ensure_model", load_then_close)
+        with patch.object(nemotron_parse, "nemotron_parse_pages") as parse_pages:
+            actor.process(pd.DataFrame({"page_image": ["x"]}))
+
+        assert parse_pages.call_args.kwargs["model"] is model
+
     def test_remote_chat_completions_uses_v1_2_protocol(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import (
             NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,

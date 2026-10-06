@@ -346,7 +346,8 @@ class NemotronParseV12(BaseModel):
             IndexError: vLLM returns a request without a completion.
             RuntimeError: The model was closed.
         """
-        if self._llm is None:
+        llm = self._llm
+        if llm is None:
             raise RuntimeError("This Nemotron Parse model was closed; create a new NemotronParseV12 to run it again.")
         prompt = task_prompt or self._task_prompt
         prompts = [
@@ -359,7 +360,7 @@ class NemotronParseV12(BaseModel):
             }
             for img in inputs
         ]
-        outputs = self._llm.generate(prompts, self._sampling_params)
+        outputs = llm.generate(prompts, self._sampling_params)
         return [(out.outputs[0].text, str(out.outputs[0].finish_reason or "unknown")) for out in outputs]
 
     def __call__(
@@ -372,9 +373,10 @@ class NemotronParseV12(BaseModel):
     def close(self) -> None:
         """Release the vLLM engine and the GPU memory it holds; later calls do nothing.
 
-        The async engine stops at once. vLLM's offline engine has no shutdown API, so
-        this drops the model's reference and vLLM's own finalizer stops its engine
-        process. The model cannot run afterwards.
+        The async engine stops at once, cancelling batches it is still running.
+        vLLM's offline engine has no shutdown API, so this drops the model's
+        reference and vLLM's own finalizer stops its engine process once a running
+        batch finishes. Safe to call from any thread; the model cannot run afterwards.
         """
         engine, self._llm = getattr(self, "_llm", None), None
         if isinstance(engine, _AsyncEngine):
