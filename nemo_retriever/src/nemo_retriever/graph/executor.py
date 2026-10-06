@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_GPU_OPERATOR_NUM_GPUS = OCR_GPUS_PER_ACTOR
 _STREAM_INGEST_PREFETCH_BATCHES = 1
 STRICT_ROWS_PER_BLOCK = "strict_rows_per_block"
+MAX_TASKS_IN_FLIGHT_PER_ACTOR = "max_tasks_in_flight_per_actor"
 _DatasetSegment = Literal["all", "before_stream_ingest", "after_stream_ingest"]
 
 # Ray can briefly report stale available resources after a Dataset releases its
@@ -238,6 +239,18 @@ def _planned_concurrency(concurrency: Any, planned: int) -> Any:
     if isinstance(concurrency, tuple) and len(concurrency) == 2:
         return (min(minimum, planned), planned)
     return planned
+
+
+def _concurrent_actor_pool(concurrency: Any, tasks_in_flight: int) -> Any:
+    """Return the actor pool for ``concurrency`` with each actor running ``tasks_in_flight`` batches at once."""
+    from ray.data import ActorPoolStrategy
+
+    if isinstance(concurrency, tuple):
+        minimum, maximum, initial = _concurrency_bounds(concurrency)
+        sizes = {"min_size": minimum, "max_size": maximum, "initial_size": initial}
+    else:
+        sizes = {"size": int(concurrency)}
+    return ActorPoolStrategy(**sizes, max_tasks_in_flight_per_actor=tasks_in_flight, enable_true_multi_threading=True)
 
 
 def preflight_executors(
@@ -531,6 +544,11 @@ class RayDataExecutor(AbstractExecutor):
     hold exactly that many rows. With ``batch_size`` equal to the target, the
     node then receives full batches rather than a small remainder after each
     bundle; the cost is buffering up to one block of rows before it is emitted.
+
+    ``max_tasks_in_flight_per_actor`` (default 1) lets each of the node's actors
+    run that many batches at once on separate threads; ``concurrency`` still sets
+    the number of actors. Use it only for operators that are safe to call
+    concurrently, such as Nemotron Parse with ``async_engine=True``.
     """
 
     def __init__(
@@ -951,6 +969,14 @@ class RayDataExecutor(AbstractExecutor):
                     "operator_class": node.operator_class,
                     "operator_kwargs": node.operator_kwargs,
                 }
+
+            tasks_in_flight = overrides.pop(MAX_TASKS_IN_FLIGHT_PER_ACTOR, 1)
+            if isinstance(tasks_in_flight, bool) or not isinstance(tasks_in_flight, int) or tasks_in_flight < 1:
+                raise ValueError(f"{node.name}: {MAX_TASKS_IN_FLIGHT_PER_ACTOR} must be a positive integer")
+            if tasks_in_flight > 1:
+                # Ray ignores ``concurrency`` once ``compute`` is set, so the pool size moves into the strategy.
+                overrides["compute"] = _concurrent_actor_pool(overrides.pop("concurrency"), tasks_in_flight)
+                overrides["max_concurrency"] = tasks_in_flight
 
             ds = ds.map_batches(
                 map_operator_class,

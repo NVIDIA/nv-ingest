@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import uuid
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Union
 
@@ -51,6 +54,58 @@ def _patch_vllm_nemotron_parse_processor() -> None:
     _VLLM_PROCESSOR_PATCHED = True
 
 
+class _AsyncEngine:
+    """One vLLM ``AsyncLLM`` on a private event-loop thread, shared by concurrent callers.
+
+    Every caller's pages become requests to the same scheduler, so one batch's
+    slowest pages no longer hold the GPU while the next batch waits.
+    """
+
+    def __init__(self, engine_kwargs: dict[str, Any]) -> None:
+        from vllm.engine.arg_utils import AsyncEngineArgs
+        from vllm.v1.engine.async_llm import AsyncLLM
+
+        self._loop = asyncio.new_event_loop()
+        thread = threading.Thread(target=self._loop.run_forever, name="nemotron-parse-engine", daemon=True)
+        thread.start()
+
+        async def create() -> Any:
+            return AsyncLLM.from_engine_args(AsyncEngineArgs(**engine_kwargs))
+
+        try:
+            self._engine = asyncio.run_coroutine_threadsafe(create(), self._loop).result()
+        except BaseException:
+            self._loop.call_soon_threadsafe(self._loop.stop)
+            thread.join()
+            self._loop.close()
+            raise
+
+    def generate(self, prompts: Sequence[Any], sampling_params: Any) -> List[Any]:
+        """Return each prompt's final output in input order, like ``LLM.generate``.
+
+        The first failure cancels the batch's other requests, which vLLM aborts,
+        and then propagates unchanged.
+        """
+
+        async def final_output(prompt: Any) -> Any:
+            output = None
+            async for output in self._engine.generate(prompt, sampling_params, uuid.uuid4().hex):
+                pass
+            return output
+
+        async def generate_all() -> List[Any]:
+            tasks = [asyncio.ensure_future(final_output(prompt)) for prompt in prompts]
+            try:
+                return list(await asyncio.gather(*tasks))
+            except Exception:
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+
+        return asyncio.run_coroutine_threadsafe(generate_all(), self._loop).result()
+
+
 # ---------------------------------------------------------------------------
 # Model wrapper
 # ---------------------------------------------------------------------------
@@ -65,6 +120,10 @@ class NemotronParseV12(BaseModel):
     vLLM handles KV-cache management, continuous batching, and GPU scheduling
     internally, avoiding the transformers cache-API incompatibility that affects
     the HuggingFace ``trust_remote_code`` model code with transformers >= 4.52.
+
+    With ``async_engine=True`` it uses vLLM's ``AsyncLLM`` instead, with the same
+    model and sampling settings, so several threads can submit batches to one
+    engine at once. Use it only when the caller runs batches concurrently.
     """
 
     _DEFAULT_TASK_PROMPT: str = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
@@ -78,6 +137,7 @@ class NemotronParseV12(BaseModel):
         gpu_memory_utilization: float = 0.8,
         max_num_seqs: int = 64,
         max_tokens: int = 9000,
+        async_engine: bool = False,
     ) -> None:
         super().__init__()
 
@@ -106,7 +166,7 @@ class NemotronParseV12(BaseModel):
         configure_global_hf_cache_base(hf_cache_dir)
         revision = get_hf_revision(model_path)
 
-        self._llm = LLM(
+        engine_kwargs: dict[str, Any] = dict(
             model=model_path,
             revision=revision,
             trust_remote_code=True,
@@ -115,14 +175,23 @@ class NemotronParseV12(BaseModel):
             limit_mm_per_prompt={"image": 1},
             gpu_memory_utilization=gpu_memory_utilization,
         )
-
-        self._sampling_params = SamplingParams(
+        sampling_kwargs: dict[str, Any] = dict(
             temperature=0,
             top_k=1,
             repetition_penalty=1.1,
             max_tokens=self._max_tokens,
             skip_special_tokens=False,
         )
+        if async_engine:
+            from vllm.sampling_params import RequestOutputKind
+
+            # The offline LLM applies these engine defaults itself; AsyncEngineArgs does not.
+            self._llm = _AsyncEngine({**engine_kwargs, "seed": 0, "disable_log_stats": True})
+            sampling_kwargs["output_kind"] = RequestOutputKind.FINAL_ONLY
+        else:
+            self._llm = LLM(**engine_kwargs)
+
+        self._sampling_params = SamplingParams(**sampling_kwargs)
 
     # ------------------------------------------------------------------
     # Input normalisation

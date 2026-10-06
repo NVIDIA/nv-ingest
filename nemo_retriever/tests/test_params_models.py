@@ -82,6 +82,19 @@ class TestExtractParams:
         assert "nvidia/NVIDIA-Nemotron-Parse-2.0" in error
         assert "nemotron_parse_invoke_url" in error
 
+    @pytest.mark.parametrize("endpoint_field", ["nemotron_parse_invoke_url", "invoke_url"])
+    def test_parse_batches_in_flight_require_local_parse(self, endpoint_field: str) -> None:
+        with pytest.raises(ValidationError, match="requires local Nemotron Parse"):
+            ExtractParams(
+                method="nemotron_parse",
+                batch_tuning={"nemotron_parse_batches_in_flight": 2},
+                **{endpoint_field: "http://parse:8000/v1/chat/completions"},
+            )
+
+    def test_parse_batches_in_flight_must_be_positive(self) -> None:
+        with pytest.raises(ValidationError, match="greater than or equal to 1"):
+            ExtractParams(method="nemotron_parse", batch_tuning={"nemotron_parse_batches_in_flight": 0})
+
     @pytest.mark.parametrize(
         "model",
         [None, "nvidia/nemotron-parse", "nvidia/nemotron-parse-v1.2"],

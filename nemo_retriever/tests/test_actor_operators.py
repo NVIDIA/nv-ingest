@@ -413,6 +413,26 @@ class TestNemotronParseActor:
         mock_fn.assert_called_once()
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_concurrent_first_calls_load_one_async_engine(self):
+        import threading
+        import time
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        def slow_load(**kwargs):
+            time.sleep(0.05)
+            return MagicMock()
+
+        actor = NemotronParseGPUActor(async_engine=True)
+        with patch("nemo_retriever.models.local.NemotronParseV12", side_effect=slow_load) as model_class:
+            threads = [threading.Thread(target=actor._ensure_model) for _ in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        model_class.assert_called_once_with(task_prompt=actor._task_prompt, async_engine=True)
+
     def test_remote_chat_completions_uses_v1_2_protocol(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import (
             NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,

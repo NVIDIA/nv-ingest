@@ -21,6 +21,7 @@ import base64
 import io
 import json
 import re
+import threading
 import time
 import traceback
 
@@ -542,7 +543,14 @@ def nemotron_parse_pages(
 
 
 class NemotronParseGPUActor(AbstractOperator, GPUOperator):
-    """Ray-friendly callable that initialises Nemotron Parse v1.2 once per actor."""
+    """Ray-friendly callable that initialises Nemotron Parse v1.2 once per actor.
+
+    ``async_engine=True`` loads the model on vLLM's async engine so the actor can
+    run several batches at once; the executor decides how many.
+    """
+
+    # Concurrent actor tasks must not each start an engine on the same GPU.
+    _model_lock = threading.Lock()
 
     def __init__(
         self,
@@ -560,9 +568,11 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
         remote_max_pool_workers: int = 16,
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
+        async_engine: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        self._async_engine = bool(async_engine)
         self._invoke_url = str(nemotron_parse_invoke_url or "").strip() or str(invoke_url or "").strip()
         self._nemotron_parse_model = nemotron_parse_model
         validate_nemotron_parse_endpoint_list(self._invoke_url)
@@ -589,10 +599,13 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
 
     def _ensure_model(self) -> None:
         """Load the local vLLM model on first use (i.e. on the worker, not the driver)."""
-        if self._model is None and not self._invoke_url:
-            from nemo_retriever.models.local import NemotronParseV12
+        if self._model is not None or self._invoke_url:
+            return
+        with self._model_lock:
+            if self._model is None:
+                from nemo_retriever.models.local import NemotronParseV12
 
-            self._model = NemotronParseV12(task_prompt=self._task_prompt)
+                self._model = NemotronParseV12(task_prompt=self._task_prompt, async_engine=self._async_engine)
 
     def process(self, data: Any, **kwargs: Any) -> Any:
         self._ensure_model()

@@ -1901,6 +1901,112 @@ class TestRayDataExecutor:
         with pytest.raises(ValueError, match=message):
             executor.build_dataset(dataset)
 
+    @pytest.mark.parametrize(
+        ("tasks_in_flight", "concurrency", "expected"),
+        [
+            (1, 2, {"concurrency": 2}),
+            (
+                4,
+                2,
+                {
+                    "compute": {"size": 2, "max_tasks_in_flight_per_actor": 4, "enable_true_multi_threading": True},
+                    "max_concurrency": 4,
+                },
+            ),
+            (
+                4,
+                (1, 3),
+                {
+                    "compute": {
+                        "min_size": 1,
+                        "max_size": 3,
+                        "initial_size": 1,
+                        "max_tasks_in_flight_per_actor": 4,
+                        "enable_true_multi_threading": True,
+                    },
+                    "max_concurrency": 4,
+                },
+            ),
+        ],
+    )
+    def test_tasks_in_flight_keep_the_actor_pool_size(
+        self, repartition_calls_and_dataset, monkeypatch, tasks_in_flight, concurrency, expected
+    ):
+        import sys
+
+        _calls, dataset = repartition_calls_and_dataset
+        monkeypatch.setattr(sys.modules["ray.data"], "ActorPoolStrategy", lambda **kwargs: kwargs, raising=False)
+        captured: list[dict[str, Any]] = []
+        dataset.map_batches = lambda operator_class, **kwargs: captured.append(kwargs) or dataset
+        overrides = {"concurrency": concurrency, "max_tasks_in_flight_per_actor": tasks_in_flight}
+        executor = RayDataExecutor(
+            Graph() >> UDFOperator(lambda frame: frame), node_overrides={"UDFOperator": overrides}
+        )
+        executor._resources_preflight_complete = True
+        executor.build_dataset(dataset)
+
+        (kwargs,) = captured
+        assert {key: kwargs[key] for key in ("concurrency", "compute", "max_concurrency") if key in kwargs} == expected
+        assert "max_tasks_in_flight_per_actor" not in kwargs
+
+    @pytest.mark.parametrize("tasks_in_flight", [0, True, "2"])
+    def test_tasks_in_flight_rejects_invalid_settings(self, repartition_calls_and_dataset, tasks_in_flight):
+        _calls, dataset = repartition_calls_and_dataset
+        overrides = {"max_tasks_in_flight_per_actor": tasks_in_flight}
+        executor = RayDataExecutor(
+            Graph() >> UDFOperator(lambda frame: frame), node_overrides={"UDFOperator": overrides}
+        )
+        executor._resources_preflight_complete = True
+        with pytest.raises(ValueError, match="max_tasks_in_flight_per_actor must be a positive integer"):
+            executor.build_dataset(dataset)
+
+    @pytest.mark.integration
+    def test_tasks_in_flight_overlap_batches_in_one_actor_with_real_ray(self, monkeypatch):
+        from tempfile import TemporaryDirectory
+
+        ray = pytest.importorskip("ray", minversion="2.56.1")
+        monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+        monkeypatch.setenv("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
+        assert not ray.is_initialized(), "Run this test without an existing Ray connection"
+
+        # Each actor deserializes its own copy of this function, so ``state`` is per actor.
+        def record_overlap(frame: pd.DataFrame, state: dict = {}) -> pd.DataFrame:
+            import threading
+            import time
+
+            lock = state.setdefault("lock", threading.Lock())
+            with lock:
+                state["active"] = state.get("active", 0) + 1
+                state["peak"] = max(state.get("peak", 0), state["active"])
+            time.sleep(0.5)
+            with lock:
+                state["active"] -= 1
+            return frame.assign(peak=state["peak"])
+
+        frames = [pd.DataFrame({"page": range(start, start + 8)}) for start in range(0, 32, 8)]
+        with TemporaryDirectory(prefix="nrl-tasks-") as temp_dir:
+            ray.init(
+                address="local",
+                num_cpus=2,
+                num_gpus=0,
+                include_dashboard=False,
+                object_store_memory=256 * 1024**2,
+                _temp_dir=temp_dir,
+            )
+            try:
+                for tasks_in_flight in (1, 2):
+                    executor = RayDataExecutor(
+                        Graph() >> UDFOperator(record_overlap),
+                        node_overrides={
+                            "UDFOperator": {"batch_size": 8, "max_tasks_in_flight_per_actor": tasks_in_flight}
+                        },
+                    )
+                    result = pd.DataFrame(executor.build_dataset(ray.data.from_pandas(frames)).take_all())
+                    assert sorted(result["page"]) == list(range(32))
+                    assert result["peak"].max() == tasks_in_flight
+            finally:
+                ray.shutdown()
+
     def test_node_overrides_stored(self):
 
         g = Graph()

@@ -435,6 +435,22 @@ def test_batch_tuning_to_node_overrides_auto_cpu_only_when_no_gpus(ocr_version: 
     assert overrides["NemotronParseActor"]["concurrency"] == 2
 
 
+@pytest.mark.parametrize(("batches_in_flight", "tasks", "async_engine"), [(1, None, None), (4, 4, True)])
+def test_parse_batches_in_flight_set_actor_tasks_and_the_async_engine(batches_in_flight, tasks, async_engine) -> None:
+    extract_params = ExtractParams(
+        method="nemotron_parse",
+        batch_tuning=BatchTuningParams(nemotron_parse_batches_in_flight=batches_in_flight),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+    node = build_graph(extraction_mode="pdf", extract_params=extract_params).roots[0]
+    while node.operator.__class__.__name__ != "NemotronParseActor":
+        (node,) = node.children
+
+    assert overrides.get("NemotronParseActor", {}).get("max_tasks_in_flight_per_actor") == tasks
+    assert node.operator_kwargs.get("async_engine") is async_engine
+
+
 def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> None:
     cluster = ClusterResources(
         total_resources=Resources(cpu_count=224, gpu_count=8),
