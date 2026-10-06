@@ -607,6 +607,30 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
 
                 self._model = NemotronParseV12(task_prompt=self._task_prompt, async_engine=self._async_engine)
 
+    @classmethod
+    def supports_concurrent_calls(cls, operator_kwargs: dict[str, Any]) -> bool:
+        """Report whether the executor may run several batches on one actor at once.
+
+        Args:
+            operator_kwargs: Constructor keyword arguments for this actor.
+
+        Returns:
+            True only with ``async_engine=True``; the offline vLLM engine is not thread-safe.
+        """
+        return bool(operator_kwargs.get("async_engine"))
+
+    def close(self) -> None:
+        """Release the local model and the GPU memory its engine holds.
+
+        Safe to call more than once; a later batch loads the model again.
+        """
+        model, self._model = getattr(self, "_model", None), None
+        if model is not None:
+            model.close()
+
+    # Ray Data deletes the actor's operator when the actor exits gracefully.
+    __del__ = close
+
     def process(self, data: Any, **kwargs: Any) -> Any:
         self._ensure_model()
         return nemotron_parse_pages(

@@ -1936,6 +1936,9 @@ class TestRayDataExecutor:
 
         _calls, dataset = repartition_calls_and_dataset
         monkeypatch.setattr(sys.modules["ray.data"], "ActorPoolStrategy", lambda **kwargs: kwargs, raising=False)
+        monkeypatch.setattr(
+            UDFOperator, "supports_concurrent_calls", classmethod(lambda cls, _kwargs: True), raising=False
+        )
         captured: list[dict[str, Any]] = []
         dataset.map_batches = lambda operator_class, **kwargs: captured.append(kwargs) or dataset
         overrides = {"concurrency": concurrency, "max_tasks_in_flight_per_actor": tasks_in_flight}
@@ -1949,15 +1952,23 @@ class TestRayDataExecutor:
         assert {key: kwargs[key] for key in ("concurrency", "compute", "max_concurrency") if key in kwargs} == expected
         assert "max_tasks_in_flight_per_actor" not in kwargs
 
-    @pytest.mark.parametrize("tasks_in_flight", [0, True, "2"])
-    def test_tasks_in_flight_rejects_invalid_settings(self, repartition_calls_and_dataset, tasks_in_flight):
+    @pytest.mark.parametrize(
+        ("tasks_in_flight", "message"),
+        [
+            (0, "must be a positive integer"),
+            (True, "must be a positive integer"),
+            ("2", "must be a positive integer"),
+            (2, "requires an operator whose supports_concurrent_calls"),
+        ],
+    )
+    def test_tasks_in_flight_rejects_invalid_settings(self, repartition_calls_and_dataset, tasks_in_flight, message):
         _calls, dataset = repartition_calls_and_dataset
         overrides = {"max_tasks_in_flight_per_actor": tasks_in_flight}
         executor = RayDataExecutor(
             Graph() >> UDFOperator(lambda frame: frame), node_overrides={"UDFOperator": overrides}
         )
         executor._resources_preflight_complete = True
-        with pytest.raises(ValueError, match="max_tasks_in_flight_per_actor must be a positive integer"):
+        with pytest.raises(ValueError, match=message):
             executor.build_dataset(dataset)
 
     @pytest.mark.integration
@@ -1967,6 +1978,9 @@ class TestRayDataExecutor:
         ray = pytest.importorskip("ray", minversion="2.56.1")
         monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
         monkeypatch.setenv("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
+        monkeypatch.setattr(
+            UDFOperator, "supports_concurrent_calls", classmethod(lambda cls, _kwargs: True), raising=False
+        )
         assert not ray.is_initialized(), "Run this test without an existing Ray connection"
 
         # Each actor deserializes its own copy of this function, so ``state`` is per actor.

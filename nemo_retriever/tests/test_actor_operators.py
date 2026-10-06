@@ -433,6 +433,27 @@ class TestNemotronParseActor:
 
         model_class.assert_called_once_with(task_prompt=actor._task_prompt, async_engine=True)
 
+    def test_only_the_async_engine_supports_concurrent_calls(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        assert NemotronParseGPUActor.supports_concurrent_calls({"async_engine": True}) is True
+        assert NemotronParseGPUActor.supports_concurrent_calls({}) is False
+
+    def test_close_releases_the_model_once_and_runs_when_ray_deletes_the_actor(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        model = MagicMock()
+        actor = NemotronParseGPUActor(async_engine=True)
+        actor._model = model
+        actor.close()
+        actor.close()
+        assert model.close.call_count == 1
+        assert actor._model is None
+
+        actor._model = model
+        del actor
+        assert model.close.call_count == 2
+
     def test_remote_chat_completions_uses_v1_2_protocol(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import (
             NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,

@@ -4,6 +4,7 @@ from tests import _have_ffmpeg_binary
 from nemo_retriever.graph.ingestor_runtime import batch_tuning_to_node_overrides
 from nemo_retriever.graph.ingestor_runtime import build_graph
 from nemo_retriever.graph.ingestor_runtime import build_inprocess_graph
+from nemo_retriever.graph.operator_resolution import resolve_graph
 from nemo_retriever.graph.pipeline_graph import Graph
 from nemo_retriever.operators.extract.ocr.ocr import OCRActor
 from nemo_retriever.operators.extract.page_elements.page_elements import PageElementDetectionActor
@@ -443,12 +444,14 @@ def test_parse_batches_in_flight_set_actor_tasks_and_the_async_engine(batches_in
     )
 
     overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
-    node = build_graph(extraction_mode="pdf", extract_params=extract_params).roots[0]
-    while node.operator.__class__.__name__ != "NemotronParseActor":
+    graph = build_graph(extraction_mode="pdf", extract_params=extract_params)
+    node = resolve_graph(graph, Resources(cpu_count=8, gpu_count=1)).roots[0]
+    while node.name != "NemotronParseActor":
         (node,) = node.children
 
     assert overrides.get("NemotronParseActor", {}).get("max_tasks_in_flight_per_actor") == tasks
     assert node.operator_kwargs.get("async_engine") is async_engine
+    assert node.operator_class.supports_concurrent_calls(node.operator_kwargs) is bool(async_engine)
 
 
 def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> None:

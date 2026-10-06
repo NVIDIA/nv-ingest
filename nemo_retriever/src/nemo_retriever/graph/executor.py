@@ -547,8 +547,9 @@ class RayDataExecutor(AbstractExecutor):
 
     ``max_tasks_in_flight_per_actor`` (default 1) lets each of the node's actors
     run that many batches at once on separate threads; ``concurrency`` still sets
-    the number of actors. Use it only for operators that are safe to call
-    concurrently, such as Nemotron Parse with ``async_engine=True``.
+    the number of actors. Values above 1 require the operator class to define
+    ``supports_concurrent_calls(operator_kwargs)`` returning True, as Nemotron
+    Parse does with ``async_engine=True``.
     """
 
     def __init__(
@@ -974,6 +975,12 @@ class RayDataExecutor(AbstractExecutor):
             if isinstance(tasks_in_flight, bool) or not isinstance(tasks_in_flight, int) or tasks_in_flight < 1:
                 raise ValueError(f"{node.name}: {MAX_TASKS_IN_FLIGHT_PER_ACTOR} must be a positive integer")
             if tasks_in_flight > 1:
+                supports_concurrent_calls = getattr(node.operator_class, "supports_concurrent_calls", None)
+                if supports_concurrent_calls is None or not supports_concurrent_calls(node.operator_kwargs):
+                    raise ValueError(
+                        f"{node.name}: {MAX_TASKS_IN_FLIGHT_PER_ACTOR} above 1 requires an operator whose "
+                        "supports_concurrent_calls(operator_kwargs) returns True"
+                    )
                 # Ray ignores ``concurrency`` once ``compute`` is set, so the pool size moves into the strategy.
                 overrides["compute"] = _concurrent_actor_pool(overrides.pop("concurrency"), tasks_in_flight)
                 overrides["max_concurrency"] = tasks_in_flight

@@ -256,3 +256,24 @@ def test_async_engine_close_from_its_own_loop_thread_does_not_deadlock() -> None
     assert not engine._thread.is_alive()
     assert fake.shutdown_calls == 1
 
+
+def test_model_close_stops_the_async_engine_once_and_rejects_later_calls() -> None:
+    fake = _FakeAsyncLLM()
+    model = _local_wrapper([])
+    model._llm = _make_async_engine(fake)
+
+    model.close()
+    model.close()
+
+    assert fake.shutdown_calls == 1
+    with pytest.raises(RuntimeError, match="was closed"):
+        model.invoke_batch_with_finish_reasons(["image"])
+
+
+def test_model_close_drops_the_offline_engine() -> None:
+    model = _local_wrapper([])
+
+    model.close()
+
+    assert model._llm is None
+
