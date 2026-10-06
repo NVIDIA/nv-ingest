@@ -107,18 +107,19 @@ def test_async_engine_adds_only_the_engine_defaults_the_offline_llm_applies_itse
 
 
 class _FakeAsyncLLM:
-    """Finishes "slow" prompts last and fails "bad" ones, recording cancelled prompts."""
+    """Finishes "slow" prompts last, fails "bad" ones, never finishes "hang", and records cancellations."""
 
     def __init__(self) -> None:
         self.request_ids: list[str] = []
         self.cancelled: list[str] = []
+        self.shutdown_calls = 0
 
     async def generate(self, prompt, sampling_params, request_id):
         import asyncio
 
         self.request_ids.append(request_id)
         try:
-            await asyncio.sleep(0.2 if prompt == "slow" else 0)
+            await asyncio.sleep({"slow": 0.2, "hang": 60}.get(prompt, 0))
         except asyncio.CancelledError:
             self.cancelled.append(prompt)
             raise
@@ -126,19 +127,26 @@ class _FakeAsyncLLM:
             raise RuntimeError("engine failed")
         yield SimpleNamespace(prompt=prompt)
 
+    def shutdown(self) -> None:
+        self.shutdown_calls += 1
 
-@pytest.fixture
-def fake_async_engine():
+
+def _make_async_engine(fake: _FakeAsyncLLM):
     from nemo_retriever.models.local.nemotron_parse_v1_2 import _AsyncEngine
 
-    fake = _FakeAsyncLLM()
     with (
         patch("vllm.engine.arg_utils.AsyncEngineArgs", side_effect=lambda **kwargs: kwargs),
         patch("vllm.v1.engine.async_llm.AsyncLLM.from_engine_args", return_value=fake),
     ):
-        engine = _AsyncEngine({"model": "test"})
+        return _AsyncEngine({"model": "test"})
+
+
+@pytest.fixture
+def fake_async_engine():
+    fake = _FakeAsyncLLM()
+    engine = _make_async_engine(fake)
     yield engine, fake
-    engine._loop.call_soon_threadsafe(engine._loop.stop)
+    engine.close()
 
 
 def test_async_engine_returns_outputs_in_input_order(fake_async_engine) -> None:
@@ -176,4 +184,75 @@ def test_async_engine_creation_failure_stops_its_event_loop_thread() -> None:
         _AsyncEngine({"model": "test"})
 
     assert engine_threads() <= before
+
+
+def test_async_engine_close_cancels_in_flight_requests_and_shuts_down_once() -> None:
+    import concurrent.futures
+    import threading
+    import time
+
+    fake = _FakeAsyncLLM()
+    engine = _make_async_engine(fake)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        in_flight = pool.submit(engine.generate, ["hang"], None)
+        deadline = time.monotonic() + 5
+        while not fake.request_ids and time.monotonic() < deadline:
+            time.sleep(0.01)
+        closers = [threading.Thread(target=engine.close) for _ in range(2)]
+        for closer in closers:
+            closer.start()
+        for closer in closers:
+            closer.join()
+        with pytest.raises(concurrent.futures.CancelledError):
+            in_flight.result(timeout=5)
+
+    engine.close()
+    assert fake.cancelled == ["hang"]
+    assert fake.shutdown_calls == 1
+    assert not engine._thread.is_alive()
+    assert engine._loop.is_closed()
+
+
+def test_async_engine_cancels_only_the_output_handler_and_batches_before_shutdown() -> None:
+    import asyncio
+
+    fake = _FakeAsyncLLM()
+    engine = _make_async_engine(fake)
+
+    async def start_engine_tasks():
+        fake.output_handler = asyncio.ensure_future(asyncio.sleep(60))
+        return asyncio.ensure_future(asyncio.sleep(60))
+
+    other_engine_task = asyncio.run_coroutine_threadsafe(start_engine_tasks(), engine._loop).result()
+    seen_at_shutdown = []
+    fake.shutdown = lambda: seen_at_shutdown.append((fake.output_handler.cancelled(), other_engine_task.done()))
+
+    engine.close()
+
+    assert seen_at_shutdown == [(True, False)]
+
+
+def test_async_engine_shuts_down_when_collected() -> None:
+    import gc
+
+    fake = _FakeAsyncLLM()
+    engine = _make_async_engine(fake)
+    thread = engine._thread
+
+    del engine
+    gc.collect()
+
+    assert fake.shutdown_calls == 1
+    assert not thread.is_alive()
+
+
+def test_async_engine_close_from_its_own_loop_thread_does_not_deadlock() -> None:
+    fake = _FakeAsyncLLM()
+    engine = _make_async_engine(fake)
+
+    engine._loop.call_soon_threadsafe(engine.close)
+    engine._thread.join(timeout=5)
+
+    assert not engine._thread.is_alive()
+    assert fake.shutdown_calls == 1
 

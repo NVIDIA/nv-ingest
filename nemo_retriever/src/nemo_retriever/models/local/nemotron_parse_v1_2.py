@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import uuid
+import weakref
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Union
 
@@ -54,11 +55,52 @@ def _patch_vllm_nemotron_parse_processor() -> None:
     _VLLM_PROCESSOR_PATCHED = True
 
 
+def _run_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    try:
+        loop.run_forever()
+    finally:
+        loop.close()
+
+
+def _stop_event_loop(loop: asyncio.AbstractEventLoop, thread: threading.Thread) -> None:
+    loop.call_soon_threadsafe(loop.stop)
+    thread.join()
+
+
+_BATCH_TASK_NAME = "nemotron-parse-batch"
+
+
+async def _cancel_requests_and_shut_down(engine: Any) -> None:
+    # vLLM's own shutdown stops the engine core before cancelling its output handler, which then logs
+    # EngineDeadError; cancelling in-flight batches and the handler first lets the engine stop quietly.
+    tasks = [task for task in asyncio.all_tasks() if task.get_name() == _BATCH_TASK_NAME]
+    if (handler := getattr(engine, "output_handler", None)) is not None:
+        tasks.append(handler)
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    engine.shutdown()
+
+
+def _shut_down(engine: Any, loop: asyncio.AbstractEventLoop, thread: threading.Thread) -> None:
+    if not thread.is_alive():
+        return
+    if threading.current_thread() is thread:
+        loop.create_task(_cancel_requests_and_shut_down(engine)).add_done_callback(lambda _task: loop.stop())
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(_cancel_requests_and_shut_down(engine), loop).result()
+    finally:
+        _stop_event_loop(loop, thread)
+
+
 class _AsyncEngine:
     """One vLLM ``AsyncLLM`` on a private event-loop thread, shared by concurrent callers.
 
     Every caller's pages become requests to the same scheduler, so one batch's
-    slowest pages no longer hold the GPU while the next batch waits.
+    slowest pages no longer hold the GPU while the next batch waits. The engine
+    and its thread stop once: on :meth:`close`, when this object is collected,
+    or at interpreter exit.
     """
 
     def __init__(self, engine_kwargs: dict[str, Any]) -> None:
@@ -66,8 +108,10 @@ class _AsyncEngine:
         from vllm.v1.engine.async_llm import AsyncLLM
 
         self._loop = asyncio.new_event_loop()
-        thread = threading.Thread(target=self._loop.run_forever, name="nemotron-parse-engine", daemon=True)
-        thread.start()
+        self._thread = threading.Thread(
+            target=_run_event_loop, args=(self._loop,), name="nemotron-parse-engine", daemon=True
+        )
+        self._thread.start()
 
         async def create() -> Any:
             return AsyncLLM.from_engine_args(AsyncEngineArgs(**engine_kwargs))
@@ -75,10 +119,14 @@ class _AsyncEngine:
         try:
             self._engine = asyncio.run_coroutine_threadsafe(create(), self._loop).result()
         except BaseException:
-            self._loop.call_soon_threadsafe(self._loop.stop)
-            thread.join()
-            self._loop.close()
+            _stop_event_loop(self._loop, self._thread)
             raise
+        # Created after the engine so that, at interpreter exit, it runs before vLLM's own finalizers.
+        self._finalizer = weakref.finalize(self, _shut_down, self._engine, self._loop, self._thread)
+
+    def close(self) -> None:
+        """Cancel in-flight requests, shut down the engine, and stop its thread; later calls do nothing."""
+        self._finalizer()
 
     def generate(self, prompts: Sequence[Any], sampling_params: Any) -> List[Any]:
         """Return each prompt's final output in input order, like ``LLM.generate``.
@@ -94,6 +142,7 @@ class _AsyncEngine:
             return output
 
         async def generate_all() -> List[Any]:
+            asyncio.current_task().set_name(_BATCH_TASK_NAME)
             tasks = [asyncio.ensure_future(final_output(prompt)) for prompt in prompts]
             try:
                 return list(await asyncio.gather(*tasks))
