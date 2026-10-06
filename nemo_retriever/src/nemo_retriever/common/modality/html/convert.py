@@ -177,7 +177,7 @@ def html_bytes_to_chunks_df(
 
     Used by batch HtmlSplitActor when input is bytes + path from read_binary_files.
     """
-    path = str(Path(path).resolve())
+    path = path if "://" in path else str(Path(path).resolve())
     html_text = content_bytes.decode(encoding, errors="replace")
     markdown_text = html_to_markdown(html_text)
     return _markdown_to_chunks_df(

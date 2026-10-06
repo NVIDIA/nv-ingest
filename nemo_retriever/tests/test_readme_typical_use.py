@@ -49,6 +49,10 @@ class _FakeIngestor:
         self.calls.append(("files", documents))
         return self
 
+    def urls(self, urls: list[str]) -> "_FakeIngestor":
+        self.calls.append(("urls", urls))
+        return self
+
     def extract(self, **kwargs: Any) -> "_FakeIngestor":
         self.calls.append(("extract", kwargs))
         return self
@@ -61,9 +65,9 @@ class _FakeIngestor:
         self.calls.append(("vdb_upload", None))
         return self
 
-    def ingest(self) -> pd.DataFrame:
-        self.calls.append(("ingest", None))
-        return pd.DataFrame(
+    def ingest(self, *, return_failures: bool = False) -> pd.DataFrame | tuple[pd.DataFrame, list]:
+        self.calls.append(("ingest", {"return_failures": return_failures}))
+        result = pd.DataFrame(
             [
                 {
                     "page_number": 1,
@@ -77,6 +81,7 @@ class _FakeIngestor:
                 },
             ]
         )
+        return (result, []) if return_failures else result
 
 
 def test_front_page_typical_use_snippets_execute_through_query(monkeypatch, capsys) -> None:
@@ -90,9 +95,10 @@ def test_front_page_typical_use_snippets_execute_through_query(monkeypatch, caps
 
     retriever_module = importlib.import_module("nemo_retriever.graph.retriever")
     blocks = _front_page_typical_use_python_blocks()
-    assert len(blocks) == 2
+    assert len(blocks) == 3
     assert "create_ingestor" in blocks[0][1]
-    assert "OpenAI" in blocks[1][1]
+    assert ".urls(urls)" in blocks[1][1]
+    assert "OpenAI" in blocks[2][1]
 
     ingestors: list[_FakeIngestor] = []
     retriever_init_calls: list[dict[str, Any]] = []
@@ -153,6 +159,18 @@ def test_front_page_typical_use_snippets_execute_through_query(monkeypatch, caps
         "ingest",
     ]
     assert ingestors[0].calls[0] == ("files", ["data/multimodal_test.pdf"])
+    assert [call[0] for call in ingestors[1].calls] == [
+        "urls",
+        "extract",
+        "embed",
+        "vdb_upload",
+        "ingest",
+    ]
+    assert ingestors[1].calls[0] == (
+        "urls",
+        ["https://ontheline.trincoll.edu/images/bookdown/sample-local-pdf.pdf"],
+    )
+    assert ingestors[1].calls[-1] == ("ingest", {"return_failures": True})
     assert retriever_init_calls == [{}]
     assert retriever_queries == ["Given their activities, which animal is responsible for the typos in my documents?"]
     assert "Cat Jumping onto a laptop" in llm_requests[0]["messages"][0]["content"]

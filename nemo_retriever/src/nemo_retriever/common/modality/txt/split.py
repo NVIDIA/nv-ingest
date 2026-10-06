@@ -290,7 +290,7 @@ def txt_bytes_to_chunks_df(
     """
     chunk_params = params or TextChunkParams()
     is_inline = is_inline_text_source(path)
-    source_id = path if is_inline else str(Path(path).resolve())
+    source_id = path if is_inline or "://" in path else str(Path(path).resolve())
     encoding = "utf-8" if is_inline else chunk_params.encoding
     raw = content_bytes.decode(encoding, errors="replace")
     return text_to_chunks_df(raw, source_id, params=chunk_params)

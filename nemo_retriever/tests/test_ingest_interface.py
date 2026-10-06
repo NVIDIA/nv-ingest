@@ -118,6 +118,16 @@ def test_graph_ingestion_error_is_exported_from_top_level_package() -> None:
     assert nemo_retriever.GraphIngestionError is GraphIngestionError
 
 
+def test_graph_ingestor_ingest_documents_public_contract() -> None:
+    docstring = GraphIngestor.ingest.__doc__ or ""
+
+    assert "Parameters" in docstring
+    assert "Returns" in docstring
+    assert "Raises" in docstring
+    assert "return_failures" in docstring
+    assert "GraphIngestionError" in docstring
+
+
 def test_create_ingestor_rejects_unknown_kwargs() -> None:
     with pytest.raises(Exception):
         create_ingestor(run_mode="inprocess", unknown_field=True)
@@ -129,7 +139,7 @@ def test_create_ingestor_rejects_unknown_run_modes() -> None:
 
 
 @pytest.mark.parametrize("run_mode", ["inprocess", "batch", "service"])
-@pytest.mark.parametrize("input_method", [None, "files", "texts", "buffers"])
+@pytest.mark.parametrize("input_method", [None, "files", "urls", "texts", "buffers"])
 def test_ingest_requires_input_sources(
     run_mode: str,
     input_method: str | None,
@@ -163,9 +173,13 @@ def test_ingest_requires_input_sources(
 
     with pytest.raises(
         ValueError,
-        match=r"No input sources configured\. Call files\(\), texts\(\), or buffers\(\) with at least one source",
+        match=(
+            r"No input sources configured\. Call files\(\), urls\(\), texts\(\), or buffers\(\) "
+            r"with at least one source"
+        ),
     ):
-        ingestor.extract(params=ExtractParams(extract_text=True)).ingest()
+        configured = ingestor if run_mode == "service" else ingestor.extract(params=ExtractParams(extract_text=True))
+        configured.ingest()
 
 
 def test_texts_accepts_scalar(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -30,9 +30,9 @@ operator output columns, not to document extraction.
 ### Configure at least one input source
 
 Before you call `.ingest()`, `.ingest_stream()`, or `.aingest_stream()`,
-configure at least one input source by calling `.files()`, `.texts()`, or
-`.buffers()` with a nonempty value. Omitting input configuration or passing an
-empty collection raises `ValueError` before pipeline execution.
+configure at least one input source by calling `.files()`, `.urls()`,
+`.texts()`, or `.buffers()` with a nonempty value. Omitting input configuration
+or passing an empty collection raises `ValueError` before pipeline execution.
 
 A configured source can legitimately produce blank text or an empty result.
 For example, OCR can find no text on an image-only page. This outcome does not
@@ -41,6 +41,93 @@ raise the missing-input error.
 A nonempty optional glob passed to `.files()` also counts as a configured
 source. If it matches no files, `.ingest()` can return an empty result, and the
 streaming methods can yield no results.
+
+### Fetch content from URLs { #fetch-content-from-urls }
+
+Call `.urls()` with one absolute HTTP or HTTPS URL, or a sequence of URLs. URL
+fetching is lazy and starts when you call an ingest method. NeMo Retriever
+Library performs the HTTP GET requests in the Python SDK process. In service
+mode, the client fetches the content and sends it to the Retriever service.
+
+The response must match an existing [supported input
+format](multimodal-extraction.md#supported-file-types-and-formats). NeMo
+Retriever Library uses a recognized response content type and filename hints
+to select the extraction path. It checks `Content-Disposition`, the final URL
+after redirects, and then the submitted URL for filename hints. HTML responses
+use the same MarkItDown conversion as local `.html` files.
+
+Results retain the submitted URL as their base `path` and `source_id`,
+including when the request follows a redirect. Extractors can add their normal
+page suffix to a page-specific identity. NeMo Retriever Library preserves that
+suffix while replacing the internal transport name with the submitted URL
+before post-extraction stages such as embedding and `.vdb_upload()`.
+
+The following example fetches and extracts a PDF.
+
+```python
+from nemo_retriever import create_ingestor
+
+pdf_url = "https://ontheline.trincoll.edu/images/bookdown/sample-local-pdf.pdf"
+
+result, failures = (
+    create_ingestor(run_mode="batch")
+    .urls([pdf_url])
+    .extract()
+    .ingest(return_failures=True)
+)
+```
+
+Pass `UrlFetchParams` or equivalent keyword arguments to `.urls()` when you
+need to configure the HTTP requests.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import UrlFetchParams
+
+fetch_params = UrlFetchParams(
+    headers={"Authorization": "Bearer <token>"},
+    request_timeout_s=60,
+    follow_redirects=True,
+    max_response_bytes=20_000_000,
+    max_concurrency=4,
+)
+
+ingestor = create_ingestor(run_mode="inprocess").urls(
+    ["https://example.com/private-document.html"],
+    params=fetch_params,
+)
+```
+
+The following settings apply to `inprocess`, `batch`, and `service` run modes.
+
+| Field | Default | Behavior |
+| --- | --- | --- |
+| `headers` | `{}` | Adds the same request headers to every configured URL. |
+| `request_timeout_s` | `30.0` | Sets the timeout for each HTTP connect, read, write, and connection-pool operation. It is not an end-to-end ingest deadline. |
+| `follow_redirects` | `True` | Follows HTTP redirects. Redirect targets can provide filename hints, but they do not replace the submitted source URL. |
+| `max_response_bytes` | `10_000_000` | Rejects an individual response after it exceeds this many downloaded bytes. |
+| `max_concurrency` | `8` | Limits the number of concurrent URL fetches. |
+
+Repeated `.urls()` calls append sources. A call without `params` or keyword
+settings retains the existing `UrlFetchParams`. A later call with explicit
+settings replaces the shared fetch configuration for all URLs on that
+ingestor.
+
+NeMo Retriever Library streams each accepted response into managed temporary
+storage and removes that storage after ingestion. Service mode also streams
+the spooled content during upload. This keeps memory use bounded by active I/O
+instead of the total size of all fetched content.
+
+Invalid URLs and unsupported URL schemes raise a configuration error. HTTP
+error responses, timeouts, network failures, oversized responses, and
+unsupported response formats are per-URL failures. Pass
+`return_failures=True` to keep successful results and receive failures as
+`(url, error_message)` tuples. Without that option, graph run modes raise
+`GraphIngestionError` for URL fetch failures. With that option, service mode
+returns `(ServiceIngestResult, failures)`. In service mode, URL fetch, upload,
+and server-side document failures are also available in
+`ServiceIngestResult.failures`. URL fetch and upload failures identify the
+submitted URL instead of an internal transport filename.
 
 ### Select a supported extraction method
 

@@ -32,6 +32,8 @@ from concurrent.futures.process import BrokenProcessPool
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
+from nemo_retriever.common.url_fetch import restore_url_source_value
+
 if TYPE_CHECKING:
     from nemo_retriever.service.config import (
         LocalModelsConfig,
@@ -788,13 +790,18 @@ def _run_pipeline_in_process(
                 caption_params_dict,
                 asr_params_dict,
             )
+            document_metadata = write_context.document_metadata if write_context is not None else None
+            source_url = document_metadata.get("_nrl_source_url") if document_metadata else None
+            if isinstance(source_url, str):
+                ingestor._set_source_map({filename: source_url})
             effective_embed_params = getattr(ingestor, "_embed_params", None)
             embedding_column = getattr(effective_embed_params, "output_column", None)
 
             result_df = ingestor.ingest()
             _merge_document_metadata(
                 result_df,
-                write_context.document_metadata if write_context is not None else None,
+                document_metadata,
+                source_identifier=filename,
             )
     finally:
         tracing.force_flush(timeout_millis=500)
@@ -843,7 +850,12 @@ def _run_pipeline_in_process(
     return row_count, result_data, elapsed
 
 
-def _merge_document_metadata(result: Any, document_metadata: dict[str, Any] | None) -> None:
+def _merge_document_metadata(
+    result: Any,
+    document_metadata: dict[str, Any] | None,
+    *,
+    source_identifier: str | None = None,
+) -> None:
     """Merge request metadata into extracted rows without replacing parser fields."""
     if not document_metadata:
         return
@@ -851,14 +863,24 @@ def _merge_document_metadata(result: Any, document_metadata: dict[str, Any] | No
     # Validate and copy at the child-process boundary so storage receives no
     # aliases or values that cannot be represented in JSON query hits.
     canonical = json.loads(json.dumps(document_metadata, ensure_ascii=False))
+    source_url = canonical.pop("_nrl_source_url", None)
+    source_map = (
+        {source_identifier: source_url} if isinstance(source_identifier, str) and isinstance(source_url, str) else {}
+    )
 
     def merge_row(row: Any) -> None:
         if not isinstance(row, dict):
             return
         metadata = row.get("metadata")
+        if source_map:
+            for field in ("path", "source_path", "source_id"):
+                if field in row:
+                    row[field] = restore_url_source_value(row[field], source_map)
         if not isinstance(metadata, dict):
             metadata = {}
-            row["metadata"] = metadata
+        if source_map:
+            metadata = restore_url_source_value(metadata, source_map)
+        row["metadata"] = metadata
         content_metadata = metadata.get("content_metadata")
         if not isinstance(content_metadata, dict):
             content_metadata = {}
@@ -872,9 +894,12 @@ def _merge_document_metadata(result: Any, document_metadata: dict[str, Any] | No
         return
     if hasattr(result, "iterrows"):
         for index, row in result.iterrows():
-            holder = {"metadata": row.get("metadata")}
+            fields = ("path", "source_path", "source_id", "metadata")
+            holder = {field: row.get(field) for field in fields if field in result.columns}
             merge_row(holder)
-            result.at[index, "metadata"] = holder["metadata"]
+            for field, value in holder.items():
+                if field in result.columns:
+                    result.at[index, field] = value
 
 
 def _local_model_runtime_kwargs(local: "LocalModelsConfig") -> dict[str, Any]:

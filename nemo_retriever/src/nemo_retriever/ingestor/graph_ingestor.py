@@ -69,6 +69,7 @@ from nemo_retriever.common.params import (
     NO_API_KEY,
     StoreParams,
     TextChunkParams,
+    UrlFetchParams,
     VideoFrameParams,
     VideoFrameTextDedupParams,
     VdbUploadParams,
@@ -81,6 +82,13 @@ from nemo_retriever.common.input_files import (
     _is_explicit_glob_path,
     expand_input_file_patterns,
     input_type_for_path,
+)
+from nemo_retriever.common.url_fetch import (
+    FetchedUrl,
+    UrlFetchFailure,
+    cleanup_fetched_urls,
+    fetch_urls,
+    normalize_urls,
 )
 from nemo_retriever.common.remote_auth import resolve_remote_api_key
 from nemo_retriever.common.ray_runtime import ensure_local_ray_runtime
@@ -508,6 +516,10 @@ class GraphIngestor(ingestor):
         self._show_progress = show_progress
         self._error_policy = error_policy
         self._rd_dataset: Any = None
+        self._fetched_urls: list[FetchedUrl] = []
+        self._url_failures: list[UrlFetchFailure] = []
+        self._url_source_map: dict[str, str] = {}
+        self._external_source_map: dict[str, str] = {}
         self._buffers: list[tuple[str, BytesIO]] = []
         self._inline_texts: list[str] | None = None
 
@@ -535,6 +547,39 @@ class GraphIngestor(ingestor):
     # ------------------------------------------------------------------
     # Input configuration
     # ------------------------------------------------------------------
+
+    def urls(
+        self,
+        urls: Union[str, Sequence[str]],
+        params: UrlFetchParams | None = None,
+        **kwargs: Any,
+    ) -> "GraphIngestor":
+        """Add HTTP(S) sources, fetched lazily when ingestion starts.
+
+        Parameters
+        ----------
+        urls
+            One absolute HTTP(S) URL or a sequence of URLs to append.
+        params
+            Shared fetch settings. Existing settings are retained when this
+            append call supplies neither params nor keyword overrides.
+        **kwargs
+            Field overrides for UrlFetchParams.
+
+        Returns
+        -------
+        GraphIngestor
+            This ingestor for fluent chaining.
+
+        Raises
+        ------
+        ValueError
+            If a URL is empty, relative, or uses a non-HTTP(S) scheme.
+        """
+        self._urls.extend(normalize_urls(urls))
+        if params is not None or kwargs:
+            self._url_fetch_params = _coerce(params, kwargs, default_factory=UrlFetchParams)
+        return self
 
     def files(self, documents: Union[str, List[str]]) -> "GraphIngestor":
         """Set the input file paths or glob patterns."""
@@ -814,11 +859,12 @@ class GraphIngestor(ingestor):
     # ------------------------------------------------------------------
 
     def ingest(self, params: Any = None, **kwargs: Any) -> Any:
-        """Build the operator graph and run it through the configured executor.
+        """Fetch configured URLs and execute the configured ingestion graph.
 
         Captioning automatically applies default image deduplication to
         non-image inputs unless an explicit dedup configuration disables both
-        deduplication passes.
+        deduplication passes. Fetched URL payloads are removed after execution,
+        including when graph construction or execution fails.
 
         Parameters
         ----------
@@ -828,25 +874,49 @@ class GraphIngestor(ingestor):
         **kwargs
             Execute-time flags passed directly. ``return_failures`` may be
             passed here and takes precedence over the value in ``params``.
-        return_failures
-            When ``True`` (default ``False``), return ``(result, failures)``
-            instead of raising collected row-level stage errors. If no explicit
+            It defaults to ``False``; when true, collected row-level and URL
+            failures are returned instead of raised. If no explicit
             remote-stage diagnostics are configured, all output columns are
             scanned for populated error fields so local collected failures can
-            still be returned; the default raise path remains scoped to
-            explicitly configured remote stages.
+            still be returned. The default raise path remains scoped to
+            explicitly configured remote stages and URL fetch failures.
 
         Returns
         -------
-        ``run_mode='batch'`` or ``run_mode='inprocess'``
-            A ``pandas.DataFrame``.
-        ``return_failures=True``
-            ``(result, failures)`` where ``failures`` is a list of
+        pandas.DataFrame
+            Extracted rows for ``run_mode='batch'`` or
+            ``run_mode='inprocess'``.
+        tuple[pandas.DataFrame, list[tuple[str, str]]]
+            ``(result, failures)`` when ``return_failures=True``. Failures use
             service-style ``(source, error)`` tuples.
+
+        Raises
+        ------
+        ValueError
+            If input sources, extraction settings, or execute-time parameters
+            are invalid or incompatible.
+        FileNotFoundError
+            If a configured local input cannot be read.
+        GraphIngestionError
+            If URL fetching or a collected graph stage fails and
+            ``return_failures`` is false.
         """
-        return_failures = self._resolve_return_failures(params, kwargs)
         self._validate_input_sources(self._inline_texts)
-        if not self._documents and not self._buffers and is_blank_inline_corpus(self._inline_texts):
+        self._prepare_url_inputs()
+        try:
+            return self._ingest_prepared(params, **kwargs)
+        finally:
+            self._cleanup_url_inputs()
+
+    def _ingest_prepared(self, params: Any = None, **kwargs: Any) -> Any:
+        """Execute ingestion after URL inputs have been fetched and classified."""
+        return_failures = self._resolve_return_failures(params, kwargs)
+        if (
+            not self._documents
+            and not self._url_documents()
+            and not self._all_buffers()
+            and is_blank_inline_corpus(self._inline_texts)
+        ):
             result = empty_text_chunks_df()
             if self._run_mode == "batch":
                 self._rd_dataset = result
@@ -856,7 +926,7 @@ class GraphIngestor(ingestor):
 
         default_branches = self._plan_default_extraction_branches()
         execute_branches = default_branches is not None and (
-            len(default_branches) > 1 or self._has_mixed_inline_sources()
+            len(default_branches) > 1 or self._has_mixed_inline_sources() or bool(self._effective_source_map())
         )
         if default_branches is None:
             single_effective = self._resolve_effective_extraction_inputs()
@@ -1007,10 +1077,10 @@ class GraphIngestor(ingestor):
         self._rd_dataset = None
         if self._inline_texts:
             return executor.ingest(self._inline_text_dataframe())
-        if self._buffers:
+        if self._all_buffers():
             import pandas as pd
 
-            df = pd.DataFrame([{"bytes": buf.getvalue(), "path": name} for name, buf in self._buffers])
+            df = pd.DataFrame([{"bytes": buf.getvalue(), "path": name} for name, buf in self._all_buffers()])
             return executor.ingest(df)
         return executor.ingest(self._documents)
 
@@ -1024,8 +1094,10 @@ class GraphIngestor(ingestor):
         result = ExtractionBranchExecutor(
             run_mode=self._run_mode,
             branches=branches,
-            documents=self._documents,
-            buffers=self._buffers,
+            documents=[*self._documents, *self._url_documents()],
+            buffers=self._all_buffers(),
+            source_map=self._effective_source_map(),
+            driver_local_paths=set(self._url_documents()),
             inline_rows=self._inline_text_rows(),
             split_config=self._split_config,
             extract_params=self._extract_params,
@@ -1062,9 +1134,31 @@ class GraphIngestor(ingestor):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def _prepare_url_inputs(self) -> None:
+        self._cleanup_url_inputs()
+        self._fetched_urls, self._url_failures = fetch_urls(self._urls, self._url_fetch_params)
+        self._url_source_map = {str(item.local_path): item.url for item in self._fetched_urls}
+
+    def _cleanup_url_inputs(self) -> None:
+        cleanup_fetched_urls(self._fetched_urls)
+        self._fetched_urls = []
+        self._url_source_map = {}
+
+    def _set_source_map(self, source_map: dict[str, str]) -> None:
+        """Set transport-to-source mappings supplied by an internal caller."""
+        self._external_source_map = dict(source_map)
+
+    def _effective_source_map(self) -> dict[str, str]:
+        return {**self._external_source_map, **self._url_source_map}
+
+    def _url_documents(self) -> list[str]:
+        return [str(item.local_path) for item in self._fetched_urls]
+
+    def _all_buffers(self) -> list[tuple[str, BytesIO]]:
+        return list(self._buffers)
 
     def _has_mixed_inline_sources(self) -> bool:
-        return bool(self._inline_texts) and bool(self._documents or self._buffers)
+        return bool(self._inline_texts) and bool(self._documents or self._url_documents() or self._all_buffers())
 
     def _inline_text_rows(self) -> list[dict[str, str]]:
         return [
@@ -1086,7 +1180,8 @@ class GraphIngestor(ingestor):
                 paths.extend(expand_input_file_patterns([document]))
             except FileNotFoundError:
                 paths.append(os.fspath(document))
-        paths.extend(name for name, _ in self._buffers)
+        paths.extend(self._url_documents())
+        paths.extend(name for name, _ in self._all_buffers())
         paths.extend(inline_text_source_id(index) for index, _ in enumerate(self._inline_texts or []))
         return paths
 
@@ -1122,8 +1217,13 @@ class GraphIngestor(ingestor):
             raise ValueError(f"Input file type(s) do not match extraction_mode={extraction_mode!r}: {examples}")
 
     def _plan_default_extraction_branches(self) -> tuple[ExtractionBranchPlan, ...] | None:
-        if self._extraction_mode is not None and not self._has_mixed_inline_sources():
-            return None
+        if self._extraction_mode is not None:
+            classified = self._classified_input_paths()
+            if self._inline_texts:
+                classified = [(path, kind) for path, kind in classified if not is_inline_text_source(path)]
+            self._validate_explicit_extraction_mode_inputs(self._extraction_mode, classified)
+            if not self._has_mixed_inline_sources() and not self._effective_source_map():
+                return None
         manifest = build_input_manifest(self._configured_input_paths())
         branches = plan_extraction_branches(manifest)
         if self._debug:
@@ -1441,8 +1541,11 @@ class GraphIngestor(ingestor):
         return [self._public_failure_tuple(record) for record in self._collect_failure_records(result)]
 
     def _finalize_ingest_result(self, result: Any, *, return_failures: bool) -> Any:
+        url_failures = [(failure.url, failure.message) for failure in self._url_failures]
         if return_failures:
-            return result, self._collect_failure_tuples(result)
+            return result, [*url_failures, *self._collect_failure_tuples(result)]
+        if self._url_failures:
+            raise GraphIngestionError([failure.as_record() for failure in self._url_failures])
         self._raise_for_stage_errors(result)
         return result
 

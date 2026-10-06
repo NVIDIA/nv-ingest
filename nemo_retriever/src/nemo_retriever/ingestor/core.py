@@ -26,6 +26,7 @@ from nemo_retriever.common.params import IngestExecuteParams
 from nemo_retriever.common.params import IngestorCreateParams
 from nemo_retriever.common.params import IngestorRunMode
 from nemo_retriever.common.params import StoreParams
+from nemo_retriever.common.params import UrlFetchParams
 from nemo_retriever.common.params import VdbUploadParams
 from nemo_retriever.common.params import WebhookParams
 
@@ -95,6 +96,8 @@ class ingestor:
 
     def __init__(self, documents: Optional[List[str]] = None) -> None:
         self._documents: List[str] = list(documents or [])
+        self._urls: List[str] = []
+        self._url_fetch_params = UrlFetchParams()
         self._buffers: List[Tuple[str, BytesIO]] = []
 
     def _not_implemented(self, method_name: str) -> "None":
@@ -103,11 +106,37 @@ class ingestor:
         )
 
     def _validate_input_sources(self, inline_texts: Sequence[str] | None) -> None:
-        if self._documents or self._buffers or inline_texts:
+        if self._documents or self._buffers or self._urls or inline_texts:
             return
         raise ValueError(
-            "No input sources configured. Call files(), texts(), or buffers() with at least one source before ingest()."
+            "No input sources configured. Call files(), urls(), texts(), or buffers() "
+            "with at least one source before ingest()."
         )
+
+    def urls(self, urls: Union[str, Sequence[str]], params: UrlFetchParams | None = None, **kwargs: Any) -> "ingestor":
+        """Add HTTP(S) URL sources for processing.
+
+        Parameters
+        ----------
+        urls
+            One absolute HTTP(S) URL or a sequence of URLs.
+        params
+            Shared URL-fetch configuration.
+        **kwargs
+            Field overrides for :class:`UrlFetchParams`.
+
+        Returns
+        -------
+        ingestor
+            This ingestor for fluent chaining.
+
+        Raises
+        ------
+        ValueError
+            If URL validation or fetch configuration validation fails.
+        """
+        _ = _merge_params(params, kwargs)
+        self._not_implemented("urls")
 
     def files(self, documents: Union[str, List[str]]) -> "ingestor":
         """Add document paths/URIs for processing."""
