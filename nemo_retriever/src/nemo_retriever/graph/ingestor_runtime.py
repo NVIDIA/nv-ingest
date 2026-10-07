@@ -204,7 +204,9 @@ def batch_tuning_to_node_overrides(
             local_caption_concurrency = 1 if available_gpus <= 1 else max(1, available_gpus - 1)
 
     if embed_params is not None:
-        embed_invoke_url = _positive(getattr(embed_params, "embed_invoke_url", None))
+        embed_invoke_url = _positive(getattr(embed_params, "embed_invoke_url", None)) or _positive(
+            getattr(embed_params, "embedding_endpoint", None)
+        )
         explicit_bs = getattr(embed_tuning, "embed_batch_size", None) if embed_tuning is not None else None
         embed_bs = _positive(explicit_bs) or (plan.embed_batch_size if plan else None)
         _set(_BatchEmbedActor.__name__, "batch_size", embed_bs)

@@ -773,6 +773,25 @@ def test_elastic_actor_pool_respects_explicit_and_remote_ocr_workers() -> None:
     assert remote_overrides["OCRActor"].get("elastic_pool") is None
 
 
+def test_elastic_embed_actor_treats_embedding_endpoint_alias_as_remote() -> None:
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=64, gpu_count=2),
+        available_resources=Resources(cpu_count=64, gpu_count=2),
+    )
+    embed_params = EmbedParams(
+        model_name="nvidia/llama-nemotron-embed-1b-v2",
+        embedding_endpoint="http://embed.example/v1",
+        batch_tuning=BatchTuningParams(actor_pool_mode="elastic"),
+    )
+
+    overrides = batch_tuning_to_node_overrides(ExtractParams(), embed_params, cluster_resources=cluster)
+    embed_override = overrides["_BatchEmbedActor"]
+
+    assert not isinstance(embed_override["concurrency"], tuple)
+    assert embed_override.get("elastic_pool") is None
+    assert "num_gpus" not in embed_override
+
+
 def test_batch_tuning_to_node_overrides_adds_default_store_tuning() -> None:
     overrides = batch_tuning_to_node_overrides(
         extract_params=None,
