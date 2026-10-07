@@ -675,7 +675,7 @@ def test_custom_vdb_stream_capability_and_legacy_fallback() -> None:
     legacy_duck = IngestVdbOperator(vdb=LegacyDuckVDB())
     put = PutVdbOperator(vdb=streaming_vdb)
 
-    assert streaming._stream_ingest(batches()) is None
+    assert streaming._stream_ingest(batches()) == 2
     assert pulls == [0, 1]
     assert streaming_vdb.run_calls == []
     assert [record["document_type"] for record in streaming_vdb.stream_records] == ["text", "text"]

@@ -11,6 +11,7 @@ from typing import ClassVar
 
 from fastapi import HTTPException, UploadFile
 
+from nemo_retriever.common.input_files import INPUT_FORMAT_BY_SUFFIX
 from nemo_retriever.common.inline_text import is_inline_text_source
 from nemo_retriever.common.schemas.base import RichModel
 
@@ -26,6 +27,17 @@ class FileCategory(str, Enum):
     VIDEO = "video"
 
 
+_CATEGORY_BY_INPUT_TYPE: dict[str, FileCategory] = {
+    "pdf": FileCategory.DOCUMENT,
+    "doc": FileCategory.DOCUMENT,
+    "txt": FileCategory.TEXT,
+    "html": FileCategory.HTML,
+    "image": FileCategory.IMAGE,
+    "audio": FileCategory.AUDIO,
+    "video": FileCategory.VIDEO,
+}
+
+
 class FileClassification(RichModel):
     """Result of classifying an uploaded file."""
 
@@ -38,42 +50,13 @@ class FileClassification(RichModel):
 class FileClassifier:
     """Identify uploaded file types from filename suffix.
 
-    Supported extensions are derived from the pipeline's extraction operators:
-      - multi_type_extract_operator.py  (PDF, text, html, image, audio, video)
-      - utils/input_files.py            (CLI input type patterns)
-      - audio/stage.py                  (ffmpeg-capable containers)
-      - utils/convert/to_pdf.py         (office → PDF conversion)
+    Supported extensions and media types are derived from the canonical
+    definitions in :mod:`nemo_retriever.common.input_files`.
     """
 
     SUFFIX_MAP: ClassVar[dict[str, tuple[FileCategory, str]]] = {
-        # Document / office
-        ".pdf": (FileCategory.DOCUMENT, "application/pdf"),
-        ".docx": (FileCategory.DOCUMENT, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-        ".pptx": (FileCategory.DOCUMENT, "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-        # Plain text
-        ".txt": (FileCategory.TEXT, "text/plain"),
-        ".md": (FileCategory.TEXT, "text/plain"),
-        ".json": (FileCategory.TEXT, "text/plain"),
-        ".sh": (FileCategory.TEXT, "text/plain"),
-        # Web / markup
-        ".html": (FileCategory.HTML, "text/html"),
-        # Image
-        ".png": (FileCategory.IMAGE, "image/png"),
-        ".jpg": (FileCategory.IMAGE, "image/jpeg"),
-        ".jpeg": (FileCategory.IMAGE, "image/jpeg"),
-        ".bmp": (FileCategory.IMAGE, "image/bmp"),
-        ".tiff": (FileCategory.IMAGE, "image/tiff"),
-        ".tif": (FileCategory.IMAGE, "image/tiff"),
-        ".svg": (FileCategory.IMAGE, "image/svg+xml"),
-        # Audio
-        ".mp3": (FileCategory.AUDIO, "audio/mpeg"),
-        ".wav": (FileCategory.AUDIO, "audio/wav"),
-        ".m4a": (FileCategory.AUDIO, "audio/mp4"),
-        # Video
-        ".mp4": (FileCategory.VIDEO, "video/mp4"),
-        ".mov": (FileCategory.VIDEO, "video/quicktime"),
-        ".mkv": (FileCategory.VIDEO, "video/x-matroska"),
-        ".avi": (FileCategory.VIDEO, "video/x-msvideo"),
+        suffix: (_CATEGORY_BY_INPUT_TYPE[item.input_type], item.content_type)
+        for suffix, item in INPUT_FORMAT_BY_SUFFIX.items()
     }
 
     @classmethod

@@ -92,10 +92,19 @@ from nemo_retriever.common.params import (
     IngestExecuteParams,
     PdfSplitParams,
     StoreParams,
+    UrlFetchParams,
     VdbUploadParams,
     WebhookParams,
 )
-from nemo_retriever.service.client import InMemoryUpload, RetrieverServiceClient, UploadInput
+from nemo_retriever.common.url_fetch import (
+    FetchedUrl,
+    UrlFetchFailure,
+    cleanup_fetched_urls,
+    fetch_urls,
+    normalize_urls,
+    restore_url_source_value,
+)
+from nemo_retriever.service.client import FileUpload, InMemoryUpload, RetrieverServiceClient, UploadInput
 
 logger = logging.getLogger(__name__)
 
@@ -447,6 +456,9 @@ class ServiceIngestor(ingestor):
         self._base_url = base_url.rstrip("/")
         self._max_concurrency = max_concurrency
         self._request_timeout_s = request_timeout_s
+        self._url_failures: list[UrlFetchFailure] = []
+        self._fetched_urls: list[FetchedUrl] = []
+        self._url_source_map: dict[str, str] = {}
         self._api_token = (api_token or "").strip() or None
         self._inline_texts: list[str] | None = None
         self._document_ids: list[str] = []
@@ -617,6 +629,40 @@ class ServiceIngestor(ingestor):
             self._documents.append(documents)
         else:
             self._documents.extend(documents)
+        return self
+
+    def urls(
+        self,
+        urls: Union[str, Sequence[str]],
+        params: UrlFetchParams | None = None,
+        **kwargs: Any,
+    ) -> "ServiceIngestor":
+        """Add HTTP(S) sources for client-side fetch and service upload.
+
+        Parameters
+        ----------
+        urls
+            One absolute HTTP(S) URL or a sequence of URLs to append.
+        params
+            Shared fetch settings. Existing settings are retained when this
+            append call supplies neither params nor keyword overrides.
+        **kwargs
+            Field overrides for UrlFetchParams.
+
+        Returns
+        -------
+        ServiceIngestor
+            This ingestor for fluent chaining.
+
+        Raises
+        ------
+        ValueError
+            If a URL is empty, relative, or uses a non-HTTP(S) scheme.
+        """
+        self._urls.extend(normalize_urls(urls))
+        if params is not None or kwargs:
+            merged = _merge_params(params, kwargs)
+            self._url_fetch_params = merged if isinstance(merged, UrlFetchParams) else UrlFetchParams(**merged)
         return self
 
     def texts(self, texts: Union[str, Sequence[str]]) -> Self:
@@ -1245,7 +1291,7 @@ class ServiceIngestor(ingestor):
         )
         del params, kwargs
         self._validate_input_sources(self._inline_texts)
-        if not self._documents and not self._buffers and is_blank_inline_corpus(self._inline_texts):
+        if not self._documents and not self._buffers and not self._urls and is_blank_inline_corpus(self._inline_texts):
             self._document_ids.clear()
             self._last_run_elapsed_s = 0.0
             self._last_job_id = None
@@ -1466,6 +1512,7 @@ class ServiceIngestor(ingestor):
         * ``{"event": "job_finalized"|"job_partial"|"job_failed", "job_id": ..., ...}``
         """
         result_schema = self._normalize_result_schema(result_schema)
+        self._validate_input_sources(self._inline_texts)
         return self._ingest_stream_with_retain(
             retain_results,
             result_schema=result_schema,
@@ -1487,23 +1534,33 @@ class ServiceIngestor(ingestor):
     ) -> AsyncIterator[dict[str, Any]]:
         """Async generator yielding events as documents are processed."""
         result_schema = self._normalize_result_schema(result_schema)
-        files = self._collect_inputs()
-        if not files:
-            return
+        self._reset_run_state()
+        collection_task = asyncio.create_task(asyncio.to_thread(self._collect_inputs))
+        try:
+            try:
+                files = await asyncio.shield(collection_task)
+            except asyncio.CancelledError:
+                await self._finish_cancelled_input_collection(collection_task)
+                raise
+            for event in self._url_failure_events():
+                yield event
+            if not files:
+                return
 
-        self._document_ids.clear()
-        async for evt in self._aingest_stream_impl(
-            files,
-            retain_results=retain_results,
-            result_schema=result_schema,
-            return_embeddings=return_embeddings,
-            return_images=return_images,
-        ):
-            if evt.get("event") == "upload_complete":
-                did = evt.get("document_id")
-                if did:
-                    self._document_ids.append(did)
-            yield evt
+            async for evt in self._aingest_stream_impl(
+                files,
+                retain_results=retain_results,
+                result_schema=result_schema,
+                return_embeddings=return_embeddings,
+                return_images=return_images,
+            ):
+                if evt.get("event") == "upload_complete":
+                    did = evt.get("document_id")
+                    if did:
+                        self._document_ids.append(did)
+                yield evt
+        finally:
+            self._cleanup_url_inputs()
 
     # ------------------------------------------------------------------
     # Async helper used by both sync and async streaming entry points
@@ -1518,11 +1575,15 @@ class ServiceIngestor(ingestor):
         return_images: bool = False,
     ) -> Iterator[dict[str, Any]]:
         """Like :meth:`ingest_stream` but passes server-side retention to the HTTP client."""
+        self._reset_run_state()
         files = self._collect_inputs()
+        failure_events = self._url_failure_events()
         if not files:
-            return iter(())
-
-        self._document_ids.clear()
+            try:
+                yield from failure_events
+            finally:
+                self._cleanup_url_inputs()
+            return
 
         def _record_doc_id(evt: dict[str, Any]) -> None:
             if evt.get("event") == "upload_complete":
@@ -1543,7 +1604,15 @@ class ServiceIngestor(ingestor):
             )
 
         bridge = _AsyncToSyncBridge(_factory)
-        return iter(bridge)
+
+        def _events() -> Iterator[dict[str, Any]]:
+            try:
+                yield from failure_events
+                yield from bridge
+            finally:
+                self._cleanup_url_inputs()
+
+        yield from _events()
 
     async def _aingest_stream_impl(
         self,
@@ -1569,7 +1638,7 @@ class ServiceIngestor(ingestor):
             pipeline_spec=pipeline_payload,
             retain_results=retain_results,
         ):
-            yield evt
+            yield self._restore_url_event(evt)
 
     @staticmethod
     async def _wrap_for_capture(
@@ -1658,17 +1727,71 @@ class ServiceIngestor(ingestor):
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
+    @staticmethod
+    async def _finish_cancelled_input_collection(collection_task: asyncio.Task[list[UploadInput]]) -> None:
+        """Wait for a shielded preparation thread before its owner cleans up."""
+
+        while not collection_task.done():
+            try:
+                await asyncio.shield(collection_task)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        try:
+            collection_task.result()
+        except Exception:
+            logger.exception("Service input collection failed while cancellation was being handled")
+
+    def _reset_run_state(self) -> None:
+        self._document_ids.clear()
+        self._last_job_id = None
+        self._last_run_elapsed_s = 0.0
+
+    def _cleanup_url_inputs(self) -> None:
+        cleanup_fetched_urls(self._fetched_urls)
+        self._fetched_urls = []
+        self._url_source_map = {}
+
+    def _restore_url_event(self, event: dict[str, Any]) -> dict[str, Any]:
+        filename = event.get("filename")
+        restored = restore_url_source_value(filename, self._url_source_map)
+        if restored == filename:
+            return event
+        translated = dict(event)
+        translated["filename"] = restored
+        return translated
+
+    def _url_failure_events(self) -> list[dict[str, Any]]:
+        return [
+            {"event": "upload_failed", "filename": failure.url, "error": f"URL fetch failed: {failure.message}"}
+            for failure in self._url_failures
+        ]
 
     def _has_mixed_inline_sources(self) -> bool:
-        return bool(self._inline_texts) and bool(self._documents or self._buffers)
+        return bool(self._inline_texts) and bool(self._documents or self._buffers or self._urls)
 
     def _collect_inputs(self) -> list[UploadInput]:
         """Gather filesystem and in-memory inputs for the service client."""
         self._validate_input_sources(self._inline_texts)
-        if not self._documents and not self._buffers and is_blank_inline_corpus(self._inline_texts):
+        self._cleanup_url_inputs()
+        if not self._documents and not self._buffers and not self._urls and is_blank_inline_corpus(self._inline_texts):
             return []
 
         files: list[UploadInput] = [Path(p) for p in self._documents]
+
+        self._fetched_urls, self._url_failures = fetch_urls(self._urls, self._url_fetch_params)
+        self._url_source_map = {item.transport_path: item.url for item in self._fetched_urls}
+        for item in self._fetched_urls:
+            files.append(
+                FileUpload(
+                    path=item.local_path,
+                    filename=item.transport_path,
+                    content_type=item.content_type,
+                    classification_filename=item.classification_filename,
+                    metadata={"_nrl_source_url": item.url},
+                )
+            )
 
         if self._buffers:
             import tempfile

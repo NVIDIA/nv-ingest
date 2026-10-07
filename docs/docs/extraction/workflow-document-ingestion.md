@@ -6,6 +6,10 @@ This page covers extracting content from documents and turning that content into
 
 Document ingestion is the step where NeMo Retriever Library reads your files (PDFs, Office documents, images, and other [supported formats](multimodal-extraction.md#supported-file-types-and-formats)), runs extraction and optional enrichment, and returns structured content you can embed and index.
 
+You can also ingest content directly from HTTP and HTTPS URLs. The Python SDK
+fetches each URL when ingestion starts and sends the response through the same
+format-specific extraction pipeline as a local file.
+
 Follow these steps:
 
 1. **Choose how you call the library.** Use the [Python API](nemo-retriever-api-reference.md) or [CLI](https://github.com/NVIDIA/NeMo-Retriever/tree/26.08.1/nemo_retriever/docs/cli) from application code, or run a deployment (for example [NeMo Retriever Library on GitHub](https://github.com/NVIDIA/NeMo-Retriever/tree/26.08.1/nemo_retriever), [Deployment options](deployment-options.md), or [Quickstart: Kubernetes (Helm)](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/helm/README.md)) and send jobs over the network. Runnable examples appear in [Choose how you call the library](#choose-how-you-call-the-library) below.
@@ -21,6 +25,46 @@ The Python example below stops after `.embed()` so you can inspect chunks first;
 ## Choose how you call the library { #choose-how-you-call-the-library }
 
 The following examples match the [NeMo Retriever Library README](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/README.md). They assume a checkout of the [NeMo Retriever](https://github.com/NVIDIA/NeMo-Retriever) repository and the `batch` run mode with local GPU inference unless you configure remote NIMs.
+
+### Ingest content from a URL (Python)
+
+Use `.urls()` to fetch live content without downloading it separately. The
+response must use a [supported file
+format](multimodal-extraction.md#supported-file-types-and-formats). HTML
+responses use the same MarkItDown conversion as local `.html` files.
+
+The following example fetches a PDF, extracts it, and reports any fetch or
+extraction failures without discarding successful results.
+
+```python
+from nemo_retriever import create_ingestor
+
+urls = [
+    "https://ontheline.trincoll.edu/images/bookdown/sample-local-pdf.pdf",
+]
+
+results, failures = (
+    create_ingestor(run_mode="batch")
+    .urls(urls)
+    .extract()
+    .embed()
+    .ingest(return_failures=True)
+)
+
+for url, error_message in failures:
+    print(f"Could not ingest {url}: {error_message}")
+```
+
+The result `path`, `source_id`, and source metadata use the submitted URL as
+their base identity.
+Page-specific identities preserve their derived page suffix. URL fetching also
+works with `run_mode="inprocess"` and `run_mode="service"`. In service mode,
+the SDK client fetches the content before uploading it to the service. You can
+combine `.urls()` with local and in-memory inputs in one pipeline.
+
+For request headers, timeouts, redirects, response-size limits, concurrency,
+and failure behavior, refer to [Fetch content from
+URLs](nemo-retriever-api-reference.md#fetch-content-from-urls).
 
 ### Ingest a test PDF (Python)
 

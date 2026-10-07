@@ -173,8 +173,8 @@ class IngestVdbOperator(AbstractOperator):
 
         return bool(getattr(self._vdb, "supports_stream_ingest", False))
 
-    def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> None:
-        """Lazily convert executor batches and delegate one backend stream."""
+    def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> int:
+        """Write one backend stream and return the number of canonical records submitted."""
 
         if not self._supports_stream_ingest():
             raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not implement stream_ingest()")
@@ -196,10 +196,13 @@ class IngestVdbOperator(AbstractOperator):
 
         record_stream = records
         exhausted = False
+        submitted_records = 0
 
         def required_records() -> Iterator[dict[str, Any]]:
-            nonlocal exhausted
-            yield from record_stream
+            nonlocal exhausted, submitted_records
+            for record in record_stream:
+                submitted_records += 1
+                yield record
             exhausted = True
 
         self._vdb.stream_ingest(required_records())
@@ -207,6 +210,7 @@ class IngestVdbOperator(AbstractOperator):
             raise RuntimeError(
                 f"{type(self._vdb).__name__}.stream_ingest() returned before consuming the record stream"
             )
+        return submitted_records
 
     def postprocess(self, data: Any, **kwargs: Any) -> Any:
         return data

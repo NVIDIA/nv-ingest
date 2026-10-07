@@ -786,18 +786,30 @@ async def _submit_job_work_item(
                 write=item.write,
                 sidecar=item.sidecar_attachment[1] if item.sidecar_attachment is not None else None,
             )
-        except Exception:
-            if item.sidecar_attachment is not None:
-                from nemo_retriever.service.services.sidecar_store import get_sidecar_store
-
-                store = get_sidecar_store()
-                if store is not None:
-                    store.restore(item.sidecar_attachment[0])
+        except (HTTPException, OSError, ValueError):
+            _rollback_rejected_work_item(item)
             raise
     else:
-        await _enqueue_or_reject(pool_type, item)
+        try:
+            await _enqueue_or_reject(pool_type, item)
+        except HTTPException:
+            _rollback_rejected_work_item(item)
+            raise
 
     return None
+
+
+def _rollback_rejected_work_item(item: WorkItem) -> None:
+    """Undo state reserved before a work item was rejected by its queue."""
+    tracker = get_job_tracker()
+    if tracker is not None:
+        tracker.unregister_pending(item.id)
+    if item.sidecar_attachment is not None:
+        from nemo_retriever.service.services.sidecar_store import get_sidecar_store
+
+        store = get_sidecar_store()
+        if store is not None:
+            store.restore(item.sidecar_attachment[0])
 
 
 def _parse_backend_json(resp: Response) -> dict:

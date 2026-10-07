@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 import math
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
@@ -622,7 +622,7 @@ class RayDataExecutor(AbstractExecutor):
         return ordered
 
     @staticmethod
-    def _stream_ingest_index(nodes: List[Node]) -> int | None:
+    def _stream_ingest_index(nodes: List[Node], *, require_terminal: bool = False) -> int | None:
         """Return one VDB streaming position, falling back for ambiguous graphs."""
         from nemo_retriever.operators.vdb import IngestVdbOperator
 
@@ -631,17 +631,57 @@ class RayDataExecutor(AbstractExecutor):
             for index, node in enumerate(nodes)
             if isinstance(node.operator, IngestVdbOperator) and node.operator._supports_stream_ingest()
         ]
-        return positions[0] if len(positions) == 1 else None
+        sink_index = positions[0] if len(positions) == 1 else None
+        if require_terminal and (sink_index is None or sink_index != len(nodes) - 1):
+            raise ValueError("return_results=False requires a terminal VDB that supports streaming ingest")
+        return sink_index
 
-    def ingest(self, data: Any, **kwargs: Any) -> Any:
-        """Build, execute, and materialize a Ray Data pipeline from the graph."""
+    def ingest(
+        self,
+        data: Any,
+        *,
+        return_results: bool = True,
+        **kwargs: Any,
+    ) -> Any:
+        """Run the graph and complete any streaming VDB write.
+
+        Parameters
+        ----------
+        data : Any
+            Input accepted by ``build_dataset``.
+        return_results : bool, default True
+            Return the full result frame. If false, release consumed batches
+            and return one row with ``input_rows`` and ``submitted_records``.
+            Submitted records are counted before backend filtering.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Full graph results, or the counts after a successful terminal write.
+
+        Raises
+        ------
+        ValueError
+            Summary mode requires a terminal VDB that supports streaming ingest.
+        TypeError
+            Additional keyword settings are not supported.
+        """
 
         if kwargs:
             unsupported = ", ".join(sorted(kwargs))
             raise TypeError(f"RayDataExecutor.ingest() does not accept setting(s): {unsupported}")
+        return self._ingest(data, return_results=return_results)
 
+    def _ingest(
+        self,
+        data: Any,
+        *,
+        return_results: bool = True,
+        validate_batch: Callable[[pd.DataFrame], None] | None = None,
+    ) -> Any:
+        """Execute ingestion with optional stage-error validation before upload."""
         nodes = self._linearize(self.graph)
-        sink_index = self._stream_ingest_index(nodes)
+        sink_index = self._stream_ingest_index(nodes, require_terminal=not return_results)
         if sink_index is None:
             return ray_dataset_to_pandas(self.build_dataset(data))
 
@@ -654,6 +694,7 @@ class RayDataExecutor(AbstractExecutor):
         )
 
         terminal_frames: list[pd.DataFrame] = []
+        input_rows = 0
         batch_iterator = iter(
             dataset.iter_batches(
                 batch_format=None,
@@ -662,18 +703,26 @@ class RayDataExecutor(AbstractExecutor):
             )
         )
 
-        def retained_batches() -> Iterator[pd.DataFrame]:
+        def input_batches() -> Iterator[pd.DataFrame]:
+            nonlocal input_rows
             for block in batch_iterator:
                 frame = arrow_table_to_pandas(block)
-                terminal_frames.append(frame)
+                if validate_batch is not None:
+                    validate_batch(frame)
+                input_rows += len(frame)
+                if return_results:
+                    terminal_frames.append(frame)
                 yield frame
 
         try:
-            sink_operator._stream_ingest(retained_batches())
+            submitted_records = sink_operator._stream_ingest(input_batches())
         finally:
             close = getattr(batch_iterator, "close", None)
             if callable(close):
                 close()
+
+        if not return_results:
+            return pd.DataFrame([{"input_rows": input_rows, "submitted_records": submitted_records}])
 
         if has_downstream_nodes:
             import ray.data as rd

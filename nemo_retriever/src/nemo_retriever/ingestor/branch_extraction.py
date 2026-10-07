@@ -9,10 +9,12 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, replace
 from io import BytesIO
+from pathlib import Path
 from typing import Any, Callable
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
 from nemo_retriever.graph.executor import call_pandas_function_on_arrow, preflight_executors
+from nemo_retriever.common.url_fetch import restore_url_source_value
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
@@ -40,6 +42,55 @@ def ensure_pandas_columns(batch_df: Any, *, columns: tuple[str, ...]) -> Any:
     return batch_df.loc[:, list(columns)]
 
 
+def restore_source_urls(batch_df: Any, *, source_map: dict[str, str]) -> Any:
+    """Restore caller-facing URLs after suffix-bearing transport identifiers."""
+
+    if not source_map or batch_df.empty:
+        return batch_df
+    for column in ("path", "source_path", "source_id", "metadata"):
+        if column in batch_df.columns:
+            batch_df[column] = batch_df[column].map(lambda value: restore_url_source_value(value, source_map))
+    return batch_df
+
+
+def _driver_local_files_to_ray_dataset(ray_module: Any, paths: list[str]) -> Any:
+    """Copy driver-local files into Ray's spillable object store.
+
+    Each payload is read and submitted separately so the driver's Python heap
+    does not retain the complete URL corpus. Ray owns the resulting blocks,
+    making them available to workers that do not share the driver's temporary
+    filesystem.
+    """
+
+    import pandas as pd
+
+    frame_refs = []
+    for path in paths:
+        frame = pd.DataFrame([{"bytes": Path(path).read_bytes(), "path": path}])
+        frame_refs.append(ray_module.put(frame))
+    return ray_module.data.from_pandas_refs(frame_refs)
+
+
+def _filesystem_files_to_ray_dataset(ray_module: Any, paths: list[str]) -> Any:
+    """Create a Ray dataset for files visible to Ray workers."""
+
+    try:
+        return ray_module.data.read_binary_files(paths, include_paths=True)
+    except FileNotFoundError as exc:
+        from nemo_retriever.common.input_files import raise_input_path_not_found
+
+        raise_input_path_not_found(paths, exc)
+
+
+def _union_ray_datasets(datasets: list[Any]) -> Any:
+    """Union source datasets before applying a shared extraction graph."""
+
+    combined = datasets[0]
+    for dataset in datasets[1:]:
+        combined = combined.union(dataset)
+    return combined
+
+
 @dataclass
 class ExtractionBranchExecutor:
     """Run manifest extraction branches and common post-extraction stages."""
@@ -48,6 +99,8 @@ class ExtractionBranchExecutor:
     branches: tuple[ExtractionBranchPlan, ...]
     documents: list[str]
     buffers: list[tuple[str, BytesIO]]
+    source_map: dict[str, str]
+    driver_local_paths: set[str]
     inline_rows: list[dict[str, str]]
     split_config: dict[str, Any]
     extract_params: Any | None
@@ -73,6 +126,8 @@ class ExtractionBranchExecutor:
     show_progress: bool
     allow_no_gpu: bool
     ensure_batch_runtime: Callable[[], tuple[Any, Any]]
+    return_results: bool = True
+    validate_batch: Callable[[Any], None] | None = None
 
     def execute(self) -> Any:
         logger.info(
@@ -109,18 +164,31 @@ class ExtractionBranchExecutor:
                 video_frame_params=effective_extraction.video_frame_params,
                 extraction_mode=effective_extraction.extraction_mode,
             )
-            file_paths, inline_rows = self._partition_branch_inputs(branch)
-            inputs: list[Any] = []
-            if file_paths:
-                inputs.append(file_paths)
-            if inline_rows:
-                inputs.append(ray_module.data.from_items(inline_rows))
+            file_paths, in_memory_rows = self._partition_branch_inputs(branch)
+            ray_managed_paths = [path for path in file_paths if path in self.driver_local_paths]
+            file_paths = [path for path in file_paths if path not in self.driver_local_paths]
+            if ray_managed_paths:
+                source_datasets: list[Any] = []
+                if file_paths:
+                    source_datasets.append(_filesystem_files_to_ray_dataset(ray_module, file_paths))
+                source_datasets.append(_driver_local_files_to_ray_dataset(ray_module, ray_managed_paths))
+                if in_memory_rows:
+                    source_datasets.append(ray_module.data.from_items(_as_binary_source_rows(in_memory_rows)))
+                inputs: list[Any] = [_union_ray_datasets(source_datasets)]
+            else:
+                inputs = []
+                if file_paths:
+                    inputs.append(file_paths)
+                if in_memory_rows:
+                    inputs.append(ray_module.data.from_items(in_memory_rows))
             for input_data in inputs:
                 executor = self._ray_executor(
                     graph,
                     derived_overrides,
                     default_concurrency_node_names(effective_extraction.extract_params, None, None, None),
-                    source_cpu_reservation=1 if isinstance(input_data, list) else 0,
+                    source_cpu_reservation=(
+                        1 if file_paths and (ray_managed_paths or isinstance(input_data, list)) else 0
+                    ),
                 )
                 branch_executors.append(executor)
                 branch_inputs.append((executor, input_data))
@@ -160,12 +228,24 @@ class ExtractionBranchExecutor:
             )
 
         for executor, input_data in branch_inputs:
-            branch_datasets.append(executor.build_dataset(input_data))
+            dataset = executor.build_dataset(input_data)
+            if self.source_map:
+                dataset = dataset.map_batches(
+                    call_pandas_function_on_arrow,
+                    batch_format="pyarrow",
+                    fn_kwargs={
+                        "fn": restore_source_urls,
+                        "fn_kwargs": {"source_map": self.source_map},
+                    },
+                )
+            branch_datasets.append(dataset)
         normalized = normalize_ray_branch_datasets(branch_datasets)
         combined = normalized[0]
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
-        return post_executor.ingest(combined)
+        if self.return_results:
+            return post_executor.ingest(combined)
+        return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
 
     def _execute_inprocess(self) -> Any:
         frames = []
@@ -179,7 +259,9 @@ class ExtractionBranchExecutor:
             )
             graph = self._build_extraction_only_graph(effective_extraction)
             executor = InprocessExecutor(graph, show_progress=self.show_progress)
-            frames.append(executor.ingest(self._inprocess_branch_input(branch)))
+            frames.append(
+                restore_source_urls(executor.ingest(self._inprocess_branch_input(branch)), source_map=self.source_map)
+            )
 
         combined = concat_dataframes(frames)
         logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
@@ -287,17 +369,26 @@ class ExtractionBranchExecutor:
     def _inline_rows_by_path(self) -> dict[str, dict[str, str]]:
         return {row["path"]: row for row in self.inline_rows}
 
-    def _partition_branch_inputs(self, branch: ExtractionBranchPlan) -> tuple[list[str], list[dict[str, str]]]:
+    def _partition_branch_inputs(self, branch: ExtractionBranchPlan) -> tuple[list[str], list[dict[str, Any]]]:
         inline_by_path = self._inline_rows_by_path()
+        buffer_by_name = {name: buf for name, buf in self.buffers}
         file_paths: list[str] = []
-        inline_rows: list[dict[str, str]] = []
+        in_memory_rows: list[dict[str, Any]] = []
         for path in branch.input_paths:
             row = inline_by_path.get(path)
-            if row is None:
-                file_paths.append(path)
+            if row is not None:
+                in_memory_rows.append(row)
+            elif path in buffer_by_name:
+                in_memory_rows.append({"bytes": buffer_by_name[path].getvalue(), "path": path})
             else:
-                inline_rows.append(row)
-        return file_paths, inline_rows
+                file_paths.append(path)
+        return file_paths, in_memory_rows
+
+
+def _as_binary_source_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Align inline text with binary source datasets only for URL branches."""
+
+    return [{"bytes": row["text"].encode("utf-8"), "path": row["path"]} if "text" in row else row for row in rows]
 
 
 def merge_node_overrides(

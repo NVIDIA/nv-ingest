@@ -20,3 +20,4 @@ For advanced scenarios, use these guides and notebooks:
 - [Try Enterprise RAG Blueprint](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
 - [Multimodal RAG with LangChain](langchain_multimodal_rag.ipynb)
 - [Multimodal RAG with LlamaIndex](llama_index_multimodal_rag.ipynb)
+- [Rerank ViDoRe v3 HR (Text Only)](reranking/reranking_vidore_v3_hr_text_only.ipynb)

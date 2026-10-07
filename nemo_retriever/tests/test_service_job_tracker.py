@@ -321,6 +321,30 @@ def test_register_document_appends_to_aggregate() -> None:
     assert agg.counts[DocumentStatus.PENDING.value] == 1
 
 
+def test_unregister_pending_releases_count_and_manifest_reservation() -> None:
+    tracker = JobTracker()
+    tracker.register_job("j", expected_documents=1)
+    tracker.register_document(
+        "rejected-attempt",
+        job_id="j",
+        manifest_entry_id="entry",
+    )
+
+    assert tracker.unregister_pending("rejected-attempt") is True
+    job = tracker.get_job("j")
+    assert job is not None
+    assert job.document_ids == []
+    assert job.counts[DocumentStatus.PENDING.value] == 0
+
+    replay, created = tracker.register_document_idempotent(
+        "accepted-attempt",
+        job_id="j",
+        manifest_entry_id="entry",
+    )
+    assert created is True
+    assert replay.id == "accepted-attempt"
+
+
 def test_register_document_rejects_capacity_overflow() -> None:
     tracker = JobTracker()
     tracker.register_job("j", expected_documents=2)
