@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Contract tests for GPU inference capture markers at model call sites."""
+"""Contract tests for batch and GPU inference NVTX ranges."""
 
 from contextlib import contextmanager
 import os
@@ -15,7 +15,7 @@ import nvtx
 import pytest
 
 
-_REMOTE_BATCH_ACTOR_SCRIPT = r"""
+_BATCH_ACTOR_SCRIPT = r"""
 import builtins
 import functools
 import nvtx
@@ -63,12 +63,19 @@ nvtx.annotate = RecordingAnnotate
 
 from nemo_retriever.common.params import EmbedParams
 from nemo_retriever.common.ray_resource_hueristics import Resources
+from nemo_retriever.operators.extract.pdf.split import PDFSplitActor, PDFSplitCPUActor
+from nemo_retriever.operators.extract.pdf.extract import PDFExtractionActor, PDFExtractionCPUActor
 from nemo_retriever.operators.extract.page_elements.page_elements import PageElementDetectionActor
 from nemo_retriever.operators.extract.ocr.ocr import OCRActor
 from nemo_retriever.operators.embed.operators import _BatchEmbedActor
+from nemo_retriever.operators.extract.table.table_detection import TableStructureActor as TableStructureArchetype
 from nemo_retriever.operators.extract.page_elements import cpu_actor
 from nemo_retriever.operators.extract.ocr import cpu_ocr
 from nemo_retriever.operators.embed import cpu_operator
+from nemo_retriever.operators.extract.pdf import split as pdf_split
+from nemo_retriever.operators.extract.pdf import extract as pdf_extract
+from nemo_retriever.operators.extract.table import cpu_actor as table_cpu_actor
+from nemo_retriever.operators.extract.table import gpu_actor as table_gpu_actor
 
 
 def record_backend(stage):
@@ -79,33 +86,54 @@ def record_backend(stage):
     return backend
 
 
+pdf_split.split_pdf_batch = record_backend("pdf_split")
+pdf_extract.pdf_extraction = record_backend("pdf_extract")
 cpu_actor.detect_page_elements_v3 = record_backend("page_elements")
 cpu_ocr.ocr_page_elements = record_backend("ocr")
 cpu_operator.ensure_embedding_input_policy_for_batch = lambda kwargs, data: None
 cpu_operator.embed_text_main_text_embed = record_backend("embedding")
+table_cpu_actor.probe_endpoint = lambda *args, **kwargs: None
+table_cpu_actor.table_structure_ocr_page_elements = record_backend("table_structure")
+table_gpu_actor.table_structure_ocr_page_elements = record_backend("table_structure")
 
 
-def check_actor(archetype, expected_class, operator_kwargs, stage):
+def check_ranges(actor_class, constructor_kwargs, stage, expect_startup=True):
+    events.clear()
+    actor = actor_class(**constructor_kwargs)
+    actor.process(pd.DataFrame({"x": [1]}))
+    expected = []
+    if expect_startup:
+        expected.extend(
+            [
+                ("push", f"nrl.batch::{stage}.startup"),
+                ("pop",),
+            ]
+        )
+    expected.extend(
+        [
+            ("push", f"nrl.batch::{stage}.batch"),
+            ("call", stage),
+            ("pop",),
+        ]
+    )
+    assert events == expected, (stage, events)
+
+
+def check_actor(archetype, expected_class, operator_kwargs, stage, expect_startup=True):
     resources = Resources(cpu_count=8, gpu_count=1)
     resolved_class = archetype.resolve_operator_class(resources, operator_kwargs=operator_kwargs)
     assert resolved_class is expected_class
     resolved_kwargs = archetype.variant_operator_kwargs(resolved_class, operator_kwargs)
-
-    events.clear()
-    actor = resolved_class(**resolved_kwargs)
-    actor.process(pd.DataFrame({"x": [1]}))
-    assert events == [
-        ("push", f"nrl.batch::{stage}.startup"),
-        ("pop",),
-        ("push", f"nrl.batch::{stage}.batch"),
-        ("call", stage),
-        ("pop",),
-    ], (stage, events)
+    check_ranges(resolved_class, resolved_kwargs, stage, expect_startup)
 
 
 from nemo_retriever.operators.extract.page_elements.cpu_actor import PageElementDetectionCPUActor
 from nemo_retriever.operators.extract.ocr.cpu_ocr import OCRCPUActor
 from nemo_retriever.operators.embed.cpu_operator import _BatchEmbedCPUActor
+from nemo_retriever.operators.extract.table.cpu_actor import TableStructureCPUActor
+
+check_actor(PDFSplitActor, PDFSplitCPUActor, {}, "pdf_split", expect_startup=False)
+check_actor(PDFExtractionActor, PDFExtractionCPUActor, {}, "pdf_extract", expect_startup=False)
 
 check_actor(
     PageElementDetectionActor,
@@ -125,7 +153,21 @@ check_actor(
     {"params": EmbedParams(embed_invoke_url="http://embed.invalid")},
     "embedding",
 )
-print("remote_batch_actor_ranges_ok")
+check_actor(
+    TableStructureArchetype,
+    TableStructureCPUActor,
+    {"table_structure_invoke_url": "http://table-structure.invalid"},
+    "table_structure",
+)
+check_ranges(
+    table_gpu_actor.TableStructureActor,
+    {
+        "table_structure_invoke_url": "http://table-structure.invalid",
+        "ocr_invoke_url": "http://ocr.invalid",
+    },
+    "table_structure",
+)
+print("batch_actor_ranges_ok")
 """
 
 
@@ -146,7 +188,7 @@ def capture_ranges(monkeypatch: pytest.MonkeyPatch):
     return events
 
 
-def test_remote_batch_actors_emit_stage_ranges() -> None:
+def test_batch_actors_emit_stage_ranges() -> None:
     root = Path(__file__).resolve().parents[1]
     src = root / "src"
     env = os.environ.copy()
@@ -156,7 +198,7 @@ def test_remote_batch_actors_emit_stage_ranges() -> None:
     env["PYTHONPATH"] = str(src) + (os.pathsep + prev if prev else "")
 
     proc = subprocess.run(
-        [sys.executable, "-c", _REMOTE_BATCH_ACTOR_SCRIPT],
+        [sys.executable, "-c", _BATCH_ACTOR_SCRIPT],
         cwd=str(root),
         env=env,
         capture_output=True,
@@ -165,7 +207,7 @@ def test_remote_batch_actors_emit_stage_ranges() -> None:
         check=False,
     )
     assert proc.returncode == 0, f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}\n" f"exit={proc.returncode}"
-    assert "remote_batch_actor_ranges_ok" in proc.stdout
+    assert "batch_actor_ranges_ok" in proc.stdout
 
 
 @pytest.mark.parametrize("batch_size", [2, 8])

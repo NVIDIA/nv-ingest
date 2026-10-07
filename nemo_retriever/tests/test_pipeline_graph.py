@@ -389,6 +389,18 @@ class TestNode:
         actor_class, kwargs = cloudpickle.loads(cloudpickle.dumps((node.operator_class, node.operator_kwargs)))
         assert actor_class(**kwargs)._params == params
 
+    def test_node_preserves_annotated_table_structure_cpu_constructor(self, monkeypatch):
+        from ray import cloudpickle
+
+        from nemo_retriever.operators.extract.table import cpu_actor
+
+        monkeypatch.setattr(cpu_actor, "probe_endpoint", lambda *args, **kwargs: None)
+        operator = cpu_actor.TableStructureCPUActor(table_structure_invoke_url="http://unused")
+        node = Node(operator)
+        assert node.operator_kwargs["table_structure_invoke_url"] == "http://unused"
+        actor_class, kwargs = cloudpickle.loads(cloudpickle.dumps((node.operator_class, node.operator_kwargs)))
+        assert actor_class(**kwargs)._table_structure_invoke_url == "http://unused"
+
     def test_node_rejects_non_operator(self):
         with pytest.raises(TypeError, match="operator must be an AbstractOperator"):
             Node("not_an_operator")

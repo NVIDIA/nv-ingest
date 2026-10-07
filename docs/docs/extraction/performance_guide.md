@@ -104,8 +104,12 @@ workstation with the interface installed. Search the timeline for
 
 | Range | Interpretation |
 | --- | --- |
+| `nrl.batch::pdf_split.batch` | One PDF split actor call that splits a batch of documents into single-page PDFs. |
+| `nrl.batch::pdf_extract.batch` | One PDF extraction actor call that extracts text and images from a batch of pages. |
 | `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
 | `nrl.batch::page_elements.batch` | One Page Elements actor processing call. |
+| `nrl.batch::table_structure.startup` | One Table Structure actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::table_structure.batch` | One Table Structure actor processing call. |
 | `nrl.batch::ocr.startup` | One OCR actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
 | `nrl.batch::ocr.batch` | One OCR actor processing call. |
 | `nrl.batch::embedding.startup` | One embedding actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
@@ -114,7 +118,7 @@ workstation with the interface installed. Search the timeline for
 | `nrl.batch::pipeline.terminal_stream` | Consumption of the lazy upstream pipeline and streaming of its records to the vector database backend. This range is not pure vector database time. |
 | `nrl.batch::result.concat` | Concatenation of retained frames when the graph ends at a streaming vector database sink and at least one batch was consumed. This range is absent when the sink has downstream nodes or the input has no batches. |
 
-Local and remote (endpoint-backed) Page Elements, OCR, and embedding actors emit the same ranges; for remote actors, the batch range includes network requests to the endpoint.
+Local and remote (endpoint-backed) Page Elements, Table Structure, OCR, and embedding actors emit the same ranges; for remote actors, the batch range includes network requests to the endpoint.
 
 Ranges from concurrent Ray actors can overlap. Their durations include CPU
 preparation, waits, and calls into inference backends. They do not represent
