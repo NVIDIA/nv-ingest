@@ -36,12 +36,21 @@ builtins.__import__ = _guard
 from nemo_retriever.models.nim.util import create_inference_client  # noqa: F401
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor  # noqa: F401
 from nemo_retriever.graph.executor import ray_dataset_to_pandas
+from nemo_retriever.common.nvtx import gpu_inference_range
+import warnings
 from types import SimpleNamespace
 import pandas as pd
 
 frame = pd.DataFrame({"value": [42]})
 dataset = SimpleNamespace(iter_batches=lambda **kwargs: iter([frame]))
 assert ray_dataset_to_pandas(dataset).equals(frame)
+
+with warnings.catch_warnings(record=True) as captured:
+    warnings.simplefilter("always", DeprecationWarning)
+    with gpu_inference_range("legacy", batch_size=8):
+        pass
+assert len(captured) == 1
+assert captured[0].category is DeprecationWarning
 
 print("slim_imports_ok")
 """
