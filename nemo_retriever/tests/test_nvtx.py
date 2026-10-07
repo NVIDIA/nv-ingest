@@ -243,35 +243,3 @@ def test_embedding_capture_ranges(capture_ranges, batch_size: int, fails: bool) 
         ("pop",),
         ("pop",),
     ]
-
-
-@pytest.mark.parametrize("batch_size", [-1, 8])
-@pytest.mark.parametrize("fails", [False, True])
-def test_legacy_inference_range_remains_compatible(capture_ranges, batch_size: int, fails: bool) -> None:
-    from nemo_retriever.common.nvtx import gpu_inference_range
-
-    error = ValueError("original workload error")
-
-    def inference():
-        with gpu_inference_range("legacy", batch_size, mode="decode"):
-            capture_ranges.append(("inference",))
-            if fails:
-                raise error
-            return "result"
-
-    with pytest.warns(DeprecationWarning, match="deprecated; use nvtx.annotate") as warning:
-        if fails:
-            with pytest.raises(ValueError) as exc:
-                inference()
-            assert exc.value is error
-        else:
-            assert inference() == "result"
-    assert warning[0].filename == __file__
-    label = "legacy | mode=decode" if batch_size < 0 else "legacy | bs=8 | mode=decode"
-    assert capture_ranges == [
-        ("push", "gpu_inference"),
-        ("push", label),
-        ("inference",),
-        ("pop",),
-        ("pop",),
-    ]

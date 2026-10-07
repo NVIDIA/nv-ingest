@@ -165,13 +165,6 @@ def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     return pd.DataFrame(columns=list(names) if names is not None else None)
 
 
-@nvtx.annotate("nrl.batch::result.concat", color="blue")
-def _concat_terminal_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
-    """Concatenate retained terminal batches under one low-cardinality range."""
-
-    return pd.concat(frames, ignore_index=True)
-
-
 def call_pandas_function_on_arrow(
     table: Any,
     *,
@@ -701,7 +694,8 @@ class RayDataExecutor(AbstractExecutor):
             return ray_dataset_to_pandas(downstream)
 
         if terminal_frames:
-            return _concat_terminal_frames(terminal_frames)
+            with nvtx.annotate("nrl.batch::result.concat", color="blue"):
+                return pd.concat(terminal_frames, ignore_index=True)
         schema = dataset.schema()
         names = getattr(schema, "names", None)
         return pd.DataFrame(columns=list(names) if names is not None else None)

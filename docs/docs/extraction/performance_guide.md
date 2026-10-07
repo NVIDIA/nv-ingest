@@ -136,35 +136,6 @@ The summary adds durations from all matching ranges. With concurrent actors,
 the summed duration can exceed wall-clock time, so use the timeline to reason
 about overlap and the critical path.
 
-### Migrate existing inference annotations
-
-`nemo_retriever.common.nvtx.gpu_inference_range` is deprecated and retained for
-compatibility with existing integrations. Entering its context emits a
-`DeprecationWarning`. Replace the helper with `nvtx.annotate` directly.
-
-For example, replace this existing annotation:
-
-```python
-from nemo_retriever.common.nvtx import gpu_inference_range
-
-with gpu_inference_range("NemotronOCRv1", batch_size=8):
-    result = model(inputs)
-```
-
-Use nested native annotations to preserve the capture marker and model label:
-
-```python
-import nvtx
-
-with nvtx.annotate("gpu_inference", color="blue"):
-    with nvtx.annotate("NemotronOCRv1 | bs=8", color="blue"):
-        result = model(inputs)
-```
-
-Keep the outer `gpu_inference` range if you use
-`--capture-range=nvtx --nvtx-capture=gpu_inference`. Include any additional label
-fields in the inner message, for example `NemotronOCRv1 | bs=8 | mode=text`.
-
 ## Tune remote OCR request batching
 
 Remote OCR batches cropped regions across the page rows supplied to one OCR actor call. This behavior applies to in-process, batch, and service ingestion with a remote OCR NIM. It preserves page and region output order.
