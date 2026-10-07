@@ -177,10 +177,16 @@ def batch_tuning_to_node_overrides(
         if v is not None:
             overrides.setdefault(node_name, {})["num_gpus"] = v
 
+    def _set_elastic_pool(node_name: str, minimum: int, maximum: int, initial: int) -> None:
+        node_override = overrides.setdefault(node_name, {})
+        node_override["concurrency"] = minimum if minimum == maximum else (minimum, maximum, initial)
+        node_override["elastic_pool"] = True
+
     def _force_cpu_only(node_name: str) -> None:
         overrides.setdefault(node_name, {})["num_gpus"] = 0.0
 
     embed_tuning = _batch_tuning(embed_params)
+    embed_actor_pool_mode = getattr(embed_tuning, "actor_pool_mode", "fixed") if embed_tuning is not None else "fixed"
     embed_concurrency: int = 0
     embed_cpus: float = 1.0
     local_caption_concurrency: int | None = None
@@ -206,6 +212,7 @@ def batch_tuning_to_node_overrides(
             overrides.setdefault(_BatchEmbedActor.__name__, {})["target_num_rows_per_block"] = embed_bs
         explicit_embed_workers = getattr(embed_tuning, "embed_workers", None) if embed_tuning is not None else None
         embed_workers_fallback = plan.embed_initial_actors if plan else None
+        embed_workers_fallback_recomputed = False
         if (
             local_caption_concurrency is not None
             and local_caption_gpus_per_actor is not None
@@ -219,6 +226,7 @@ def batch_tuning_to_node_overrides(
                 embed_workers_fallback = max(1, int(remaining_gpu_budget // plan.embed_gpus_per_actor))
             else:
                 embed_workers_fallback = 1
+            embed_workers_fallback_recomputed = True
         embed_concurrency = (
             _resolve(
                 explicit_embed_workers,
@@ -227,6 +235,20 @@ def batch_tuning_to_node_overrides(
             or 0
         )
         _set(_BatchEmbedActor.__name__, "concurrency", embed_concurrency or None)
+        if (
+            embed_actor_pool_mode == "elastic"
+            and plan is not None
+            and not effective_allow_no_gpu
+            and not embed_invoke_url
+            and _positive(explicit_embed_workers) is None
+            and not embed_workers_fallback_recomputed
+        ):
+            _set_elastic_pool(
+                _BatchEmbedActor.__name__,
+                plan.embed_min_actors,
+                plan.embed_max_actors,
+                plan.embed_initial_actors,
+            )
         embed_cpus = (
             _resolve(
                 getattr(embed_tuning, "embed_cpus_per_actor", None) if embed_tuning is not None else None,
@@ -257,6 +279,9 @@ def batch_tuning_to_node_overrides(
             )
 
     extract_tuning = _batch_tuning(extract_params)
+    extract_actor_pool_mode = (
+        getattr(extract_tuning, "actor_pool_mode", "fixed") if extract_tuning is not None else "fixed"
+    )
     ocr_concurrency: int = 0
     ocr_cpus: float = 1.0
     page_elements_concurrency: int = 0
@@ -278,6 +303,20 @@ def batch_tuning_to_node_overrides(
             or 0
         )
         _set(ocr_actor_name, "concurrency", ocr_concurrency or None)
+        explicit_ocr_workers = getattr(extract_tuning, "ocr_workers", None) if extract_tuning is not None else None
+        if (
+            extract_actor_pool_mode == "elastic"
+            and plan is not None
+            and not effective_allow_no_gpu
+            and not ocr_invoke_url
+            and _positive(explicit_ocr_workers) is None
+        ):
+            _set_elastic_pool(
+                ocr_actor_name,
+                plan.ocr_min_actors,
+                plan.ocr_max_actors,
+                plan.ocr_initial_actors,
+            )
         ocr_cpus = (
             _resolve(
                 getattr(extract_tuning, "ocr_cpus_per_actor", None) if extract_tuning is not None else None,
@@ -308,6 +347,22 @@ def batch_tuning_to_node_overrides(
             or 0
         )
         _set(PageElementDetectionActor.__name__, "concurrency", page_elements_concurrency or None)
+        explicit_page_elements_workers = (
+            getattr(extract_tuning, "page_elements_workers", None) if extract_tuning is not None else None
+        )
+        if (
+            extract_actor_pool_mode == "elastic"
+            and plan is not None
+            and not effective_allow_no_gpu
+            and not page_elements_invoke_url
+            and _positive(explicit_page_elements_workers) is None
+        ):
+            _set_elastic_pool(
+                PageElementDetectionActor.__name__,
+                plan.page_elements_min_actors,
+                plan.page_elements_max_actors,
+                plan.page_elements_initial_actors,
+            )
         page_elements_cpus = (
             _resolve(
                 getattr(extract_tuning, "page_elements_cpus_per_actor", None) if extract_tuning is not None else None,
@@ -337,6 +392,22 @@ def batch_tuning_to_node_overrides(
             plan.table_structure_initial_actors if plan else None,
         ) or (2 if table_structure_invoke_url else 0)
         _set(TableStructureActor.__name__, "concurrency", ts_concurrency or None)
+        explicit_table_structure_workers = (
+            getattr(extract_tuning, "table_structure_workers", None) if extract_tuning is not None else None
+        )
+        if (
+            extract_actor_pool_mode == "elastic"
+            and plan is not None
+            and not effective_allow_no_gpu
+            and not table_structure_invoke_url
+            and _positive(explicit_table_structure_workers) is None
+        ):
+            _set_elastic_pool(
+                TableStructureActor.__name__,
+                plan.table_structure_min_actors,
+                plan.table_structure_max_actors,
+                plan.table_structure_initial_actors,
+            )
         ts_cpus = (
             _resolve(
                 getattr(extract_tuning, "table_structure_cpus_per_actor", None) if extract_tuning is not None else None,

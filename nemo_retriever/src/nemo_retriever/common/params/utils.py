@@ -89,6 +89,8 @@ def build_embed_option_kwargs(
     embed_cpus_per_actor: float | None = None,
     embed_gpus_per_actor: float | None = None,
     embed_model_revision: str | None = None,
+    *,
+    embed_actor_pool_mode: str | None = None,
 ) -> Dict[str, Any]:
     """Build ``EmbedParams`` kwargs from CLI/request option values."""
     embed_kwargs: Dict[str, Any] = {}
@@ -119,6 +121,7 @@ def build_embed_option_kwargs(
         embed_batch_size=embed_batch_size,
         embed_cpus_per_actor=embed_cpus_per_actor,
         embed_gpus_per_actor=embed_gpus_per_actor,
+        embed_actor_pool_mode=embed_actor_pool_mode,
     )
     if embed_tuning is not None:
         embed_kwargs["batch_tuning"] = embed_tuning
@@ -131,6 +134,7 @@ def _build_embed_batch_tuning(
     embed_batch_size: int | None,
     embed_cpus_per_actor: float | None,
     embed_gpus_per_actor: float | None,
+    embed_actor_pool_mode: str | None,
 ) -> BatchTuningParams | None:
     from nemo_retriever.common.params.models import BatchTuningParams
 
@@ -141,6 +145,7 @@ def _build_embed_batch_tuning(
             "embed_batch_size": embed_batch_size,
             "embed_cpus_per_actor": embed_cpus_per_actor,
             "gpu_embed": embed_gpus_per_actor,
+            "actor_pool_mode": embed_actor_pool_mode,
         }.items()
         if value is not None
     }

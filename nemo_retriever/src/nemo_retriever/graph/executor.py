@@ -227,10 +227,12 @@ def _concurrency_required(concurrency: Any) -> int:
     return _concurrency_initial(concurrency) if isinstance(concurrency, tuple) else int(concurrency)
 
 
-def _planned_concurrency(concurrency: Any, planned: int) -> Any:
+def _planned_concurrency(concurrency: Any, planned: int, *, elastic_pool: bool = False) -> Any:
     """Preserve Ray's actor-pool tuple while capping its maximum size."""
-    minimum, _maximum, initial = _concurrency_bounds(concurrency)
+    minimum, maximum, initial = _concurrency_bounds(concurrency)
     if isinstance(concurrency, tuple) and len(concurrency) == 3:
+        if elastic_pool:
+            return minimum, maximum, planned
         return (minimum, max(minimum, initial, planned), initial)
     if isinstance(concurrency, tuple) and len(concurrency) == 2:
         return (min(minimum, planned), planned)
@@ -287,16 +289,27 @@ def _preflight_executor_nodes(
         for node in nodes:
             override = executor._node_overrides.get(node.name, {})
             concurrency = override.get("concurrency", 1)
+            auto = node.name in executor._auto_concurrency_nodes
+            elastic_pool = (
+                auto
+                and override.get("elastic_pool") is True
+                and isinstance(concurrency, tuple)
+                and len(concurrency) == 3
+            )
+            minimum = _concurrency_bounds(concurrency)[0]
+            initial = _concurrency_initial(concurrency)
             entries.append(
                 (
                     executor,
                     node.name,
                     concurrency,
-                    _concurrency_target(concurrency),
-                    _concurrency_initial(concurrency),
+                    initial if elastic_pool else _concurrency_target(concurrency),
+                    initial,
                     float(override.get("num_cpus", executor._default_num_cpus)),
                     executor._scheduled_num_gpus(node, override, available_gpus),
-                    node.name in executor._auto_concurrency_nodes,
+                    auto,
+                    elastic_pool,
+                    minimum if elastic_pool else initial,
                 )
             )
     fixed = [item for item in entries if not item[7]]
@@ -305,8 +318,8 @@ def _preflight_executor_nodes(
     source_cpu_reservation = sum(executor._source_cpu_reservation for executor, _nodes in executor_nodes)
     task_cpu_reservation = source_cpu_reservation + reserved_cpus
     fixed_gpu = sum(_concurrency_required(item[2]) * item[6] for item in fixed)
-    min_cpu = sum(item[4] * item[5] for item in auto)
-    min_gpu = sum(item[4] * item[6] for item in auto)
+    min_cpu = sum(item[9] * item[5] for item in auto)
+    min_gpu = sum(item[9] * item[6] for item in auto)
     requested_cpu = task_cpu_reservation + fixed_cpu + min_cpu
     requested_gpu = fixed_gpu + min_gpu
     effective_resources = cluster_resources
@@ -346,7 +359,7 @@ def _preflight_executor_nodes(
             "Reduce explicit *_workers or node_overrides concurrency, or wait for cluster capacity."
         )
     used_cpu, used_gpu = fixed_cpu + min_cpu, fixed_gpu + min_gpu
-    planned = {(id(item[0]), item[1]): item[4] for item in auto}
+    planned = {(id(item[0]), item[1]): item[9] for item in auto}
     while True:
         candidates = sorted(
             (item for item in auto if planned[(id(item[0]), item[1])] < item[3]),
@@ -365,9 +378,9 @@ def _preflight_executor_nodes(
         planned[(id(selected[0]), selected[1])] += 1
         used_cpu += selected[5]
         used_gpu += selected[6]
-    for executor, name, concurrency, _target, _initial, _cpu, _gpu, _auto in auto:
+    for executor, name, concurrency, _target, _initial, _cpu, _gpu, _auto, elastic_pool, _floor in auto:
         executor._node_overrides.setdefault(name, {})["concurrency"] = _planned_concurrency(
-            concurrency, planned[(id(executor), name)]
+            concurrency, planned[(id(executor), name)], elastic_pool=elastic_pool
         )
     executors = [executor for executor, _nodes in executor_nodes]
     logger.info(
@@ -380,8 +393,13 @@ def _preflight_executor_nodes(
         used_gpu,
         available_gpus,
         [
-            f"executor[{executors.index(executor)}].{name}={planned[(id(executor), name)]}"
-            for executor, name, _concurrency, _target, _initial, _cpu, _gpu, _auto in auto
+            (
+                f"executor[{executors.index(executor)}].{name}={planned[(id(executor), name)]}"
+                f" (min={_concurrency_bounds(concurrency)[0]}, max={_concurrency_bounds(concurrency)[1]})"
+                if elastic_pool
+                else f"executor[{executors.index(executor)}].{name}={planned[(id(executor), name)]}"
+            )
+            for executor, name, concurrency, _target, _initial, _cpu, _gpu, _auto, elastic_pool, _floor in auto
         ],
     )
     return effective_resources
@@ -809,6 +827,7 @@ class RayDataExecutor(AbstractExecutor):
         preserve_pandas_output = input_preserves_pandas_output
         for node in nodes:
             overrides = dict(self._node_overrides.get(node.name, {}))
+            overrides.pop("elastic_pool", None)
             target_num_rows_per_block = overrides.pop("target_num_rows_per_block", None)
             batch_size = overrides.pop("batch_size", self._default_batch_size)
             batch_format = overrides.pop("batch_format", self._default_batch_format)

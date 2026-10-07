@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from nemo_retriever.common.params.utils import build_embed_option_kwargs
 from nemo_retriever.harness.benchmark_registry import (
     get_benchmark,
     get_dataset,
@@ -13,8 +14,10 @@ from nemo_retriever.harness.benchmark_registry import (
     VIDORE_V3_EMBED_MODEL,
     VIDORE_V3_PUBLIC_DATASETS,
 )
-from nemo_retriever.harness.resolution import resolve_benchmark
+from nemo_retriever.harness.contracts import HarnessRunError
+from nemo_retriever.harness.resolution import ALLOWED_OVERRIDE_PATHS, build_ingest_request, resolve_benchmark
 from nemo_retriever.harness.runfile import load_runfile
+from nemo_retriever.ingest.plan import _build_extract_batch_tuning
 
 
 BO767_VL_EMBED_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2"
@@ -62,6 +65,44 @@ def test_bo767_vl_hybrid_runfiles_resolve_expected_sweep(runfile_name: str, moda
     assert resolved["ingest"]["storage"]["index_mode"] == "hybrid"
     assert resolved["query"]["embed_model_name"] == BO767_VL_EMBED_MODEL
     assert resolved["query"]["retrieval_mode"] == "auto"
+
+
+def test_actor_pool_mode_overrides_reach_batch_tuning_params(tmp_path: Path) -> None:
+    extract_key = "ingest.extract.batch.actor_pool_mode"
+    embed_key = "ingest.embed.batch.actor_pool_mode"
+    assert extract_key in ALLOWED_OVERRIDE_PATHS
+    assert embed_key in ALLOWED_OVERRIDE_PATHS
+
+    resolved = resolve_benchmark(
+        "jp20_smoke",
+        mode="batch",
+        overrides=[f"{extract_key}=elastic", f"{embed_key}=elastic"],
+    )
+    request = build_ingest_request(resolved, tmp_path / "input.pdf", tmp_path)
+    extract_tuning = _build_extract_batch_tuning(request.extract.batch)
+    embed_tuning = build_embed_option_kwargs(
+        None,
+        None,
+        embed_actor_pool_mode=request.embed.batch.actor_pool_mode,
+    )["batch_tuning"]
+
+    assert extract_tuning is not None
+    assert extract_tuning.actor_pool_mode == "elastic"
+    assert embed_tuning.actor_pool_mode == "elastic"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        "ingest.extract.batch.actor_pool_mode=auto",
+        "ingest.embed.batch.actor_pool_mode=auto",
+    ],
+)
+def test_actor_pool_mode_overrides_reject_invalid_values(override: str, tmp_path: Path) -> None:
+    resolved = resolve_benchmark("jp20_smoke", mode="batch", overrides=[override])
+
+    with pytest.raises(HarnessRunError, match="actor_pool_mode must be 'fixed' or 'elastic'"):
+        build_ingest_request(resolved, tmp_path / "input.pdf", tmp_path)
 
 
 @pytest.mark.parametrize("dataset_name", VIDORE_V3_DATASET_FACTS)

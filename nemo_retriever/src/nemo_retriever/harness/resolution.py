@@ -354,6 +354,12 @@ def _dataclass_kwargs(context: str, cls: type[Any], data: Mapping[str, Any] | No
     return payload
 
 
+def _validate_actor_pool_mode(context: str, data: Mapping[str, Any]) -> None:
+    mode = data.get("actor_pool_mode")
+    if mode is not None and mode not in ("fixed", "elastic"):
+        _invalid_config(context, f"actor_pool_mode must be 'fixed' or 'elastic', got {mode!r}")
+
+
 def build_ingest_request(resolved: dict[str, Any], dataset_path: Path, artifact_dir: Path) -> IngestPlanRequest:
     ingest = _mapping_payload("ingest", deepcopy(resolved["ingest"]))
     _validate_keys("ingest", ingest, _override_child_keys("ingest", INGEST_OVERRIDE_PATHS))
@@ -366,12 +372,16 @@ def build_ingest_request(resolved: dict[str, Any], dataset_path: Path, artifact_
     resolved["ingest"] = ingest
 
     extract_data = _mapping_payload("ingest.extract", ingest.get("extract"))
+    extract_batch_data = _mapping_payload("ingest.extract.batch", extract_data.pop("batch", {}))
+    _validate_actor_pool_mode("ingest.extract.batch", extract_batch_data)
     extract_batch = IngestExtractBatchOptions(
-        **_dataclass_kwargs("ingest.extract.batch", IngestExtractBatchOptions, extract_data.pop("batch", {}))
+        **_dataclass_kwargs("ingest.extract.batch", IngestExtractBatchOptions, extract_batch_data)
     )
     embed_data = _mapping_payload("ingest.embed", ingest.get("embed"))
+    embed_batch_data = _mapping_payload("ingest.embed.batch", embed_data.pop("batch", {}))
+    _validate_actor_pool_mode("ingest.embed.batch", embed_batch_data)
     embed_batch = IngestEmbedBatchOptions(
-        **_dataclass_kwargs("ingest.embed.batch", IngestEmbedBatchOptions, embed_data.pop("batch", {}))
+        **_dataclass_kwargs("ingest.embed.batch", IngestEmbedBatchOptions, embed_batch_data)
     )
     return IngestPlanRequest(
         source=IngestSourceOptions(

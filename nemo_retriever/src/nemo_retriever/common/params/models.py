@@ -489,6 +489,10 @@ class LanceDbParams(_ParamsModel):
 
 
 class BatchTuningParams(_ParamsModel):
+    actor_pool_mode: Literal["fixed", "elastic"] = Field(
+        default="fixed",
+        description="Use fixed actor counts or elastic pools that can scale up to the heuristic maximum.",
+    )
     debug_run_id: str = "unknown"
     pdf_split_batch_size: int = 1
     pdf_extract_batch_size: int = 4

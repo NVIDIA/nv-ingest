@@ -55,6 +55,7 @@ IngestProfileValue = Literal["auto", "fast-text"]
 IngestIndexModeValue = RequestedIngestIndexMode
 AudioSplitTypeValue = Literal["size", "time", "frame"]
 LocalIngestEmbedBackendValue = Literal["vllm", "hf"]
+ActorPoolModeValue = Literal["fixed", "elastic"]
 OcrLangValue = OCRLang
 OcrVersionValue = OCRVersion
 TableOutputFormatValue = Literal["pseudo_markdown", "markdown"]
@@ -94,6 +95,7 @@ class IngestRuntimeOptions:
 
 @dataclass(frozen=True)
 class IngestExtractBatchOptions:
+    actor_pool_mode: ActorPoolModeValue | None = None
     pdf_split_batch_size: int | None = None
     pdf_extract_workers: int | None = None
     pdf_extract_batch_size: int | None = None
@@ -182,6 +184,7 @@ class IngestChunkOptions:
 
 @dataclass(frozen=True)
 class IngestEmbedBatchOptions:
+    actor_pool_mode: ActorPoolModeValue | None = None
     embed_workers: int | None = None
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
@@ -538,6 +541,7 @@ def _build_extract_batch_tuning(batch: IngestExtractBatchOptions) -> BatchTuning
         key: value
         for key, value in {
             "pdf_split_batch_size": batch.pdf_split_batch_size,
+            "actor_pool_mode": batch.actor_pool_mode,
             "pdf_extract_workers": batch.pdf_extract_workers,
             "pdf_extract_batch_size": batch.pdf_extract_batch_size,
             # BatchTuningParams names this per-Ray-task reservation num_cpus.
@@ -703,6 +707,7 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         embed_batch_size=embed.batch.embed_batch_size,
         embed_cpus_per_actor=embed.batch.embed_cpus_per_actor,
         embed_gpus_per_actor=embed.batch.embed_gpus_per_actor,
+        embed_actor_pool_mode=embed.batch.actor_pool_mode,
     )
     extract_params = ExtractParams(**extract_kwargs)
     embed_params = None if resolved_index_mode == "sparse" else EmbedParams(**embed_kwargs) if embed_kwargs else None

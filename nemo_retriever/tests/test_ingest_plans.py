@@ -670,6 +670,96 @@ def test_batch_tuning_to_node_overrides_honors_table_structure_tuning() -> None:
     assert overrides["TableStructureActor"]["num_gpus"] == 0.25
 
 
+def test_elastic_actor_pool_mode_uses_requested_heuristic_bounds() -> None:
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=64, gpu_count=2),
+        available_resources=Resources(cpu_count=64, gpu_count=2),
+    )
+    extract_params = ExtractParams(
+        use_page_elements=True,
+        use_table_structure=True,
+        batch_tuning=BatchTuningParams(actor_pool_mode="elastic"),
+    )
+    embed_params = EmbedParams(
+        model_name="nvidia/llama-nemotron-embed-1b-v2",
+        batch_tuning=BatchTuningParams(actor_pool_mode="elastic"),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params, embed_params, cluster_resources=cluster)
+
+    assert overrides["PageElementDetectionActor"]["concurrency"] == (2, 20, 6)
+    assert overrides["OCRActor"]["concurrency"] == (2, 20, 6)
+    assert overrides["_BatchEmbedActor"]["concurrency"] == (2, 8, 4)
+    assert overrides["TableStructureActor"]["concurrency"] == (2, 12, 4)
+    assert overrides["PageElementDetectionActor"]["num_gpus"] == 0.1
+    assert overrides["OCRActor"]["num_gpus"] == 0.1
+    assert overrides["_BatchEmbedActor"]["num_gpus"] == 0.5
+    assert all(
+        overrides[name]["elastic_pool"] is True
+        for name in ("PageElementDetectionActor", "OCRActor", "_BatchEmbedActor", "TableStructureActor")
+    )
+
+
+def test_default_actor_pool_mode_keeps_heuristic_worker_counts_fixed() -> None:
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=64, gpu_count=2),
+        available_resources=Resources(cpu_count=64, gpu_count=2),
+    )
+
+    overrides = batch_tuning_to_node_overrides(
+        ExtractParams(use_page_elements=True, use_table_structure=True),
+        EmbedParams(model_name="nvidia/llama-nemotron-embed-1b-v2"),
+        cluster_resources=cluster,
+    )
+
+    assert overrides["PageElementDetectionActor"]["concurrency"] == 6
+    assert overrides["OCRActor"]["concurrency"] == 6
+    assert overrides["_BatchEmbedActor"]["concurrency"] == 4
+
+
+def test_single_gpu_elastic_actor_pool_keeps_fixed_embed_and_elastic_ocr() -> None:
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=64, gpu_count=1),
+        available_resources=Resources(cpu_count=64, gpu_count=1),
+    )
+
+    overrides = batch_tuning_to_node_overrides(
+        ExtractParams(batch_tuning=BatchTuningParams(actor_pool_mode="elastic")),
+        EmbedParams(
+            model_name="nvidia/llama-nemotron-embed-1b-v2",
+            batch_tuning=BatchTuningParams(actor_pool_mode="elastic"),
+        ),
+        cluster_resources=cluster,
+    )
+
+    assert overrides["_BatchEmbedActor"]["concurrency"] == 1
+    assert overrides["OCRActor"]["concurrency"] == (1, 10, 3)
+
+
+def test_elastic_actor_pool_respects_explicit_and_remote_ocr_workers() -> None:
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=64, gpu_count=2),
+        available_resources=Resources(cpu_count=64, gpu_count=2),
+    )
+    elastic_tuning = BatchTuningParams(actor_pool_mode="elastic")
+
+    explicit_overrides = batch_tuning_to_node_overrides(
+        ExtractParams(batch_tuning=BatchTuningParams(actor_pool_mode="elastic", ocr_workers=2)),
+        None,
+        cluster_resources=cluster,
+    )
+    remote_overrides = batch_tuning_to_node_overrides(
+        ExtractParams(ocr_invoke_url="http://ocr.example/v1", batch_tuning=elastic_tuning),
+        None,
+        cluster_resources=cluster,
+    )
+
+    assert explicit_overrides["OCRActor"]["concurrency"] == 2
+    assert explicit_overrides["OCRActor"].get("elastic_pool") is None
+    assert not isinstance(remote_overrides["OCRActor"]["concurrency"], tuple)
+    assert remote_overrides["OCRActor"].get("elastic_pool") is None
+
+
 def test_batch_tuning_to_node_overrides_adds_default_store_tuning() -> None:
     overrides = batch_tuning_to_node_overrides(
         extract_params=None,

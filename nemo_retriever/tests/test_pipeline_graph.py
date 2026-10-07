@@ -1466,6 +1466,36 @@ class TestRayDataExecutor:
         assert ample._node_overrides["CPUAdaptiveAddOperator"]["concurrency"] == (1, 4, 1)
         assert constrained._node_overrides["CPUAdaptiveAddOperator"]["concurrency"] == (1, 1, 1)
 
+    def test_preflight_elastic_pool_reserves_minimum_and_grows_only_to_initial(self):
+        def executor() -> RayDataExecutor:
+            graph = Graph()
+            graph.add_root(GPUAdaptiveAddOperator())
+            return RayDataExecutor(
+                graph,
+                node_overrides={
+                    "GPUAdaptiveAddOperator": {
+                        "concurrency": (2, 20, 6),
+                        "num_cpus": 1,
+                        "num_gpus": 0.5,
+                        "elastic_pool": True,
+                    }
+                },
+                auto_concurrency_nodes={"GPUAdaptiveAddOperator"},
+            )
+
+        tight = executor()
+        tight._preflight_resources(tight._linearize(tight.graph), available_cpus=32, available_gpus=2)
+
+        plenty = executor()
+        plenty._preflight_resources(plenty._linearize(plenty.graph), available_cpus=32, available_gpus=8)
+
+        assert tight._node_overrides["GPUAdaptiveAddOperator"]["concurrency"] == (2, 20, 4)
+        assert plenty._node_overrides["GPUAdaptiveAddOperator"]["concurrency"] == (2, 20, 6)
+
+        infeasible = executor()
+        with pytest.raises(ValueError, match="Infeasible Ray CPU/GPU plan"):
+            infeasible._preflight_resources(infeasible._linearize(infeasible.graph), 32, 0)
+
     def test_build_dataset_uses_shared_preflight_resource_snapshot(self, monkeypatch):
         import sys
         from types import SimpleNamespace
@@ -1498,7 +1528,7 @@ class TestRayDataExecutor:
         graph.add_root(GPUAdaptiveAddOperator())
         executor = RayDataExecutor(
             graph,
-            node_overrides={"GPUAdaptiveAddOperator": {"concurrency": 1}},
+            node_overrides={"GPUAdaptiveAddOperator": {"concurrency": (1, 2, 1), "elastic_pool": True}},
             auto_concurrency_nodes={"GPUAdaptiveAddOperator"},
         )
         from nemo_retriever.common.ray_resource_hueristics import ClusterResources
@@ -1511,6 +1541,8 @@ class TestRayDataExecutor:
         assert executor._preflight_cluster_resources is not None
 
         assert captured["num_gpus"] == 0.1
+        assert captured["concurrency"] == (1, 2, 1)
+        assert "elastic_pool" not in captured
 
     def test_build_dataset_uses_recovered_standalone_preflight_gpu_snapshot(self, monkeypatch):
         import sys
