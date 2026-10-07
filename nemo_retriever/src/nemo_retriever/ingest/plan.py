@@ -95,7 +95,6 @@ class IngestRuntimeOptions:
 
 @dataclass(frozen=True)
 class IngestExtractBatchOptions:
-    actor_pool_mode: ActorPoolModeValue | None = None
     pdf_split_batch_size: int | None = None
     pdf_extract_workers: int | None = None
     pdf_extract_batch_size: int | None = None
@@ -115,6 +114,7 @@ class IngestExtractBatchOptions:
     nemotron_parse_workers: int | None = None
     nemotron_parse_batch_size: int | None = None
     nemotron_parse_gpus_per_actor: float | None = None
+    actor_pool_mode: ActorPoolModeValue | None = None
 
 
 @dataclass(frozen=True)
@@ -184,11 +184,11 @@ class IngestChunkOptions:
 
 @dataclass(frozen=True)
 class IngestEmbedBatchOptions:
-    actor_pool_mode: ActorPoolModeValue | None = None
     embed_workers: int | None = None
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
+    actor_pool_mode: ActorPoolModeValue | None = None
 
 
 @dataclass(frozen=True)

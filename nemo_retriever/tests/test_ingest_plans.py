@@ -27,6 +27,8 @@ from nemo_retriever.common.params import VdbUploadParams
 from nemo_retriever.common.params import WebhookParams
 from nemo_retriever.common.ray_resource_hueristics import ClusterResources
 from nemo_retriever.common.ray_resource_hueristics import Resources
+from nemo_retriever.ingest.plan import IngestEmbedBatchOptions
+from nemo_retriever.ingest.plan import IngestExtractBatchOptions
 
 
 def _linear_nodes(graph):
@@ -37,6 +39,17 @@ def _linear_nodes(graph):
         if not node.children:
             return nodes
         node = node.children[0]
+
+
+def test_batch_options_preserve_positional_argument_order() -> None:
+    embed_batch = IngestEmbedBatchOptions(2, 64)
+    extract_batch = IngestExtractBatchOptions(16)
+
+    assert embed_batch.embed_workers == 2
+    assert embed_batch.embed_batch_size == 64
+    assert embed_batch.actor_pool_mode is None
+    assert extract_batch.pdf_split_batch_size == 16
+    assert extract_batch.actor_pool_mode is None
 
 
 def test_base_ingest_plan_carries_split_config() -> None:
