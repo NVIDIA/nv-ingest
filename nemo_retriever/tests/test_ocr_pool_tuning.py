@@ -4,6 +4,7 @@
 
 """Bounded OCR pools preserve explicit initial resource admission."""
 
+import pandas as pd
 import pytest
 
 from nemo_retriever.common.params import BatchTuningParams, ExtractParams
@@ -13,8 +14,10 @@ from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
     default_concurrency_node_names,
+    require_pdf_graph_for_bounded_ocr,
 )
 from nemo_retriever.ingest.plan import IngestExtractBatchOptions, _build_extract_batch_tuning
+from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
 
 
 @pytest.mark.parametrize(
@@ -47,7 +50,7 @@ def test_bounded_ocr_rejected_without_dedicated_pdf_graph(mode):
         )
     )
     with pytest.raises(ValueError, match="dedicated PDF batch extraction graph"):
-        batch_tuning_to_node_overrides(params, None, extraction_mode=mode)
+        require_pdf_graph_for_bounded_ocr(params, (mode,))
 
 
 @pytest.mark.parametrize("version,actor", [("v1", "OCRActor"), ("v2", "OCRActor")])
@@ -149,3 +152,63 @@ def test_fixed_and_unspecified_ocr_keep_existing_behavior():
     assert overrides["OCRActor"]["concurrency"] == 2
     assert "OCRActor" not in default_concurrency_node_names(fixed, None, None, None)
     assert "OCRActor" in default_concurrency_node_names(ExtractParams(), None, None, None)
+
+
+def _run_batch_branches(monkeypatch, paths, params):
+    branch_overrides = []
+
+    class FakeCluster:
+        def available_cpu_count(self):
+            return 32
+
+        def total_cpu_count(self):
+            return 32
+
+        def available_gpu_count(self):
+            return 1
+
+        def total_gpu_count(self):
+            return 1
+
+    class FakeDataset:
+        def union(self, _other):
+            return self
+
+    class FakeExecutor:
+        def __init__(self, _graph, **kwargs):
+            branch_overrides.append(kwargs["node_overrides"])
+
+        def build_dataset(self, _data, **_kwargs):
+            return FakeDataset()
+
+        def ingest(self, _data, **_kwargs):
+            return pd.DataFrame({"done": [True]})
+
+    monkeypatch.setattr(GraphIngestor, "_ensure_batch_runtime", lambda self: (None, FakeCluster()))
+    monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.RayDataExecutor", FakeExecutor)
+    monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.preflight_executors", lambda *_a, **_k: None)
+    monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.normalize_ray_branch_datasets", lambda ds: ds)
+    GraphIngestor(run_mode="batch").files([str(path) for path in paths]).extract(params).ingest()
+    return branch_overrides
+
+
+@pytest.mark.parametrize("other", ["notes.txt", "scan.png"])
+def test_mixed_batch_applies_bounded_ocr_to_pdf_branch(monkeypatch, tmp_path, other):
+    pdf, other_path = tmp_path / "report.pdf", tmp_path / other
+    pdf.write_bytes(b"pdf")
+    other_path.write_bytes(b"data")
+    params = ExtractParams(batch_tuning=BatchTuningParams(ocr_min_workers=2, ocr_initial_workers=2, ocr_max_workers=4))
+
+    branch_overrides = _run_batch_branches(monkeypatch, [pdf, other_path], params)
+
+    assert branch_overrides[0]["OCRActor"]["concurrency"] == (2, 4, 2)
+
+
+def test_mixed_batch_without_pdf_rejects_bounded_ocr(monkeypatch, tmp_path):
+    image, text = tmp_path / "scan.png", tmp_path / "notes.txt"
+    image.write_bytes(b"png")
+    text.write_bytes(b"txt")
+    params = ExtractParams(batch_tuning=BatchTuningParams(ocr_min_workers=2, ocr_initial_workers=2, ocr_max_workers=4))
+
+    with pytest.raises(ValueError, match="dedicated PDF batch extraction graph"):
+        _run_batch_branches(monkeypatch, [image, text], params)

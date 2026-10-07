@@ -18,6 +18,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     build_graph,
     build_post_extract_graph,
     default_concurrency_node_names,
+    require_pdf_graph_for_bounded_ocr,
     _image_embedding_requires_page_image,
 )
 from nemo_retriever.ingestor.manifest import (
@@ -85,6 +86,7 @@ class ExtractionBranchExecutor:
         return self._execute_inprocess()
 
     def _execute_batch(self) -> Any:
+        require_pdf_graph_for_bounded_ocr(self.extract_params, (branch.extraction_mode for branch in self.branches))
         ray_module, cluster_resources = self.ensure_batch_runtime()
         effective_allow_no_gpu = self.allow_no_gpu or cluster_resources.total_gpu_count() == 0
         branch_datasets: list[Any] = []

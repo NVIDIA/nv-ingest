@@ -39,6 +39,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
     default_concurrency_node_names,
+    require_pdf_graph_for_bounded_ocr,
 )
 from nemo_retriever.ingestor.manifest import (
     ExtractionBranchPlan,
@@ -924,6 +925,7 @@ class GraphIngestor(ingestor):
         dedup_params: DedupParams | None,
         post_extract_order: tuple[str, ...],
     ) -> Any:
+        require_pdf_graph_for_bounded_ocr(effective_extraction.extract_params, (effective_extraction.extraction_mode,))
         ray, cluster_resources = self._ensure_batch_runtime()
         graph = build_graph(
             extraction_mode=effective_extraction.extraction_mode,

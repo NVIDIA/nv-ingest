@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
+from collections.abc import Iterable
 from typing import cast
 from typing import Any
 
@@ -125,6 +126,14 @@ def _nim_remote_http_kwargs(extract_params: Any) -> dict[str, int]:
     }
 
 
+def require_pdf_graph_for_bounded_ocr(extract_params: Any | None, extraction_modes: Iterable[str | None]) -> None:
+    """Reject bounded OCR when no extraction graph in the run has the PDF OCR actor pool."""
+    if getattr(_batch_tuning(extract_params), "ocr_min_workers", None) is None:
+        return
+    if not any(mode in (None, "pdf") for mode in extraction_modes):
+        raise ValueError("Bounded OCR workers require an input that uses the dedicated PDF batch extraction graph")
+
+
 def batch_tuning_to_node_overrides(
     extract_params: Any | None,
     embed_params: Any | None,
@@ -147,9 +156,6 @@ def batch_tuning_to_node_overrides(
     Final actor-pool sizing is reconciled after graph resolution by the executor
     resource preflight.
     """
-    extract_tuning = _batch_tuning(extract_params)
-    if getattr(extract_tuning, "ocr_min_workers", None) is not None and extraction_mode not in (None, "pdf"):
-        raise ValueError("Bounded OCR workers require the dedicated PDF batch extraction graph")
     auto_allow_no_gpu = bool(cluster_resources is not None and cluster_resources.total_gpu_count() == 0)
     effective_allow_no_gpu = allow_no_gpu if allow_no_gpu is not None else auto_allow_no_gpu
     plan = (
