@@ -126,12 +126,18 @@ def _nim_remote_http_kwargs(extract_params: Any) -> dict[str, int]:
     }
 
 
-def require_pdf_graph_for_bounded_ocr(extract_params: Any | None, extraction_modes: Iterable[str | None]) -> None:
-    """Reject bounded OCR when no extraction graph in the run has the PDF OCR actor pool."""
+def require_ocr_actor_for_bounded_ocr(extract_params: Any | None, graphs: Iterable[Graph]) -> None:
+    """Reject bounded OCR when no graph in the run contains the OCR actor pool it sizes."""
     if getattr(_batch_tuning(extract_params), "ocr_min_workers", None) is None:
         return
-    if not any(mode in (None, "pdf") for mode in extraction_modes):
-        raise ValueError("Bounded OCR workers require an input that uses the dedicated PDF batch extraction graph")
+    ocr_name = resolve_ocr_archetype(extract_params).__name__
+    pending = [root for graph in graphs for root in graph.roots]
+    while pending:
+        node = pending.pop()
+        if node.name == ocr_name:
+            return
+        pending.extend(node.children)
+    raise ValueError(f"Bounded OCR workers require a batch extraction graph with {ocr_name}; this run builds none")
 
 
 def batch_tuning_to_node_overrides(

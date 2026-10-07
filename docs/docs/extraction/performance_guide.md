@@ -89,9 +89,10 @@ these fields with `ocr_workers`.
 Use these bounds when extraction resolves to the dedicated PDF graph. PDF-only
 inputs infer this mode, or you can set `extraction_mode="pdf"` explicitly.
 Batch `auto`, image, HTML, audio, and other extraction graphs do not have this
-OCR actor pool. When a batch mixes PDFs with other file types, the bounds apply
-only to the PDF OCR pool. A run with no input that uses the PDF graph rejects
-the bounds with a `ValueError`.
+OCR actor pool. The PDF graph also omits it with `method="nemotron_parse"` or
+when text, table, chart, and infographic extraction are all disabled. When a
+batch mixes PDFs with other file types, the bounds apply only to the PDF OCR
+pool. A run with no OCR actor pool rejects the bounds with a `ValueError`.
 
 The following example starts with 2 OCR actors and allows Ray Data to grow
 the pool to 4 actors when work and resources are available.

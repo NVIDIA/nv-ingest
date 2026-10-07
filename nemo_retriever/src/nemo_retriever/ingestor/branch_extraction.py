@@ -20,7 +20,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     build_graph,
     build_post_extract_graph,
     default_concurrency_node_names,
-    require_pdf_graph_for_bounded_ocr,
+    require_ocr_actor_for_bounded_ocr,
     _image_embedding_requires_page_image,
 )
 from nemo_retriever.ingestor.manifest import (
@@ -141,12 +141,12 @@ class ExtractionBranchExecutor:
         return self._execute_inprocess()
 
     def _execute_batch(self) -> Any:
-        require_pdf_graph_for_bounded_ocr(self.extract_params, (branch.extraction_mode for branch in self.branches))
         ray_module, cluster_resources = self.ensure_batch_runtime()
         effective_allow_no_gpu = self.allow_no_gpu or cluster_resources.total_gpu_count() == 0
         branch_datasets: list[Any] = []
         branch_executors: list[RayDataExecutor] = []
         branch_inputs: list[tuple[RayDataExecutor, Any]] = []
+        branch_graphs: list[Any] = []
         for branch in self.branches:
             effective_extraction = self._resolve_branch(branch)
             logger.info(
@@ -156,6 +156,7 @@ class ExtractionBranchExecutor:
                 effective_extraction.extraction_mode,
             )
             graph = self._build_extraction_only_graph(effective_extraction)
+            branch_graphs.append(graph)
             derived_overrides = batch_tuning_to_node_overrides(
                 effective_extraction.extract_params,
                 None,
@@ -194,6 +195,7 @@ class ExtractionBranchExecutor:
                 )
                 branch_executors.append(executor)
                 branch_inputs.append((executor, input_data))
+        require_ocr_actor_for_bounded_ocr(self.extract_params, branch_graphs)
 
         logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
         post_graph = build_post_extract_graph(

@@ -14,7 +14,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
     default_concurrency_node_names,
-    require_pdf_graph_for_bounded_ocr,
+    require_ocr_actor_for_bounded_ocr,
 )
 from nemo_retriever.ingest.plan import IngestExtractBatchOptions, _build_extract_batch_tuning
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
@@ -40,17 +40,34 @@ def test_invalid_pool_rejected_by_plan_conversion_and_params(fields):
         _build_extract_batch_tuning(IngestExtractBatchOptions(**fields))
 
 
-@pytest.mark.parametrize("mode", ["auto", "image", "html", "audio", "text", "video"])
-def test_bounded_ocr_rejected_without_dedicated_pdf_graph(mode):
-    params = ExtractParams(
-        batch_tuning=BatchTuningParams(
-            ocr_min_workers=2,
-            ocr_initial_workers=2,
-            ocr_max_workers=4,
-        )
-    )
-    with pytest.raises(ValueError, match="dedicated PDF batch extraction graph"):
-        require_pdf_graph_for_bounded_ocr(params, (mode,))
+_BOUNDS = {"ocr_min_workers": 2, "ocr_initial_workers": 2, "ocr_max_workers": 4}
+
+
+@pytest.mark.parametrize(
+    "mode,extract_fields",
+    [
+        ("auto", {}),
+        ("image", {}),
+        ("html", {}),
+        ("audio", {}),
+        ("text", {}),
+        ("pdf", {"method": "nemotron_parse"}),
+        (
+            "pdf",
+            {"extract_text": False, "extract_tables": False, "extract_charts": False, "extract_infographics": False},
+        ),
+    ],
+)
+def test_bounded_ocr_rejected_without_ocr_actor(mode, extract_fields):
+    params = ExtractParams(**extract_fields, batch_tuning=BatchTuningParams(**_BOUNDS))
+    graph = build_graph(extraction_mode=mode, extract_params=params)
+    with pytest.raises(ValueError, match="graph with OCRActor"):
+        require_ocr_actor_for_bounded_ocr(params, (graph,))
+
+
+def test_bounded_ocr_accepted_with_pdf_ocr_actor():
+    params = ExtractParams(batch_tuning=BatchTuningParams(**_BOUNDS))
+    require_ocr_actor_for_bounded_ocr(params, (build_graph(extraction_mode="pdf", extract_params=params),))
 
 
 @pytest.mark.parametrize("version,actor", [("v1", "OCRActor"), ("v2", "OCRActor")])
@@ -210,5 +227,5 @@ def test_mixed_batch_without_pdf_rejects_bounded_ocr(monkeypatch, tmp_path):
     text.write_bytes(b"txt")
     params = ExtractParams(batch_tuning=BatchTuningParams(ocr_min_workers=2, ocr_initial_workers=2, ocr_max_workers=4))
 
-    with pytest.raises(ValueError, match="dedicated PDF batch extraction graph"):
+    with pytest.raises(ValueError, match="graph with OCRActor"):
         _run_batch_branches(monkeypatch, [image, text], params)
