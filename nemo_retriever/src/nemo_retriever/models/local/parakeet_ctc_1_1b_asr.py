@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from nemo_retriever.common.nvtx import gpu_inference_range
+import nvtx
 
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import get_hf_revision
@@ -347,7 +347,9 @@ class ParakeetCTC1B1ASR:
             padding=True,
         )
         inputs = inputs.to(self._model.device, dtype=self._model.dtype)
-        with torch.no_grad(), gpu_inference_range("ParakeetCTC1B", batch_size=len(audios)):
+        with torch.no_grad(), nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+            f"ParakeetCTC1B | bs={len(audios)}", color="blue"
+        ):
             outputs = self._model(**inputs)
         logits = outputs.logits  # [B, T, V]
 

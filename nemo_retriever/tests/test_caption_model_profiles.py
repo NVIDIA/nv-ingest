@@ -38,7 +38,6 @@ def test_canonical_caption_defaults_are_omni():
 
 _LOCAL_CAPTIONER_NEMO_IMPORT_MODULES = (
     "nemo_retriever.models.local.nemotron_vlm_captioner",
-    "nemo_retriever.common.nvtx",
     "nemo_retriever.models.model",
 )
 _LOCAL_CAPTIONER_DEPENDENCY_MODULES = (

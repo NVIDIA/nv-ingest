@@ -10,10 +10,10 @@ import os
 from pathlib import Path  # noqa: F401
 
 import numpy as np
+import nvtx
 import torch
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import install_pinned_hf_hub_download
-from nemo_retriever.common.nvtx import gpu_inference_range
 from nemo_retriever.models.model import BaseModel, ModelRunMode
 
 from PIL import Image
@@ -188,22 +188,24 @@ class NemotronOCRV1(BaseModel):
                 out: List[Any] = []
                 for i in range(int(input_data.shape[0])):
                     b64 = self._tensor_to_png_b64(input_data[i])
-                    with gpu_inference_range("NemotronOCRv1", batch_size=1):
+                    with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                        "NemotronOCRv1 | bs=1", color="blue"
+                    ):
                         out.extend(self._model(b64.encode("utf-8"), merge_level=merge_level))
                 return out
             if input_data.ndim == 3:
                 b64 = self._tensor_to_png_b64(input_data)
-                with gpu_inference_range("NemotronOCRv1", batch_size=1):
+                with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate("NemotronOCRv1 | bs=1", color="blue"):
                     return self._model(b64.encode("utf-8"), merge_level=merge_level)
             raise ValueError(f"Unsupported torch tensor shape for OCR: {tuple(input_data.shape)}")
 
         # Disambiguate str: existing file path vs base64 string.
         if isinstance(input_data, str):
-            with gpu_inference_range("NemotronOCRv1", batch_size=1):
+            with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate("NemotronOCRv1 | bs=1", color="blue"):
                 return self._model(input_data.encode("utf-8"), merge_level=merge_level)
 
         # bytes / ndarray / BytesIO are supported directly by nemotron_ocr.
-        with gpu_inference_range("NemotronOCRv1", batch_size=1):
+        with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate("NemotronOCRv1 | bs=1", color="blue"):
             return self._model(input_data, merge_level=merge_level)
 
     @property

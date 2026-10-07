@@ -4,10 +4,10 @@
 
 from typing import Any, Dict, List, Tuple, Union
 
+import nvtx
 import torch
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import install_pinned_hf_hub_download
-from nemo_retriever.common.nvtx import gpu_inference_range
 from nemo_retriever.models.model import BaseModel, ModelRunMode
 
 import nemotron_table_structure_v1.model as _table_structure_model
@@ -75,7 +75,9 @@ class NemotronTableStructureV1(BaseModel):
         if self._model is None:
             raise RuntimeError("Local table_structure_v1 model was not initialized.")
 
-        with gpu_inference_range("TableStructureV1", batch_size=input_tensor.shape[0]):
+        with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+            f"TableStructureV1 | bs={input_tensor.shape[0]}", color="blue"
+        ):
             table_preds = self._model(input_tensor, orig_shape)[0]
         return table_preds
 

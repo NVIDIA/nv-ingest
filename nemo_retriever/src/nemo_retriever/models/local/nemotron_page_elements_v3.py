@@ -5,11 +5,11 @@
 from typing import Any, Dict, List, Sequence, Tuple, Union, cast  # noqa: F401
 
 from torch import nn
+import nvtx
 import torch
 import numpy as np
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import install_pinned_hf_hub_download
-from nemo_retriever.common.nvtx import gpu_inference_range
 from nemo_retriever.models.model import HuggingFaceModel, ModelRunMode
 
 import nemotron_page_elements_v3.model as _page_elements_model
@@ -110,7 +110,9 @@ class NemotronPageElementsV3(HuggingFaceModel):
 
         with torch.inference_mode():
             with torch.autocast(device_type="cuda"):
-                with gpu_inference_range("PageElementsV3", batch_size=input_data.shape[0]):
+                with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                    f"PageElementsV3 | bs={input_data.shape[0]}", color="blue"
+                ):
                     out = self._model(input_data, orig_shape)
                     return out
         # preds0: Any

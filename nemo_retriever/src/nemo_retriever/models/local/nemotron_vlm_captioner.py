@@ -200,9 +200,11 @@ class NemotronVLMCaptioner(BaseModel):
         sampling_params = SamplingParams(**sp_kwargs)
         chat_kwargs = merge_request_extras(self._request_extras, extra_body or {})
         chat_kwargs.setdefault("use_tqdm", False)
-        from nemo_retriever.common.nvtx import gpu_inference_range
+        import nvtx
 
-        with gpu_inference_range("NemotronVLMCaptioner", batch_size=len(conversations)):
+        with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+            f"NemotronVLMCaptioner | bs={len(conversations)}", color="blue"
+        ):
             outputs = self._llm.chat(conversations, sampling_params=sampling_params, **chat_kwargs)
         return [out.outputs[0].text.strip() for out in outputs]
 
