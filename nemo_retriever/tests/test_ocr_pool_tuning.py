@@ -49,7 +49,6 @@ _BOUNDS = {"ocr_min_workers": 2, "ocr_initial_workers": 2, "ocr_max_workers": 4}
         ("auto", {}),
         ("image", {}),
         ("html", {}),
-        ("audio", {}),
         ("text", {}),
         ("pdf", {"method": "nemotron_parse"}),
         (
