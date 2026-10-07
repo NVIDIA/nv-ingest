@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import nvtx
+
 from nemo_retriever.common.api.util.string_processing import prepend_model_provider_prefix
 from nemo_retriever.common.params import EmbedParams
 from nemo_retriever.models.inference.embedding_input import ensure_embedding_input_policy_for_batch
@@ -23,6 +25,7 @@ class _BatchEmbedCPUActor(AbstractOperator, CPUOperator):
 
     DEFAULT_EMBED_INVOKE_URL = "https://integrate.api.nvidia.com/v1/embeddings"
 
+    @nvtx.annotate("nrl.batch::embedding.startup", color="blue")
     def __init__(self, params: EmbedParams) -> None:
         super().__init__()
         self._params = params
@@ -65,6 +68,7 @@ class _BatchEmbedCPUActor(AbstractOperator, CPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::embedding.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         ensure_embedding_input_policy_for_batch(self._kwargs, data)
         return embed_text_main_text_embed(data, model=self._model, **self._kwargs)
