@@ -166,6 +166,10 @@ class ingestor:
     ) -> Union[List[Any], Tuple[Any, ...]]:
         """Execute the configured ingestion pipeline (placeholder).
 
+        In ``run_mode='batch'``, ``return_results=False`` returns a one-row
+        DataFrame with ``input_rows`` and ``submitted_records`` counts for a
+        terminal streaming VDB upload. The default returns full records.
+
         In ``run_mode='service'``, ``return_results`` (default ``True``)
         controls whether completed rows are fetched into
         ``ServiceIngestResult.dataframe``.

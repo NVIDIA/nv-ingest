@@ -126,6 +126,8 @@ class ExtractionBranchExecutor:
     show_progress: bool
     allow_no_gpu: bool
     ensure_batch_runtime: Callable[[], tuple[Any, Any]]
+    return_results: bool = True
+    validate_batch: Callable[[Any], None] | None = None
 
     def execute(self) -> Any:
         logger.info(
@@ -241,7 +243,9 @@ class ExtractionBranchExecutor:
         combined = normalized[0]
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
-        return post_executor.ingest(combined)
+        if self.return_results:
+            return post_executor.ingest(combined)
+        return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
 
     def _execute_inprocess(self) -> Any:
         frames = []
