@@ -141,22 +141,21 @@ class ExtractionBranchExecutor:
         return self._execute_inprocess()
 
     def _execute_batch(self) -> Any:
+        resolved_branches = [(branch, self._resolve_branch(branch)) for branch in self.branches]
+        branch_graphs = [self._build_extraction_only_graph(extraction) for _, extraction in resolved_branches]
+        require_ocr_actor_for_bounded_ocr(self.extract_params, branch_graphs)
         ray_module, cluster_resources = self.ensure_batch_runtime()
         effective_allow_no_gpu = self.allow_no_gpu or cluster_resources.total_gpu_count() == 0
         branch_datasets: list[Any] = []
         branch_executors: list[RayDataExecutor] = []
         branch_inputs: list[tuple[RayDataExecutor, Any]] = []
-        branch_graphs: list[Any] = []
-        for branch in self.branches:
-            effective_extraction = self._resolve_branch(branch)
+        for (branch, effective_extraction), graph in zip(resolved_branches, branch_graphs):
             logger.info(
                 "Retriever ingest extraction branch family=%s files=%d graph_mode=%s",
                 branch.family,
                 len(branch.input_paths),
                 effective_extraction.extraction_mode,
             )
-            graph = self._build_extraction_only_graph(effective_extraction)
-            branch_graphs.append(graph)
             derived_overrides = batch_tuning_to_node_overrides(
                 effective_extraction.extract_params,
                 None,
@@ -195,7 +194,6 @@ class ExtractionBranchExecutor:
                 )
                 branch_executors.append(executor)
                 branch_inputs.append((executor, input_data))
-        require_ocr_actor_for_bounded_ocr(self.extract_params, branch_graphs)
 
         logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
         post_graph = build_post_extract_graph(
