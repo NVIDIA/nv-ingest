@@ -113,9 +113,20 @@ class InMemoryUpload(NamedTuple):
     content: bytes
     content_type: str = "application/octet-stream"
     classification_filename: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
-UploadInput = Path | InMemoryUpload
+class FileUpload(NamedTuple):
+    """Disk-backed document streamed during upload."""
+
+    path: Path
+    filename: str
+    content_type: str = "application/octet-stream"
+    classification_filename: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+UploadInput = Path | InMemoryUpload | FileUpload
 
 
 def _upload_filename(source: UploadInput) -> str:
@@ -881,19 +892,33 @@ class RetrieverServiceClient:
         key so the server can validate and apply it. Returns the parsed
         JSON response (contains ``document_id`` and ``job_id``).
         """
+        file_path: Path | None = None
+        file_bytes: bytes | None = None
         if isinstance(source, Path):
-            file_bytes = source.read_bytes()
+            file_path = source
             filename = source.name
             content_type = "application/octet-stream"
             classification_filename = None
+            source_metadata = None
+        elif isinstance(source, FileUpload):
+            file_path = source.path
+            filename = source.filename
+            content_type = source.content_type
+            classification_filename = source.classification_filename
+            source_metadata = source.metadata
         else:
             file_bytes = source.content
             filename = source.filename
             content_type = source.content_type
             classification_filename = source.classification_filename
+            source_metadata = source.metadata
         meta_payload: dict[str, Any] = dict(metadata or {})
         if classification_filename is not None:
             meta_payload.setdefault("filename", classification_filename)
+        if source_metadata:
+            document_metadata = dict(meta_payload.get("metadata") or {})
+            document_metadata.update(source_metadata)
+            meta_payload["metadata"] = document_metadata
         if pipeline_spec is not None:
             meta_payload["pipeline"] = pipeline_spec
         meta_json = json.dumps(meta_payload)
@@ -902,14 +927,15 @@ class RetrieverServiceClient:
 
         for attempt in range(1, _MAX_UPLOAD_RETRIES + 1):
             try:
-                resp = await client.post(
-                    url,
-                    files={"file": (filename, file_bytes, content_type)},
-                    data={
-                        "metadata": meta_json,
-                        **({"manifest_entry_id": manifest_entry_id} if manifest_entry_id else {}),
-                    },
-                )
+                data = {
+                    "metadata": meta_json,
+                    **({"manifest_entry_id": manifest_entry_id} if manifest_entry_id else {}),
+                }
+                if file_path is None:
+                    resp = await client.post(url, files={"file": (filename, file_bytes, content_type)}, data=data)
+                else:
+                    with file_path.open("rb") as file_obj:
+                        resp = await client.post(url, files={"file": (filename, file_obj, content_type)}, data=data)
             except _TRANSIENT_ERRORS as exc:
                 transport_attempts += 1
                 if transport_attempts > 5:

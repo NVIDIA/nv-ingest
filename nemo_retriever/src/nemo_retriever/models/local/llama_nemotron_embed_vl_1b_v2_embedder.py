@@ -8,11 +8,11 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Any, Optional, Sequence
 
+import nvtx
 import torch
 
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.embed_model_spec import resolve_embed_model_revision
-from nemo_retriever.common.nvtx import gpu_inference_range
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
@@ -121,7 +121,9 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         with torch.inference_mode(), warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("text")
-            with gpu_inference_range("LlamaNemotronEmbedVL1B", batch_size=len(texts_list), mode="doc_text"):
+            with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                f"LlamaNemotronEmbedVL1B | bs={len(texts_list)} | mode=doc_text", color="blue"
+            ):
                 out = self._model.encode_documents(texts=texts_list)
         return _to_normalized_cpu(out)
 
@@ -133,7 +135,9 @@ class LlamaNemotronEmbedVL1BV2Embedder:
             return torch.empty((0, self.output_dimension), dtype=torch.float32)
         with torch.inference_mode(), warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
-            with gpu_inference_range("LlamaNemotronEmbedVL1B", batch_size=len(texts_list), mode="query"):
+            with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                f"LlamaNemotronEmbedVL1B | bs={len(texts_list)} | mode=query", color="blue"
+            ):
                 out = self._model.encode_queries(texts_list)
         return _to_normalized_cpu(out)
 
@@ -146,7 +150,9 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         with torch.inference_mode(), warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("image")
-            with gpu_inference_range("LlamaNemotronEmbedVL1B", batch_size=len(image_dicts), mode="doc_image"):
+            with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                f"LlamaNemotronEmbedVL1B | bs={len(image_dicts)} | mode=doc_image", color="blue"
+            ):
                 out = self._model.encode_documents(images=image_dicts)
         return _to_normalized_cpu(out)
 
@@ -166,7 +172,9 @@ class LlamaNemotronEmbedVL1BV2Embedder:
         with torch.inference_mode(), warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="`input_embeds` is deprecated", category=FutureWarning)
             self._set_p_max_length("text_image")
-            with gpu_inference_range("LlamaNemotronEmbedVL1B", batch_size=len(paired_images), mode="doc_text_image"):
+            with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
+                f"LlamaNemotronEmbedVL1B | bs={len(paired_images)} | mode=doc_text_image", color="blue"
+            ):
                 out = self._model.encode_documents(texts=paired_texts, images=paired_images)
         return _to_normalized_cpu(out)
 

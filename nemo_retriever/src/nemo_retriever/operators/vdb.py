@@ -9,9 +9,9 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+import nvtx
 import pandas as pd
 
-from nemo_retriever.common.nvtx import batch_phase
 from nemo_retriever.common.vdb.adt_vdb import CollectionWriteContext, UnsupportedVDBOperation, VDB
 from nemo_retriever.common.vdb.factory import get_vdb_op_cls
 from nemo_retriever.common.vdb.records import (
@@ -174,9 +174,9 @@ class IngestVdbOperator(AbstractOperator):
 
         return bool(getattr(self._vdb, "supports_stream_ingest", False))
 
-    @batch_phase("pipeline.terminal_stream")
-    def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> None:
-        """Lazily execute upstream batches and delegate one backend stream."""
+    @nvtx.annotate("nrl.batch::pipeline.terminal_stream", color="blue")
+    def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> int:
+        """Write one backend stream and return the number of canonical records submitted."""
 
         if not self._supports_stream_ingest():
             raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not implement stream_ingest()")
@@ -198,10 +198,13 @@ class IngestVdbOperator(AbstractOperator):
 
         record_stream = records
         exhausted = False
+        submitted_records = 0
 
         def required_records() -> Iterator[dict[str, Any]]:
-            nonlocal exhausted
-            yield from record_stream
+            nonlocal exhausted, submitted_records
+            for record in record_stream:
+                submitted_records += 1
+                yield record
             exhausted = True
 
         self._vdb.stream_ingest(required_records())
@@ -209,6 +212,7 @@ class IngestVdbOperator(AbstractOperator):
             raise RuntimeError(
                 f"{type(self._vdb).__name__}.stream_ingest() returned before consuming the record stream"
             )
+        return submitted_records
 
     def postprocess(self, data: Any, **kwargs: Any) -> Any:
         return data

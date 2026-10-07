@@ -8,6 +8,7 @@ Use this documentation to learn how [NeMo Retriever Library](overview.md) stores
 - [Keep the embedding model aligned](#lancedb-embedding-model-compatibility)
 - [LanceDB Overview](#why-lancedb)
 - [Upload to LanceDB](#upload-to-lancedb)
+    - [Return a batch ingest summary](#batch-ingest-summary)
     - [Direct LanceDB ingest and retrieval](#direct-lancedb-ingest-and-retrieval)
 - [Semantic retrieval](#semantic-retrieval)
 - [Metadata and filtering](#metadata-and-filtering)
@@ -110,11 +111,57 @@ Use `--lancedb-uri` and `--table-name` on the local and batch commands when you 
 
 For URI, table name, and other parameters, refer to the [Python API guide](nemo-retriever-api-reference.md).
 
+### Return a batch ingest summary { #batch-ingest-summary }
+
+When you only need to index documents, pass `return_results=False` to
+`.ingest()` in batch mode. This returns a one-row pandas `DataFrame` with
+counts, without retaining each consumed batch for the final result.
+The default `return_results=True` returns the full records.
+
+The following example writes to the default local LanceDB table and returns
+a summary.
+
+```python
+from nemo_retriever import create_ingestor
+
+summary = (
+    create_ingestor(run_mode="batch")
+    .files(["document.pdf"])
+    .extract(extract_text=True)
+    .embed()
+    .vdb_upload()
+    .ingest(return_results=False)
+)
+print(summary)
+```
+
+The summary contains these columns.
+
+| Column | Meaning |
+| --- | --- |
+| `input_rows` | Rows received by the VDB upload stage. |
+| `submitted_records` | Canonical records passed to the backend. |
+
+When no rows reach the upload stage, both counts are zero.
+Backend filtering or retry handling can change how many rows are written,
+so `submitted_records` is not a count of newly stored rows.
+
+This option requires a final VDB upload stage that supports streaming ingest,
+`error_policy="raise"`, and `return_failures=False`. The default local LanceDB
+configuration supports it. For supported LanceDB locations, refer to
+[streaming ingest](#vdb-backends-implementations). Batch summary mode keeps the
+existing [raise error policy coverage](nemo-retriever-api-reference.md#what-the-raise-error-policy-covers).
+
+When the only input is blank inline text, ingestion validates the pipeline and
+VDB backend before returning zero counts. Invalid backend configuration,
+missing streaming support, or a stage after VDB upload raises an error.
+Valid blank input does not start Ray or write to the VDB.
+
 ### Direct LanceDB ingest and retrieval { #direct-lancedb-ingest-and-retrieval }
 
 You can also construct a `LanceDB` instance and call `run` and `retrieval` directly. This is the optional low-level path. Prefer `.vdb_upload()` for typical ingest.
 
-Graph ingest returns a pandas `DataFrame` of flat rows. Use the following input shapes:
+By default, graph ingest returns a pandas `DataFrame` of flat rows. Use the following input shapes:
 
 - `LanceDB.run()` expects nested client record batches: a `list` of batches, and each batch is a `list` of record dictionaries. Convert graph or `DataFrame` rows with `to_client_vdb_records()` before you call `run()`.
 - `LanceDB.run()` does not accept the graph `DataFrame` or a flat `list` of dictionaries from `DataFrame.to_dict("records")`.

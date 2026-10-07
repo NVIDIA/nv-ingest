@@ -1113,3 +1113,38 @@ def test_default_write_timeout_outlasts_the_index_readiness_waits() -> None:
     )
 
     assert worst_case_index_wait_s < _DEFAULT_VECTORDB_WRITE_TIMEOUT_S
+
+
+def test_service_worker_installs_url_source_map_before_ingest(monkeypatch: pytest.MonkeyPatch) -> None:
+    import pandas as pd
+
+    transport = "url-source://00000000/url-00000000.pdf"
+    source_url = "https://example.test/report.pdf"
+    observed = {}
+
+    class _Ingestor:
+        _embed_params = None
+
+        def _set_source_map(self, source_map):
+            observed["source_map"] = source_map
+
+        def ingest(self):
+            assert observed["source_map"] == {transport: source_url}
+            return pd.DataFrame([{"path": f"{transport}_1", "metadata": {"source_path": f"{transport}_1"}}])
+
+    monkeypatch.setattr(
+        "nemo_retriever.service.services.pipeline_executor._build_graph_ingestor_from_spec",
+        lambda *_args, **_kwargs: (_Ingestor(), "pdf", False),
+    )
+
+    row_count, rows, _ = _run_pipeline_in_process(
+        transport,
+        b"%PDF-1.4 stub",
+        {},
+        None,
+        write_context=DocumentWriteContext(document_metadata={"_nrl_source_url": source_url}),
+    )
+
+    assert row_count == 1
+    assert rows[0]["path"] == f"{source_url}_1"
+    assert rows[0]["metadata"]["source_path"] == f"{source_url}_1"

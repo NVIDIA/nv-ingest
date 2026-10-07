@@ -814,6 +814,97 @@ def test_upload_to_missing_job_returns_404(app_with_stub_pool: TestClient) -> No
 
 
 @pytest.mark.anyio
+async def test_rejected_standalone_submission_unregisters_pending(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from nemo_retriever.service.routers import ingest
+
+    unregistered: list[str] = []
+
+    async def _reject(_pool_type: PoolType, _item: WorkItem) -> None:
+        raise HTTPException(status_code=429, detail="queue full")
+
+    monkeypatch.setattr(ingest, "_enqueue_or_reject", _reject)
+    monkeypatch.setattr(
+        ingest,
+        "_register_document_under_job",
+        lambda **_kwargs: (SimpleNamespace(), True),
+    )
+    monkeypatch.setattr(
+        ingest,
+        "get_job_tracker",
+        lambda: type(
+            "Tracker",
+            (),
+            {"unregister_pending": staticmethod(unregistered.append)},
+        )(),
+    )
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(config=SimpleNamespace(mode="standalone"))))
+
+    with pytest.raises(HTTPException, match="429"):
+        await ingest._submit_job_work_item(
+            request,
+            PoolType.BATCH,
+            WorkItem(id="rejected", job_id="job"),
+            manifest_entry_id=None,
+        )
+
+    assert unregistered == ["rejected"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "failure",
+    [OSError("disk full"), ValueError("invalid work record")],
+)
+async def test_gateway_admission_failure_restores_sidecar(
+    monkeypatch: pytest.MonkeyPatch,
+    failure: Exception,
+) -> None:
+    from nemo_retriever.service.routers import ingest
+    from nemo_retriever.service.services import sidecar_store
+
+    unregistered: list[str] = []
+    restored: list[str] = []
+
+    async def _spool_failure(*_args: Any, **_kwargs: Any) -> None:
+        raise failure
+
+    monkeypatch.setattr(ingest, "_gateway_enqueue", _spool_failure)
+    monkeypatch.setattr(
+        ingest,
+        "_register_document_under_job",
+        lambda **_kwargs: (SimpleNamespace(), True),
+    )
+    monkeypatch.setattr(
+        ingest,
+        "get_job_tracker",
+        lambda: SimpleNamespace(unregister_pending=unregistered.append),
+    )
+    monkeypatch.setattr(
+        sidecar_store,
+        "get_sidecar_store",
+        lambda: SimpleNamespace(restore=restored.append),
+    )
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(config=SimpleNamespace(mode="gateway"))))
+
+    with pytest.raises(type(failure), match=str(failure)):
+        await ingest._submit_job_work_item(
+            request,
+            PoolType.BATCH,
+            WorkItem(
+                id="spooled",
+                job_id="job",
+                sidecar_attachment=("sidecar-key", SimpleNamespace()),
+            ),
+            manifest_entry_id=None,
+        )
+
+    assert unregistered == ["spooled"]
+    assert restored == ["sidecar-key"]
+
+
+@pytest.mark.anyio
 async def test_gateway_enqueue_unregisters_pending_when_broker_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     from fastapi import HTTPException
 

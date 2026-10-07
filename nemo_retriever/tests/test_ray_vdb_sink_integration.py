@@ -76,7 +76,10 @@ def _source_table(block_id: int) -> pa.Table:
 
 
 @pytest.mark.integration
-def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize("return_results", [True, False])
+def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
+    tmp_path, monkeypatch, return_results
+) -> None:
     """Streaming ingest avoids the global sink barrier and executes in order once."""
 
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
@@ -129,21 +132,19 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(tmp_p
             def postprocess(self, data, **kwargs):
                 return data
 
-        graph = (
-            Graph()
-            >> IngestVdbOperator(
-                vdb_op="lancedb",
-                vdb_kwargs={
-                    "uri": str(tmp_path),
-                    "table_name": "chunks",
-                    "vector_dim": 2,
-                    "overwrite": True,
-                    "build_index": False,
-                    "stream_batch_bytes": 512,
-                },
-            )
-            >> RequireFinalizedWrite()
+        graph = Graph() >> IngestVdbOperator(
+            vdb_op="lancedb",
+            vdb_kwargs={
+                "uri": str(tmp_path),
+                "table_name": "chunks",
+                "vector_dim": 2,
+                "overwrite": True,
+                "build_index": False,
+                "stream_batch_bytes": 512,
+            },
         )
+        if return_results:
+            graph = graph >> RequireFinalizedWrite()
         executor = RayDataExecutor(graph)
 
         lazy = executor.build_dataset(dataset)
@@ -160,14 +161,17 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(tmp_p
 
         monkeypatch.setattr(ray.data.Dataset, "repartition", reject_global_repartition)
 
-        result = executor.ingest(dataset)
+        result = executor.ingest(dataset, return_results=return_results)
 
         assert Counter(ray.get(completed.completed_blocks.remote())) == Counter({0: 1, 1: 1, 2: 1})
 
-        assert result["page_number"].tolist() == list(range(6))
-        assert result["text"].tolist() == [f"chunk-{row_id}" for row_id in range(6)]
-        assert result["result_only"].tolist() == [f"not-stored-{row_id}" for row_id in range(6)]
-        assert result["after_sink"].tolist() == [True] * 6
+        if return_results:
+            assert result["page_number"].tolist() == list(range(6))
+            assert result["text"].tolist() == [f"chunk-{row_id}" for row_id in range(6)]
+            assert result["result_only"].tolist() == [f"not-stored-{row_id}" for row_id in range(6)]
+            assert result["after_sink"].tolist() == [True] * 6
+        else:
+            assert result.to_dict("records") == [{"input_rows": 6, "submitted_records": 6}]
 
         stored_table = lancedb.connect(str(tmp_path)).open_table("chunks")
         stored = stored_table.to_arrow().sort_by("id")

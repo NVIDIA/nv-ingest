@@ -544,6 +544,10 @@ class JobTracker:
                 return False
             agg = self._jobs.get(rec.job_id)
             self._documents.pop(document_id, None)
+            if rec.manifest_entry_id:
+                manifest_key = (rec.job_id, rec.manifest_entry_id)
+                if self._accepted_manifest_entries.get(manifest_key) == document_id:
+                    self._accepted_manifest_entries.pop(manifest_key, None)
             if agg is not None:
                 try:
                     agg.document_ids.remove(document_id)

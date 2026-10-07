@@ -2,42 +2,66 @@ from __future__ import annotations
 
 import glob
 from collections.abc import Iterable
+from dataclasses import dataclass
 from os import PathLike, fspath
 from pathlib import Path
 from typing import NoReturn
 
-INPUT_TYPE_PATTERNS: dict[str, tuple[str, ...]] = {
-    "auto": (
-        "*.pdf",
-        "*.docx",
-        "*.pptx",
-        "*.txt",
-        "*.md",
-        "*.json",
-        "*.sh",
-        "*.html",
-        "*.jpg",
-        "*.jpeg",
-        "*.png",
-        "*.tiff",
-        "*.tif",
-        "*.bmp",
-        "*.svg",
-        "*.mp3",
-        "*.wav",
-        "*.m4a",
-        "*.mp4",
-        "*.mov",
-        "*.mkv",
-        "*.avi",
+
+@dataclass(frozen=True)
+class InputFormat:
+    """Canonical metadata for one supported ingest filename suffix."""
+
+    suffix: str
+    input_type: str
+    content_type: str
+    mime_types: tuple[str, ...] = ()
+
+
+SUPPORTED_INPUT_FORMATS: tuple[InputFormat, ...] = (
+    InputFormat(".pdf", "pdf", "application/pdf", ("application/pdf",)),
+    InputFormat(
+        ".docx",
+        "doc",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ("application/vnd.openxmlformats-officedocument.wordprocessingml.document",),
     ),
-    "pdf": ("*.pdf",),
-    "txt": ("*.txt", "*.md", "*.json", "*.sh"),
-    "html": ("*.html",),
-    "doc": ("*.docx", "*.pptx"),
-    "image": ("*.jpg", "*.jpeg", "*.png", "*.tiff", "*.tif", "*.bmp", "*.svg"),
-    "audio": ("*.mp3", "*.wav", "*.m4a"),
-    "video": ("*.mp4", "*.mov", "*.mkv", "*.avi"),
+    InputFormat(
+        ".pptx",
+        "doc",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ("application/vnd.openxmlformats-officedocument.presentationml.presentation",),
+    ),
+    InputFormat(".txt", "txt", "text/plain", ("text/plain",)),
+    InputFormat(".md", "txt", "text/plain", ("text/markdown",)),
+    InputFormat(".json", "txt", "text/plain", ("application/json",)),
+    InputFormat(".sh", "txt", "text/plain", ("application/x-sh", "text/x-shellscript")),
+    InputFormat(".html", "html", "text/html", ("text/html", "application/xhtml+xml")),
+    InputFormat(".jpg", "image", "image/jpeg", ("image/jpeg",)),
+    InputFormat(".jpeg", "image", "image/jpeg"),
+    InputFormat(".png", "image", "image/png", ("image/png",)),
+    InputFormat(".tiff", "image", "image/tiff", ("image/tiff",)),
+    InputFormat(".tif", "image", "image/tiff"),
+    InputFormat(".bmp", "image", "image/bmp", ("image/bmp",)),
+    InputFormat(".svg", "image", "image/svg+xml", ("image/svg+xml",)),
+    InputFormat(".mp3", "audio", "audio/mpeg", ("audio/mpeg",)),
+    InputFormat(".wav", "audio", "audio/wav", ("audio/wav", "audio/x-wav")),
+    InputFormat(".m4a", "audio", "audio/mp4", ("audio/mp4",)),
+    InputFormat(".mp4", "video", "video/mp4", ("video/mp4",)),
+    InputFormat(".mov", "video", "video/quicktime", ("video/quicktime",)),
+    InputFormat(".mkv", "video", "video/x-matroska", ("video/x-matroska",)),
+    InputFormat(".avi", "video", "video/x-msvideo", ("video/x-msvideo",)),
+)
+INPUT_FORMAT_BY_SUFFIX: dict[str, InputFormat] = {item.suffix: item for item in SUPPORTED_INPUT_FORMATS}
+MIME_TYPE_TO_EXTENSION: dict[str, str] = {
+    mime_type: item.suffix for item in SUPPORTED_INPUT_FORMATS for mime_type in item.mime_types
+}
+INPUT_TYPE_PATTERNS: dict[str, tuple[str, ...]] = {
+    "auto": tuple(f"*{item.suffix}" for item in SUPPORTED_INPUT_FORMATS),
+    **{
+        input_type: tuple(f"*{item.suffix}" for item in SUPPORTED_INPUT_FORMATS if item.input_type == input_type)
+        for input_type in ("pdf", "txt", "html", "doc", "image", "audio", "video")
+    },
 }
 INPUT_TYPE_EXTENSIONS: dict[str, frozenset[str]] = {
     input_type: frozenset(pattern[1:].lower() for pattern in patterns if pattern.startswith("*."))

@@ -8,6 +8,7 @@ import logging
 import time
 from typing import Any, Optional
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.operators.abstract_operator import AbstractOperator
@@ -29,6 +30,7 @@ class TableStructureCPUActor(AbstractOperator, CPUOperator):
 
     DEFAULT_TABLE_STRUCTURE_INVOKE_URL = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-table-structure-v1"
 
+    @nvtx.annotate("nrl.batch::table_structure.startup", color="blue")
     def __init__(
         self,
         *,
@@ -87,6 +89,7 @@ class TableStructureCPUActor(AbstractOperator, CPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::table_structure.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         n_rows = len(data) if hasattr(data, "__len__") else "?"
         logger.info("TableStructureCPUActor.process: received batch of %s rows", n_rows)
