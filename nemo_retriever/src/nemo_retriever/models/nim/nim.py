@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed, wait
 from urllib.parse import urlsplit, urlunsplit
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import nvtx
 import requests
 
 logger = logging.getLogger(__name__)
@@ -128,6 +129,7 @@ def _normalize_batch_response(response_json: Any, expected_count: int) -> List[A
     return out
 
 
+@nvtx.annotate("nrl.remote::nim.request", color="blue")
 def _post_with_retries(
     *,
     invoke_url: str,

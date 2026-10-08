@@ -69,16 +69,15 @@ class NemotronTableStructureV1(BaseModel):
 
         raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
+    @nvtx.annotate("gpu_inference", color="blue")
+    @nvtx.annotate("nrl.model::table_structure.inference", color="blue")
     def invoke(
         self, input_tensor: torch.Tensor, orig_shape: Tuple[int, int]
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
         if self._model is None:
             raise RuntimeError("Local table_structure_v1 model was not initialized.")
 
-        with nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
-            f"TableStructureV1 | bs={input_tensor.shape[0]}", color="blue"
-        ):
-            table_preds = self._model(input_tensor, orig_shape)[0]
+        table_preds = self._model(input_tensor, orig_shape)[0]
         return table_preds
 
     @property

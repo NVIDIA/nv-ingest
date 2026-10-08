@@ -5,6 +5,7 @@
 """Contract tests for batch and GPU inference NVTX ranges."""
 
 from contextlib import contextmanager
+import importlib
 import os
 import subprocess
 import sys
@@ -210,22 +211,23 @@ def test_batch_actors_emit_stage_ranges() -> None:
     assert "batch_actor_ranges_ok" in proc.stdout
 
 
-@pytest.mark.parametrize("batch_size", [2, 8])
 @pytest.mark.parametrize("fails", [False, True])
-def test_embedding_capture_ranges(capture_ranges, batch_size: int, fails: bool) -> None:
+def test_embedding_inference_decorators(capture_ranges, fails: bool) -> None:
     torch = pytest.importorskip("torch")
-    from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import LlamaNemotronEmbedVL1BV2Embedder
+    module = importlib.import_module("nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder")
+    module = importlib.reload(module)
+    LlamaNemotronEmbedVL1BV2Embedder = module.LlamaNemotronEmbedVL1BV2Embedder
 
     events = capture_ranges
     error = ValueError("inference failed")
-    inputs = ["document"] * batch_size
+    inputs = ["document", "document"]
 
     def encode_documents(*, texts):
         assert texts == inputs
         events.append(("inference",))
         if fails:
             raise error
-        return torch.tensor([[3.0, 4.0]] * batch_size)
+        return torch.tensor([[3.0, 4.0]] * len(inputs))
 
     embedder = LlamaNemotronEmbedVL1BV2Embedder()
     embedder._model = SimpleNamespace(encode_documents=encode_documents)
@@ -235,11 +237,111 @@ def test_embedding_capture_ranges(capture_ranges, batch_size: int, fails: bool) 
         assert exc.value is error
     else:
         result = embedder.embed(inputs)
-        torch.testing.assert_close(result, torch.tensor([[0.6, 0.8]] * batch_size))
+        torch.testing.assert_close(result, torch.tensor([[0.6, 0.8]] * len(inputs)))
     assert events == [
         ("push", "gpu_inference"),
-        ("push", f"LlamaNemotronEmbedVL1B | bs={batch_size} | mode=doc_text"),
+        ("push", "nrl.model::llama_nemotron_embed_vl.encode_documents"),
         ("inference",),
         ("pop",),
+        ("pop",),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("model_class", "expected_range"),
+    [
+        ("NemotronOCRV1", "nrl.model::ocr_v1.inference"),
+        ("NemotronOCRV2", "nrl.model::ocr_v2.inference"),
+    ],
+)
+@pytest.mark.parametrize("fails", [False, True])
+def test_ocr_inference_decorators(capture_ranges, model_class: str, expected_range: str, fails: bool) -> None:
+    if model_class == "NemotronOCRV1":
+        module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v1")
+    else:
+        module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v2")
+    module = importlib.reload(module)
+    cls = getattr(module, model_class)
+
+    events = capture_ranges
+    error = ValueError("inference failed")
+
+    def infer(input_data, *, merge_level):
+        assert input_data == b"image"
+        assert merge_level == "paragraph"
+        events.append(("inference",))
+        if fails:
+            raise error
+        return ["text"]
+
+    model = object.__new__(cls)
+    model._model = infer
+    if fails:
+        with pytest.raises(ValueError) as exc:
+            model.invoke(b"image")
+        assert exc.value is error
+    else:
+        assert model.invoke(b"image") == ["text"]
+    assert events == [
+        ("push", "gpu_inference"),
+        ("push", expected_range),
+        ("inference",),
+        ("pop",),
+        ("pop",),
+    ]
+
+
+def test_remote_nim_request_decorator(capture_ranges, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = importlib.import_module("nemo_retriever.models.nim.nim")
+    module = importlib.reload(module)
+    events = capture_ranges
+
+    class Response:
+        status_code = 200
+
+        @staticmethod
+        def raise_for_status() -> None:
+            return None
+
+        @staticmethod
+        def json() -> dict[str, bool]:
+            return {"ok": True}
+
+    def post(url, *, headers, json, timeout):
+        events.append(("request", url, headers, json, timeout))
+        return Response()
+
+    monkeypatch.setattr(module, "_service_tracing", lambda: None)
+    monkeypatch.setattr(module.requests, "post", post)
+    assert module._post_with_retries(
+        invoke_url="http://nim.invalid/infer",
+        payload={"input": "value"},
+        headers={"Authorization": "test"},
+        timeout_s=5.0,
+        max_retries=1,
+        max_429_retries=1,
+    ) == {"ok": True}
+    assert events == [
+        ("push", "nrl.remote::nim.request"),
+        (
+            "request",
+            "http://nim.invalid/infer",
+            {"Authorization": "test"},
+            {"input": "value"},
+            5.0,
+        ),
+        ("pop",),
+    ]
+
+
+def test_ray_pipeline_ingest_decorator(capture_ranges) -> None:
+    module = importlib.import_module("nemo_retriever.graph.executor")
+    module = importlib.reload(module)
+    executor = object.__new__(module.RayDataExecutor)
+
+    with pytest.raises(TypeError, match="unsupported"):
+        executor.ingest(None, unsupported=True)
+    assert capture_ranges == [
+        ("push", "nrl.batch::pipeline.ingest"),
         ("pop",),
     ]

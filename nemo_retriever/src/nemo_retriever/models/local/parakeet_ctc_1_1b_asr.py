@@ -18,7 +18,7 @@ import logging
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import nvtx
@@ -332,6 +332,14 @@ class ParakeetCTC1B1ASR:
             results[i] = (text, _segment_words(per_audio_words[i]))
         return results
 
+    @nvtx.annotate("gpu_inference", color="blue")
+    @nvtx.annotate("nrl.model::parakeet_ctc.inference", color="blue")
+    def _forward(self, inputs: Any) -> Any:
+        import torch
+
+        with torch.no_grad():
+            return self._model(**inputs)
+
     def _decode_batch(self, audios: List[np.ndarray]) -> List[Tuple[str, List[Tuple[str, Tuple[int, int]]]]]:
         """Forward pass + greedy CTC for a batch of chunks. Returns ``(text, word_alignments)``."""
         import torch
@@ -347,10 +355,7 @@ class ParakeetCTC1B1ASR:
             padding=True,
         )
         inputs = inputs.to(self._model.device, dtype=self._model.dtype)
-        with torch.no_grad(), nvtx.annotate("gpu_inference", color="blue"), nvtx.annotate(
-            f"ParakeetCTC1B | bs={len(audios)}", color="blue"
-        ):
-            outputs = self._model(**inputs)
+        outputs = self._forward(inputs)
         logits = outputs.logits  # [B, T, V]
 
         attn_mask = inputs.get("attention_mask")

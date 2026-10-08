@@ -99,11 +99,12 @@ nsys profile \
 
 The command writes `nrl-batch-profile.nsys-rep`. Open the report in the Nsight
 Systems graphical interface, or run `nsys-ui nrl-batch-profile.nsys-rep` on a
-workstation with the interface installed. Search the timeline for
-`nrl.batch::` to find the following ranges.
+workstation with the interface installed. Search the timeline for `nrl.batch::`,
+`nrl.model::`, and `nrl.remote::` to find the following ranges.
 
 | Range | Interpretation |
 | --- | --- |
+| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor.ingest()` call on the driver. Use this range for batch pipeline wall-clock time. |
 | `nrl.batch::pdf_split.batch` | One PDF split actor call that splits a batch of documents into single-page PDFs. |
 | `nrl.batch::pdf_extract.batch` | One PDF extraction actor call that extracts text and images from a batch of pages. |
 | `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
@@ -119,6 +120,27 @@ workstation with the interface installed. Search the timeline for
 | `nrl.batch::result.concat` | Concatenation of retained frames when the graph ends at a streaming vector database sink and at least one batch was consumed. This range is absent when the sink has downstream nodes or the input has no batches. |
 
 Local and remote (endpoint-backed) Page Elements, Table Structure, OCR, and embedding actors emit the same ranges; for remote actors, the batch range includes network requests to the endpoint.
+
+Local model backend calls also emit stable, decorator-based ranges. Each model
+range is nested inside `gpu_inference`, which preserves compatibility with
+`nsys profile --capture-range=nvtx --nvtx-capture=gpu_inference` for focused
+model profiling.
+
+| Range | Interpretation |
+| --- | --- |
+| `nrl.model::llama_nemotron_embed_vl.encode_documents` | One local document text, image, or paired text-image embedding backend call. |
+| `nrl.model::llama_nemotron_embed_vl.encode_queries` | One local query embedding backend call. |
+| `nrl.model::ocr_v1.inference` | One legacy Nemotron OCR v1 backend call. |
+| `nrl.model::ocr_v2.inference` | One Nemotron OCR v2 backend call. This is the model used by the current local OCR actor. |
+| `nrl.model::page_elements.inference` | One local Page Elements backend call. |
+| `nrl.model::table_structure.inference` | One local Table Structure backend call. |
+| `nrl.model::vlm_captioner.inference` | One local visual language model captioning backend call. |
+| `nrl.model::parakeet_ctc.inference` | One local Parakeet CTC forward pass. |
+
+Remote NVIDIA Inference Microservice (NIM) calls emit
+`nrl.remote::nim.request`. This range covers one HTTP request and its retry and
+backoff lifecycle. Compare it with the enclosing actor batch range to separate
+remote service wait time from local preparation and response processing.
 
 Ranges from concurrent Ray actors can overlap. Their durations include CPU
 preparation, waits, and calls into inference backends. They do not represent
