@@ -380,7 +380,7 @@ def create_local_agent_llm(
     OpenAI-compatible chat-completions response dict. V1 supports the in-process
     vLLM backend and uses process-level vLLM placement (for example,
     ``CUDA_VISIBLE_DEVICES`` plus ``tensor_parallel_size``). Callers (typically
-    ``AgenticRetriever``) should reuse one instance for a harness/CLI job and
+    ``AgenticRetriever``) should reuse one instance for a CLI job and
     call ``unload()`` when the job finishes.
     """
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from nemo_retriever.harness.config import REPO_ROOT
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _multimodal_pdf() -> Path:

@@ -24,7 +24,7 @@ five-field dense CLI projection. Answer mode terminates inside the ReAct loop
 and bypasses reciprocal rank fusion and final document selection. It returns an
 answer, citation IDs, hydrated citation hits, and status/error metadata.
 
-Local CLI and harness runs default to an in-process vLLM agent LLM. Retriever
+Local CLI runs default to an in-process vLLM agent LLM. Retriever
 Service requires a remote OpenAI-compatible chat-completions endpoint. A
 self-hosted vLLM-backed NIM must enable automatic tool choice and a tool-call
 parser. Helm `answer_llm` configures the classic `/v1/answer` path; agentic

@@ -2,13 +2,11 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Measured BO767 throughput profile for four physical NVIDIA B200 GPUs.
+# Example BO767 PDF ingestion profile for four physical NVIDIA B200 GPUs.
 #
-# This profile reproduces the NIM versions and settings tested with the
-# NeMo Retriever 26.08.1 chart. The target node must expose two time-sliced
-# nvidia.com/gpu resources per physical GPU with the device plugin's packed
-# allocation policy. Apply the staged rollout in the chart README to obtain
-# three embed+OCR pairs and one page-elements+table-structure pair.
+# The profile uses eight one-GPU NIM replicas. To schedule them on four GPUs,
+# configure GPU sharing so the target node advertises eight logical GPU slots.
+# Refer to the GPU scheduling prerequisite in the chart README.
 
 service:
   image:

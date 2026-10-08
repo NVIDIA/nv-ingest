@@ -75,7 +75,7 @@ def test_root_help_lists_only_product_workflows() -> None:
     assert "service" in result.output
     assert "ingest" in result.output
     assert "query" in result.output
-    assert "harness" in result.output
+    assert all(group.name != "harness" for group in cli_main.app.registered_groups)
     for developer_command in (
         "audio",
         "image",
@@ -96,13 +96,20 @@ def test_root_help_lists_only_product_workflows() -> None:
 
 @pytest.mark.parametrize(
     "removed_command",
-    ("txt", "html", "local", "audio", "image", "pdf", "chart", "compare", "pipeline"),
+    ("txt", "html", "local", "audio", "image", "pdf", "chart", "compare", "pipeline", "harness"),
 )
 def test_removed_root_commands_are_not_callable(removed_command: str) -> None:
     result = RUNNER.invoke(cli_main.app, [removed_command, "--help"])
 
     assert result.exit_code == 2
     assert f"No such command '{removed_command}'" in result.output
+
+
+@pytest.mark.parametrize("command", ("recall", "skill-eval"))
+def test_evaluation_commands_remain_callable(command: str) -> None:
+    result = RUNNER.invoke(cli_main.app, [command, "--help"])
+
+    assert result.exit_code == 0, result.output
 
 
 def test_root_ingest_help_explains_cpu_hosted_embedding_default() -> None:

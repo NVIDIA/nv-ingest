@@ -266,18 +266,6 @@ wheels = [
 ]
 
 [[package]]
-name = "apscheduler"
-version = "3.11.3"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "tzlocal" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/8c/6b/eeff360196bb20b312c9e762a820fd1b2c6d809466c755ef57863478e454/apscheduler-3.11.3.tar.gz", hash = "sha256:cd2fcc9330039a81a5893472ad49facf23a6d5604cbe1d918c835c6de7834d5a", size = 110312, upload-time = "2026-06-28T19:39:22.493Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/42/c9/8638db32514dbb9157b3d82680c6faea89283523edf9ed2415ea3884f2ae/apscheduler-3.11.3-py3-none-any.whl", hash = "sha256:bbeb2ec02d23d3c06a6c07ed7f0f3939ada6680eb121fae809a69bb42c537a30", size = 66024, upload-time = "2026-06-28T19:39:20.982Z" },
-]
-
-[[package]]
 name = "astor"
 version = "0.8.1"
 source = { registry = "https://pypi.org/simple" }
@@ -2565,7 +2553,6 @@ all = [
     { name = "accelerate" },
     { name = "addict" },
     { name = "albumentations" },
-    { name = "apscheduler" },
     { name = "backoff" },
     { name = "cairosvg" },
     { name = "datasets" },
@@ -2614,7 +2601,6 @@ local = [
     { name = "accelerate" },
     { name = "addict" },
     { name = "albumentations" },
-    { name = "apscheduler" },
     { name = "easydict" },
     { name = "einops" },
     { name = "flashinfer-cubin", marker = "sys_platform == 'linux'" },
@@ -2647,7 +2633,6 @@ nemotron-parse = [
 ]
 service = [
     { name = "addict" },
-    { name = "apscheduler" },
     { name = "backoff" },
     { name = "easydict" },
     { name = "librosa" },
@@ -2677,8 +2662,6 @@ requires-dist = [
     { name = "addict", marker = "extra == 'local'" },
     { name = "addict", marker = "extra == 'service'" },
     { name = "albumentations", marker = "extra == 'local'", specifier = "==2.0.8" },
-    { name = "apscheduler", marker = "extra == 'local'", specifier = ">=3.10" },
-    { name = "apscheduler", marker = "extra == 'service'", specifier = ">=3.10" },
     { name = "backoff" },
     { name = "backoff", marker = "extra == 'service'" },
     { name = "build", marker = "extra == 'dev'", specifier = ">=1.2.2" },
@@ -5268,18 +5251,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/92/ff/5a28bdfd8c3ebec42564ac7d0e54ca3db65044a9314a97f9564fa7a1e926/tzdata-2026.3.tar.gz", hash = "sha256:4a1518b8993086a7982523e071643f3c0e5f213e75b21318e78bcabfff9d1415", size = 198674, upload-time = "2026-07-10T08:50:37.887Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/e5/6d/b53b99a9f2766d095985947a5782f1702cabb129a34f7a802d7197af832f/tzdata-2026.3-py2.py3-none-any.whl", hash = "sha256:dc096730c87af6cab1b171c9d532be840741ff5d459015e7f6947bd7d7e54931", size = 348168, upload-time = "2026-07-10T08:50:36.46Z" },
-]
-
-[[package]]
-name = "tzlocal"
-version = "5.4.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "tzdata", marker = "sys_platform == 'win32'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/81/5b/879b2f932adfa7a053c360d50bc896c977fa6426109185f7c12ebdd0cb9d/tzlocal-5.4.4.tar.gz", hash = "sha256:8dbb8660838688a7b6ba4fed31d18dedf842afb4d47ca050d6d891c2c15f3be4", size = 31170, upload-time = "2026-06-29T08:03:40.026Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9e/a4/017a7a6cbe387d961a688ec31364ae60a5c4e22c96ae9921b79a947c855d/tzlocal-5.4.4-py3-none-any.whl", hash = "sha256:aae09f0126a8a86fa736be266eb4a471380d26a0de3bc14844e7821fee3e2a15", size = 18115, upload-time = "2026-06-29T08:03:38.666Z" },
 ]
 
 [[package]]

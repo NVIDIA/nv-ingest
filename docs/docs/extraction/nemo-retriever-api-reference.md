@@ -413,6 +413,13 @@ service = create_ingestor(run_mode="service", base_url="http://localhost:7670")
 
 `GraphIngestor` methods include `extract_html()`, `extract_audio()`, `extract_video()`, `get_error_rows()`, and `get_dataset()`. `get_error_rows()` filters rows that contain stage error payloads from a pandas DataFrame or Ray Dataset. If you omit `dataset`, it uses the dataset retained from the last `ingest()` call. `get_dataset()` returns that retained dataset.
 
+In batch mode, `.ingest(return_results=False)` returns a one-row summary
+instead of retaining full result records. You can also pass
+`IngestExecuteParams(return_results=False)` through `params`. This requires a
+final streaming VDB upload stage and the default raise error policy. Refer to
+[Return a batch ingest summary](vdbs.md#batch-ingest-summary) for the counts,
+requirements, and an example. `get_dataset()` then returns the summary.
+
 ::: nemo_retriever.ingestor.graph_ingestor.GraphIngestor
     options:
       heading_level: 4

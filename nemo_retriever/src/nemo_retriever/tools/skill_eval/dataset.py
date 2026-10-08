@@ -20,8 +20,18 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel
+import yaml
 
-from nemo_retriever.harness.config import _read_yaml_mapping
+
+def _read_yaml_mapping(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {path}")
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if data is None:
+        return {}
+    if not isinstance(data, dict):
+        raise ValueError(f"YAML config must be a mapping/object at top-level: {path}")
+    return data
 
 
 class GroundTruthPage(BaseModel):

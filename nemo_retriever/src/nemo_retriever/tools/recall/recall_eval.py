@@ -17,7 +17,7 @@ from typing import Annotated, Any, Optional
 
 from nemo_retriever.graph.designer import Param, designer_component
 from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL
-from nemo_retriever.harness.config import VALID_BEIR_DOC_ID_FIELDS, VALID_BEIR_LOADERS
+from nemo_retriever.tools.recall.beir import VALID_BEIR_DOC_ID_FIELDS, VALID_BEIR_LOADERS
 
 logger = logging.getLogger(__name__)
 

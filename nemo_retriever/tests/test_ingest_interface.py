@@ -77,7 +77,7 @@ def _run_graph_ingest_with_result(ingestor: GraphIngestor, result, monkeypatch, 
         lambda: SimpleNamespace(extraction_mode="pdf"),
     )
 
-    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order):
+    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order, return_results=True):
         assert effective_extraction.extraction_mode == "pdf"
         assert dedup_params is ingestor._dedup_params
         assert isinstance(post_extract_order, tuple)
@@ -391,7 +391,7 @@ def test_caption_auto_dedup_does_not_mutate_repeated_ingest_state(monkeypatch: p
         lambda: SimpleNamespace(extraction_mode="pdf"),
     )
 
-    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order):
+    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order, return_results=True):
         assert effective_extraction.extraction_mode == "pdf"
         calls.append((dedup_params, post_extract_order))
         return pd.DataFrame()
@@ -422,7 +422,7 @@ def test_image_only_caption_does_not_enable_or_persist_dedup(monkeypatch: pytest
         lambda: SimpleNamespace(extraction_mode="image"),
     )
 
-    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order):
+    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order, return_results=True):
         assert effective_extraction.extraction_mode == "image"
         calls.append((dedup_params, post_extract_order))
         return pd.DataFrame()
@@ -448,7 +448,7 @@ def test_explicit_disabled_dedup_preserves_sdk_state(monkeypatch: pytest.MonkeyP
         lambda: SimpleNamespace(extraction_mode="pdf"),
     )
 
-    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order):
+    def _execute_single_graph(effective_extraction, *, dedup_params, post_extract_order, return_results=True):
         assert effective_extraction.extraction_mode == "pdf"
         calls.append((dedup_params, post_extract_order))
         return pd.DataFrame()
