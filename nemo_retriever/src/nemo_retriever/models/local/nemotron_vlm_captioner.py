@@ -174,11 +174,7 @@ class NemotronVLMCaptioner(BaseModel):
             extra_body=extra_body,
         )[0]
 
-    @nvtx.annotate("gpu_inference", color="blue")
-    @nvtx.annotate("nrl.model::vlm_captioner.inference", color="blue")
-    def _chat(self, conversations: List[Any], sampling_params: Any, **chat_kwargs: Any) -> Any:
-        return self._llm.chat(conversations, sampling_params=sampling_params, **chat_kwargs)
-
+    @nvtx.annotate("nrl.model::vlm_captioner.caption_batch", color="blue")
     def caption_batch(
         self,
         base64_images: List[str],
@@ -206,7 +202,7 @@ class NemotronVLMCaptioner(BaseModel):
         sampling_params = SamplingParams(**sp_kwargs)
         chat_kwargs = merge_request_extras(self._request_extras, extra_body or {})
         chat_kwargs.setdefault("use_tqdm", False)
-        outputs = self._chat(conversations, sampling_params, **chat_kwargs)
+        outputs = self._llm.chat(conversations, sampling_params=sampling_params, **chat_kwargs)
         return [out.outputs[0].text.strip() for out in outputs]
 
     # ---- BaseModel abstract interface ----

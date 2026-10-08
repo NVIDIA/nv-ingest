@@ -121,20 +121,22 @@ workstation with the interface installed. Search the timeline for `nrl.batch::`,
 
 Local and remote (endpoint-backed) Page Elements, Table Structure, OCR, and embedding actors emit the same ranges; for remote actors, the batch range includes network requests to the endpoint.
 
-Local model backend calls also emit stable, decorator-based ranges. Each model
-range is nested inside `gpu_inference`, which preserves compatibility with
-`nsys profile --capture-range=nvtx --nvtx-capture=gpu_inference` for focused
-model profiling.
+Local model operations also emit stable, decorator-based ranges. These ranges
+wrap existing high-level methods, so they can include CPU input preparation,
+one or more backend calls, and output processing. Compare them with CUDA
+activity in the Nsight Systems timeline to isolate device execution.
 
 | Range | Interpretation |
 | --- | --- |
-| `nrl.model::llama_nemotron_embed_vl.encode_documents` | One local document text, image, or paired text-image embedding backend call. |
-| `nrl.model::llama_nemotron_embed_vl.encode_queries` | One local query embedding backend call. |
+| `nrl.model::llama_nemotron_embed_vl.embed` | One local document text embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_queries` | One local query embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_images` | One local image embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_text_image` | One local paired text-image embedding operation. |
 | `nrl.model::ocr_v2.invoke` | One end-to-end Nemotron OCR v2 wrapper call, including input conversion and all backend calls. This is the model used by the current local OCR actor. |
-| `nrl.model::page_elements.inference` | One local Page Elements backend call. |
-| `nrl.model::table_structure.inference` | One local Table Structure backend call. |
-| `nrl.model::vlm_captioner.inference` | One local visual language model captioning backend call. |
-| `nrl.model::parakeet_ctc.inference` | One local Parakeet CTC forward pass. |
+| `nrl.model::page_elements.invoke` | One local Page Elements operation, including input validation, model execution, and output scaling. |
+| `nrl.model::table_structure.invoke` | One local Table Structure operation, including input preparation, model execution, and output scaling. |
+| `nrl.model::vlm_captioner.caption_batch` | One local visual language model batch captioning operation. |
+| `nrl.model::parakeet_ctc.decode_batch` | One local Parakeet CTC chunk-batch operation, including feature preparation, model execution, and greedy decoding. |
 
 Remote NVIDIA Inference Microservice (NIM) calls emit
 `nrl.remote::nim.request`. This range covers one HTTP request and its retry and

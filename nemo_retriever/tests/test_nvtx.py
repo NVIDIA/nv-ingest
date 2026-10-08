@@ -239,10 +239,8 @@ def test_embedding_inference_decorators(capture_ranges, fails: bool) -> None:
         result = embedder.embed(inputs)
         torch.testing.assert_close(result, torch.tensor([[0.6, 0.8]] * len(inputs)))
     assert events == [
-        ("push", "gpu_inference"),
-        ("push", "nrl.model::llama_nemotron_embed_vl.encode_documents"),
+        ("push", "nrl.model::llama_nemotron_embed_vl.embed"),
         ("inference",),
-        ("pop",),
         ("pop",),
     ]
 
@@ -272,10 +270,8 @@ def test_ocr_v2_invoke_decorators(capture_ranges, fails: bool) -> None:
     else:
         assert model.invoke(b"image") == ["text"]
     assert events == [
-        ("push", "gpu_inference"),
         ("push", "nrl.model::ocr_v2.invoke"),
         ("inference",),
-        ("pop",),
         ("pop",),
     ]
 

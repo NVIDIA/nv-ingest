@@ -178,7 +178,6 @@ class NemotronOCRV2(BaseModel):
                     return " ".join(parts).strip()
         return str(obj).strip()
 
-    @nvtx.annotate("gpu_inference", color="blue")
     @nvtx.annotate("nrl.model::ocr_v2.invoke", color="blue")
     def invoke(
         self,

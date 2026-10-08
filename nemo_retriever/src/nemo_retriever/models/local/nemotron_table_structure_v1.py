@@ -69,8 +69,7 @@ class NemotronTableStructureV1(BaseModel):
 
         raise ValueError(f"Expected CHW or BCHW tensor, got shape {tuple(x.shape)}")
 
-    @nvtx.annotate("gpu_inference", color="blue")
-    @nvtx.annotate("nrl.model::table_structure.inference", color="blue")
+    @nvtx.annotate("nrl.model::table_structure.invoke", color="blue")
     def invoke(
         self, input_tensor: torch.Tensor, orig_shape: Tuple[int, int]
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:

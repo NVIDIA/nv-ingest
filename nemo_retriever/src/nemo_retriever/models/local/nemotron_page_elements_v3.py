@@ -102,8 +102,7 @@ class NemotronPageElementsV3(HuggingFaceModel):
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
         return self.invoke(input_data, orig_shape)
 
-    @nvtx.annotate("gpu_inference", color="blue")
-    @nvtx.annotate("nrl.model::page_elements.inference", color="blue")
+    @nvtx.annotate("nrl.model::page_elements.invoke", color="blue")
     def invoke(
         self, input_data: torch.Tensor, orig_shape: Union[Tuple[int, int], Sequence[Tuple[int, int]]]
     ) -> Union[List[Dict[str, torch.Tensor]], Dict[str, torch.Tensor]]:
