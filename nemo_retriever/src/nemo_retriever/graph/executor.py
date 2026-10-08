@@ -638,7 +638,6 @@ class RayDataExecutor(AbstractExecutor):
             raise ValueError("return_results=False requires a terminal VDB that supports streaming ingest")
         return sink_index
 
-    @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def ingest(
         self,
         data: Any,
@@ -675,6 +674,7 @@ class RayDataExecutor(AbstractExecutor):
             raise TypeError(f"RayDataExecutor.ingest() does not accept setting(s): {unsupported}")
         return self._ingest(data, return_results=return_results)
 
+    @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def _ingest(
         self,
         data: Any,

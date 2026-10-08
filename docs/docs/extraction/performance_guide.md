@@ -104,7 +104,7 @@ workstation with the interface installed. Search the timeline for `nrl.batch::`,
 
 | Range | Interpretation |
 | --- | --- |
-| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor.ingest()` call on the driver. Use this range for batch pipeline wall-clock time. |
+| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor` run on the driver, including `return_results=False` summary mode. Use this range for batch pipeline wall-clock time. |
 | `nrl.batch::pdf_split.batch` | One PDF split actor call that splits a batch of documents into single-page PDFs. |
 | `nrl.batch::pdf_extract.batch` | One PDF extraction actor call that extracts text and images from a batch of pages. |
 | `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |

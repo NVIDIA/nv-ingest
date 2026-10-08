@@ -319,13 +319,30 @@ def test_remote_nim_request_decorator(capture_ranges, monkeypatch: pytest.Monkey
     ]
 
 
-def test_ray_pipeline_ingest_decorator(capture_ranges) -> None:
+def test_ray_pipeline_ingest_decorator(capture_ranges, monkeypatch: pytest.MonkeyPatch) -> None:
     module = importlib.import_module("nemo_retriever.graph.executor")
     module = importlib.reload(module)
     executor = object.__new__(module.RayDataExecutor)
+    executor.graph = object()
+    monkeypatch.setattr(executor, "_linearize", lambda graph: [])
+    monkeypatch.setattr(executor, "_stream_ingest_index", lambda nodes, *, require_terminal=False: None)
+    public_result = object()
+    monkeypatch.setattr(executor, "build_dataset", lambda data: object())
+    monkeypatch.setattr(module, "ray_dataset_to_pandas", lambda dataset: public_result)
+    assert executor.ingest(None) is public_result
+    assert capture_ranges == [
+        ("push", "nrl.batch::pipeline.ingest"),
+        ("pop",),
+    ]
 
-    with pytest.raises(TypeError, match="unsupported"):
-        executor.ingest(None, unsupported=True)
+    capture_ranges.clear()
+    stream_node = SimpleNamespace(operator=SimpleNamespace(_stream_ingest=lambda batches: 3))
+    monkeypatch.setattr(executor, "_linearize", lambda graph: [stream_node])
+    monkeypatch.setattr(executor, "_stream_ingest_index", lambda nodes, *, require_terminal=False: 0)
+    dataset = SimpleNamespace(iter_batches=lambda **kwargs: iter(()))
+    monkeypatch.setattr(executor, "_build_dataset", lambda data, **kwargs: dataset)
+    result = executor._ingest(None, return_results=False)
+    assert result.to_dict("records") == [{"input_rows": 0, "submitted_records": 3}]
     assert capture_ranges == [
         ("push", "nrl.batch::pipeline.ingest"),
         ("pop",),
