@@ -179,10 +179,7 @@ class NemotronOCRV2(BaseModel):
         return str(obj).strip()
 
     @nvtx.annotate("gpu_inference", color="blue")
-    @nvtx.annotate("nrl.model::ocr_v2.inference", color="blue")
-    def _infer(self, input_data: Any, *, merge_level: str) -> Any:
-        return self._model(input_data, merge_level=merge_level)
-
+    @nvtx.annotate("nrl.model::ocr_v2.invoke", color="blue")
     def invoke(
         self,
         input_data: Union[torch.Tensor, str, bytes, np.ndarray, io.BytesIO],
@@ -206,17 +203,17 @@ class NemotronOCRV2(BaseModel):
                 out: List[Any] = []
                 for i in range(int(input_data.shape[0])):
                     b64 = self._tensor_to_png_b64(input_data[i])
-                    out.extend(self._infer(b64.encode("utf-8"), merge_level=merge_level))
+                    out.extend(self._model(b64.encode("utf-8"), merge_level=merge_level))
                 return out
             if input_data.ndim == 3:
                 b64 = self._tensor_to_png_b64(input_data)
-                return self._infer(b64.encode("utf-8"), merge_level=merge_level)
+                return self._model(b64.encode("utf-8"), merge_level=merge_level)
             raise ValueError(f"Unsupported torch tensor shape for OCR: {tuple(input_data.shape)}")
 
         if isinstance(input_data, str):
-            return self._infer(input_data.encode("utf-8"), merge_level=merge_level)
+            return self._model(input_data.encode("utf-8"), merge_level=merge_level)
 
-        return self._infer(input_data, merge_level=merge_level)
+        return self._model(input_data, merge_level=merge_level)
 
     @property
     def model_name(self) -> str:

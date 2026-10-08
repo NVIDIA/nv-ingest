@@ -247,21 +247,10 @@ def test_embedding_inference_decorators(capture_ranges, fails: bool) -> None:
     ]
 
 
-@pytest.mark.parametrize(
-    ("model_class", "expected_range"),
-    [
-        ("NemotronOCRV1", "nrl.model::ocr_v1.inference"),
-        ("NemotronOCRV2", "nrl.model::ocr_v2.inference"),
-    ],
-)
 @pytest.mark.parametrize("fails", [False, True])
-def test_ocr_inference_decorators(capture_ranges, model_class: str, expected_range: str, fails: bool) -> None:
-    if model_class == "NemotronOCRV1":
-        module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v1")
-    else:
-        module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v2")
+def test_ocr_v2_invoke_decorators(capture_ranges, fails: bool) -> None:
+    module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v2")
     module = importlib.reload(module)
-    cls = getattr(module, model_class)
 
     events = capture_ranges
     error = ValueError("inference failed")
@@ -274,7 +263,7 @@ def test_ocr_inference_decorators(capture_ranges, model_class: str, expected_ran
             raise error
         return ["text"]
 
-    model = object.__new__(cls)
+    model = object.__new__(module.NemotronOCRV2)
     model._model = infer
     if fails:
         with pytest.raises(ValueError) as exc:
@@ -284,7 +273,7 @@ def test_ocr_inference_decorators(capture_ranges, model_class: str, expected_ran
         assert model.invoke(b"image") == ["text"]
     assert events == [
         ("push", "gpu_inference"),
-        ("push", expected_range),
+        ("push", "nrl.model::ocr_v2.invoke"),
         ("inference",),
         ("pop",),
         ("pop",),

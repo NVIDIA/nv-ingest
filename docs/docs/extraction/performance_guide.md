@@ -130,8 +130,7 @@ model profiling.
 | --- | --- |
 | `nrl.model::llama_nemotron_embed_vl.encode_documents` | One local document text, image, or paired text-image embedding backend call. |
 | `nrl.model::llama_nemotron_embed_vl.encode_queries` | One local query embedding backend call. |
-| `nrl.model::ocr_v1.inference` | One legacy Nemotron OCR v1 backend call. |
-| `nrl.model::ocr_v2.inference` | One Nemotron OCR v2 backend call. This is the model used by the current local OCR actor. |
+| `nrl.model::ocr_v2.invoke` | One end-to-end Nemotron OCR v2 wrapper call, including input conversion and all backend calls. This is the model used by the current local OCR actor. |
 | `nrl.model::page_elements.inference` | One local Page Elements backend call. |
 | `nrl.model::table_structure.inference` | One local Table Structure backend call. |
 | `nrl.model::vlm_captioner.inference` | One local visual language model captioning backend call. |
