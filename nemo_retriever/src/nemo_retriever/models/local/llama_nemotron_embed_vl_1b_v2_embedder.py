@@ -259,6 +259,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
         tensor = torch.tensor(vectors, dtype=torch.float32)
         return _l2_normalize(tensor) if self.normalize else tensor
 
+    @nvtx.annotate("nrl.model::llama_nemotron_embed_vl.embed", color="blue")
     def embed(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
         """Embed document texts. Returns CPU tensor ``[N, D]``."""
         self._ensure_loaded()
@@ -276,6 +277,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
         )
         return self._finalize_vectors(vectors)
 
+    @nvtx.annotate("nrl.model::llama_nemotron_embed_vl.embed_queries", color="blue")
     def embed_queries(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
         """Embed query strings. Returns CPU tensor ``[N, D]``."""
         self._ensure_loaded()
@@ -293,6 +295,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
         )
         return self._finalize_vectors(vectors)
 
+    @nvtx.annotate("nrl.model::llama_nemotron_embed_vl.embed_images", color="blue")
     def embed_images(self, images_b64: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
         """Embed images (base64-encoded). Returns CPU tensor ``[N, D]``."""
         self._ensure_loaded()
@@ -314,6 +317,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
         )
         return self._finalize_vectors(vectors)
 
+    @nvtx.annotate("nrl.model::llama_nemotron_embed_vl.embed_text_image", color="blue")
     def embed_text_image(
         self, texts: Sequence[str], images_b64: Sequence[str], *, batch_size: int = 64
     ) -> torch.Tensor:

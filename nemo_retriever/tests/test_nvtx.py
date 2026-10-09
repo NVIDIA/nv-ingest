@@ -245,6 +245,42 @@ def test_embedding_inference_decorators(capture_ranges, fails: bool) -> None:
     ]
 
 
+def test_vllm_embedding_inference_decorator(capture_ranges, monkeypatch: pytest.MonkeyPatch) -> None:
+    torch = pytest.importorskip("torch")
+    module = importlib.import_module("nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder")
+    module = importlib.reload(module)
+    embedder = object.__new__(module.LlamaNemotronEmbedVL1BV2VLLMEmbedder)
+    embedder._llm = object()
+    embedder.document_prefix = "passage: "
+    embedder.normalize = True
+    embedder.output_dimension = 2
+    monkeypatch.setattr(embedder, "_ensure_loaded", lambda: None)
+
+    vllm_module = importlib.import_module("nemo_retriever.models.inference.vllm")
+    calls = []
+
+    def embed_with_vllm_llm(texts, llm, **kwargs):
+        assert capture_ranges == [("push", "nrl.model::llama_nemotron_embed_vl.embed")]
+        calls.append((texts, llm, kwargs))
+        return [[3.0, 4.0]]
+
+    monkeypatch.setattr(vllm_module, "embed_with_vllm_llm", embed_with_vllm_llm)
+    result = embedder.embed(["document"])
+
+    assert calls == [
+        (
+            ["document"],
+            embedder._llm,
+            {"batch_size": 64, "prefix": "passage: ", "normalize": True},
+        )
+    ]
+    torch.testing.assert_close(result, torch.tensor([[0.6, 0.8]]))
+    assert capture_ranges == [
+        ("push", "nrl.model::llama_nemotron_embed_vl.embed"),
+        ("pop",),
+    ]
+
+
 @pytest.mark.parametrize("fails", [False, True])
 def test_ocr_v2_invoke_decorators(capture_ranges, fails: bool) -> None:
     module = importlib.import_module("nemo_retriever.models.local.nemotron_ocr_v2")
