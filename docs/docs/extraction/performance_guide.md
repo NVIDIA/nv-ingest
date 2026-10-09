@@ -104,7 +104,7 @@ workstation with the interface installed. Search the timeline for `nrl.batch::`,
 
 | Range | Interpretation |
 | --- | --- |
-| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor` run on the driver, including `return_results=False` summary mode. Use this range for batch pipeline wall-clock time. |
+| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor` run on the driver, including `return_results=False` summary mode. Use this range for batch pipeline wall-clock time. Driver-side setup before the run, such as building and normalizing manifest branch datasets, is outside this range. |
 | `nrl.batch::pdf_split.batch` | One PDF split actor call that splits a batch of documents into single-page PDFs. |
 | `nrl.batch::pdf_extract.batch` | One PDF extraction actor call that extracts text and images from a batch of pages. |
 | `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
@@ -133,7 +133,7 @@ activity in the Nsight Systems timeline to isolate device execution.
 | `nrl.model::llama_nemotron_embed_vl.embed_images` | One local image embedding operation. |
 | `nrl.model::llama_nemotron_embed_vl.embed_text_image` | One local paired text-image embedding operation. |
 | `nrl.model::ocr_v2.invoke` | One end-to-end Nemotron OCR v2 wrapper call, including input conversion and all backend calls. This is the model used by the current local OCR actor. |
-| `nrl.model::page_elements.invoke` | One local Page Elements operation, including input validation, model execution, and output scaling. |
+| `nrl.model::page_elements.invoke` | One local Page Elements model call, including the initialization check and model execution. Output scaling runs in the separate `postprocess` call, outside this range. |
 | `nrl.model::table_structure.invoke` | One local Table Structure operation, including input preparation, model execution, and output scaling. |
 | `nrl.model::vlm_captioner.caption_batch` | One local visual language model batch captioning operation. |
 | `nrl.model::parakeet_ctc.decode_batch` | One local Parakeet CTC chunk-batch operation, including feature preparation, model execution, and greedy decoding. |
