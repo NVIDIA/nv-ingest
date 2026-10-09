@@ -240,10 +240,6 @@ tools/private_local/*
 # LanceDB artifacts
 lancedb_*/
 
-# Harness history database
-history.db
-history.db-shm
-history.db-wal
 
 
 lancedb/

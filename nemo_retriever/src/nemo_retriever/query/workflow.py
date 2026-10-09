@@ -186,13 +186,11 @@ def query_documents(request: QueryRequest) -> list[RetrievalHit]:
 def build_agentic_config(request: QueryRequest, *, top_k: int | None = None) -> "AgenticRetrievalConfig":
     """Build an :class:`AgenticRetrievalConfig` from a :class:`QueryRequest`.
 
-    Shared by the single-query CLI path (:func:`agentic_query_documents`) and the
-    batch harness BEIR path so agentic config derivation lives in one place. The
+    Used by the single-query CLI path (:func:`agentic_query_documents`). The
     LanceDB ``uri``/``table_name``, embedding config, and (when ``rerank`` is
     enabled) reranker config are passed straight through to the wrapped
     ``Retriever`` that backs the agent's ``retrieve`` tool. ``top_k`` overrides the
-    final document count the agent targets (the harness sets this to the deepest
-    BEIR metric ``k`` so recall at the largest cutoff is computable).
+    final document count the agent targets.
     """
     from nemo_retriever.query.agentic import AgenticRetrievalConfig
 

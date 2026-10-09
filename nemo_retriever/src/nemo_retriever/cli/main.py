@@ -15,12 +15,7 @@ from nemo_retriever.version import get_version_info
 
 logger = logging.getLogger(__name__)
 
-app = typer.Typer(
-    help=(
-        "NeMo Retriever product workflows: ingest content, query an index, "
-        "run benchmark harnesses, or operate the service."
-    )
-)
+app = typer.Typer(help="NeMo Retriever product workflows: ingest content, query an index, or operate the service.")
 
 # Service sub-app is always available (lightweight, no GPU deps).
 from nemo_retriever.service.cli import app as service_app  # noqa: E402
@@ -33,7 +28,6 @@ app.add_typer(query_app, name="query")
 # surface. HTML and TXT are intentionally absent: they are ingest input formats,
 # not standalone workflows.
 _LAZY_SUBAPPS: list[tuple[str, str, str, bool]] = [
-    ("harness", "nemo_retriever.harness", "app", False),
     ("eval", "nemo_retriever.tools.evaluation.cli", "app", True),
     ("benchmark", "nemo_retriever.tools.benchmark", "app", True),
     ("recall", "nemo_retriever.tools.recall", "app", True),

@@ -18,8 +18,7 @@ from typing import Any, Optional
 import typer
 import yaml
 
-from nemo_retriever.harness.artifacts import create_session_dir, last_commit
-from nemo_retriever.harness.config import REPO_ROOT
+from nemo_retriever.tools.skill_eval.artifacts import create_session_dir, last_commit
 from nemo_retriever.tools.skill_eval.dataset import DatasetEntry, load_config, load_eval_manifest
 from nemo_retriever.tools.skill_eval.report import overall_recall, write_summary
 from nemo_retriever.tools.skill_eval.runner import (
@@ -41,6 +40,8 @@ from nemo_retriever.tools.skill_eval.runner import (
 DEFAULT_ORDER = ("c1_base", "c2_retriever", "c3_retriever_skill")
 
 app = typer.Typer(help="Benchmark coding agents with vs. without the /nemo-retriever skill on a folder of PDFs.")
+REPO_ROOT = Path(__file__).resolve().parents[5]
+
 logger = logging.getLogger(__name__)
 
 

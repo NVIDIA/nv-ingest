@@ -383,7 +383,7 @@ def _shutdown_vllm_engine(llm: Any) -> None:
 def create_vllm_agent_chat_llm(config: LocalAgentLLMConfig) -> VLLMAgentChatLLM:
     """Create a local agent LLM owned by the caller (no process-global cache).
 
-    Mirrors embed/rerank: the harness/CLI job holds one instance for the whole
+    Mirrors embed/rerank: the CLI job holds one instance for the whole
     run and calls ``unload()`` when the job finishes.
     """
 

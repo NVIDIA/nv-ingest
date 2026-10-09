@@ -174,7 +174,7 @@ For chart keys, refer to [Agentic retrieval (self-hosted Nemotron 3.5 Lightning)
 Retriever Service exposes agentic retrieval on `POST /v1/query` and
 `POST /v1/answer` when `agentic.enabled` is true. Service mode requires remote
 OpenAI-compatible LLM and embedding endpoints. Local in-process vLLM remains
-available on the one-shot CLI and harness paths only.
+available on the one-shot CLI path.
 
 Enable agentic retrieval in `retriever-service.yaml`:
 
@@ -399,7 +399,7 @@ Agentic runs use a dedicated worker pool in the VectorDB process so they cannot 
 ## Limitations and resource requirements { #limitations-and-resource-requirements }
 
 - Local in-process agent LLMs are limited to the tested `nemotron-8b` and `super-49b` profiles. Custom in-process models require an OpenAI-compatible endpoint instead.
-- Local CLI and harness runs need a CUDA GPU host and the `[local]` extra. `super-49b` needs two visible GPUs and `--agentic-local-tensor-parallel-size 2`.
+- Local CLI runs need a CUDA GPU host and the `[local]` extra. `super-49b` needs two visible GPUs and `--agentic-local-tensor-parallel-size 2`.
 - Retriever Service agentic queries require a remote chat-completions URL, a remote embedding endpoint, and matching credentials in the process environment.
 - The default Helm `answer_llm` Nemotron 3.5 Lightning NIM is limited to `POST /v1/answer` until you add the tool-call passthrough arguments. Enabling `nimOperator.answer_llm` does not configure `serviceConfig.agentic`.
 - Helm leaves `serviceConfig.mcp.enabled` at `false`. Remote MCP agents require `--set serviceConfig.mcp.enabled=true` and must use the configured mount path, which defaults to `/mcp`. Refer to [Enable MCP on Helm](#enable-mcp-on-helm).
