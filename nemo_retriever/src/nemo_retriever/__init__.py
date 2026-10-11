@@ -42,6 +42,7 @@ __all__ = [
     "DocumentPage",
     "DocumentDeleteResult",
     "QueryHit",
+    "simple",
 ]
 
 retriever = _retriever_cls()
@@ -112,4 +113,8 @@ def __getattr__(name: str):
         )
 
         return locals()[name]
+    if name == "simple":
+        import importlib
+
+        return importlib.import_module("nemo_retriever.simple")
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
