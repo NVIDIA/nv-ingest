@@ -1,0 +1,350 @@
+{
+  "config": {
+    "dpi": 300,
+    "max_pages_per_doc": 6,
+    "backend": "pypdfium2"
+  },
+  "env": {
+    "python": "3.12.13",
+    "platform": "Linux-6.11.0-18-generic-x86_64-with-glibc2.35",
+    "numpy": "2.4.6",
+    "pypdfium2_pdfium_build": "126.0.6462.0",
+    "wall_clock_note": "Date.now unavailable in-tool; timestamp stamped by caller if needed"
+  },
+  "buckets": {
+    "born_digital": {
+      "docs": 28,
+      "pages_profiled": 97,
+      "ms_per_page": {
+        "render": 28.472,
+        "text": 0.81,
+        "objects": 5.62,
+        "image_decode": 4.213
+      },
+      "render_latency_ms": {
+        "p50": 13.3,
+        "p90": 44.1,
+        "p99": 273.6
+      },
+      "render_pages_per_sec": 35.1,
+      "open_ms_mean": 0.713,
+      "split_ms_per_page_mean": 0.883,
+      "docs_detail": [
+        {
+          "name": "access_for_domestic_workers_to_labour_and_social_protection-KE0124002ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "6a0ae67b44f10523"
+        },
+        {
+          "name": "back.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "23e277533a10fe4e"
+        },
+        {
+          "name": "citigroup_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "110df6b48975b45d"
+        },
+        {
+          "name": "employment_and_social_developments_in_europe-KE0125067ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "6fb5d05961458008"
+        },
+        {
+          "name": "employment_and_social_developments_in_europe_2024-KEBD24002ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "f23b0a0ef4d7602c"
+        },
+        {
+          "name": "estimating_labour_market_transitions_and_skills_investment-KE0125066ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "06c93a07e11372a1"
+        },
+        {
+          "name": "filesave.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "fc4fb2f04d538fd4"
+        },
+        {
+          "name": "forward.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "c179e4973f263e81"
+        },
+        {
+          "name": "functional_validation.pdf",
+          "pages": 5,
+          "first_page_raster_sha1": "4b0477b52727fd74"
+        },
+        {
+          "name": "future-oriented_occupations_in_the_eu-KE0125043ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "2d275852529fbfe1"
+        },
+        {
+          "name": "hand.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "05599359882f8651"
+        },
+        {
+          "name": "help.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "de131feca8105e86"
+        },
+        {
+          "name": "home.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "7316b12794f002f8"
+        },
+        {
+          "name": "joint_employment_report_2025-KE0125018ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "75b1f31fe2446fb3"
+        },
+        {
+          "name": "jpmorgan_chase_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "4ec3e4d5d86c9fb5"
+        },
+        {
+          "name": "labour_market_and_wage_developments_in_europe-KEBN24001ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "c026656e4cbb3345"
+        },
+        {
+          "name": "matplotlib.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "4a27a0d9d814f722"
+        },
+        {
+          "name": "move.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "ad4ac3fb91a19e6c"
+        },
+        {
+          "name": "posting_of_workers-KE0224850ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "55ae599948a5f38a"
+        },
+        {
+          "name": "qt4_editor_options.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "f7b829752006e1a9"
+        },
+        {
+          "name": "research_perspectives_on_the_future_of_work-KI0124087ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "0ab14152debccd91"
+        },
+        {
+          "name": "subplots.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "9bbcbffb47bad3fe"
+        },
+        {
+          "name": "table_test.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "7d7260d55697c068"
+        },
+        {
+          "name": "test-page-form.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "152886edea334834"
+        },
+        {
+          "name": "test.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "e1d59d6cba1151e1"
+        },
+        {
+          "name": "undeclared_care_work_in_the_eu-TJ0125004ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "218a2026d43982a2"
+        },
+        {
+          "name": "wells_fargo_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "03dc3cab1827ba13"
+        },
+        {
+          "name": "zoom_to_rect.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "5d7edd4d800b8c39"
+        }
+      ]
+    },
+    "scanned": {
+      "docs": 1,
+      "pages_profiled": 1,
+      "ms_per_page": {
+        "render": 86.955,
+        "text": 0.119,
+        "objects": 0.037,
+        "image_decode": 19.295
+      },
+      "render_latency_ms": {
+        "p50": 87.0,
+        "p90": 87.0,
+        "p99": 87.0
+      },
+      "render_pages_per_sec": 11.5,
+      "open_ms_mean": 0.039,
+      "split_ms_per_page_mean": 0.317,
+      "docs_detail": [
+        {
+          "name": "synthetic_scanned.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "6b1481034bcd5fc2"
+        }
+      ]
+    },
+    "rotated": {
+      "docs": 1,
+      "pages_profiled": 1,
+      "ms_per_page": {
+        "render": 76.708,
+        "text": 0.117,
+        "objects": 0.036,
+        "image_decode": 16.361
+      },
+      "render_latency_ms": {
+        "p50": 76.7,
+        "p90": 76.7,
+        "p99": 76.7
+      },
+      "render_pages_per_sec": 13.0,
+      "open_ms_mean": 0.046,
+      "split_ms_per_page_mean": 0.329,
+      "docs_detail": [
+        {
+          "name": "synthetic_rotated.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "bdb251f4b825aa14"
+        }
+      ]
+    },
+    "multi_image": {
+      "docs": 2,
+      "pages_profiled": 12,
+      "ms_per_page": {
+        "render": 34.181,
+        "text": 0.42,
+        "objects": 0.68,
+        "image_decode": 2.109
+      },
+      "render_latency_ms": {
+        "p50": 10.1,
+        "p90": 71.1,
+        "p99": 213.0
+      },
+      "render_pages_per_sec": 29.3,
+      "open_ms_mean": 0.598,
+      "split_ms_per_page_mean": 0.955,
+      "docs_detail": [
+        {
+          "name": "european_network_of_public_employment_services_annual-KE0124024ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "5820714cfc49c5d2"
+        },
+        {
+          "name": "recruitment_working_conditions_career_development-KI0124000ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "c4d2f8be7f02fa83"
+        }
+      ]
+    },
+    "dense_vector": {
+      "docs": 9,
+      "pages_profiled": 38,
+      "ms_per_page": {
+        "render": 35.377,
+        "text": 1.267,
+        "objects": 11.566,
+        "image_decode": 4.991
+      },
+      "render_latency_ms": {
+        "p50": 14.8,
+        "p90": 27.1,
+        "p99": 395.4
+      },
+      "render_pages_per_sec": 28.3,
+      "open_ms_mean": 0.236,
+      "split_ms_per_page_mean": 0.629,
+      "docs_detail": [
+        {
+          "name": "a_demographic_perspective_on_the_future_of_european-KJ0125152ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "c5ae6025a243baee"
+        },
+        {
+          "name": "annual_report_on_intra-eu_labour_mobility-KE0125029ENN.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "15a8b0394a066e67"
+        },
+        {
+          "name": "bank_of_america_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "c9d117f49863c6b2"
+        },
+        {
+          "name": "embedded_table.pdf",
+          "pages": 2,
+          "first_page_raster_sha1": "648f60a3f44f44c3"
+        },
+        {
+          "name": "goldman_sachs_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "d7e1c11d733874b1"
+        },
+        {
+          "name": "morgan_stanley_2024.pdf",
+          "pages": 6,
+          "first_page_raster_sha1": "d75d829b12c62237"
+        },
+        {
+          "name": "multimodal_test.pdf",
+          "pages": 3,
+          "first_page_raster_sha1": "baef693cf48e757f"
+        },
+        {
+          "name": "test-shapes.pdf",
+          "pages": 1,
+          "first_page_raster_sha1": "9e8075532319d37e"
+        },
+        {
+          "name": "woods_frost.pdf",
+          "pages": 2,
+          "first_page_raster_sha1": "33e752b3bb8c4f0b"
+        }
+      ]
+    },
+    "malformed": {
+      "docs": 0,
+      "pages_profiled": 0,
+      "ms_per_page": {
+        "render": null,
+        "text": null,
+        "objects": null,
+        "image_decode": null
+      },
+      "render_latency_ms": {
+        "p50": null,
+        "p90": null,
+        "p99": null
+      },
+      "render_pages_per_sec": null,
+      "open_ms_mean": null,
+      "split_ms_per_page_mean": null,
+      "docs_detail": [
+        {
+          "name": "garbage_header.pdf",
+          "error": "PdfiumError: Failed to load document (PDFium: Data format error)."
+        },
+        {
+          "name": "truncated.pdf",
+          "error": "PdfiumError: Failed to load document (PDFium: Data format error)."
+        }
+      ]
+    }
+  },
+  "peak_rss_mb": 304.2
+}

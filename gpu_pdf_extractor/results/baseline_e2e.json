@@ -1,0 +1,93 @@
+{
+  "config": {
+    "pages_per_doc": 8,
+    "docs_per_bucket": 6,
+    "workers": 8,
+    "backend": "pypdfium2",
+    "flags": "extract_text+images+page_as_image, method=pdfium (no NIM)"
+  },
+  "env": {
+    "python": "3.12.13",
+    "platform": "Linux-6.11.0-18-generic-x86_64-with-glibc2.35",
+    "numpy": "2.4.6",
+    "pypdfium2_pdfium_build": "126.0.6462.0",
+    "wall_clock_note": "Date.now unavailable in-tool; timestamp stamped by caller if needed"
+  },
+  "buckets": {
+    "born_digital": {
+      "docs": 6,
+      "pages": 41,
+      "pages_per_sec_serial": 15.8,
+      "docs_per_sec_serial": 2.31,
+      "ms_per_doc": {
+        "p50": 335.2,
+        "p90": 810.7,
+        "p99": 1122.2
+      },
+      "split_frac": 0.205,
+      "extract_frac": 0.795
+    },
+    "scanned": {
+      "docs": 1,
+      "pages": 1,
+      "pages_per_sec_serial": 12.4,
+      "docs_per_sec_serial": 12.36,
+      "ms_per_doc": {
+        "p50": 80.9,
+        "p90": 80.9,
+        "p99": 80.9
+      },
+      "split_frac": 0.063,
+      "extract_frac": 0.937
+    },
+    "rotated": {
+      "docs": 1,
+      "pages": 1,
+      "pages_per_sec_serial": 12.2,
+      "docs_per_sec_serial": 12.2,
+      "ms_per_doc": {
+        "p50": 82.0,
+        "p90": 82.0,
+        "p99": 82.0
+      },
+      "split_frac": 0.073,
+      "extract_frac": 0.927
+    },
+    "multi_image": {
+      "docs": 2,
+      "pages": 16,
+      "pages_per_sec_serial": 27.7,
+      "docs_per_sec_serial": 3.46,
+      "ms_per_doc": {
+        "p50": 288.8,
+        "p90": 331.3,
+        "p99": 340.9
+      },
+      "split_frac": 0.085,
+      "extract_frac": 0.915
+    },
+    "dense_vector": {
+      "docs": 6,
+      "pages": 42,
+      "pages_per_sec_serial": 8.5,
+      "docs_per_sec_serial": 1.22,
+      "ms_per_doc": {
+        "p50": 886.6,
+        "p90": 1328.1,
+        "p99": 1360.6
+      },
+      "split_frac": 0.091,
+      "extract_frac": 0.909
+    }
+  },
+  "overall": {
+    "docs": 16,
+    "pages": 101,
+    "serial_pages_per_sec": 12.2,
+    "serial_docs_per_sec": 1.94,
+    "wallclock_pages_per_sec": 56.7,
+    "workers": 8,
+    "wallclock_s": 1.78
+  },
+  "peak_rss_mb": 132.7
+}

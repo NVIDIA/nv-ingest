@@ -1,0 +1,11 @@
+# Build artifacts
+native/build/
+**/__pycache__/
+
+# Prebuilt PDFium binary (large; re-fetch via native/README.md)
+native/third_party/pdfium/
+
+# Corpus is symlinks into repo data + synthetic files; regenerate via bench/build_corpus.py
+corpus/
+
+# Keep results/ checked in (committed baseline numbers) — do NOT ignore.

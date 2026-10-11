@@ -1,0 +1,18 @@
+# Phase-0 packaging skeleton for the future `gpu_pdfium` wheel.
+# Not built into a wheel yet in P0 — we drive CMake directly for the link-proof.
+# In P1 this produces a py3.12 CUDA wheel via:  pip install .
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "gpu-pdfium"
+version = "0.0.0"
+description = "C++/CUDA PDF rasterizer + PDFium-backed drop-in for pypdfium2 (WIP)"
+requires-python = ">=3.12,<3.13"
+
+[tool.scikit-build]
+cmake.version = ">=3.22"
+cmake.build-type = "Release"
+build-dir = "build/{wheel_tag}"
+wheel.py-api = "cp312"

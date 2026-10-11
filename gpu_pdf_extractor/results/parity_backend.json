@@ -1,0 +1,494 @@
+{
+  "config": {
+    "dpi": 200.0,
+    "max_pages_per_doc": 4
+  },
+  "env": {
+    "python": "3.12.13",
+    "platform": "Linux-6.11.0-18-generic-x86_64-with-glibc2.35",
+    "numpy": "2.4.6",
+    "pypdfium2_pdfium_build": "126.0.6462.0",
+    "wall_clock_note": "Date.now unavailable in-tool; timestamp stamped by caller if needed",
+    "gpu_backend": "gpu_pdfium (PDFium C++ via nanobind)"
+  },
+  "buckets": {
+    "born_digital": [
+      {
+        "name": "access_for_domestic_workers_to_labour_and_social_protection-KE0124002ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "back.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "citigroup_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "employment_and_social_developments_in_europe-KE0125067ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "employment_and_social_developments_in_europe_2024-KEBD24002ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "estimating_labour_market_transitions_and_skills_investment-KE0125066ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "filesave.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "forward.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "functional_validation.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "future-oriented_occupations_in_the_eu-KE0125043ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "hand.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "help.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "home.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "joint_employment_report_2025-KE0125018ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "jpmorgan_chase_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "labour_market_and_wage_developments_in_europe-KEBN24001ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "matplotlib.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "move.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "posting_of_workers-KE0224850ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "qt4_editor_options.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "research_perspectives_on_the_future_of_work-KI0124087ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "subplots.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "table_test.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "test-page-form.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "test.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "undeclared_care_work_in_the_eu-TJ0125004ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "wells_fargo_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "zoom_to_rect.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      }
+    ],
+    "scanned": [
+      {
+        "name": "synthetic_scanned.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      }
+    ],
+    "rotated": [
+      {
+        "name": "synthetic_rotated.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      }
+    ],
+    "multi_image": [
+      {
+        "name": "european_network_of_public_employment_services_annual-KE0124024ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "recruitment_working_conditions_career_development-KI0124000ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      }
+    ],
+    "dense_vector": [
+      {
+        "name": "a_demographic_perspective_on_the_future_of_european-KJ0125152ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "annual_report_on_intra-eu_labour_mobility-KE0125029ENN.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "bank_of_america_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "embedded_table.pdf",
+        "pagecount_match": true,
+        "pages_compared": 2,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "2/2",
+        "objcount_match_pages": "2/2",
+        "metadata_match": true
+      },
+      {
+        "name": "goldman_sachs_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "morgan_stanley_2024.pdf",
+        "pagecount_match": true,
+        "pages_compared": 4,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "4/4",
+        "objcount_match_pages": "4/4",
+        "metadata_match": true
+      },
+      {
+        "name": "multimodal_test.pdf",
+        "pagecount_match": true,
+        "pages_compared": 3,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "3/3",
+        "objcount_match_pages": "3/3",
+        "metadata_match": true
+      },
+      {
+        "name": "test-shapes.pdf",
+        "pagecount_match": true,
+        "pages_compared": 1,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "1/1",
+        "objcount_match_pages": "1/1",
+        "metadata_match": true
+      },
+      {
+        "name": "woods_frost.pdf",
+        "pagecount_match": true,
+        "pages_compared": 2,
+        "render_shape_match": true,
+        "render_min_ssim": 1.0,
+        "render_mean_exact": 1.0,
+        "text_match_pages": "2/2",
+        "objcount_match_pages": "2/2",
+        "metadata_match": true
+      }
+    ],
+    "malformed": [
+      {
+        "name": "garbage_header.pdf",
+        "error": "PdfiumError: Failed to load document (PDFium: Data format error)."
+      },
+      {
+        "name": "truncated.pdf",
+        "error": "PdfiumError: Failed to load document (PDFium: Data format error)."
+      }
+    ]
+  },
+  "summary": {
+    "docs_compared_ok": 41,
+    "docs_errored": 2,
+    "global_min_render_ssim": 1.0,
+    "text_match_rate": "108/108",
+    "objcount_match_rate": "108/108"
+  }
+}
