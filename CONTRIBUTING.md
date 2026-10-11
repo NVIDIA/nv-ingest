@@ -16,6 +16,13 @@ External contributions will be welcome soon, and they are greatly appreciated! E
      - [Node failure decorator (try/except)](#node-failure-decorator-tryexcept)
      - [filter_by_task decorator](#filter_by_task-decorator)
    - [Adding a New Stage or Module](#adding-a-new-stage-or-module)
+     - [Overview](#overview)
+     - [End-to-End Checklist](#end-to-end-checklist)
+     - [Task Definition: CLI and Configuration](#task-definition-cli-and-configuration)
+     - [Processing Module: Operators and Tasks](#processing-module-operators-and-tasks)
+     - [Wiring into the Pipeline](#wiring-into-the-pipeline)
+     - [Unit Testing for New Stages](#unit-testing-for-new-stages)
+     - [Example: Adding a Summarization Task](#example-adding-a-summarization-task)
    - [Common Practices for Writing Unit Tests](#common-practices-for-writing-unit-tests)
      - [General Guidelines](#general-guidelines)
      - [Mocking External Services](#mocking-external-services)
@@ -285,7 +292,496 @@ function is provided.
 
 ### Adding a New Stage or Module
 
-#### TODO(Devin): Add details about adding a new stage or module once we have router node functionality in place.
+This section covers the full end-to-end process for adding a new processing task type to NeMo Retriever—from exposing it through the CLI and library, to writing the processing module, wiring it into the pipeline, and setting up unit tests.
+
+#### Overview
+
+NeMo Retriever's ingest pipeline is a directed graph of **operators**. Each operator is a class that extends `AbstractOperator` and processes a pandas DataFrame of document rows. Operators are constructed from typed **Pydantic params objects**; their presence or absence in a plan determines which stages run.
+
+The path from a user-facing flag to actual processing is:
+
+```
+CLI flag (options.py)
+  → IngestXxxOptions dataclass (ingest/plan.py)
+  → resolve_ingest_plan() → XxxParams (common/params/models.py)
+  → build_graph() (graph/ingestor_runtime.py) → Graph of operators
+  → GraphIngestor.ingest() (ingestor/graph_ingestor.py)
+```
+
+#### End-to-End Checklist
+
+Use this checklist when adding a new stage. Each step is expanded in detail below.
+
+1. **Params model** — Add a Pydantic params class in `common/params/models.py`.
+2. **Task class** *(optional, for LLM-backed tasks)* — Add a task class in `models/llm/tasks/` that encapsulates prompt building and execution.
+3. **Operator class** — Add an operator in `operators/<category>/my_task.py` extending `AbstractOperator`.
+4. **Stage registry** *(stateless function stages only)* — Register a handler in `graph/stages/stage_registry.py`.
+5. **Graph wiring** — Insert the operator into `graph/ingestor_runtime.py :: build_graph()`.
+6. **GraphIngestor fluent API** — Add a `.my_task(params)` method to `ingestor/graph_ingestor.py`.
+7. **Plan options dataclass** — Add `IngestMyTaskOptions` in `ingest/plan.py`.
+8. **Plan resolution** — Add resolution logic in `resolve_ingest_plan()` in `ingest/plan.py`.
+9. **CLI options** — Add `Annotated[...]` type aliases in `cli/ingest/options.py`.
+10. **CLI command** — Wire the new options into `_graph_ingest_command` in `cli/ingest/graph_commands.py`.
+11. **Tests** — Write unit tests for the operator, graph structure, and CLI wiring.
+
+---
+
+#### Task Definition: CLI and Configuration
+
+##### 1. Define a Params Model
+
+All stage configuration flows as typed Pydantic models. Add your params class to `common/params/models.py`:
+
+```python
+# common/params/models.py
+from pydantic import BaseModel
+
+class MyNewTaskParams(BaseModel):
+    invoke_url: str | None = None
+    api_key: str | None = None
+    my_option: str = "default"
+```
+
+Export it from `common/params/__init__.py` alongside existing params.
+
+##### 2. Define CLI Options
+
+Options are `Annotated` type aliases in `cli/ingest/options.py`. Add one alias per CLI flag:
+
+```python
+# cli/ingest/options.py
+MyNewTaskOption = Annotated[
+    bool,
+    typer.Option("--my-new-task", help="Enable the new task stage."),
+]
+MyNewTaskInvokeUrlOption = Annotated[
+    str | None,
+    typer.Option("--my-new-task-invoke-url", help="Remote endpoint URL for my new task."),
+]
+```
+
+##### 3. Add the Options Dataclass
+
+Add a frozen dataclass in `ingest/plan.py` to group the new options:
+
+```python
+# ingest/plan.py
+@dataclass(frozen=True)
+class IngestMyNewTaskOptions:
+    enabled: bool = False
+    invoke_url: str | None = None
+    my_option: str = "default"
+```
+
+Then add the field to `IngestPlanRequest`:
+
+```python
+@dataclass(frozen=True)
+class IngestPlanRequest:
+    ...
+    my_new_task: IngestMyNewTaskOptions = field(default_factory=IngestMyNewTaskOptions)
+```
+
+##### 4. Resolve the Options to Params
+
+In `resolve_ingest_plan()` in `ingest/plan.py`, translate the options dataclass into your Pydantic params:
+
+```python
+# inside resolve_ingest_plan()
+def _build_my_new_task_params(options: IngestMyNewTaskOptions) -> MyNewTaskParams | None:
+    if not options.enabled:
+        return None
+    kwargs = {}
+    if options.invoke_url is not None:
+        kwargs["invoke_url"] = options.invoke_url
+    return MyNewTaskParams(**kwargs)
+
+my_new_task_params = _build_my_new_task_params(request.my_new_task)
+```
+
+Return `my_new_task_params` from `resolve_ingest_plan()` and include it in the `ResolvedIngestPlan` dataclass. Also add it to `_ingest_plan_to_dry_run_data()` in `cli/ingest_workflow.py` so it appears in `--dry-run` output.
+
+##### 5. Wire the CLI Flags into the Command
+
+In `cli/ingest/graph_commands.py`, add the new option types as parameters to `_graph_ingest_command` and build them in `_build_graph_ingest_request`:
+
+```python
+def _build_my_new_task_options(values: Mapping[str, Any]) -> IngestMyNewTaskOptions:
+    return IngestMyNewTaskOptions(
+        enabled=values["my_new_task"],
+        invoke_url=values.get("my_new_task_invoke_url"),
+    )
+
+def _build_graph_ingest_request(values, *, run_mode) -> IngestPlanRequest:
+    return IngestPlanRequest(
+        ...
+        my_new_task=_build_my_new_task_options(values),
+    )
+```
+
+---
+
+#### Processing Module: Operators and Tasks
+
+##### Operator Base Classes
+
+All operators extend `AbstractOperator` from `operators/abstract_operator.py`:
+
+```python
+class AbstractOperator(ABC):
+    def preprocess(self, data: Any, **kwargs) -> Any: ...
+    def process(self, data: Any, **kwargs) -> Any: ...
+    def postprocess(self, data: Any, **kwargs) -> Any: ...
+
+    def run(self, data, **kwargs):
+        data = self.preprocess(data, **kwargs)
+        data = self.process(data, **kwargs)
+        return self.postprocess(data, **kwargs)
+```
+
+Mix in `CPUOperator` for CPU-bound work or `GPUOperator` for GPU-bound work. For stages that need to auto-select between CPU and GPU variants at runtime based on cluster resources, extend `ArchetypeOperator` and provide sibling CPU/GPU subclasses—see `operators/extract/ocr/ocr.py` for an example.
+
+##### Writing an Operator
+
+Create the file at `operators/<category>/my_task.py`. Follow these conventions:
+
+- Accept a params object as the first constructor argument.
+- Store all constructor state so `get_constructor_kwargs()` can reconstruct the operator without capturing live clients.
+- Use the decorators described in [Common Processing Patterns](#common-processing-patterns) to handle tracing, error annotation, and task gating.
+
+```python
+# operators/my_category/my_task.py
+from nemo_retriever.operators.abstract_operator import AbstractOperator
+from nemo_retriever.operators.cpu_operator import CPUOperator
+from nemo_retriever.common.params import MyNewTaskParams
+
+class MyNewTaskOperator(AbstractOperator, CPUOperator):
+    def __init__(self, params: MyNewTaskParams) -> None:
+        super().__init__()
+        self._params = params
+
+    def preprocess(self, data, **kwargs):
+        # Validate required columns, reject unsupported input shapes.
+        return data
+
+    def process(self, data, **kwargs):
+        # Core transformation. Input and output are pandas DataFrames.
+        results = []
+        for _, row in data.iterrows():
+            results.append(self._run_one(row))
+        return data.assign(my_output=results)
+
+    def postprocess(self, data, **kwargs):
+        return data
+
+    def _run_one(self, row):
+        # Per-row logic. Keep side effects out of preprocess/postprocess.
+        ...
+```
+
+##### Control Message Decorators
+
+Apply these decorators to methods that process `IngestControlMessage` objects in service-mode (Morpheus) stages. They are not required for pure DataFrame operators used in the Ray-backed ingest path.
+
+- `@traceable()` — records entry/exit timestamps in the message's metadata; use it on every `process_message` method so timing traces are available without additional instrumentation.
+- Node failure decorator — wraps failures so they are consistently annotated and respects `skip_processing_if_failed=True` by default; downstream stages skip already-failed messages automatically.
+- `@filter_by_task(required_tasks=["my_task"])` — short-circuits the method and passes the message through unchanged when the control message does not carry the required task. Use this whenever a stage is task-specific rather than running unconditionally.
+
+##### LLM-Backed Tasks (Optional)
+
+If the new stage calls a large-language model, follow the task/operator split used by `SummarizationOperator`:
+
+1. **Task class** in `models/llm/tasks/` — builds the prompt and calls the completion client:
+
+   ```python
+   # models/llm/tasks/my_task.py
+   from nemo_retriever.models.llm.tasks.base import TextGenerationTask
+
+   class MyNewTask(TextGenerationTask):
+       def build_request(self, *, text: str):
+           return self._build_messages_request(
+               user=f"Do something with:\n\n{text}",
+               system="You are a helpful assistant.",
+           )
+   ```
+
+2. **Operator class** in `operators/generation/` — extends `TextGenerationOperator` and wires the task:
+
+   ```python
+   # operators/generation/my_task.py
+   from nemo_retriever.operators.generation.base import TextGenerationOperator
+   from nemo_retriever.models.llm.tasks import MyNewTask
+
+   class MyNewTaskOperator(TextGenerationOperator):
+       def __init__(self, params, input_column="text", output_column="my_output", ...):
+           task = MyNewTask(prompt=params.prompt, system_prompt=params.system_prompt)
+           super().__init__(
+               params, task=task,
+               input_columns={"text": input_column},
+               output_column=output_column,
+               ...
+           )
+   ```
+
+   `TextGenerationOperator` handles batching, concurrency, error capture, and graph serialization automatically.
+
+##### Stage Registry (Stateless Function Stages)
+
+If the stage is a stateless function rather than a class-based operator, register it in `graph/stages/stage_registry.py`:
+
+```python
+# graph/stages/stage_registry.py
+from nemo_retriever.operators.my_category.my_task import my_task_handler
+
+STAGE_REGISTRY: Dict[str, StageHandler] = {
+    ...
+    "my_new_task": my_task_handler,
+}
+```
+
+The handler contract is `(df: pd.DataFrame, **kwargs) -> tuple[pd.DataFrame, dict]`.
+
+---
+
+#### Wiring into the Pipeline
+
+##### build_graph()
+
+In `graph/ingestor_runtime.py`, `build_graph()` constructs the operator chain based on which params objects are present. Add a branch for the new stage:
+
+```python
+# graph/ingestor_runtime.py :: build_graph()
+
+def build_graph(
+    ...
+    my_new_task_params: MyNewTaskParams | None = None,
+    ...
+) -> Graph:
+    ...
+    if my_new_task_params is not None:
+        my_new_task_node = Node(
+            MyNewTaskOperator,
+            operator_kwargs={"params": my_new_task_params},
+        )
+        # Append after the last existing node, before the embed/store stages.
+        last_node.children.append(my_new_task_node)
+        last_node = my_new_task_node
+    ...
+```
+
+Choose where in the chain to insert the node based on data dependencies. Extraction stages come before enrichment stages; enrichment before embedding; embedding before VDB upload.
+
+##### GraphIngestor Fluent API
+
+Add a `.my_new_task(params)` method to `GraphIngestor` in `ingestor/graph_ingestor.py`:
+
+```python
+# ingestor/graph_ingestor.py :: GraphIngestor
+
+def my_new_task(self, params: MyNewTaskParams) -> "GraphIngestor":
+    """Add a my-new-task enrichment stage to the ingest pipeline."""
+    self._my_new_task_params = params
+    self._record_stage("my_new_task")
+    return self
+```
+
+Pass `self._my_new_task_params` through to `build_graph()` in the `.ingest()` call.
+
+---
+
+#### Unit Testing for New Stages
+
+##### Operator Tests
+
+Place the test file at the mirrored path under `tests/`:
+
+```
+nemo_retriever/src/nemo_retriever/operators/my_category/my_task.py
+  → nemo_retriever/tests/operators/my_category/test_my_task.py
+```
+
+Test the operator's `run()` method directly with a pandas DataFrame. Inject fake clients via the constructor rather than patching at the class level:
+
+```python
+# tests/operators/my_category/test_my_task.py
+import pandas as pd
+import pytest
+from nemo_retriever.operators.my_category.my_task import MyNewTaskOperator
+from nemo_retriever.common.params import MyNewTaskParams
+
+
+def _make_params(**kwargs):
+    return MyNewTaskParams(**kwargs)
+
+
+class TestMyNewTaskOperator:
+    def test_happy_path_adds_output_column(self):
+        params = _make_params()
+        out = MyNewTaskOperator(params).run(pd.DataFrame({"text": ["hello"]}))
+
+        assert "my_output" in out.columns
+        assert out["my_output"].tolist() == ["expected result"]
+
+    def test_missing_required_column_raises(self):
+        with pytest.raises(ValueError, match="missing columns"):
+            MyNewTaskOperator(_make_params()).run(pd.DataFrame({"body": ["hello"]}))
+
+    def test_empty_dataframe_returns_correct_schema(self):
+        out = MyNewTaskOperator(_make_params()).run(
+            pd.DataFrame({"text": pd.Series(dtype=str)})
+        )
+        assert list(out.columns) == ["text", "my_output"]
+        assert out.empty
+```
+
+For LLM-backed operators, use the `FakeCompletionClient` pattern to avoid real network calls:
+
+```python
+class FakeCompletionClient:
+    def __init__(self, response="generated text", latency=0.1):
+        self.calls = []
+        self._response = response
+        self._latency = latency
+
+    @property
+    def model(self):
+        return "fake/model"
+
+    def complete(self, messages, max_tokens=None, extra_params=None):
+        self.calls.append((messages, max_tokens, extra_params))
+        return self._response, self._latency
+
+
+def test_llm_operator_calls_client(self):
+    client = FakeCompletionClient(response="  result  ")
+    out = MyNewTaskOperator(_make_params(), client=client).run(
+        pd.DataFrame({"text": ["source text"]})
+    )
+
+    assert out["my_output"].tolist() == ["result"]
+    assert len(client.calls) == 1
+```
+
+##### Graph Structure Tests
+
+Verify the operator appears at the correct position in the graph. Add a test in `tests/test_ingest_plans.py` (or a dedicated `tests/test_build_graph_my_task.py`):
+
+```python
+from nemo_retriever.graph.ingestor_runtime import build_graph
+from nemo_retriever.common.params import EmbedParams, ExtractParams, MyNewTaskParams
+
+
+def _node_names(graph):
+    node = graph.roots[0]
+    names = []
+    while True:
+        names.append(node.name)
+        if not node.children:
+            return names
+        node = node.children[0]
+
+
+def test_build_graph_inserts_my_new_task_before_embed():
+    graph = build_graph(
+        extract_params=ExtractParams(method="pdfium"),
+        my_new_task_params=MyNewTaskParams(),
+        embed_params=EmbedParams(
+            model_name="nvidia/llama-nemotron-embed-1b-v2",
+            embed_invoke_url="http://embed.example/v1",
+        ),
+    )
+    names = _node_names(graph)
+
+    assert "MyNewTaskOperator" in names
+    assert names.index("MyNewTaskOperator") < names.index("_BatchEmbedActor")
+
+
+def test_build_graph_omits_my_new_task_when_params_absent():
+    graph = build_graph(
+        extract_params=ExtractParams(method="pdfium"),
+        embed_params=EmbedParams(
+            model_name="nvidia/llama-nemotron-embed-1b-v2",
+            embed_invoke_url="http://embed.example/v1",
+        ),
+    )
+    assert "MyNewTaskOperator" not in _node_names(graph)
+```
+
+##### CLI Tests
+
+Use `typer.testing.CliRunner` and `monkeypatch` to test the CLI flag end-to-end without constructing a real ingestor:
+
+```python
+# tests/test_root_cli_workflow.py (or a focused test module)
+import importlib
+from unittest.mock import create_autospec
+from typer.testing import CliRunner
+import nemo_retriever.ingest.execution as ingest_execution
+from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
+from nemo_retriever.common.params import MyNewTaskParams
+
+RUNNER = CliRunner()
+cli_main = importlib.import_module("nemo_retriever.cli.main")
+
+
+def _make_fake_ingestor():
+    fake = create_autospec(GraphIngestor, instance=True, spec_set=True)
+    fake.files.return_value = fake
+    fake.extract.return_value = fake
+    fake.my_new_task.return_value = fake
+    fake.embed.return_value = fake
+    fake.vdb_upload.return_value = fake
+    fake.ingest.return_value = [{"status": "ok"}]
+    return fake
+
+
+def test_my_new_task_flag_passes_params_to_ingestor(monkeypatch, tmp_path):
+    fake = _make_fake_ingestor()
+    document = tmp_path / "test.pdf"
+    document.write_bytes(b"%PDF-1.4\n")
+
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **_: fake)
+
+    result = RUNNER.invoke(
+        cli_main.app,
+        ["ingest", "local", "--my-new-task", str(document)],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert fake.my_new_task.called
+    params = fake.my_new_task.call_args.args[0]
+    assert isinstance(params, MyNewTaskParams)
+
+
+def test_my_new_task_disabled_by_default(monkeypatch, tmp_path):
+    fake = _make_fake_ingestor()
+    document = tmp_path / "test.pdf"
+    document.write_bytes(b"%PDF-1.4\n")
+
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **_: fake)
+
+    RUNNER.invoke(cli_main.app, ["ingest", "local", str(document)])
+
+    assert not fake.my_new_task.called
+```
+
+---
+
+#### Example: Adding a Summarization Task
+
+The `SummarizationOperator` is the canonical reference for the full pattern. Follow this chain when reading the code:
+
+| Layer | File |
+|---|---|
+| Params model | `common/params/models.py` → `TextGenerationParams` |
+| Task class | `models/llm/tasks/summarize.py` → `SummarizeTask` |
+| Operator | `operators/generation/summarization.py` → `SummarizationOperator` |
+| Graph wiring | `graph/ingestor_runtime.py` → `build_graph()` |
+| Fluent API | `ingestor/graph_ingestor.py` → `GraphIngestor` |
+| Plan resolution | `ingest/plan.py` → `resolve_ingest_plan()` |
+| CLI options | `cli/ingest/options.py` |
+| CLI command | `cli/ingest/graph_commands.py` → `_graph_ingest_command` |
+| Tests | `tests/test_generation_tasks.py` |
 
 ### Common Practices for Writing Unit Tests
 
