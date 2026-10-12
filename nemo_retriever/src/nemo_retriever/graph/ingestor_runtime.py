@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from functools import partial
+from collections.abc import Iterable
 from typing import cast
 from typing import Any
 
@@ -96,6 +97,8 @@ def default_concurrency_node_names(
         names.update(
             name for name, field in worker_fields.items() if not _positive(getattr(extract_tuning, field, None))
         )
+    if getattr(extract_tuning, "ocr_min_workers", None) is not None:
+        names.discard(resolve_ocr_archetype(extract_params).__name__)
     embed_tuning = _batch_tuning(embed_params)
     if embed_params is not None and not _positive(getattr(embed_tuning, "embed_workers", None)):
         names.add(_BatchEmbedActor.__name__)
@@ -121,6 +124,33 @@ def _nim_remote_http_kwargs(extract_params: Any) -> dict[str, int]:
         "remote_max_retries": int(rr.remote_max_retries),
         "remote_max_429_retries": int(rr.remote_max_429_retries),
     }
+
+
+def require_ocr_actor_for_bounded_ocr(extract_params: Any | None, graphs: Iterable[Graph]) -> None:
+    """Reject bounded OCR when no graph in the run contains the OCR actor pool it sizes.
+
+    Args:
+        extract_params: Extraction params whose ``batch_tuning`` may set ``ocr_min_workers``,
+            ``ocr_initial_workers``, and ``ocr_max_workers``.
+        graphs: Every extraction graph the run will execute.
+
+    Returns:
+        None. Returns immediately when bounded OCR is not configured.
+
+    Raises:
+        ValueError: If bounded OCR is configured and none of ``graphs`` contains the OCR actor.
+            Use PDF input with OCR-dependent outputs enabled, or remove the bounds.
+    """
+    if getattr(_batch_tuning(extract_params), "ocr_min_workers", None) is None:
+        return
+    ocr_name = resolve_ocr_archetype(extract_params).__name__
+    pending = [root for graph in graphs for root in graph.roots]
+    while pending:
+        node = pending.pop()
+        if node.name == ocr_name:
+            return
+        pending.extend(node.children)
+    raise ValueError(f"Bounded OCR workers require a batch extraction graph with {ocr_name}; this run builds none")
 
 
 def batch_tuning_to_node_overrides(
@@ -257,7 +287,7 @@ def batch_tuning_to_node_overrides(
             )
 
     extract_tuning = _batch_tuning(extract_params)
-    ocr_concurrency: int = 0
+    ocr_concurrency: int | tuple[int, int, int] = 0
     ocr_cpus: float = 1.0
     page_elements_concurrency: int = 0
     page_elements_cpus: float = 1.0
@@ -277,6 +307,12 @@ def batch_tuning_to_node_overrides(
             )
             or 0
         )
+        if getattr(extract_tuning, "ocr_min_workers", None) is not None:
+            ocr_concurrency = (
+                extract_tuning.ocr_min_workers,
+                extract_tuning.ocr_max_workers,
+                extract_tuning.ocr_initial_workers,
+            )
         _set(ocr_actor_name, "concurrency", ocr_concurrency or None)
         ocr_cpus = (
             _resolve(

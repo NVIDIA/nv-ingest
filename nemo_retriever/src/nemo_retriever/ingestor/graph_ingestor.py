@@ -39,6 +39,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
     default_concurrency_node_names,
+    require_ocr_actor_for_bounded_ocr,
 )
 from nemo_retriever.ingestor.manifest import (
     ExtractionBranchPlan,
@@ -1031,6 +1032,7 @@ class GraphIngestor(ingestor):
             webhook_params=self._webhook_params,
             stage_order=post_extract_order,
         )
+        require_ocr_actor_for_bounded_ocr(effective_extraction.extract_params, (graph,))
         if (
             not return_results
             and not self._documents

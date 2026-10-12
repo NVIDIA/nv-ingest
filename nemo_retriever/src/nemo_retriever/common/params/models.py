@@ -499,6 +499,15 @@ class BatchTuningParams(_ParamsModel):
     ocr_inference_batch_size: Optional[int] = None
     page_elements_workers: Optional[int] = None
     ocr_workers: Optional[int] = None
+    ocr_min_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Minimum number of OCR actors in a bounded pool"
+    )
+    ocr_initial_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Initial number of OCR actors in a bounded pool"
+    )
+    ocr_max_workers: Optional[int] = Field(
+        default=None, gt=0, strict=True, description="Maximum number of OCR actors in a bounded pool"
+    )
     detect_workers: Optional[int] = None
     page_elements_cpus_per_actor: float = 1
     ocr_cpus_per_actor: float = 1
@@ -517,6 +526,19 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_batch_size: Optional[int] = None
     store_workers: Optional[int] = None
     inference_batch_size: int = 8
+
+    @model_validator(mode="after")
+    def _validate_ocr_pool(self) -> "BatchTuningParams":
+        bounds = (self.ocr_min_workers, self.ocr_initial_workers, self.ocr_max_workers)
+        if all(value is None for value in bounds):
+            return self
+        if any(value is None for value in bounds):
+            raise ValueError("Set ocr_min_workers, ocr_initial_workers and ocr_max_workers together")
+        if self.ocr_workers is not None:
+            raise ValueError("ocr_workers cannot be combined with bounded OCR worker settings")
+        if not self.ocr_min_workers <= self.ocr_initial_workers <= self.ocr_max_workers:
+            raise ValueError("OCR worker bounds must satisfy min <= initial <= max")
+        return self
 
 
 class GpuAllocationParams(_ParamsModel):
