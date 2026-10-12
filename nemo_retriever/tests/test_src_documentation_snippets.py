@@ -485,25 +485,6 @@ def test_set_trace_timestamps_with_parent_context_doc() -> None:
     assert calls["trace::exit::pdf_extractor::yolox_inference"] == ts2
 
 
-def test_neo4j_setup_doc_import_matches_package() -> None:
-    """``tabular_data/neo4j/SETUP.md`` — import path resolves (connectivity optional)."""
-    from nemo_retriever.tabular_data.neo4j import get_neo4j_conn
-
-    assert callable(get_neo4j_conn)
-
-
-@pytest.mark.skipif(
-    not all(k in __import__("os").environ for k in ("NEO4J_URI", "NEO4J_USERNAME", "NEO4J_PASSWORD")),
-    reason="Neo4j env vars not set",
-)
-def test_neo4j_setup_doc_connectivity() -> None:
-    """Runs only when ``NEO4J_*`` env is present (integration)."""
-    from nemo_retriever.tabular_data.neo4j import get_neo4j_conn
-
-    conn = get_neo4j_conn()
-    conn.verify_connectivity()
-
-
 def test_graph_pipeline_registry_register_docstring_pattern() -> None:
     """``graph_pipeline_registry.py`` ``register`` docstring — decorator registers a factory."""
     from nemo_retriever.graph import Graph, GraphPipelineRegistry, UDFOperator

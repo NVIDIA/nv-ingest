@@ -232,7 +232,7 @@ and database are intentionally required.
 
 ## Other helpers
 
-The judge and Neo4j helpers remain independent of service-mode profiles.
+The judge helper remains independent of service-mode profiles.
 
 ### Local judge
 
@@ -249,13 +249,3 @@ docker compose -f nemo_retriever/dev/compose/judge.compose.yaml up -d judge
 Set `judge.model` to `openai/nvidia/nemotron-3.5-lightning-30b-a3b` and
 `judge.api_base` to `http://localhost:8000/v1` in the skill-eval configuration.
 Override the host port with `JUDGE_HTTP_PORT` when needed.
-
-### Neo4j
-
-`neo4j.compose.yaml` starts the graph development database. Set
-`NEO4J_PASSWORD` in the environment or a repository-root `.env` file before
-starting it; `NEO4J_USERNAME` defaults to `neo4j`.
-
-```bash
-docker compose -f nemo_retriever/dev/compose/neo4j.compose.yaml up -d neo4j
-```

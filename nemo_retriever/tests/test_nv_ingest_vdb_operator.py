@@ -19,7 +19,6 @@ from nemo_retriever.common.vdb.adt_vdb import (
 from nemo_retriever.common.vdb.records import RetrievalContractError, VdbUploadError
 from nemo_retriever.operators.vdb import IngestVdbOperator, RetrieveVdbOperator
 from nemo_retriever.operators import vdb as vdb_operator_module
-from nemo_retriever.operators.vdb import PutVdbOperator
 
 
 class _CollectionContractStub(VDB):
@@ -45,7 +44,6 @@ class FakeVDB(_CollectionContractStub):
         super().__init__(**kwargs)
         self.run_calls: list[Any] = []
         self.retrieval_calls: list[tuple[Any, dict[str, Any]]] = []
-        self.put_calls: list[tuple[Any, dict[str, Any]]] = []
         self.write_collection_calls: list[tuple[Any, CollectionWriteContext]] = []
         self.retrieve_collection_calls: list[tuple[Any, dict[str, Any]]] = []
 
@@ -76,10 +74,6 @@ class FakeVDB(_CollectionContractStub):
     def run(self, records: Any) -> dict[str, Any]:
         self.run_calls.append(records)
         return {"records": records}
-
-    def put(self, records: list, **kwargs: Any) -> dict[str, Any]:
-        self.put_calls.append((records, dict(kwargs)))
-        return {"put": sum(len(b) for b in records)}
 
     def write_collection(self, records: list, *, context: CollectionWriteContext) -> CollectionWriteResult:
         self.write_collection_calls.append((records, context))
@@ -550,93 +544,6 @@ def test_constructor_requires_exactly_one_vdb_source() -> None:
         IngestVdbOperator(vdb=FakeVDB(), vdb_op="lancedb")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# PutVdbOperator
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-class _StubPutVDB(_CollectionContractStub):
-    """VDB subclass that intentionally does NOT override ``put``.
-
-    Used to exercise the construction-time guard in
-    :class:`PutVdbOperator.__init__`, which compares
-    ``type(self._vdb).put is VDB.put`` to detect backends that
-    inherit the base-class ``NotImplementedError`` stub.
-
-    Note: this class being instantiable at all is itself a regression
-    check — :meth:`VDB.put` must NOT be decorated with
-    ``@abstractmethod``; otherwise ABC machinery would reject this class
-    before the operator-level guard could run, making the guard dead code.
-    """
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(**kwargs)
-
-    def create_index(self, **kwargs: Any) -> None:
-        return None
-
-    def write_to_index(self, records: list, **kwargs: Any) -> None:
-        return None
-
-    def retrieval(self, queries: list, **kwargs: Any) -> list[list[dict[str, Any]]]:
-        return []
-
-    def run(self, records: Any) -> None:
-        return None
-
-
-def test_put_operator_rejects_vdb_without_put_override() -> None:
-    """Backends inheriting the ``VDB.put`` stub fail fast at construction."""
-    stub = _StubPutVDB()
-    # Sanity-check the precondition the guard relies on: the subclass really
-    # is using the inherited stub, not its own implementation. If this ever
-    # fails, the guard's identity comparison would silently never fire.
-    assert type(stub).put is VDB.put
-
-    with pytest.raises(NotImplementedError, match=r"does not implement put"):
-        PutVdbOperator(vdb=stub)
-
-
-def test_put_operator_delegates_records_with_configured_key_and_table_name() -> None:
-    """Happy path: nv-ingest-converted records reach ``vdb.put`` with the configured key/table."""
-    vdb = FakeVDB()
-    operator = PutVdbOperator(vdb=vdb, key="entity_id", table_name="entities")
-
-    data = [
-        {
-            "text": "graph chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
-            "source_id": "/tmp/doc-a.pdf",
-            "page_number": 7,
-        }
-    ]
-
-    assert operator(data) is data
-
-    assert vdb.run_calls == []
-    assert len(vdb.put_calls) == 1
-    call_records, call_kwargs = vdb.put_calls[0]
-    assert call_kwargs == {"table_name": "entities", "key": "entity_id"}
-    # The records that reach the backend must already be in nv-ingest-client
-    # shape (same conversion IngestVdbOperator performs), not the flat graph rows.
-    assert call_records == [
-        [
-            {
-                "document_type": "text",
-                "metadata": {
-                    "embedding": [0.1] * 2048,
-                    "content": "graph chunk",
-                    "content_metadata": {"page_number": 7},
-                    "source_metadata": {
-                        "source_id": "/tmp/doc-a.pdf",
-                        "source_name": "doc-a.pdf",
-                    },
-                },
-            }
-        ]
-    ]
-
-
 def test_custom_vdb_stream_capability_and_legacy_fallback() -> None:
     pulls: list[int] = []
 
@@ -673,7 +580,6 @@ def test_custom_vdb_stream_capability_and_legacy_fallback() -> None:
     legacy_vdb = FakeVDB()
     legacy = IngestVdbOperator(vdb=legacy_vdb)
     legacy_duck = IngestVdbOperator(vdb=LegacyDuckVDB())
-    put = PutVdbOperator(vdb=streaming_vdb)
 
     assert streaming._stream_ingest(batches()) == 2
     assert pulls == [0, 1]
@@ -698,52 +604,9 @@ def test_custom_vdb_stream_capability_and_legacy_fallback() -> None:
         legacy._stream_ingest(batches())
     with pytest.raises(UnsupportedVDBOperation, match="does not implement stream_ingest"):
         legacy_duck._stream_ingest(batches())
-    with pytest.raises(UnsupportedVDBOperation, match="does not implement stream_ingest"):
-        put._stream_ingest(batches())
     with pytest.raises(RuntimeError, match="returned before consuming the record stream"):
         operator = IngestVdbOperator(vdb=EarlyReturningVDB())
         operator._stream_ingest([pd.DataFrame(_graph_rows())])
-
-
-def test_put_operator_merges_sidecar_metadata_into_records_before_put() -> None:
-    """Sidecar kwargs are split out from ``vdb_kwargs`` and applied before delegation."""
-    vdb = FakeVDB()
-    meta_df = pd.DataFrame(
-        {
-            "source_id": ["/tmp/doc-a.pdf"],
-            "category": ["legal"],
-        }
-    )
-    operator = PutVdbOperator(
-        vdb=vdb,
-        vdb_kwargs={
-            "meta_dataframe": meta_df,
-            "meta_source_field": "source_id",
-            "meta_fields": ["category"],
-            "meta_join_key": "source_id",
-        },
-        key="id",
-        table_name="my_table",
-    )
-
-    data = [
-        {
-            "text": "graph chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
-            "source_id": "/tmp/doc-a.pdf",
-            "page_number": 7,
-        }
-    ]
-
-    assert operator.process(data) is data
-
-    assert len(vdb.put_calls) == 1
-    call_records, call_kwargs = vdb.put_calls[0]
-    assert call_kwargs == {"table_name": "my_table", "key": "id"}
-    merged_content_meta = call_records[0][0]["metadata"]["content_metadata"]
-    # Sidecar column merged in alongside the per-row ``page_number``.
-    assert merged_content_meta["category"] == "legal"
-    assert merged_content_meta["page_number"] == 7
 
 
 def test_ingest_operator_preserves_sidecar_kwargs_for_graph_reconstruction() -> None:
