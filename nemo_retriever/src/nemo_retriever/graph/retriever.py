@@ -176,6 +176,7 @@ class Retriever:
         vdb_init = _coerce_vdb_init(self.vdb_kwargs)
         retrieve = RetrieveVdbOperator(
             explode_for_rerank=self.rerank,
+            embedding_column=embed_params.output_column,
             **vdb_init,
         )
 

@@ -13,6 +13,7 @@ import pytest
 from nemo_retriever.common.schemas.collections import QueryHit
 from nemo_retriever.common.vdb.records import (
     VdbUploadError,
+    _iter_client_vdb_records,
     normalize_retrieval_results,
     to_client_vdb_records,
 )
@@ -307,6 +308,28 @@ def test_graph_record_conversion_normalizes_embedding_vector_inputs(embedding: A
 
     assert records[0][0]["metadata"]["embedding"] == [0.5, 0.25]
     assert records[0][0]["document_type"] == "text"
+
+
+def test_custom_embedding_column_converts_eager_and_streaming_records() -> None:
+    embedded_row = {"text": "embedded content", "vec": [0.5, 0.25], "vec_error": None}
+    expected_record = {
+        "document_type": "text",
+        "metadata": {
+            "embedding": [0.5, 0.25],
+            "content": "embedded content",
+            "content_metadata": {},
+            "source_metadata": {},
+        },
+    }
+
+    assert to_client_vdb_records([embedded_row], embedding_column="vec") == [[expected_record]]
+    assert list(_iter_client_vdb_records([embedded_row], embedding_column="vec")) == [expected_record]
+
+    failed_row = {"text": "failed content", "vec": None, "vec_error": "embedding failed"}
+    with pytest.raises(VdbUploadError, match="reported 1 structured row error"):
+        to_client_vdb_records([failed_row], embedding_column="vec")
+    with pytest.raises(VdbUploadError, match="reported 1 structured row error"):
+        list(_iter_client_vdb_records([failed_row], embedding_column="vec"))
 
 
 def test_arrow_backed_embedding_frame_rejects_partial_write() -> None:

@@ -53,17 +53,22 @@ def _iter_batch_rows(batches: Iterable[pd.DataFrame]) -> Iterator[dict[str, Any]
         yield from frame_to_records(batch)
 
 
-def query_vectors_from_embedded_dataframe(df: pd.DataFrame) -> list[list[float]]:
-    """Return one query vector per row from the embed stage's ``embedding`` column."""
-    if "embedding" not in df.columns:
-        raise ValueError(f"Expected query embeddings in the 'embedding' column; columns={list(df.columns)}")
-    errors = df["embedding_error"].tolist() if "embedding_error" in df.columns else [None] * len(df)
+def query_vectors_from_embedded_dataframe(
+    df: pd.DataFrame,
+    *,
+    embedding_column: str = "embedding",
+) -> list[list[float]]:
+    """Return one query vector per row from the embed stage's output column."""
+    if embedding_column not in df.columns:
+        raise ValueError(f"Expected query embeddings in the '{embedding_column}' column; columns={list(df.columns)}")
+    error_column = f"{embedding_column}_error"
+    errors = df[error_column].tolist() if error_column in df.columns else [None] * len(df)
     vectors: list[list[float]] = []
-    for index, (value, error) in enumerate(zip(df["embedding"].tolist(), errors)):
+    for index, (value, error) in enumerate(zip(df[embedding_column].tolist(), errors)):
         vector = embedding_vector(value)
         if vector is None:
             suffix = f"; embedding error: {error}" if isinstance(error, str) and error.strip() else ""
-            raise ValueError(f"Query row {index} has no vector in the 'embedding' column{suffix}")
+            raise ValueError(f"Query row {index} has no vector in the '{embedding_column}' column{suffix}")
         vectors.append(vector)
     return vectors
 
@@ -81,6 +86,7 @@ class IngestVdbOperator(AbstractOperator):
         vdb: VDB | None = None,
         vdb_op: str | None = None,
         vdb_kwargs: dict[str, Any] | None = None,
+        embedding_column: str = "embedding",
     ) -> None:
         merged = dict(vdb_kwargs or {})
         clean_kwargs, sidecar = split_sidecar_from_vdb_kwargs(merged)
@@ -88,7 +94,9 @@ class IngestVdbOperator(AbstractOperator):
             vdb=vdb,
             vdb_op=vdb_op,
             vdb_kwargs=merged,
+            embedding_column=embedding_column,
         )
+        self._embedding_column = embedding_column
         self._vdb_kwargs = clean_kwargs
         self._sidecar_spec = sidecar
         self._sidecar_lookup: dict[str, dict[str, Any]] | None = None
@@ -107,7 +115,7 @@ class IngestVdbOperator(AbstractOperator):
     def process(self, data: Any, **kwargs: Any) -> Any:
         # Graph ingest emits flat embedded rows, while
         # nv-ingest-client VDB.run still expects nested Nemo Retriever Library (NRL) records.
-        records = to_client_vdb_records(data)
+        records = to_client_vdb_records(data, embedding_column=self._embedding_column)
         if self._sidecar_spec is not None and self._sidecar_lookup is not None:
             records = apply_sidecar_metadata_to_client_batches(
                 records,
@@ -137,7 +145,10 @@ class IngestVdbOperator(AbstractOperator):
         if not self._supports_stream_ingest():
             raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not implement stream_ingest()")
 
-        records: Iterable[dict[str, Any]] = _iter_client_vdb_records(_iter_batch_rows(batches))
+        records: Iterable[dict[str, Any]] = _iter_client_vdb_records(
+            _iter_batch_rows(batches),
+            embedding_column=self._embedding_column,
+        )
         if self._sidecar_spec is not None and self._sidecar_lookup is not None:
             undecorated_records = records
 
@@ -184,6 +195,7 @@ class RetrieveVdbOperator(AbstractOperator):
         vdb_op: str | None = None,
         vdb_kwargs: dict[str, Any] | None = None,
         explode_for_rerank: bool = False,
+        embedding_column: str = "embedding",
     ) -> None:
         merged = dict(vdb_kwargs or {})
         clean_kwargs, _sidecar = split_sidecar_from_vdb_kwargs(merged)
@@ -193,11 +205,13 @@ class RetrieveVdbOperator(AbstractOperator):
             vdb_op=vdb_op,
             vdb_kwargs=clean_kwargs,
             explode_for_rerank=explode_for_rerank,
+            embedding_column=embedding_column,
         )
         self._vdb_kwargs = clean_kwargs
         self._retrieval_vdb_kwargs = clean_kwargs
         self._vdb = _construct_vdb(vdb=vdb, vdb_op=vdb_op, vdb_kwargs=clean_kwargs)
         self._explode_for_rerank = bool(explode_for_rerank)
+        self._embedding_column = embedding_column
 
     def get_index_metadata(self, key: str, **kwargs: Any) -> str | None:
         """Read one index metadata value through the configured VDB."""
@@ -205,7 +219,7 @@ class RetrieveVdbOperator(AbstractOperator):
 
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         if isinstance(data, pd.DataFrame):
-            return query_vectors_from_embedded_dataframe(data)
+            return query_vectors_from_embedded_dataframe(data, embedding_column=self._embedding_column)
         return data
 
     def process(
