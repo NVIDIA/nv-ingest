@@ -198,7 +198,7 @@ def _write_local_text_policy_metadata(tmp_path, *, prompts=None, max_input_token
         )
 
 
-def test_systemic_failure_is_not_replayed(caplog) -> None:
+def test_systemic_failure_is_not_replayed_or_exposed(caplog) -> None:
     caplog.set_level(logging.WARNING, logger="nemo_retriever.models.inference.runtime")
     embedder = _AlwaysFailsEmbedder()
 
@@ -213,9 +213,9 @@ def test_systemic_failure_is_not_replayed(caplog) -> None:
         {"unembedded": 1, "failed": 1},
     ]
     assert result["embedding_error"].tolist() == [
-        "embed: RuntimeError: echoed document: rejected input",
-        "embed: RuntimeError: echoed document: rejected input",
-    ]
+        "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause"
+    ] * 2
+    assert not any("echoed document" in error for error in result["embedding_error"])
     assert "failed=2 embedded=0 unembedded=2" in caplog.text
 
 
