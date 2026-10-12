@@ -396,3 +396,44 @@ def test_collapse_returns_iterrows_safe_page_rows() -> None:
     assert len(rows) == 1
     assert rows[0][1]["text"] == "page text"
     assert result["_embed_modality"].tolist() == ["text"]
+
+
+@pytest.mark.parametrize("value_type", [pa.float32(), pa.float64()])
+def test_arrow_to_pylist_matches_pyarrow_for_embedding_shapes(value_type: Any) -> None:
+    from nemo_retriever.graph.executor import _arrow_to_pylist
+
+    payloads = pa.array(
+        [
+            {"embedding": [0.5, 1.5], "info_msg": None},
+            {"embedding": [2.5, float("nan")], "info_msg": None},
+            None,
+            {"embedding": None, "info_msg": None},
+            {"embedding": [], "info_msg": None},
+            {"embedding": [1.0, None], "info_msg": None},
+        ],
+        type=pa.struct([("embedding", pa.list_(value_type)), ("info_msg", pa.null())]),
+    )
+
+    offsets = pa.array([0, 2, 4, 5], pa.int32())
+    floats = pa.array([1.0, 2.0, 3.0, 4.0, 5.0], value_type)
+    null_slot_mask = pa.array([False, True, False])
+    # A null slot may still cover a nonempty child range.
+    masked_list = pa.ListArray.from_arrays(offsets, floats, mask=null_slot_mask)
+    masked_struct = pa.StructArray.from_arrays(
+        [pa.ListArray.from_arrays(offsets, floats), pa.nulls(3)],
+        names=["embedding", "info_msg"],
+        mask=null_slot_mask,
+    )
+
+    for values in (
+        payloads,
+        payloads.slice(1),
+        pa.chunked_array([payloads.slice(0, 2), payloads.slice(2)]),
+        masked_list,
+        masked_list.slice(1),
+        masked_struct,
+        masked_struct.slice(1),
+    ):
+        expected = values.to_pylist()
+        actual = _arrow_to_pylist(values)
+        assert repr(actual) == repr(expected)
