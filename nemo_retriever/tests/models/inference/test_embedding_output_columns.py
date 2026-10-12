@@ -92,7 +92,10 @@ def test_embed_text_main_text_embed_records_one_line_batch_error_and_counts() ->
 
     _assert_embedding_types(result)
     assert result["embedding"].isna().all()
-    assert result["embedding_error"].tolist() == ["embed: RuntimeError: boom line2"]
+    assert result["embedding_error"].tolist() == [
+        "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause"
+    ]
+    assert not any("boom" in error for error in result["embedding_error"])
     assert result["embedding_v1_counts_by_label"].tolist() == [{"unembedded": 1, "failed": 1}]
     assert result["embedding_v1_num_detections"].tolist() == [0]
 
