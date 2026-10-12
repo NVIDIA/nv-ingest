@@ -67,8 +67,6 @@ interface.
 Backends with `supports_stream_ingest = False` retain the historical
 global-batch path. `IngestVdbOperator.REQUIRES_GLOBAL_BATCH` causes the complete
 dataset to be repartitioned to one block before `VDB.run(records)` executes.
-`PutVdbOperator` explicitly opts out of streaming so its update-only semantics
-remain on that path.
 
 The public `RayDataExecutor.build_dataset()` method also retains its historical
 behavior. It returns the full lazy graph, including the global VDB stage, and

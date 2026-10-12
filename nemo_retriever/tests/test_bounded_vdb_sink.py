@@ -301,8 +301,6 @@ def test_stream_controls_are_rejected_by_legacy_mutations(tmp_path: Path, contro
 
     with pytest.raises(ValueError, match=message):
         backend.run([])
-    with pytest.raises(ValueError, match=message):
-        backend.put([])
 
 
 def test_stream_optimize_runs_after_the_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -327,10 +325,7 @@ def test_stream_optimize_runs_after_the_write(tmp_path: Path, monkeypatch: pytes
     assert _table(tmp_path).count_rows() == 2
 
 
-def test_stream_refreshes_cached_table_for_legacy_mutations(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_stream_refreshes_cached_table_for_legacy_mutations(tmp_path: Path) -> None:
     backend = _backend(tmp_path, overwrite=False)
     backend.run([_records(0, 1)])
     assert backend._open_table("chunks").count_rows() == 1
@@ -338,22 +333,10 @@ def test_stream_refreshes_cached_table_for_legacy_mutations(
     backend.stream_ingest(_records(1, 2))
     assert backend._open_table("chunks").count_rows() == 2
 
-    class ArrowTableView:
-        def __init__(self, table) -> None:
-            self.table = table
-
-        def to_table(self, *, columns, filter):
-            return self.table.to_arrow().select(columns)
-
-    table_type = type(backend._open_table("chunks"))
-    monkeypatch.setattr(table_type, "to_lance", lambda table, **kwargs: ArrowTableView(table))
-    counts = backend.put([[_record(1, text_prefix="updated")]])
     backend.run([_records(2, 3)])
 
     rows = {row["id"]: row for row in backend._open_table("chunks").to_arrow().to_pylist()}
-    assert counts["put"] == 1
     assert set(rows) == {"row-0", "row-1", "row-2"}
-    assert rows["row-1"]["text"].startswith("updated-1")
 
 
 @pytest.mark.parametrize(
