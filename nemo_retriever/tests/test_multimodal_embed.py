@@ -139,7 +139,6 @@ class TestMultimodalCallableRunner:
 
         embedder.embed_images.assert_called_once()
         assert result["embeddings"] == [[0.1, 0.2], [0.3, 0.4]]
-        assert len(result["info_msgs"]) == 2
 
     def test_text_image_fallback(self):
         """text_image mode: rows with images use embed_text_image(), rows without fall back to embed()."""
@@ -167,7 +166,6 @@ class TestMultimodalCallableRunner:
         embedder.embed.assert_called_once()
         # Order must be preserved: row 0 (multimodal), row 1 (text fallback)
         assert result["embeddings"] == [[1.0, 2.0], [3.0, 4.0]]
-        assert len(result["info_msgs"]) == 2
 
 
 # ===================================================================

@@ -105,7 +105,7 @@ def test_text_dataframe_routes_explicit_text_modalities():
 
     def fake_runner(*args, **kwargs):
         captured["modalities"] = kwargs["modalities"]
-        return {"embeddings": [[0.1], [0.2]], "info_msgs": [None, None]}
+        return {"embeddings": [[0.1], [0.2]]}
 
     config = TextEmbeddingConfig(
         embedding_nim_endpoint="http://embedding.test/v1",

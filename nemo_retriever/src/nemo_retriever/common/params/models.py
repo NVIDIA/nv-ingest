@@ -479,8 +479,7 @@ class LanceDbParams(_ParamsModel):
     metric: str = "l2"
     num_partitions: int = 16
     num_sub_vectors: int = 256
-    embedding_column: str = "text_embeddings_1b_v2"
-    embedding_key: str = "embedding"
+    embedding_column: str = "embedding"
     include_text: bool = True
     text_column: str = "text"
     hybrid: bool = False
@@ -648,10 +647,7 @@ class EmbedParams(_ParamsModel):
     structured_elements_modality: Optional[str] = None  # per-type override for table/chart/infographic rows
     text_column: str = "text"
     inference_batch_size: int = 32
-    output_column: str = "text_embeddings_1b_v2"
-    embedding_dim_column: str = "text_embeddings_1b_v2_dim"
-    has_embedding_column: str = "text_embeddings_1b_v2_has_embedding"
-    embed_output_column: str = "text_embeddings_1b_v2"
+    output_column: str = "embedding"
     embed_inference_batch_size: int = 16
 
     local_ingest_embed_backend: str = (
