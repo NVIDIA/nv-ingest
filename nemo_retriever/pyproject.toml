@@ -130,7 +130,6 @@ service = [
   "addict",
   "scikit-learn>=1.6.0",
   "psutil>=5.9.0",
-  "apscheduler>=3.10",
   # Audio resampling used by ParakeetClient
   "librosa>=0.10.2",
   # Explicitly avoid pulling older numba/llvmlite versions that precede python 3.12
@@ -160,7 +159,6 @@ local = [
   "nemotron-table-structure-v1>=1.0.0,<2",
   "nemotron-ocr>=2.0.0,<3; sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64')",
   "nvidia-ml-py",
-  "apscheduler>=3.10",
   "psutil>=5.9.0",
   # vLLM compiles CUDA kernels at runtime via torch inductor (requires Python.h).
   # Use a uv-managed Python (`uv python install 3.12`) so headers are available;
@@ -229,7 +227,6 @@ all = [
 
 [project.scripts]
 retriever = "nemo_retriever.__main__:main"
-retriever-harness = "nemo_retriever.harness:main"
 
 # uv-only developer install: include every published extra plus the published
 # dev extra, then overlay the prerelease Nemotron selection without exposing it
@@ -265,7 +262,6 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "nemo_retriever._agentic.nemo_agent.prompts" = ["templates/**/*.j2"]
-"nemo_retriever.harness.portal" = ["static/**/*"]
 "nemo_retriever.service" = ["retriever-service.yaml"]
 "nemo_retriever.tools.skill_eval" = ["prompts/*.j2", "configs/*.yaml"]
 

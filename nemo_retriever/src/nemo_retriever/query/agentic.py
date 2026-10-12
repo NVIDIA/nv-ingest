@@ -486,9 +486,9 @@ class AgenticRetriever:
         """Release the in-process agent LLM owned by this retriever.
 
         OpenAI-compatible endpoint mode is a no-op. Local vLLM mode shuts down
-        this instance's EngineCore so CLI/harness jobs can exit cleanly. Embed
+        this instance's EngineCore so CLI jobs can exit cleanly. Embed
         and rerank models stay on ``self._retriever`` and are released with the
-        process, matching dense harness BEIR behavior.
+        process.
         """
 
         with self._lock:
@@ -1061,7 +1061,7 @@ def agentic_beir_retrieve(
     Doc-id matching follows ``doc_id_field`` (BEIR semantics, applied inside the
     agent's retrieve hop), so the ranked ids align with the qrels keys produced by
     ``load_beir_dataset(..., doc_id_field=...)``. Splitting this out lets callers
-    that already hold a loaded dataset (e.g. the harness) reuse the agent's
+    that already hold a loaded dataset (e.g. batch evaluation) reuse the agent's
     retrieve+rank step without re-loading or re-implementing it.
     """
     retriever = AgenticRetriever(cfg, match_mode="pdf_page", doc_id_field=doc_id_field)

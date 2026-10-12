@@ -10,7 +10,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from packaging.requirements import Requirement
-import pytest
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -42,13 +41,3 @@ def test_applies_vllm_startup_defaults_before_constructing_llm(monkeypatch):
         patch("vllm.SamplingParams"),
     ):
         mod.NemotronParseV12()
-
-
-def test_parse_playground_accepts_only_the_supported_v1_2_model():
-    from nemo_retriever.harness.portal.app import ParseTestRequest
-
-    request = ParseTestRequest(image_b64="aW1hZ2U=")
-    assert request.model_id == "nvidia/NVIDIA-Nemotron-Parse-v1.2"
-
-    with pytest.raises(ValueError):
-        ParseTestRequest(model_id="nvidia/NVIDIA-Nemotron-Parse-2.0", image_b64="aW1hZ2U=")

@@ -11,7 +11,7 @@ from pathlib import Path
 from statistics import mean
 from typing import Any, Iterable
 
-from nemo_retriever.harness.artifacts import last_commit, write_session_summary
+from nemo_retriever.tools.skill_eval.artifacts import last_commit, write_session_summary
 from nemo_retriever.tools.skill_eval.dataset import DatasetEntry
 from nemo_retriever.tools.skill_eval.runner import CONDITIONS, TrialResult
 from nemo_retriever.tools.skill_eval.score import recall_at_k
@@ -36,9 +36,8 @@ def overall_recall(
 ) -> dict[str, float]:
     """Macro-averaged recall@k: mean of per-query recall@k across query turns.
 
-    Matches the aggregation used by ``recall/beir.py:compute_beir_metrics`` (which
-    ``retriever harness`` runs), so skill_eval numbers are directly comparable to
-    harness BEIR output.
+    Matches the aggregation used by ``tools.recall.beir.compute_beir_metrics``,
+    so skill_eval numbers are directly comparable to BEIR evaluation output.
     """
     per_query: dict[int, list[float]] = {k: [] for k in ks}
     for r in results:

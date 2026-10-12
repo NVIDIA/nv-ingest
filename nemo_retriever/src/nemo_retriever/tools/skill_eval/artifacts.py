@@ -4,15 +4,16 @@
 
 from __future__ import annotations
 
+import json
+import os
 import re
 import subprocess
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from nemo_retriever.harness.json_io import write_json
-
-NEMO_RETRIEVER_ROOT = Path(__file__).resolve().parents[3]
+NEMO_RETRIEVER_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_ARTIFACTS_ROOT = NEMO_RETRIEVER_ROOT / "artifacts"
 _COMMIT_RE = re.compile(r"^[0-9a-fA-F]{7,64}$")
 
@@ -118,37 +119,10 @@ def last_commit() -> str:
     return "unknown"
 
 
-def working_tree_dirty() -> bool | None:
-    """Return whether the source checkout is modified, or ``None`` outside Git."""
-
-    repo_root = NEMO_RETRIEVER_ROOT.parent
-    try:
-        result = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=normal", "--ignore-submodules"],
-            cwd=str(repo_root),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except Exception:
-        return None
-    if result.returncode != 0:
-        return None
-    return bool(result.stdout.strip())
-
-
 def get_artifacts_root(base_dir: str | None = None) -> Path:
     if base_dir:
         return Path(base_dir).expanduser().resolve()
     return DEFAULT_ARTIFACTS_ROOT
-
-
-def create_run_artifact_dir(dataset_label: str, run_name: str | None = None, base_dir: str | None = None) -> Path:
-    root = get_artifacts_root(base_dir)
-    label = run_name or dataset_label or "run"
-    out_dir = root / f"{label}_{now_timestr()}"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir
 
 
 def create_session_dir(prefix: str, base_dir: str | None = None) -> Path:
@@ -156,6 +130,36 @@ def create_session_dir(prefix: str, base_dir: str | None = None) -> Path:
     session_dir = root / f"{prefix}_{now_timestr()}"
     session_dir.mkdir(parents=True, exist_ok=True)
     return session_dir
+
+
+def jsonable(value: Any) -> Any:
+    return json.loads(json.dumps(value, default=str))
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    temporary_path: Path | None = None
+    try:
+        rendered = json.dumps(jsonable(payload), indent=2, sort_keys=False) + "\n"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(rendered)
+        assert temporary_path is not None
+        os.replace(temporary_path, path)
+    except Exception:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def write_session_summary(
