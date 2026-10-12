@@ -505,6 +505,24 @@ class BatchTuningParams(_ParamsModel):
     table_structure_batch_size: Optional[int] = None
     table_structure_cpus_per_actor: float = 1
     embed_workers: Optional[int] = None
+    embed_workers_min: Optional[int] = Field(
+        default=None,
+        description=(
+            "Minimum native Ray batch embedding actor count. Set with initial and maximum; excludes embed_workers."
+        ),
+    )
+    embed_workers_initial: Optional[int] = Field(
+        default=None,
+        description=(
+            "Initial native Ray batch embedding actor count requested at startup and budgeted by resource preflight."
+        ),
+    )
+    embed_workers_max: Optional[int] = Field(
+        default=None,
+        description=(
+            "Maximum native Ray batch embedding actor count; does not reserve capacity or guarantee VRAM safety."
+        ),
+    )
     embed_batch_size: int = 32
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
@@ -516,6 +534,32 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_batch_size: Optional[int] = None
     store_workers: Optional[int] = None
     inference_batch_size: int = 8
+
+    @model_validator(mode="after")
+    def _validate_embed_worker_pool(self) -> "BatchTuningParams":
+        elastic_workers = (
+            self.embed_workers_min,
+            self.embed_workers_initial,
+            self.embed_workers_max,
+        )
+        configured_elastic_workers = [value for value in elastic_workers if value is not None]
+        if self.embed_workers is not None and configured_elastic_workers:
+            raise ValueError(
+                "embed_workers cannot be combined with embed_workers_min, "
+                "embed_workers_initial, or embed_workers_max."
+            )
+        if configured_elastic_workers and len(configured_elastic_workers) != len(elastic_workers):
+            raise ValueError("embed_workers_min, embed_workers_initial, and embed_workers_max must be set together.")
+        if configured_elastic_workers:
+            minimum, initial, maximum = (int(value) for value in elastic_workers if value is not None)
+            if minimum < 1 or initial < 1 or maximum < 1:
+                raise ValueError("Elastic embedding worker counts must be positive integers.")
+            if not minimum <= initial <= maximum:
+                raise ValueError(
+                    "Elastic embedding worker counts must satisfy "
+                    "embed_workers_min <= embed_workers_initial <= embed_workers_max."
+                )
+        return self
 
 
 class GpuAllocationParams(_ParamsModel):

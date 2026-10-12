@@ -10,7 +10,7 @@ import warnings
 
 import pytest
 
-from nemo_retriever.common.params.models import EmbedParams, IMAGE_MODALITIES
+from nemo_retriever.common.params.models import BatchTuningParams, EmbedParams, IMAGE_MODALITIES
 from nemo_retriever.common.params.utils import build_embed_option_kwargs
 
 
@@ -101,6 +101,84 @@ def test_build_embed_option_kwargs_retains_prefix_when_model_is_omitted():
         "embedding_endpoint": "https://inference-api.nvidia.com/v1",
         "embed_model_provider_prefix": "nvidia",
     }
+
+
+def test_batch_tuning_accepts_ordered_elastic_embed_workers():
+    tuning = BatchTuningParams(
+        embed_workers_min=1,
+        embed_workers_initial=4,
+        embed_workers_max=8,
+    )
+
+    assert (
+        tuning.embed_workers_min,
+        tuning.embed_workers_initial,
+        tuning.embed_workers_max,
+    ) == (1, 4, 8)
+
+
+def test_build_embed_option_kwargs_records_elastic_embed_workers():
+    kwargs = build_embed_option_kwargs(
+        None,
+        "nvidia/llama-nemotron-embed-1b-v2",
+        embed_workers_min=1,
+        embed_workers_initial=4,
+        embed_workers_max=8,
+    )
+
+    tuning = kwargs["batch_tuning"]
+    assert tuning.embed_workers_min == 1
+    assert tuning.embed_workers_initial == 4
+    assert tuning.embed_workers_max == 8
+
+
+def test_build_embed_option_kwargs_preserves_existing_positional_arguments():
+    kwargs = build_embed_option_kwargs(
+        None, "test-model", "vllm", None, None, "text", None, None, "element", 4, 32, 0.5, 0.35, "pinned-revision"
+    )
+
+    tuning = kwargs["batch_tuning"]
+    assert tuning.embed_workers == 4
+    assert tuning.embed_batch_size == 32
+    assert tuning.embed_cpus_per_actor == 0.5
+    assert tuning.gpu_embed == 0.35
+    assert tuning.embed_workers_min is None
+    assert tuning.embed_workers_initial is None
+    assert tuning.embed_workers_max is None
+    assert kwargs["embed_model_revision"] == "pinned-revision"
+
+
+def test_elastic_embed_worker_fields_have_schema_descriptions():
+    properties = BatchTuningParams.model_json_schema()["properties"]
+
+    for name in ("embed_workers_min", "embed_workers_initial", "embed_workers_max"):
+        assert properties[name]["description"]
+
+
+@pytest.mark.parametrize(
+    "kwargs, message",
+    [
+        (
+            {"embed_workers": 4, "embed_workers_min": 1, "embed_workers_initial": 4, "embed_workers_max": 8},
+            "embed_workers cannot be combined",
+        ),
+        (
+            {"embed_workers_min": 1, "embed_workers_max": 8},
+            "must be set together",
+        ),
+        (
+            {"embed_workers_min": 0, "embed_workers_initial": 4, "embed_workers_max": 8},
+            "must be positive integers",
+        ),
+        (
+            {"embed_workers_min": 4, "embed_workers_initial": 2, "embed_workers_max": 8},
+            "embed_workers_min <= embed_workers_initial <= embed_workers_max",
+        ),
+    ],
+)
+def test_batch_tuning_rejects_invalid_elastic_embed_workers(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        BatchTuningParams(**kwargs)
 
 
 # ===================================================================

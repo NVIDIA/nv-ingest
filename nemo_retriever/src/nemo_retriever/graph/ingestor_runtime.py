@@ -97,7 +97,11 @@ def default_concurrency_node_names(
             name for name, field in worker_fields.items() if not _positive(getattr(extract_tuning, field, None))
         )
     embed_tuning = _batch_tuning(embed_params)
-    if embed_params is not None and not _positive(getattr(embed_tuning, "embed_workers", None)):
+    if (
+        embed_params is not None
+        and not _positive(getattr(embed_tuning, "embed_workers", None))
+        and _elastic_embed_concurrency(embed_tuning) is None
+    ):
         names.add(_BatchEmbedActor.__name__)
     store_tuning = _batch_tuning(store_params)
     if store_params is not None and not _positive(getattr(store_tuning, "store_workers", None)):
@@ -109,6 +113,18 @@ def default_concurrency_node_names(
 
 def _positive(value: Any) -> Any:
     return value if value not in (None, 0, 0.0, "", False) else None
+
+
+def _elastic_embed_concurrency(tuning: Any) -> tuple[int, int, int] | None:
+    if tuning is None:
+        return None
+    minimum = getattr(tuning, "embed_workers_min", None)
+    initial = getattr(tuning, "embed_workers_initial", None)
+    maximum = getattr(tuning, "embed_workers_max", None)
+    if minimum is None or initial is None or maximum is None:
+        return None
+    # Ray actor pools encode elasticity as (minimum, maximum, initial).
+    return (int(minimum), int(maximum), int(initial))
 
 
 def _nim_remote_http_kwargs(extract_params: Any) -> dict[str, int]:
@@ -181,7 +197,7 @@ def batch_tuning_to_node_overrides(
         overrides.setdefault(node_name, {})["num_gpus"] = 0.0
 
     embed_tuning = _batch_tuning(embed_params)
-    embed_concurrency: int = 0
+    embed_concurrency: int | tuple[int, int, int] = 0
     embed_cpus: float = 1.0
     local_caption_concurrency: int | None = None
     local_caption_gpus_per_actor: float | None = None
@@ -205,11 +221,13 @@ def batch_tuning_to_node_overrides(
         if embed_bs:
             overrides.setdefault(_BatchEmbedActor.__name__, {})["target_num_rows_per_block"] = embed_bs
         explicit_embed_workers = getattr(embed_tuning, "embed_workers", None) if embed_tuning is not None else None
+        elastic_embed_concurrency = _elastic_embed_concurrency(embed_tuning)
         embed_workers_fallback = plan.embed_initial_actors if plan else None
         if (
             local_caption_concurrency is not None
             and local_caption_gpus_per_actor is not None
             and _positive(explicit_embed_workers) is None
+            and elastic_embed_concurrency is None
             and cluster_resources is not None
             and plan is not None
         ):
@@ -220,7 +238,8 @@ def batch_tuning_to_node_overrides(
             else:
                 embed_workers_fallback = 1
         embed_concurrency = (
-            _resolve(
+            elastic_embed_concurrency
+            or _resolve(
                 explicit_embed_workers,
                 embed_workers_fallback,
             )
