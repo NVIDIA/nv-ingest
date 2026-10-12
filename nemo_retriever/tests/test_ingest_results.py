@@ -5,7 +5,9 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 from nemo_retriever.ingestor.results import (
     concat_ingest_results,
@@ -28,8 +30,9 @@ def test_transport_preserves_column_layout_and_strips_bulky_payloads() -> None:
             "page_image": [{"image_b64": "raw-page", "stored_image_uri": "file:///stored/page.png"}],
             "images": [[{"image_b64": "raw-crop", "bbox_xyxy_norm": [0.1, 0.2, 0.3, 0.4]}]],
             "page_elements_v3": [[{"label": "Table"}]],
-            "text_embeddings_1b_v2": [{"embedding": [0.1, 0.2]}],
-            "metadata": [{"embedding": [0.3, 0.4], "dpi": 200, "source_path": "/a.pdf"}],
+            "embedding": pd.array([[0.1, 0.2]], dtype=pd.ArrowDtype(pa.list_(pa.float32()))),
+            "embedding_error": pd.array([None], dtype=pd.ArrowDtype(pa.string())),
+            "metadata": [{"dpi": 200, "source_path": "/a.pdf"}],
         }
     )
     records = dataframe_to_transport_records(df)
@@ -42,8 +45,9 @@ def test_transport_preserves_column_layout_and_strips_bulky_payloads() -> None:
     assert record["bytes"] == "<bytes len=9>"
     assert record["_stored_image_uri"] == "file:///stored/page.png"
     assert record["_bbox_xyxy_norm"] == [0.1, 0.2, 0.3, 0.4]
-    assert record["text_embeddings_1b_v2"] == {"embedding": None}
-    assert record["metadata"] == {"embedding": None, "dpi": 200, "source_path": "/a.pdf"}
+    assert record["embedding"] is None
+    assert record["embedding_error"] is None
+    assert record["metadata"] == {"dpi": 200, "source_path": "/a.pdf"}
     assert record["page_image"] == {"image_b64": None, "stored_image_uri": "file:///stored/page.png"}
     assert record["images"][0] == {"image_b64": None, "bbox_xyxy_norm": [0.1, 0.2, 0.3, 0.4]}
 
@@ -51,13 +55,11 @@ def test_transport_preserves_column_layout_and_strips_bulky_payloads() -> None:
 def test_transport_can_return_legacy_bulk_payloads_when_requested() -> None:
     base64_image = "a" * 600
     embedding = [float(i) for i in range(64)]
-    embedding_array = __import__("numpy").array(embedding)
     df = pd.DataFrame(
         {
             "page_image": [{"image_b64": base64_image, "stored_image_uri": "file:///stored/page.png"}],
             "images": [[{"image_b64": base64_image}]],
-            "text_embeddings_1b_v2": [{"embedding": embedding}],
-            "metadata": [{"embedding": embedding_array}],
+            "embedding": pd.array([embedding], dtype=pd.ArrowDtype(pa.list_(pa.float32()))),
         }
     )
 
@@ -65,8 +67,18 @@ def test_transport_can_return_legacy_bulk_payloads_when_requested() -> None:
 
     assert record["page_image"]["image_b64"] == base64_image
     assert record["images"][0]["image_b64"] == base64_image
-    assert record["text_embeddings_1b_v2"] == {"embedding": embedding}
-    assert record["metadata"] == {"embedding": embedding}
+    assert record["embedding"] == embedding
+
+
+def test_transport_strips_configured_embedding_column() -> None:
+    embedding = np.array([0.5, 0.25], dtype=np.float32)
+    df = pd.DataFrame({"text": ["hello"], "custom_embeddings": [embedding]})
+
+    stripped = dataframe_to_transport_records(df, embedding_column="custom_embeddings")[0]
+    returned = dataframe_to_transport_records(df, return_embeddings=True, embedding_column="custom_embeddings")[0]
+
+    assert stripped == {"text": "hello", "custom_embeddings": None}
+    assert returned == {"text": "hello", "custom_embeddings": [0.5, 0.25]}
 
 
 def test_transport_preserves_all_legacy_string_values() -> None:
@@ -107,7 +119,7 @@ def test_transport_preserves_text_across_element_types() -> None:
         {
             "text": [long_text] * len(element_types),
             "_content_type": list(element_types),
-            "custom_embeddings": [{"embedding": [float(index)]} for index in range(len(element_types))],
+            "custom_embeddings": [[float(index)] for index in range(len(element_types))],
         }
     )
 
@@ -178,7 +190,8 @@ def test_transport_compact_document_rows_drop_legacy_metadata_and_bbox() -> None
             "_stored_image_uri": ["file:///stored/page.png"],
             "page_image": [{"image_b64": "raw-page", "stored_image_uri": "file:///stored/page.png"}],
             "images": [[{"image_b64": "raw-crop", "bbox_xyxy_norm": [0.1, 0.2, 0.3, 0.4]}]],
-            "metadata": [{"embedding": [0.3, 0.4], "dpi": 200, "source_path": "/a.pdf"}],
+            "embedding": [[0.3, 0.4]],
+            "metadata": [{"dpi": 200, "source_path": "/a.pdf"}],
         }
     )
 
@@ -207,9 +220,9 @@ def test_transport_compact_media_rows_return_timings() -> None:
                     "segment_start_seconds": 10.5,
                     "segment_end_seconds": 12.0,
                     "source_path": "/media/call.wav",
-                    "embedding": [0.1, 0.2],
                 }
             ],
+            "embedding": [[0.1, 0.2]],
         }
     )
 
@@ -225,13 +238,26 @@ def test_transport_compact_media_rows_return_timings() -> None:
     ]
 
 
-def test_transport_compact_rows_return_metadata_embedding_when_requested() -> None:
-    embedding = __import__("numpy").array([0.1, 0.2])
+def test_transport_compact_rows_ignore_metadata_embedding() -> None:
     df = pd.DataFrame(
         {
             "path": ["/a.pdf"],
             "text": ["hello"],
-            "metadata": [{"embedding": embedding}],
+            "metadata": [{"embedding": [0.1, 0.2]}],
+        }
+    )
+
+    assert dataframe_to_transport_records(df, result_schema="compact", return_embeddings=True) == [
+        {"text": "hello", "source_id": "/a.pdf", "element_type": "text"}
+    ]
+
+
+def test_transport_compact_rows_return_column_embedding_when_requested() -> None:
+    df = pd.DataFrame(
+        {
+            "path": ["/a.pdf"],
+            "text": ["hello"],
+            "embedding": [np.array([0.1, 0.2])],
         }
     )
 
@@ -245,18 +271,19 @@ def test_transport_compact_rows_return_metadata_embedding_when_requested() -> No
     ]
 
 
-def test_transport_compact_rows_return_payload_embedding_when_requested() -> None:
+def test_transport_compact_rows_return_arrow_embedding_when_requested() -> None:
     df = pd.DataFrame(
         {
-            "path": ["/a.pdf"],
-            "text": ["hello"],
-            "text_embeddings_1b_v2": [{"embedding": (0.3, 0.4)}],
+            "path": ["/a.pdf", "/b.pdf"],
+            "text": ["hello", "unembedded"],
+            "embedding": pd.array([[0.5, 0.25], None], dtype=pd.ArrowDtype(pa.list_(pa.float32()))),
         }
     )
 
-    record = dataframe_to_transport_records(df, result_schema="compact", return_embeddings=True)[0]
+    records = dataframe_to_transport_records(df, result_schema="compact", return_embeddings=True)
 
-    assert record["embedding"] == [0.3, 0.4]
+    assert records[0]["embedding"] == [0.5, 0.25]
+    assert "embedding" not in records[1]
 
 
 def test_transport_compact_rows_return_configured_column_embedding_when_requested() -> None:
@@ -264,8 +291,8 @@ def test_transport_compact_rows_return_configured_column_embedding_when_requeste
         {
             "path": ["/a.pdf"],
             "text": ["hello"],
-            "earlier_payload": [{"embedding": [9.0, 9.0]}],
-            "custom_embeddings": [{"embedding": [0.5, 0.6]}],
+            "embedding": [[9.0, 9.0]],
+            "custom_embeddings": [[0.5, 0.6]],
         }
     )
 
@@ -308,8 +335,8 @@ def test_sanitize_result_data_forwards_compact_embedding_flag() -> None:
     df = pd.DataFrame(
         {
             "text": ["x"],
-            "earlier_payload": [{"embedding": [9.0]}],
-            "custom_embeddings": [{"embedding": [0.1]}],
+            "embedding": [[9.0]],
+            "custom_embeddings": [[0.1]],
         }
     )
 
@@ -321,7 +348,7 @@ def test_sanitize_result_data_forwards_compact_embedding_flag() -> None:
 
 
 def test_sanitize_result_data_forwards_legacy_payload_flags() -> None:
-    df = pd.DataFrame({"metadata": [{"embedding": [0.1]}], "page_image": [{"image_b64": "raw"}]})
+    df = pd.DataFrame({"embedding": [[0.1]], "page_image": [{"image_b64": "raw"}]})
 
     assert _sanitize_result_data(df, return_embeddings=True, return_images=True) == dataframe_to_transport_records(
         df,
