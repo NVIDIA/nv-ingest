@@ -439,15 +439,25 @@ def test_arrow_to_pylist_matches_pyarrow_for_embedding_shapes(value_type: Any) -
         assert repr(actual) == repr(expected)
 
 
-def test_frame_to_records_keeps_non_string_column_labels() -> None:
+def test_frame_to_records_converts_nested_arrow_columns() -> None:
     from nemo_retriever.graph.executor import frame_to_records
 
+    payload_type = pa.struct([("embedding", pa.list_(pa.float64())), ("info_msg", pa.null())])
     frame = pd.DataFrame(
         {
-            0: pd.Series([[1.0, 2.0]], dtype=pd.ArrowDtype(pa.list_(pa.float64()))),
-            "text": ["a"],
+            0: pd.Series([[1.0, 2.0], None], dtype=pd.ArrowDtype(pa.list_(pa.float64()))),
+            "payload": pd.Series(
+                [{"embedding": [3.0], "info_msg": None}, None],
+                dtype=pd.ArrowDtype(payload_type),
+            ),
+            "text": ["a", "b"],
         }
     )
-    result = frame_to_records(frame)
-    assert result == [{0: [1.0, 2.0], "text": "a"}]
-    assert isinstance(frame.dtypes.loc[0], pd.ArrowDtype)
+    frame.index = [10, 20]
+
+    assert frame_to_records(frame) == [
+        {0: [1.0, 2.0], "payload": {"embedding": [3.0], "info_msg": None}, "text": "a"},
+        {0: None, "payload": None, "text": "b"},
+    ]
+    assert isinstance(frame[0].dtype, pd.ArrowDtype)
+    assert isinstance(frame["payload"].dtype, pd.ArrowDtype)
