@@ -88,7 +88,6 @@ def test_sdk_auto_page_image_embedding_skips_unused_page_elements(monkeypatch, m
         )
         return {
             "embeddings": [[1.0] * 2048 for _ in range(prompt_count)],
-            "info_msgs": [None] * prompt_count,
         }
 
     class _UnexpectedPageElementsActor:
@@ -139,9 +138,7 @@ def test_sdk_auto_page_image_embedding_skips_unused_page_elements(monkeypatch, m
         .all()
     )
     assert result["_image_b64"].map(lambda image_b64: isinstance(image_b64, str) and bool(image_b64)).all()
-    assert result["_contains_embeddings"].all()
-    assert result["text_embeddings_1b_v2_has_embedding"].all()
-    assert (result["text_embeddings_1b_v2_dim"] == 2048).all()
+    assert result["embedding"].notna().all()
 
     assert len(remote_calls) == 1
     remote_call = remote_calls[0]

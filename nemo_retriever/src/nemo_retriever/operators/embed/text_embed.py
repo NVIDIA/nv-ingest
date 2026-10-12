@@ -14,33 +14,22 @@ It mirrors the "pure pandas batch fn + Ray-friendly actor" pattern used by
 the extraction operators.
 """
 
-from typing import Any, Dict, List, Optional, Sequence  # noqa: F401
-
-import time
-import traceback
+import logging
+from typing import Any, List, Optional
 
 import pandas as pd
 from nemo_retriever.operators.abstract_operator import AbstractOperator
 from nemo_retriever.graph.designer import designer_component
 from nemo_retriever.operators.gpu_operator import GPUOperator
 from nemo_retriever.operators.operator_archetype import ArchetypeOperator
+from nemo_retriever.models.inference.main_text_embed import assign_embedding_columns, embedding_error_message
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
 except Exception:  # pragma: no cover
     torch = None  # type: ignore[assignment]
-
-
-def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
-    return {
-        "embedding": None,
-        "error": {
-            "stage": str(stage),
-            "type": exc.__class__.__name__,
-            "message": str(exc),
-            "traceback": "".join(traceback.format_exception(type(exc), exc, exc.__traceback__)),
-        },
-    }
 
 
 def _text_from_row(row: pd.Series, *, text_column: str) -> str:
@@ -71,9 +60,7 @@ def embed_text_1b_v2(
     input_type: str = "passage",
     text_column: str = "text",
     inference_batch_size: int = 32,
-    output_column: str = "text_embeddings_1b_v2",
-    embedding_dim_column: str = "text_embeddings_1b_v2_dim",
-    has_embedding_column: str = "text_embeddings_1b_v2_has_embedding",
+    output_column: str = "embedding",
     **_: Any,
 ) -> Any:
     """
@@ -85,9 +72,8 @@ def embed_text_1b_v2(
 
     Output:
       - Returns a pandas.DataFrame with original columns preserved, plus:
-        - `output_column`: dict payload `{"embedding": list[float]|None, "timing": {...}, "error": ...}`
-        - `embedding_dim_column`: int
-        - `has_embedding_column`: bool
+        - `output_column`: list<float32> vector or null
+        - `f"{output_column}_error"`: string or null
     """
     _ = (model_name, embedding_endpoint)  # reserved for future remote execution support
     if not isinstance(batch_df, pd.DataFrame):
@@ -95,7 +81,8 @@ def embed_text_1b_v2(
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
 
-    payloads: List[Dict[str, Any]] = [{"embedding": None, "error": None} for _ in range(len(batch_df.index))]
+    vectors: List[Any] = [None] * len(batch_df.index)
+    errors: List[Optional[str]] = [None] * len(batch_df.index)
     texts: List[str] = []
     text_row_idxs: List[int] = []
 
@@ -103,8 +90,6 @@ def embed_text_1b_v2(
         try:
             txt = _text_from_row(row, text_column=str(text_column))
             if not txt.strip():
-                # Keep placeholder but mark as "no text".
-                payloads[i] = {"embedding": None, "error": None}
                 continue
             # VL model handles formatting internally; skip prefix.
             if input_type and not hasattr(model, "embed_queries"):
@@ -113,15 +98,8 @@ def embed_text_1b_v2(
                 texts.append(txt)
             text_row_idxs.append(i)
         except BaseException as e:
-            payloads[i] = _error_payload(stage="extract_text", exc=e)
-
-    # Nothing to embed.
-    if not texts:
-        out0 = batch_df.copy()
-        out0[output_column] = payloads
-        out0[embedding_dim_column] = [0 for _ in range(len(out0.index))]
-        out0[has_embedding_column] = [False for _ in range(len(out0.index))]
-        return out0
+            logger.error("Text extraction failed for row %d: %s", i, e, exc_info=e)
+            errors[i] = embedding_error_message("extract_text", e)
 
     # Run inference in chunks.
     for start in range(0, len(texts), int(inference_batch_size)):
@@ -130,51 +108,24 @@ def embed_text_1b_v2(
         if not chunk_texts:
             continue
 
-        t0 = time.perf_counter()
         try:
             vecs = model.embed(chunk_texts, batch_size=int(inference_batch_size))
-            elapsed = time.perf_counter() - t0
-
             if torch is not None and isinstance(vecs, torch.Tensor):
-                vecs_list = vecs.detach().to("cpu").tolist()
-            elif isinstance(vecs, list):
-                vecs_list = vecs
+                rows = vecs.detach().to("cpu").float().numpy()
             else:
-                # Best-effort conversion.
-                tolist = getattr(vecs, "tolist", None)
-                vecs_list = tolist() if callable(tolist) else vecs  # type: ignore[assignment]
+                rows = vecs
 
-            if not isinstance(vecs_list, list) or len(vecs_list) != len(chunk_idxs):
+            if len(rows) != len(chunk_idxs):
                 raise RuntimeError("Embedder returned unexpected output shape/type.")
 
             for local_i, row_i in enumerate(chunk_idxs):
-                emb = vecs_list[local_i]
-                if not isinstance(emb, list):
-                    # Allow numpy arrays or tensors that slipped through.
-                    tolist = getattr(emb, "tolist", None)
-                    emb = tolist() if callable(tolist) else emb
-                payloads[row_i] = {
-                    "embedding": emb,
-                    "timing": {"seconds": float(elapsed)},
-                    "error": None,
-                }
+                vectors[row_i] = rows[local_i]
         except BaseException as e:
-            elapsed = time.perf_counter() - t0
+            logger.error("Text embedding failed for chunk starting at row %d: %s", start, e, exc_info=e)
             for row_i in chunk_idxs:
-                payloads[row_i] = _error_payload(stage="embed", exc=e) | {"timing": {"seconds": float(elapsed)}}
+                errors[row_i] = embedding_error_message("embed", e)
 
-    out = batch_df.copy()
-    out[output_column] = payloads
-    out[embedding_dim_column] = [
-        (
-            int(len((p or {}).get("embedding") or []))
-            if isinstance(p, dict) and isinstance(p.get("embedding"), list)
-            else 0
-        )
-        for p in payloads
-    ]
-    out[has_embedding_column] = [bool(d > 0) for d in out[embedding_dim_column].tolist()]
-    return out
+    return assign_embedding_columns(batch_df, vectors, errors, output_column=output_column)
 
 
 @designer_component(
@@ -225,14 +176,18 @@ class TextEmbedGPUActor(AbstractOperator, GPUOperator):
         try:
             return self.run(batch_df, **override_kwargs)
         except BaseException as e:
+            logger.error("Text embedding actor failed: %s", e, exc_info=e)
+            output_column = override_kwargs.get("output_column", self.detect_kwargs.get("output_column", "embedding"))
+            error_column = f"{output_column}_error"
+            message = embedding_error_message("actor_call", e)
             if isinstance(batch_df, pd.DataFrame):
-                out = batch_df.copy()
-                payload = _error_payload(stage="actor_call", exc=e)
-                out["text_embeddings_1b_v2"] = [payload for _ in range(len(out.index))]
-                out["text_embeddings_1b_v2_dim"] = [0 for _ in range(len(out.index))]
-                out["text_embeddings_1b_v2_has_embedding"] = [False for _ in range(len(out.index))]
-                return out
-            return [{"text_embeddings_1b_v2": _error_payload(stage="actor_call", exc=e)}]
+                return assign_embedding_columns(
+                    batch_df,
+                    [None] * len(batch_df),
+                    [message] * len(batch_df),
+                    output_column=output_column,
+                )
+            return [{output_column: None, error_column: message}]
 
 
 class TextEmbedActor(ArchetypeOperator):
