@@ -437,3 +437,17 @@ def test_arrow_to_pylist_matches_pyarrow_for_embedding_shapes(value_type: Any) -
         expected = values.to_pylist()
         actual = _arrow_to_pylist(values)
         assert repr(actual) == repr(expected)
+
+
+def test_frame_to_records_keeps_non_string_column_labels() -> None:
+    from nemo_retriever.graph.executor import frame_to_records
+
+    frame = pd.DataFrame(
+        {
+            0: pd.Series([[1.0, 2.0]], dtype=pd.ArrowDtype(pa.list_(pa.float64()))),
+            "text": ["a"],
+        }
+    )
+    result = frame_to_records(frame)
+    assert result == [{0: [1.0, 2.0], "text": "a"}]
+    assert isinstance(frame.dtypes.loc[0], pd.ArrowDtype)
