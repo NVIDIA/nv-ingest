@@ -28,7 +28,6 @@ from nemo_retriever.common.params.models import PdfSplitParams
 from nemo_retriever.common.params.models import RemoteInvokeParams
 from nemo_retriever.common.params.models import RemoteRetryParams
 from nemo_retriever.common.params.models import StoreParams
-from nemo_retriever.common.params.models import TabularExtractParams
 from nemo_retriever.common.params.models import TableParams
 from nemo_retriever.common.params.models import TextChunkParams
 from nemo_retriever.common.params.models import TextGenerationParams
@@ -70,7 +69,6 @@ __all__ = [
     "RemoteRetryParams",
     "SPLIT_CONFIG_VALID_KEYS",
     "StoreParams",
-    "TabularExtractParams",
     "TableParams",
     "TextChunkParams",
     "TextGenerationParams",
