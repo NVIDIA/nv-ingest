@@ -218,10 +218,11 @@ product-wide error-code enum. HTTP status codes usually appear inside
 structured status is present, `GraphIngestionError` can include it in the
 rendered exception.
 
-The embedding stage does not use the nested shape. For a row that is not
-embedded, it sets `embedding` to null and writes a one-line message to
-`embedding_error`. If you set `EmbedParams.output_column`, the error column is
-`{output_column}_error`.
+The embedding stage does not use the nested shape. Its output column defaults
+to `embedding` and can be changed with `EmbedParams.output_column`. It sets
+`{output_column}` to null when it produces no vector. `{output_column}_error`
+is null on success or when there is no embeddable content, and contains a
+one-line message only when embedding fails.
 
 ```python
 import os

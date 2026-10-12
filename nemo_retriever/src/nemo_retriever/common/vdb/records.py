@@ -166,8 +166,8 @@ class RetrievalHit(TypedDict, total=False):
     content_sha256: str
 
 
-def _embedding_from_graph_row(row: dict[str, Any]) -> list[float] | None:
-    return embedding_vector(row.get("embedding"))
+def _embedding_from_graph_row(row: dict[str, Any], *, embedding_column: str = "embedding") -> list[float] | None:
+    return embedding_vector(row.get(embedding_column))
 
 
 def _first_str(*values: Any) -> str:
@@ -287,10 +287,15 @@ def _derive_fidelity(content_type: Any, metadata: dict[str, Any], content_metada
     return None
 
 
-def _client_record_from_graph_row(row: dict[str, Any], *, require_embedding: bool = True) -> dict[str, Any] | None:
+def _client_record_from_graph_row(
+    row: dict[str, Any],
+    *,
+    require_embedding: bool = True,
+    embedding_column: str = "embedding",
+) -> dict[str, Any] | None:
     metadata = _dict_or_empty(row.get("metadata"))
 
-    embedding = _embedding_from_graph_row(row)
+    embedding = _embedding_from_graph_row(row, embedding_column=embedding_column)
     text = _text_from_graph_row(row)
     if require_embedding and embedding is None:
         return None
@@ -387,11 +392,12 @@ def _stage_error_field(path: Any) -> str:
     return "error"
 
 
-def _row_stage_errors(row: dict[str, Any]) -> list[dict[str, Any]]:
+def _row_stage_errors(row: dict[str, Any], *, embedding_column: str = "embedding") -> list[dict[str, Any]]:
     errors = list(iter_stage_errors_from_value(row))
-    embedding_error = row.get("embedding_error")
+    error_column = f"{embedding_column}_error"
+    embedding_error = row.get(error_column)
     if isinstance(embedding_error, str) and embedding_error.strip():
-        errors.append({"path": "embedding_error", "error": embedding_error})
+        errors.append({"path": error_column, "error": embedding_error})
     return errors
 
 
@@ -422,7 +428,11 @@ def _raise_for_empty_vdb_conversion(
     )
 
 
-def _iter_client_vdb_records(rows: Iterable[dict[str, Any]]) -> Iterator[dict[str, Any]]:
+def _iter_client_vdb_records(
+    rows: Iterable[dict[str, Any]],
+    *,
+    embedding_column: str = "embedding",
+) -> Iterator[dict[str, Any]]:
     """Lazily convert graph rows into individual canonical NRL records.
 
     Rows without searchable content are skipped. Missing embeddings fail the
@@ -440,18 +450,18 @@ def _iter_client_vdb_records(rows: Iterable[dict[str, Any]]) -> Iterator[dict[st
         if not isinstance(row, dict):
             continue
         row_count += 1
-        record = _client_record_from_graph_row(row)
+        record = _client_record_from_graph_row(row, embedding_column=embedding_column)
         if record is not None:
             converted_count += 1
             yield record
             continue
 
-        embedding = _embedding_from_graph_row(row)
+        embedding = _embedding_from_graph_row(row, embedding_column=embedding_column)
         missing_embedding = _row_has_uploadable_content_without_embedding(row, embedding)
         if missing_embedding:
             missing_embeddings += 1
 
-        upstream_errors = _row_stage_errors(row)
+        upstream_errors = _row_stage_errors(row, embedding_column=embedding_column)
         if upstream_errors:
             upstream_error_count += len(upstream_errors)
             upstream_error_fields.update(_stage_error_field(error.get("path")) for error in upstream_errors)
@@ -473,7 +483,7 @@ def _iter_client_vdb_records(rows: Iterable[dict[str, Any]]) -> Iterator[dict[st
         )
 
 
-def to_client_vdb_records(rows: Any) -> list[list[dict[str, Any]]]:
+def to_client_vdb_records(rows: Any, *, embedding_column: str = "embedding") -> list[list[dict[str, Any]]]:
     """Convert graph-ingest rows into the nested record shape expected by client VDBs.
 
     Dense rows require an embedding and either nonblank text or concrete image backing.
@@ -509,9 +519,17 @@ def to_client_vdb_records(rows: Any) -> list[list[dict[str, Any]]]:
     # Walrus: bind conversion once per row — a plain ``if f(row)`` + ``f(row)`` list comp
     # would call _client_record_from_graph_row twice per row on large datasets.
     # isinstance(row, dict): plain lists are not normalized like DataFrame rows; skip None/Series/etc.
-    inner = [record for row in graph_rows if (record := _client_record_from_graph_row(row)) is not None]
+    inner = [
+        record
+        for row in graph_rows
+        if (record := _client_record_from_graph_row(row, embedding_column=embedding_column)) is not None
+    ]
     missing_embeddings = sum(
-        _row_has_uploadable_content_without_embedding(row, _embedding_from_graph_row(row)) for row in graph_rows
+        _row_has_uploadable_content_without_embedding(
+            row,
+            _embedding_from_graph_row(row, embedding_column=embedding_column),
+        )
+        for row in graph_rows
     )
     if inner and missing_embeddings:
         raise VdbUploadError(
@@ -519,11 +537,16 @@ def to_client_vdb_records(rows: Any) -> list[list[dict[str, Any]]]:
             f"input rows={len(graph_rows)}, uploadable rows={len(inner)}, missing embedding={missing_embeddings}."
         )
     if not inner and graph_rows:
-        upstream_errors = [error for row in graph_rows for error in _row_stage_errors(row)]
+        upstream_errors = [
+            error for row in graph_rows for error in _row_stage_errors(row, embedding_column=embedding_column)
+        ]
         rejection_reasons = Counter(
             (
                 "missing embedding"
-                if _row_has_uploadable_content_without_embedding(row, _embedding_from_graph_row(row))
+                if _row_has_uploadable_content_without_embedding(
+                    row,
+                    _embedding_from_graph_row(row, embedding_column=embedding_column),
+                )
                 else "missing searchable text or image backing"
             )
             for row in graph_rows

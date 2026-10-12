@@ -837,20 +837,26 @@ def test_run_pipeline_in_process_uses_effective_embedding_output_column(
     import pandas as pd
 
     class _Ingestor:
-        _embed_params = EmbedParams(model_name="embed-model", output_column="custom_embeddings")
+        _embed_params = EmbedParams(model_name="embed-model", output_column="vec")
 
         def ingest(self):
             return pd.DataFrame(
                 {
                     "text": ["hello"],
                     "earlier_payload": [[9.0]],
-                    "custom_embeddings": [[0.1]],
+                    "vec": [[0.1]],
+                    "vec_error": [None],
                 }
             )
 
+    posted = []
     monkeypatch.setattr(
         "nemo_retriever.service.services.pipeline_executor._build_graph_ingestor_from_spec",
         lambda *_args, **_kwargs: (_Ingestor(), "pdf", False),
+    )
+    monkeypatch.setattr(
+        "nemo_retriever.service.services.pipeline_executor._post_records_to_vectordb",
+        lambda records, *_args, **_kwargs: posted.append(records),
     )
 
     row_count, rows, _ = _run_pipeline_in_process(
@@ -858,11 +864,13 @@ def test_run_pipeline_in_process_uses_effective_embedding_output_column(
         b"%PDF-1.4 stub",
         {},
         None,
+        vectordb_url="http://vectordb",
         pipeline_spec={"result_schema": "compact", "return_embeddings": True},
     )
 
     assert row_count == 1
     assert rows[0]["embedding"] == [0.1]
+    assert posted[0][0][0]["metadata"]["embedding"] == [0.1]
 
 
 def test_build_graph_ingestor_omits_asr_params_when_worker_unconfigured() -> None:

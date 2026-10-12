@@ -618,6 +618,24 @@ class TestRunModeServiceRequiresHttpEmbed:
             Retriever(run_mode="service", embed_kwargs={})._merge_embed_params()
 
 
+def test_retriever_wires_custom_output_column_to_retrieve_operator() -> None:
+    from nemo_retriever.operators.vdb import RetrieveVdbOperator
+
+    retriever = _make_retriever(
+        embed_kwargs={
+            "model_name": "embedder",
+            "embed_model_name": "embedder",
+            "output_column": "vec",
+        },
+        vdb_kwargs={"vdb": MagicMock()},
+    )
+    graph = retriever._build_default_graph()
+
+    retrieve = graph.roots[0].children[0].operator
+    assert isinstance(retrieve, RetrieveVdbOperator)
+    assert retrieve._embedding_column == "vec"
+
+
 class TestRetrieveVdbOperatorPreprocess:
     def test_dataframe_to_vectors_reads_embedding_column(self) -> None:
         from nemo_retriever.operators.vdb import RetrieveVdbOperator
@@ -648,6 +666,31 @@ class TestRetrieveVdbOperatorPreprocess:
         op = RetrieveVdbOperator(vdb_op="lancedb", vdb_kwargs={"uri": "/tmp", "table_name": "t"})
         vec = op.preprocess(df)
         assert vec == [[0.5, 0.25]]
+
+    def test_dataframe_to_vectors_reads_custom_embedding_column(self) -> None:
+        from nemo_retriever.operators.vdb import RetrieveVdbOperator
+
+        df = pd.DataFrame({"text": ["a"], "vec": [[0.5, 0.25]], "vec_error": [None]})
+        op = RetrieveVdbOperator(
+            vdb_op="lancedb",
+            vdb_kwargs={"uri": "/tmp", "table_name": "t"},
+            embedding_column="vec",
+        )
+
+        assert op.preprocess(df) == [[0.5, 0.25]]
+
+    def test_dataframe_to_vectors_names_custom_embedding_column_in_errors(self) -> None:
+        from nemo_retriever.operators.vdb import RetrieveVdbOperator
+
+        df = pd.DataFrame({"text": ["a"], "vec": [None], "vec_error": ["embedding failed"]})
+        op = RetrieveVdbOperator(
+            vdb_op="lancedb",
+            vdb_kwargs={"uri": "/tmp", "table_name": "t"},
+            embedding_column="vec",
+        )
+
+        with pytest.raises(ValueError, match=r"Query row 0 has no vector in the 'vec' column"):
+            op.preprocess(df)
 
     def test_dataframe_to_vectors_reports_embedding_error(self) -> None:
         from nemo_retriever.operators.vdb import RetrieveVdbOperator
