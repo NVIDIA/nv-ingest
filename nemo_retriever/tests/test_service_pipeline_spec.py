@@ -891,7 +891,7 @@ def test_run_pipeline_posts_canonical_pdf_table_image_provenance(
     graph_rows = [
         {
             "text": "table content",
-            "text_embeddings_1b_v2": {"embedding": [0.1, 0.2]},
+            "embedding": [0.1, 0.2],
             "path": "/documents/report.pdf",
             "page_number": 1,
             "_page_number": 7,

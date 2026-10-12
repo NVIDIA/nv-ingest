@@ -263,8 +263,8 @@ def test_conversion_failure_does_not_commit_a_partial_stream(tmp_path: Path) -> 
     backend = _backend(tmp_path)
     rows = pd.DataFrame(
         [
-            {"text": "embedded", "metadata": {"embedding": [1.0, 1.0]}},
-            {"text": "missing", "metadata": {"embedding": []}},
+            {"text": "embedded", "embedding": [1.0, 1.0]},
+            {"text": "missing", "embedding": None, "embedding_error": "embedding failed"},
         ]
     )
 
