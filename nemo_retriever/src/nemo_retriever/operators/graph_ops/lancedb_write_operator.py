@@ -38,8 +38,7 @@ class LanceDBWriteOperator(AbstractOperator, CPUOperator):
         uri: str = "/var/lib/nemo-retriever/lancedb",
         table_name: str = "nemo-retriever",
         hybrid: bool = False,
-        embedding_column: str = "text_embeddings_1b_v2",
-        embedding_key: str = "embedding",
+        embedding_column: str = "embedding",
         text_column: str = "text",
         include_text: bool = True,
     ) -> None:
@@ -48,7 +47,6 @@ class LanceDBWriteOperator(AbstractOperator, CPUOperator):
         self._table_name = table_name
         self._hybrid = hybrid
         self._embedding_column = embedding_column
-        self._embedding_key = embedding_key
         self._text_column = text_column
         self._include_text = include_text
         self._db: Any = None
@@ -104,7 +102,6 @@ class LanceDBWriteOperator(AbstractOperator, CPUOperator):
         rows = build_lancedb_rows(
             data,
             embedding_column=self._embedding_column,
-            embedding_key=self._embedding_key,
             text_column=self._text_column,
             include_text=self._include_text,
         )

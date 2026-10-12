@@ -10,28 +10,16 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from nemo_retriever.common.vdb.records import normalize_content_type
+from nemo_retriever.common.vdb.records import embedding_vector, normalize_content_type
 
 
 def extract_embedding_from_row(
     row: Any,
     *,
-    embedding_column: str = "text_embeddings_1b_v2",
-    embedding_key: str = "embedding",
+    embedding_column: str = "embedding",
 ) -> Optional[List[float]]:
     """Extract an embedding vector from a row."""
-    meta = getattr(row, "metadata", None)
-    if isinstance(meta, dict):
-        emb = meta.get("embedding")
-        if isinstance(emb, list) and emb:
-            return emb  # type: ignore[return-value]
-
-    payload = getattr(row, embedding_column, None)
-    if isinstance(payload, dict):
-        emb = payload.get(embedding_key)
-        if isinstance(emb, list) and emb:
-            return emb  # type: ignore[return-value]
-    return None
+    return embedding_vector(getattr(row, embedding_column, None))
 
 
 def extract_source_path_and_page(row: Any, *, provenance_page: Optional[int] = None) -> Tuple[str, int]:
@@ -131,14 +119,13 @@ def update_metadata_with_content_type(metadata_obj: Dict[str, Any], *, content_t
 def build_lancedb_row(
     row: Any,
     *,
-    embedding_column: str = "text_embeddings_1b_v2",
-    embedding_key: str = "embedding",
+    embedding_column: str = "embedding",
     text_column: str = "text",
     include_text: bool = True,
     provenance_page: Optional[int] = None,
 ) -> Optional[Dict[str, Any]]:
     """Build a single LanceDB-ready dict from a DataFrame row."""
-    embedding = extract_embedding_from_row(row, embedding_column=embedding_column, embedding_key=embedding_key)
+    embedding = extract_embedding_from_row(row, embedding_column=embedding_column)
     if embedding is None:
         return None
 
@@ -195,8 +182,7 @@ def build_lancedb_row(
 def build_lancedb_rows(
     df: Any,
     *,
-    embedding_column: str = "text_embeddings_1b_v2",
-    embedding_key: str = "embedding",
+    embedding_column: str = "embedding",
     text_column: str = "text",
     include_text: bool = True,
 ) -> List[Dict[str, Any]]:
@@ -214,7 +200,6 @@ def build_lancedb_rows(
         row_out = build_lancedb_row(
             row,
             embedding_column=embedding_column,
-            embedding_key=embedding_key,
             text_column=text_column,
             include_text=include_text,
             provenance_page=pp,
