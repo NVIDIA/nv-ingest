@@ -181,7 +181,12 @@ def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
         for name, dtype in frame.dtypes.items()
         if isinstance(dtype, pd.ArrowDtype) and pa.types.is_nested(dtype.pyarrow_dtype)
     }
-    return (frame.assign(**nested) if nested else frame).to_dict(orient="records")
+    if not nested:
+        return frame.to_dict(orient="records")
+    frame = frame.copy(deep=False)
+    for name, values in nested.items():
+        frame[name] = values
+    return frame.to_dict(orient="records")
 
 
 def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
