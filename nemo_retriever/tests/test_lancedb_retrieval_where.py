@@ -247,13 +247,13 @@ def test_hybrid_returns_image_only_row_through_dense_fusion() -> None:
             {
                 "text": "",
                 "_image_b64": "page-image",
-                "text_embeddings_1b_v2": {"embedding": [1.0, 0.0]},
+                "embedding": [1.0, 0.0],
                 "source_id": "scanned.pdf",
                 "page_number": 7,
             },
             {
                 "text": "lexical-only comparison row",
-                "text_embeddings_1b_v2": {"embedding": [0.0, 1.0]},
+                "embedding": [0.0, 1.0],
                 "source_id": "text.pdf",
                 "page_number": 1,
                 "_content_type": "text",

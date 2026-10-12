@@ -49,7 +49,7 @@ class GeneratedBatches:
                     [
                         {
                             "text": f"page-{i}",
-                            "metadata": {"embedding": [1.0, 2.0]},
+                            "embedding": [1.0, 2.0],
                             "result_only": "extraction payload",
                         },
                         {"text": "", "metadata": {}},

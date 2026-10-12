@@ -132,14 +132,14 @@ def _graph_rows() -> list[dict[str, Any]]:
     return [
         {
             "text": "first chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "path": "/tmp/doc-a.pdf",
             "page_number": 1,
             "metadata": {"content_metadata": {"type": "text"}},
         },
         {
             "text": "second chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.2] * 2048},
+            "embedding": [0.2] * 2048,
             "path": "/tmp/doc-a.pdf",
             "page_number": 2,
             "metadata": {"content_metadata": {"type": "text"}},
@@ -186,7 +186,7 @@ def test_ingest_operator_converts_graph_rows_to_client_vdb_records() -> None:
     data = [
         {
             "text": "graph chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "source_id": "/tmp/doc-a.pdf",
             "page_number": 7,
         }
@@ -239,7 +239,7 @@ def test_ingest_operator_rejects_unembedded_content_when_embedded_row_is_filtere
     operator = IngestVdbOperator(vdb=vdb)
     data = pd.DataFrame(
         [
-            {"text": "", "metadata": {"embedding": [0.1]}},
+            {"text": "", "embedding": [0.1]},
             {"text": "extracted chunk"},
         ]
     )
@@ -265,7 +265,7 @@ def test_ingest_operator_retains_embedded_blank_image_row_without_text_fidelity(
         {
             "text": text,
             "document_type": "structured",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "_image_b64": "page-image",
             "source_id": "/tmp/scanned.pdf",
             "page_number": 7,
@@ -304,7 +304,7 @@ def test_ingest_operator_rejects_noncanonical_image_payload_without_truthiness(
     data = [
         {
             "text": "",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "_image_b64": image_payload,
             "source_id": "/tmp/scanned.pdf",
             "page_number": 7,
@@ -328,7 +328,7 @@ def test_ingest_operator_retains_image_only_row_with_stored_image_uri(
     data = [
         {
             "text": "",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             uri_field: "file:///tmp/scanned-page-7.png",
             "source_id": "/tmp/scanned.pdf",
             "page_number": 7,
@@ -352,7 +352,7 @@ def test_ingest_operator_rejects_nonempty_batch_with_zero_uploadable_records() -
     data = [
         {
             "text": "",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "source_id": "/tmp/empty.pdf",
             "page_number": 1,
         }
@@ -372,10 +372,8 @@ def test_ingest_operator_rejects_runtime_empty_vectors_before_backend_call() -> 
     data = [
         {
             "text": text,
-            "text_embeddings_1b_v2": {
-                "embedding": [],
-                "error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
-            },
+            "embedding": None,
+            "embedding_error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
         }
         for text in ("valid neighbor before", "valid neighbor after")
     ]
@@ -591,7 +589,8 @@ def test_custom_vdb_stream_capability_and_legacy_fallback() -> None:
     ]
 
     partial_rows = _graph_rows()
-    partial_rows[1]["text_embeddings_1b_v2"] = {"embedding": []}
+    partial_rows[1]["embedding"] = None
+    partial_rows[1]["embedding_error"] = "embedding failed"
     fail_closed_vdb = StreamingFakeVDB()
     pulls.clear()
     with pytest.raises(VdbUploadError, match="refusing a partial write"):

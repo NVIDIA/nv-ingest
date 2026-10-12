@@ -219,7 +219,7 @@ class TestStoreOperatorInGraph:
         assert table_row["metadata"]["content_metadata"]["uploaded_image_uri"] == table_uri
         assert table_row["metadata"]["table_metadata"]["uploaded_image_uri"] == table_uri
 
-        result["metadata"] = result["metadata"].apply(lambda metadata: {**metadata, "embedding": [0.1, 0.2]})
+        result["embedding"] = [[0.1, 0.2] for _ in range(len(result.index))]
         records = to_client_vdb_records(result)[0]
         table_record = next(
             record for record in records if record["metadata"]["content_metadata"].get("type") == "table"

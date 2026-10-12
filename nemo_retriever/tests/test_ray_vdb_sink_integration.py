@@ -24,10 +24,8 @@ _GRAPH_SCHEMA = pa.schema(
     [
         pa.field("block_id", pa.int64()),
         pa.field("text", pa.string()),
-        pa.field(
-            "text_embeddings_1b_v2",
-            pa.struct([pa.field("embedding", pa.list_(pa.float32()))]),
-        ),
+        pa.field("embedding", pa.list_(pa.float32())),
+        pa.field("embedding_error", pa.string()),
         pa.field("source_id", pa.string()),
         pa.field("page_number", pa.int64()),
         pa.field(
@@ -58,7 +56,7 @@ def _source_table(block_id: int) -> pa.Table:
             {
                 "block_id": block_id,
                 "text": f"chunk-{row_id}",
-                "text_embeddings_1b_v2": {"embedding": [float(row_id), 1.0]},
+                "embedding": [float(row_id), 1.0],
                 "source_id": f"/tmp/doc-{row_id}.pdf",
                 "page_number": row_id,
                 "metadata": {
