@@ -620,8 +620,8 @@ def _to_service_lancedb_row(row: dict[str, Any]) -> dict[str, Any] | None:
         content_metadata["_content_type"] = content_type
     wide_row = build_lancedb_row(
         SimpleNamespace(
+            embedding=row.get("vector"),
             metadata={
-                "embedding": row.get("vector"),
                 "source_path": source_id,
                 "content_metadata": content_metadata,
             },

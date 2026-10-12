@@ -212,9 +212,10 @@ def test_systemic_failure_is_not_replayed_or_exposed(caplog) -> None:
         {"unembedded": 1, "failed": 1},
         {"unembedded": 1, "failed": 1},
     ]
-    assert result["embedding_error"].tolist() == [
-        "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause"
-    ] * 2
+    assert (
+        result["embedding_error"].tolist()
+        == ["RuntimeError: embedding batch failed; inspect embed-stage logs for the cause"] * 2
+    )
     assert not any("echoed document" in error for error in result["embedding_error"])
     assert "failed=2 embedded=0 unembedded=2" in caplog.text
 

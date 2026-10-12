@@ -843,8 +843,8 @@ def test_run_pipeline_in_process_uses_effective_embedding_output_column(
             return pd.DataFrame(
                 {
                     "text": ["hello"],
-                    "earlier_payload": [{"embedding": [9.0]}],
-                    "custom_embeddings": [{"embedding": [0.1]}],
+                    "earlier_payload": [[9.0]],
+                    "custom_embeddings": [[0.1]],
                 }
             )
 
