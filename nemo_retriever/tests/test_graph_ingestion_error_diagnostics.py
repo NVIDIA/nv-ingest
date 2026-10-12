@@ -506,4 +506,15 @@ def test_collect_policy_returns_embedding_error_column_failures() -> None:
             "ConnectionError: embedding batch failed; inspect embed-stage logs for the cause",
         )
     ]
-    assert GraphIngestor.extract_error_rows(frame).index.tolist() == [1]
+    assert ingestor.get_error_rows(frame).index.tolist() == [1]
+
+
+def test_generation_error_strings_are_not_reported_as_stage_errors() -> None:
+    ingestor = _remote_embed_ingestor(error_policy="collect")
+    frame = _embed_failure_frame().assign(summary_error=[None, "TimeoutError: summary request timed out"])
+    frame["vec_error"] = None
+
+    assert ingestor._collect_failure_tuples(frame) == []
+    assert GraphIngestor._stage_error_records(frame) == []
+    assert ingestor.get_error_rows(frame).empty
+    assert GraphIngestor.extract_error_rows(frame).empty
