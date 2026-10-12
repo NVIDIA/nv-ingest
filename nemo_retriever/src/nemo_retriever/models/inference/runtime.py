@@ -24,7 +24,6 @@ from nemo_retriever.models.inference.main_text_embed import (
     TextEmbeddingConfig,
     assign_embedding_columns,
     create_text_embeddings_for_df,
-    embedding_error_message,
 )
 from nemo_retriever.models.nim.error_reporter import report_error
 
@@ -212,10 +211,11 @@ def embed_text_main_text_embed(
             logger.debug("torch.cuda.empty_cache() failed during error cleanup: %s", _cache_exc)
         logger.error("Embedding failed: %s: %s", type(exc).__name__, exc, exc_info=True)
         report_error("embed", exc)
+        public_error = f"{type(exc).__name__}: embedding batch failed; inspect embed-stage logs for the cause"
         out_df = assign_embedding_columns(
             prepared_df,
             [None] * len(prepared_df),
-            [embedding_error_message("embed", exc)] * len(prepared_df),
+            [public_error] * len(prepared_df),
             output_column=output_column,
         )
         if "_embed_modality" in out_df.columns:
