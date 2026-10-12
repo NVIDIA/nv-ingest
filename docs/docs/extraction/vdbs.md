@@ -291,7 +291,7 @@ Existing custom backends retain the global-batch `VDB.run(records)` path unless
 they opt in. For LanceDB, ordinary fixed-table configurations with scheme-less
 local paths or authority-free `file:///` URIs use bounded Arrow batches. Remote
 stores and private service schemas retain the
-global-batch path. `PutVdbOperator` does not use streaming ingest.
+global-batch path.
 
 For Ray batch ingestion, configure LanceDB streaming behavior in the LanceDB
 `vdb_kwargs`:
@@ -323,8 +323,8 @@ the exception instructs you to resume with the original explicit
 `stream_operation_id`. If the original attempt did not set an ID, do not replay
 records after a known commit and finalization failure.
 
-These settings apply only to `LanceDB.stream_ingest()`. Legacy `run()` and
-`put()` calls reject non-default streaming settings instead of ignoring them.
+These settings apply only to `LanceDB.stream_ingest()`. Legacy `run()` calls
+reject non-default streaming settings instead of ignoring them.
 
 `RayDataExecutor.build_dataset()` remains lazy and builds the complete legacy
 graph, including the global VDB stage. In-process and service execution do not

@@ -20,7 +20,6 @@ from urllib.request import url2pathname
 
 import lancedb
 import pyarrow as pa
-import pyarrow.compute as pc
 from filelock import FileLock
 
 from nemo_retriever.common.schemas.collections import (
@@ -2017,111 +2016,6 @@ class LanceDB(VDB):
             checkout_latest()
         except Exception as exc:  # noqa: BLE001 - version refresh is advisory.
             logger.debug("Could not advance LanceDB table handle to the latest version: %s", exc)
-
-    def put(
-        self,
-        records,
-        table_name: str | None = None,
-        key: str = "id",
-    ) -> dict[str, int]:
-        """Replace existing rows of a LanceDB table in place, keyed by ``key``.
-
-        Strict update-only semantics:
-
-        * Rows matching an existing row by ``key`` are **updated in place**
-          (all columns, including ``vector``, are replaced).
-        * Rows whose ``key`` value is missing/empty raise :class:`KeyError`
-          — a put operation has no stable identity to target without a key.
-        * Rows whose ``key`` value does not match any row currently in the
-          table raise :class:`KeyError` — ``put`` never inserts new rows.
-        * Rows already in the table that are *not* referenced are **left
-          untouched** — ``put`` never deletes.
-
-        If the target table does not exist, :class:`FileNotFoundError` is
-        raised; ``put`` will not create tables on the fly.
-
-        Vector / FTS indexes are intentionally **not** rebuilt here:
-        incremental puts typically carry only a handful of rows. Indexes
-        will be (re)built by the next full :meth:`run` /
-        :meth:`write_to_index` call.
-
-        Returns the row counts dict from :func:`_create_lancedb_results`
-        plus: ``put``.
-        """
-        self._reject_stream_controls_for_legacy_operation("put")
-        target_name = table_name or self.table_name
-        with _table_mutation_lock(self.uri, target_name), self._write_lock:
-            self._assert_legacy_table_ready(target_name)
-            return self._put(records, table_name=target_name, key=key)
-
-    def _put(
-        self,
-        records,
-        table_name: str,
-        key: str,
-    ) -> dict[str, int]:
-        target_name = table_name or self.table_name
-
-        if self.validate_vector_length and self.on_bad_vectors != "error":
-            expected_dim: int | None = self.vector_dim
-        else:
-            expected_dim = None
-
-        rows, counts = _create_lancedb_results(records or [], expected_dim=expected_dim)
-        counts["put"] = 0
-
-        if not rows:
-            logger.info("LanceDB.put: nothing to put into table %r.", target_name)
-            return counts
-
-        rows_missing_key = [r for r in rows if not r.get(key)]
-        if rows_missing_key:
-            raise KeyError(
-                f"LanceDB.put: {len(rows_missing_key)} row(s) have an empty {key!r} value; "
-                "put() requires a stable id for every row."
-            )
-
-        try:
-            table = self._open_table(target_name)
-        except (ValueError, FileNotFoundError) as exc:
-            if isinstance(exc, ValueError) and not _is_missing_lancedb_table_error(exc):
-                raise
-            raise FileNotFoundError(
-                f"LanceDB.put: table {target_name!r} not found at uri={self.uri!r}; "
-                "put() only updates existing rows and will not create tables."
-            ) from exc
-
-        if self.on_bad_vectors == "fill":
-            rows = _stabilize_fill_vectors(
-                rows,
-                vector_dim=_schema_vector_dim(_table_schema(table)),
-                fill_value=self.fill_value,
-            )
-
-        input_ids = [r[key] for r in rows]
-        unique_input_ids = list(dict.fromkeys(input_ids))
-
-        filter_expr = pc.field(key).isin(pa.array(unique_input_ids, type=pa.string()))
-        existing_arrow = table.to_lance().to_table(columns=[key], filter=filter_expr)
-        existing_ids = set(existing_arrow.column(key).to_pylist())
-
-        missing_ids = [i for i in unique_input_ids if i not in existing_ids]
-        if missing_ids:
-            raise KeyError(
-                f"LanceDB.put: row(s) with {key}={missing_ids!r} not found in table "
-                f"{target_name!r}; put() only updates existing rows."
-            )
-
-        put_start = time.perf_counter()
-        table.merge_insert(key).when_matched_update_all().execute(rows)
-        _record_timing(
-            "lancedb.put",
-            time.perf_counter() - put_start,
-            {"rows": len(rows), "table": target_name},
-        )
-
-        counts["put"] = len(rows)
-        return counts
 
     def sparse_retrieval(self, query_texts: Iterable[str], **kwargs: Any) -> list[list[dict[str, Any]]]:
         """Search a LanceDB FTS-only table without query embeddings."""
