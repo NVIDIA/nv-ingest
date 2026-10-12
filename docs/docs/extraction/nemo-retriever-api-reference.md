@@ -178,7 +178,7 @@ row-level error fields.
 | `ocr_invoke_url` | `ocr` | OCR NIM |
 | `table_structure_invoke_url` | `table_structure_ocr_v1` | Table Structure NIM |
 | `nemotron_parse_invoke_url` or `invoke_url` | `nemotron_parse_v1_2` | Nemotron Parse NIM |
-| `embed_invoke_url` or `embedding_endpoint` | `output_column` (default `text_embeddings_1b_v2`) | Embedding NIM |
+| `embed_invoke_url` or `embedding_endpoint` | `{output_column}_error` (default `embedding_error`) | Embedding NIM |
 
 Caption and ASR use remote endpoints but are outside this raise path today.
 Remote caption failures can abort the whole ingest instead of returning a
@@ -207,6 +207,11 @@ product-wide error-code enum. HTTP status codes usually appear inside
 `message` text rather than as a separate `status_code` field; when a
 structured status is present, `GraphIngestionError` can include it in the
 rendered exception.
+
+The embedding stage does not use the nested shape. For a row that is not
+embedded, it sets `embedding` to null and writes a one-line message to
+`embedding_error`. If you set `EmbedParams.output_column`, the error column is
+`{output_column}_error`.
 
 ```python
 import os

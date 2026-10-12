@@ -65,7 +65,9 @@ result = (
 Bare `.vdb_upload()` writes to table `nemo-retriever`. Default `Retriever()`
 queries that table.
 
-You can omit `.embed()` if a custom stage provides an embedding in `metadata["embedding"]` or `text_embeddings_1b_v2["embedding"]`. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+`.embed()` writes each vector to the `embedding` column as a list of `float32` values. The column name comes from `EmbedParams.output_column`, which defaults to `embedding`. The stage also writes `embedding_error`, which is null on success and contains a one-line error message when a row is not embedded.
+
+You can omit `.embed()` if a custom stage writes each vector to the `embedding` column. Upload reads vectors only from this column. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
 
 ## Keep the embedding model aligned { #lancedb-embedding-model-compatibility }
 
@@ -190,7 +192,7 @@ graph_rows = pd.DataFrame(
     [
         {
             "text": "hello from graph",
-            "text_embeddings_1b_v2": {"embedding": [1.0, 0.0]},
+            "embedding": [1.0, 0.0],
             "path": "graph.pdf",
             "page_number": 2,
             "metadata": {},
