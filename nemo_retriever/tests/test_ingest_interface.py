@@ -970,7 +970,7 @@ def test_graph_ingestion_error_sanitizes_remote_message_fields() -> None:
         [
             {
                 "row_index": 0,
-                "column": "text_embeddings_1b_v2",
+                "column": "embedding_error",
                 "path": "error",
                 "error": long_message,
             }

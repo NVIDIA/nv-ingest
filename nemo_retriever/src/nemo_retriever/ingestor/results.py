@@ -20,12 +20,11 @@ import numpy as np
 
 ResultSchema = Literal["legacy", "compact"]
 
-_DEFAULT_EMBEDDING_COLUMN = "text_embeddings_1b_v2"
+_DEFAULT_EMBEDDING_COLUMN = "embedding"
 _MAX_STR_LEN = 500
 _TEXT_FIELD_NAMES = frozenset({"caption", "content", "text"})
 _RAW_IMAGE_FIELD_NAMES = frozenset({"image_b64", "_image_b64"})
 _EMBEDDING_FIELD_NAMES = frozenset({"embedding", "embeddings"})
-_EMBEDDING_PAYLOAD_COLUMNS = frozenset({"text_embeddings_1b_v2"})
 _ELEMENT_TYPE_ALIASES = {
     "chart_caption": "chart",
     "image_caption": "image",
@@ -132,6 +131,7 @@ def _sanitize_result_value(
     *,
     return_embeddings: bool = False,
     return_images: bool = False,
+    embedding_column: str = _DEFAULT_EMBEDDING_COLUMN,
 ) -> Any:
     """Convert a result value to JSON-safe transport form.
 
@@ -142,12 +142,8 @@ def _sanitize_result_value(
     """
     if key in _RAW_IMAGE_FIELD_NAMES:
         return _sanitize_returned_payload(val) if return_images else None
-    if key in _EMBEDDING_FIELD_NAMES:
+    if key in _EMBEDDING_FIELD_NAMES or key == embedding_column:
         return _sanitize_returned_payload(val) if return_embeddings else None
-    if key in _EMBEDDING_PAYLOAD_COLUMNS and not isinstance(val, dict) and not return_embeddings:
-        return None
-    if key in _EMBEDDING_PAYLOAD_COLUMNS and not isinstance(val, dict):
-        return _sanitize_returned_payload(val)
     if isinstance(val, str):
         return val
     if isinstance(val, dict):
@@ -347,11 +343,8 @@ def _extract_stored_image_uri(row: dict[str, Any]) -> str | None:
     return _first_str(row.get("_stored_image_uri"), row.get("stored_image_uri"), page_uri)
 
 
-def _extract_embedding(row: dict[str, Any], metadata: dict[str, Any], *, embedding_column: str) -> Any:
-    payload = row.get(embedding_column)
-    embedding = payload.get("embedding") if isinstance(payload, dict) else payload
-    if embedding is None:
-        embedding = metadata.get("embedding")
+def _extract_embedding(row: dict[str, Any], *, embedding_column: str) -> Any:
+    embedding = row.get(embedding_column)
     if _is_missing(embedding):
         return None
     return _sanitize_returned_payload(embedding)
@@ -385,7 +378,7 @@ def compact_result_record(
     return_embeddings
         Include a normalized top-level embedding when the row contains one.
     embedding_column
-        Pipeline result column containing the embedding payload.
+        Pipeline result column containing the embedding vector.
 
     Returns
     -------
@@ -421,7 +414,7 @@ def compact_result_record(
         record["stored_image_uri"] = stored_image_uri
 
     if return_embeddings:
-        embedding = _extract_embedding(row, metadata, embedding_column=embedding_column)
+        embedding = _extract_embedding(row, embedding_column=embedding_column)
         if embedding is not None:
             record["embedding"] = embedding
 
@@ -454,6 +447,7 @@ def dataframe_to_transport_records(
     """
     import pandas as pd
 
+    embedding_column = embedding_column or _DEFAULT_EMBEDDING_COLUMN
     if result_schema not in ("legacy", "compact"):
         raise ValueError(f"unknown result_schema: {result_schema!r}")
     if not isinstance(df, pd.DataFrame):
@@ -464,7 +458,7 @@ def dataframe_to_transport_records(
             compact_result_record(
                 row,
                 return_embeddings=return_embeddings,
-                embedding_column=embedding_column or _DEFAULT_EMBEDDING_COLUMN,
+                embedding_column=embedding_column,
             )
             for row in records
         ]
@@ -475,6 +469,7 @@ def dataframe_to_transport_records(
                 v,
                 return_embeddings=return_embeddings,
                 return_images=return_images,
+                embedding_column=embedding_column,
             )
             for k, v in row.items()
         }
