@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Literal, Sequence, cast
 
 from nemo_retriever.ingestor.manifest import (
+    DEFAULT_AUDIO_SPLIT_INTERVAL,
+    DEFAULT_VIDEO_FRAME_FPS,
     ExtractionBranchPlan,
     build_input_manifest,
     plan_extraction_branches,
@@ -37,12 +39,13 @@ from nemo_retriever.common.params import (
 from nemo_retriever.common.input_files import (
     AUTO_INPUT_EXTENSIONS,
     INPUT_TYPE_EXTENSIONS,
+    expand_input_directories,
     expand_input_file_patterns,
-    resolve_input_files,
 )
 from nemo_retriever.ingest.index_mode import (
     RequestedIngestIndexMode,
     inspect_existing_lancedb_mode,
+    lancedb_index_mode_kwargs,
     resolve_ingest_index_mode,
     validate_requested_index_mode,
 )
@@ -71,8 +74,6 @@ _SUPPORTED_INPUT_TYPES: tuple[IngestInputTypeValue, ...] = (
     "audio",
     "video",
 )
-_AUDIO_SPLIT_INTERVAL = 500000
-_VIDEO_FRAME_FPS = 0.5
 _VIDEO_TEXT_DEDUP_MAX_DROPPED_FRAMES = 2
 _DEFAULT_TEXT_CHUNK_MAX_TOKENS = 1024
 _DEFAULT_TEXT_CHUNK_OVERLAP_TOKENS = 150
@@ -275,18 +276,7 @@ def validate_ingest_document_types(documents: Sequence[str], *, input_type: Inge
 
 
 def expand_ingest_documents(documents: Sequence[str], *, input_type: IngestInputTypeValue = "auto") -> list[str]:
-    inputs: list[str] = []
-    for document in documents:
-        raw_document = str(document)
-        path = Path(raw_document).expanduser()
-        if path.is_dir():
-            directory_files = resolve_input_files(path, input_type)
-            if not directory_files:
-                raise FileNotFoundError(f"No supported ingest files found under directory: {path}")
-            inputs.extend(str(file) for file in directory_files)
-        else:
-            inputs.append(raw_document)
-
+    inputs = expand_input_directories([str(document) for document in documents], input_type=input_type)
     document_list = expand_input_file_patterns(inputs)
     validate_ingest_document_types(document_list, input_type=input_type)
     return document_list
@@ -403,7 +393,7 @@ def _resolve_media_params(
         return None, _build_asr_params(segment_audio=media.segment_audio, needed=False), None, None, None
 
     split_interval = (
-        int(media.audio_split_interval) if media.audio_split_interval is not None else _AUDIO_SPLIT_INTERVAL
+        int(media.audio_split_interval) if media.audio_split_interval is not None else DEFAULT_AUDIO_SPLIT_INTERVAL
     )
     audio_chunk_params = AudioChunkParams(
         enabled=bool(media.video_extract_audio) if media.video_extract_audio is not None and needs_video else True,
@@ -417,7 +407,7 @@ def _resolve_media_params(
 
     video_frame_params = VideoFrameParams(
         enabled=bool(media.video_extract_frames) if media.video_extract_frames is not None else True,
-        fps=float(media.video_frame_fps) if media.video_frame_fps is not None else _VIDEO_FRAME_FPS,
+        fps=float(media.video_frame_fps) if media.video_frame_fps is not None else DEFAULT_VIDEO_FRAME_FPS,
         dedup=bool(media.video_frame_dedup) if media.video_frame_dedup is not None else True,
     )
     video_text_dedup_params = VideoFrameTextDedupParams(
@@ -711,11 +701,8 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         "table_name": storage.table_name,
         "overwrite": bool(storage.overwrite),
     }
-    # Keep dense ingest kwargs unchanged unless the index mode needs additional LanceDB behavior.
-    if resolved_index_mode == "sparse":
-        vdb_upload_kwargs["sparse"] = True
-    elif resolved_index_mode == "hybrid":
-        vdb_upload_kwargs["hybrid"] = True
+    # Pass the resolved mode explicitly so the upload does not resolve ``auto`` again.
+    vdb_upload_kwargs.update(lancedb_index_mode_kwargs(resolved_index_mode))
     if embedding_model_name is not None:
         vdb_upload_kwargs["embedding_model_name"] = embedding_model_name
         if embed.embed_model_name is not None:

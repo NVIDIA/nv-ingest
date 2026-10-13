@@ -133,7 +133,7 @@ def test_manifest_branch_specs_resolve_default_params(monkeypatch, tmp_path) -> 
     video = tmp_path / "scene.mp4"
     audio.write_bytes(b"audio")
     video.write_bytes(b"video")
-    monkeypatch.setattr("nemo_retriever.ingestor.manifest._default_asr_params", lambda: ASRParams(segment_audio=False))
+    monkeypatch.setattr("nemo_retriever.ingestor.manifest.default_asr_params", lambda: ASRParams(segment_audio=False))
 
     branches = plan_extraction_branches(build_input_manifest([str(video), str(audio)]))
     by_family = {branch.family: branch for branch in branches}

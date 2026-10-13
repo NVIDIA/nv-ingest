@@ -26,7 +26,9 @@ from nemo_retriever.common.params import (
     NO_API_KEY,
     RemoteRetryParams,
     TextChunkParams,
+    VdbUploadParams,
 )
+from nemo_retriever.operators.vdb import IngestVdbOperator
 
 
 class _InlineTextTokenizer:
@@ -1154,3 +1156,68 @@ def test_batch_ingest_finalization_skips_unrelated_arrow_extension_columns(
     result = _run_graph_ingest_with_result(ingestor, batch_df, monkeypatch)
 
     assert result is batch_df
+
+
+def _vdb_sink(graph):
+    node = graph.roots[0]
+    while not isinstance(node.operator, IngestVdbOperator):
+        node = node.children[0]
+    return node.operator._vdb
+
+
+def test_lancedb_sink_resolves_index_mode_each_time_the_graph_is_built(tmp_path: Path) -> None:
+    import lancedb
+
+    params = VdbUploadParams(vdb_kwargs={"uri": str(tmp_path), "table_name": "docs", "overwrite": False})
+
+    def build():
+        return build_graph(extraction_mode="pdf", extract_params=ExtractParams(), vdb_upload_params=params)
+
+    assert _vdb_sink(build()).hybrid is True
+    lancedb.connect(str(tmp_path)).create_table("docs", data=[{"vector": [0.1, 0.2], "text": "alpha"}])
+    assert _vdb_sink(build()).hybrid is False
+
+
+def test_lancedb_sink_records_the_embed_stage_model(tmp_path: Path) -> None:
+    graph = build_graph(
+        extraction_mode="pdf",
+        extract_params=ExtractParams(),
+        embed_params=EmbedParams(),
+        vdb_upload_params=VdbUploadParams(vdb_kwargs={"uri": str(tmp_path)}),
+        stage_order=("embed",),
+    )
+
+    assert _vdb_sink(graph).embedding_model_name == "nvidia/nemotron-3-embed-1b"
+
+
+def test_directory_inputs_expand_to_supported_files(tmp_path: Path) -> None:
+    (tmp_path / "nested.pdf").mkdir()
+    (tmp_path / "empty").mkdir()
+    (tmp_path / "a.pdf").write_bytes(b"%PDF-1.4\n")
+    (tmp_path / "nested.pdf" / "b.txt").write_text("b")
+    (tmp_path / "notes.xyz").write_text("unsupported")
+    expected = [str((tmp_path / "a.pdf").resolve()), str((tmp_path / "nested.pdf" / "b.txt").resolve())]
+
+    assert GraphIngestor().files(str(tmp_path))._documents == expected
+    assert GraphIngestor().files(str(tmp_path / "nested.pdf"))._documents == expected[1:]
+    assert create_ingestor(documents=[str(tmp_path)])._documents == expected
+    assert GraphIngestor(documents=str(tmp_path / "a.pdf"))._documents == [str(tmp_path / "a.pdf")]
+    with pytest.raises(FileNotFoundError, match="No supported ingest files found under directory"):
+        GraphIngestor().files(str(tmp_path / "empty"))
+
+
+def test_explicit_media_methods_use_the_shared_media_defaults() -> None:
+    from nemo_retriever.ingestor.manifest import (
+        DEFAULT_AUDIO_SPLIT_INTERVAL,
+        DEFAULT_VIDEO_FRAME_FPS,
+        default_asr_params,
+    )
+
+    audio = GraphIngestor().extract_audio()
+    video = GraphIngestor().extract_video()
+
+    assert audio._audio_chunk_params.split_interval == DEFAULT_AUDIO_SPLIT_INTERVAL
+    assert audio._asr_params == video._asr_params == default_asr_params()
+    assert video._video_frame_params.fps == DEFAULT_VIDEO_FRAME_FPS
+    # Other split types keep the model's interval.
+    assert GraphIngestor().extract_audio(split_type="time")._audio_chunk_params.split_interval == 450
