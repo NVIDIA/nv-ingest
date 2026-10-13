@@ -356,24 +356,29 @@ def _apply_bad_vector_policy(
 ) -> tuple[np.ndarray, pa.Array]:
     """Columnar twin of :func:`_apply_deferred_bad_vector_policy`.
 
-    ``vectors`` holds non-null ``list<float>`` values. Returns the kept row
+    ``vectors`` holds non-null ``list`` values. Returns the kept row
     positions and their vectors as ``fixed_size_list<float32, vector_dim>``,
     with wrong-width and NaN vectors dropped, filled, nulled, or rejected the
-    same way the row path does.
+    same way the row path does. As on the row path, the width check runs
+    first; only correctly sized vectors are then coerced to floats, so a
+    non-numeric value in one of them raises the Arrow conversion error.
     """
 
     fixed_type = pa.list_(pa.float32(), int(vector_dim))
     row_count = len(vectors)
     wrong_dim = _vector_lengths(vectors) != vector_dim
-    has_nan = np.zeros(row_count, dtype=bool)
     sized = np.flatnonzero(~wrong_dim)
+    sized_vectors = vectors.take(pa.array(sized, type=pa.int64()))
+    child_type = sized_vectors.type.value_type
+    if not (pa.types.is_floating(child_type) or pa.types.is_integer(child_type)):
+        sized_vectors = sized_vectors.cast(pa.list_(pa.float64()))
+    has_nan = np.zeros(row_count, dtype=bool)
     if sized.size:
-        sized_vectors = vectors.take(pa.array(sized, type=pa.int64()))
         nan_flags = pc.fill_null(pc.is_nan(pc.list_flatten(sized_vectors)), False).to_numpy(zero_copy_only=False)
         has_nan[sized] = nan_flags.reshape(sized.size, vector_dim).any(axis=1)
     bad = wrong_dim | has_nan
     if not bad.any():
-        return np.arange(row_count), vectors.cast(fixed_type)
+        return np.arange(row_count), sized_vectors.cast(fixed_type)
 
     if on_bad_vectors == "error":
         first_bad = int(np.flatnonzero(bad)[0])
@@ -381,11 +386,11 @@ def _apply_bad_vector_policy(
         raise ValueError(
             f"Invalid LanceDB vector: {detail}. Set on_bad_vectors to 'drop', 'fill', or 'null' to handle it."
         )
-    if on_bad_vectors == "drop":
-        kept = np.flatnonzero(~bad)
-        return kept, vectors.take(pa.array(kept, type=pa.int64())).cast(fixed_type)
-
     good = np.flatnonzero(~bad)
+    good_vectors = sized_vectors.take(pa.array(np.searchsorted(sized, good), type=pa.int64())).cast(fixed_type)
+    if on_bad_vectors == "drop":
+        return good, good_vectors
+
     bad_count = int(bad.sum())
     if on_bad_vectors == "fill":
         # LanceDB 0.34 replaces the complete vector when its width is wrong or
@@ -393,12 +398,11 @@ def _apply_bad_vector_policy(
         replacement = pa.array([[float(fill_value)] * vector_dim] * bad_count, type=fixed_type)
     else:
         replacement = pa.nulls(bad_count, type=fixed_type)
-    good_vectors = vectors.take(pa.array(good, type=pa.int64())).cast(fixed_type)
-    positions = np.empty(row_count, dtype=np.int64)
-    positions[good] = np.arange(good.size)
-    positions[bad] = good.size + np.arange(bad_count)
-    combined = pa.concat_arrays([good_vectors, replacement])
-    return np.arange(row_count), combined.take(pa.array(positions, type=pa.int64()))
+    merged = pa.concat_arrays([good_vectors, replacement])
+    order = np.empty(row_count, dtype=np.int64)
+    order[good] = np.arange(good.size)
+    order[np.flatnonzero(bad)] = good.size + np.arange(bad_count)
+    return np.arange(row_count), merged.take(pa.array(order, type=pa.int64()))
 
 
 def _infer_vector_dim_with_spooled_prefix(

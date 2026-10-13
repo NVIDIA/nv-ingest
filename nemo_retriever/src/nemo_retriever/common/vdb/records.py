@@ -531,8 +531,7 @@ def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
 
     Arrow-backed pandas columns are taken as they are, without touching rows.
     Anything else is normalized per row with :func:`embedding_vector`, so empty
-    and non-list values become null slots and every element goes through
-    ``float()``, matching the record path.
+    and non-list values become null slots, matching the record path.
     """
     backing = getattr(values, "array", values)
     if callable(getattr(backing, "__arrow_array__", None)):
@@ -547,10 +546,17 @@ def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
             return column
         values = column.to_pylist()
     vectors = [embedding_vector(value) for value in values]
-    return pa.array(
-        [None if vector is None else [None if item is None else float(item) for item in vector] for vector in vectors],
-        type=pa.list_(pa.float64()),
-    )
+    if any(isinstance(item, str) for vector in vectors if vector for item in vector):
+        # Keep strings as strings: the LanceDB policy casts them after the
+        # width check, in the order the record path applies ``float()``.
+        return pa.array(
+            [
+                None if vector is None else [None if item is None else str(item) for item in vector]
+                for vector in vectors
+            ],
+            type=pa.list_(pa.string()),
+        )
+    return pa.array(vectors, type=pa.list_(pa.float64()))
 
 
 def iter_canonical_record_batches(

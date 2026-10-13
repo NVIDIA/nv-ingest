@@ -366,3 +366,38 @@ def test_prepared_chunks_respect_stream_batch_bytes_before_arrow_allocation(tmp_
     schema = backend._stream_schema(DIM)
     assert sum(len(chunk.vector) for chunk in chunks) == 60
     assert all(chunk.record_batch(schema).get_total_buffer_size() <= limit for chunk in chunks)
+
+
+def test_arrow_backed_numeric_string_vectors_match_record_path(tmp_path: Path) -> None:
+    rows = [_row(0, embedding=["0.0", "0.25", "0.5", "0.75"]), _row(1, embedding=["1.0", "1.25", "1.5", "1.75"])]
+    frame = pd.DataFrame(rows)
+    frame["embedding"] = pd.Series(
+        pa.array(frame["embedding"].tolist(), type=pa.list_(pa.string())),
+        dtype=pd.ArrowDtype(pa.list_(pa.string())),
+    )
+
+    _ingest_both(tmp_path, [frame])
+
+    table = _assert_tables_equal(tmp_path)
+    assert table.column("vector").to_pylist() == [pytest.approx(_vector(0)), pytest.approx(_vector(1))]
+
+
+def test_wrong_width_uncoercible_vector_is_dropped_like_record_path(tmp_path: Path) -> None:
+    rows = [_row(0), _row(1, embedding=["bad"]), _row(2)]
+
+    _ingest_both(tmp_path, [pd.DataFrame(rows)])
+
+    table = _assert_tables_equal(tmp_path)
+    assert table.column("id").to_pylist() == ["row-0", "row-2"]
+
+
+def test_correct_width_uncoercible_vector_fails_on_both_paths(tmp_path: Path) -> None:
+    rows = [_row(0), _row(1, embedding=["a", "b", "c", "d"])]
+    frames = [pd.DataFrame(rows)]
+
+    record_backend = _backend(tmp_path / "records")
+    record_backend.supports_stream_ingest_batches = False
+    with pytest.raises(Exception):
+        IngestVdbOperator(vdb=record_backend)._stream_ingest(iter(frames))
+    with pytest.raises(Exception):
+        IngestVdbOperator(vdb=_backend(tmp_path / "arrow"))._stream_ingest(iter(frames))
