@@ -75,7 +75,15 @@ EMBEDDING_ERROR_DTYPE = pd.ArrowDtype(pa.string())
 
 
 def embedding_error_message(stage: str, exc: BaseException) -> str:
-    """Return a one-line ``stage: ExcType: message`` string for the error column."""
+    """Format an exception as a one-line message for the embedding error column.
+
+    Args:
+        stage: Name of the stage where the exception occurred.
+        exc: Exception to describe.
+
+    Returns:
+        A single-line ``stage: ExceptionType: message`` string, omitting the message when it is empty.
+    """
     message = " ".join(str(exc).split())
     return f"{stage}: {type(exc).__name__}: {message}" if message else f"{stage}: {type(exc).__name__}"
 
@@ -87,13 +95,30 @@ def assign_embedding_columns(
     *,
     output_column: str,
 ) -> pd.DataFrame:
-    """Return ``df`` with ``output_column`` as list<float32> and ``f"{output_column}_error"`` as string."""
+    """Return a copy of ``df`` with typed embedding and error columns.
+
+    Args:
+        df: Input dataframe to copy.
+        vectors: Per-row float sequences, or ``None`` or empty sequences for rows that were not embedded.
+        errors: Per-row error messages or ``None``; values are preserved.
+        output_column: Name of the vector column; its error column is named ``f"{output_column}_error"``.
+
+    Returns:
+        A new dataframe with ``output_column`` as an Arrow ``list<float32>`` column and
+        ``f"{output_column}_error"`` as an Arrow string column. Missing and empty vectors are null;
+        ``df`` is unchanged.
+
+    Raises:
+        ValueError: If ``vectors``, ``errors``, and ``df`` have different lengths.
+    """
     if len(vectors) != len(errors) or len(vectors) != len(df):
         raise ValueError("vectors, errors, and dataframe must have the same length")
 
-    mask = [vector is None for vector in vectors]
-    present = [vector for vector in vectors if vector is not None]
-    lengths = np.asarray([len(vector) if vector is not None else 0 for vector in vectors], dtype=np.int32)
+    mask = [vector is None or len(vector) == 0 for vector in vectors]
+    present = [vector for vector, is_missing in zip(vectors, mask) if not is_missing]
+    lengths = np.asarray(
+        [len(vector) if not is_missing else 0 for vector, is_missing in zip(vectors, mask)], dtype=np.int32
+    )
     offsets = np.concatenate((np.zeros(1, dtype=np.int32), np.cumsum(lengths, dtype=np.int32)))
     if present:
         try:

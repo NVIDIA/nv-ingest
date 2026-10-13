@@ -42,7 +42,14 @@ def normalize_content_type(value: Any) -> str | None:
 
 
 def embedding_vector(value: Any) -> list[float] | None:
-    """Normalize a supported embedding value to a nonempty list."""
+    """Normalize a supported embedding value to a nonempty Python list.
+
+    Args:
+        value: A list, tuple, NumPy array, PyArrow scalar, or pandas array containing an embedding.
+
+    Returns:
+        The embedding as a list, or ``None`` when the value is missing or empty.
+    """
     as_py = getattr(value, "as_py", None)
     if callable(as_py):
         value = as_py()
