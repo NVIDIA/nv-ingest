@@ -289,7 +289,10 @@ EmbedModelNameOption = Annotated[
     typer.Option(
         "--embed-model-name",
         envvar="EMBED_MODEL_NAME",
-        help=f"Optional embedding model name override. Defaults to {DEFAULT_EMBED_MODEL} when omitted.",
+        help=(
+            "Optional embedding model override. Local inference defaults to Nemotron 3.5 Embed 1B "
+            f"(NVFP4 on supported vLLM GPUs, BF16 otherwise); remote defaults to {DEFAULT_EMBED_MODEL}."
+        ),
     ),
 ]
 EmbedModelProviderPrefixOption = Annotated[

@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Annotated, Any, Optional
 
 from nemo_retriever.graph.designer import Param, designer_component
-from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class BEIREvaluatorActor:
         self,
         lancedb_uri: Annotated[str, Param(label="LanceDB URI", placeholder="/path/to/lancedb")] = "lancedb",
         lancedb_table: Annotated[str, Param(label="Table Name")] = "nemo-retriever",
-        embedding_model: Annotated[str, Param(label="Embedding Model")] = NEMOTRON_3_EMBED_MODEL,
+        embedding_model: Annotated[str | None, Param(label="Embedding Model")] = None,
         beir_loader: Annotated[str, Param(label="BEIR Loader", choices=["vidore_hf"])] = "vidore_hf",
         beir_dataset_name: Annotated[
             str, Param(label="BEIR Dataset Name", placeholder="e.g. vidore_v3_computer_science")
@@ -81,7 +80,7 @@ class BEIREvaluatorActor:
         from nemo_retriever.tools.recall.beir import BeirConfig, evaluate_lancedb_beir
         from nemo_retriever.tools.recall.core import print_run_summary
 
-        resolved_model = resolve_embed_model(self.embedding_model)
+        resolved_model = resolve_embed_model(self.embedding_model) if self.embedding_model else None
 
         evaluation_label = "BEIR"
         evaluation_total_time = 0.0

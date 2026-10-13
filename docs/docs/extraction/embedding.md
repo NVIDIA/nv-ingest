@@ -1,16 +1,30 @@
 # Use Embedding with NeMo Retriever Library
 
-NeMo Retriever Library defaults to the text-only [Nemotron 3 Embed 1B](https://huggingface.co/nvidia/Nemotron-3-Embed-1B-BF16) model. The logical model ID is `nvidia/nemotron-3-embed-1b`.
+## Local checkpoint defaults
 
-For local inference, the default `vllm` backend resolves that logical ID as follows:
+This development branch defaults to the Nemotron 3.5 Embed 1B family for local inference. These changes are not part of the documented 26.08.1 release.
 
-- On Blackwell systems where every visible CUDA device has compute capability 10.0 or later, it selects `nvidia/Nemotron-3-Embed-1B-NVFP4`.
-- On older GPUs, unknown devices, or systems without visible CUDA devices, it selects `nvidia/Nemotron-3-Embed-1B-BF16`.
-- When you explicitly select the `hf` backend, it selects the BF16 checkpoint because the NVFP4 checkpoint requires vLLM.
+This integration remains experimental. The durable vLLM bidirectional-attention fix and complete multimodal input-budgeting policy are not included in this branch. Do not treat successful model loading as production retrieval validation.
 
-The BF16 and NVFP4 checkpoints share an embedding space. Validate retrieval quality on representative data before you change the precision used by an existing index.
+When you omit the local embedding model, the library selects a checkpoint as follows:
 
-The previous default, `nvidia/llama-nemotron-embed-vl-1b-v2`, does not share this embedding space. Before upgrading a persistent LanceDB index, back it up and follow [Keep the embedding model aligned](vdbs.md#lancedb-embedding-model-compatibility) to retain the old model or rebuild and re-ingest with the new default.
+- With the default `vllm` backend, it selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4.
+- On other devices, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`.
+- With the `hf` backend, it selects the BF16 checkpoint. The compressed-tensors NVFP4 checkpoint requires vLLM.
+
+The default modality remains `text`. Nemotron 3.5 also supports `image` and `text_image` inputs when you explicitly select those modalities.
+
+The prerelease checkpoints require Hugging Face repository access. Set `HF_TOKEN` to a token from an account with access before loading them. Do not include tokens in source files or shared configuration.
+
+For Nemotron 3.5, local inference uses the checkpoint's processor and retrieval chat template for query and document formatting. Pass unformatted content; do not add `query: ` or `passage: ` yourself. By default, the local backends produce normalized, masked mean-pooled embeddings.
+
+The 1B checkpoints produce 2,048-dimensional vectors. This adapter supports only the checkpoint's full output dimension; reduced-dimension overrides are rejected.
+
+Before changing an existing index's model or precision, validate retrieval quality on representative data. Follow [Keep the embedding model aligned](vdbs.md#lancedb-embedding-model-compatibility) to retain its recorded model or rebuild and re-ingest with the new default.
+
+## Remote and Helm defaults
+
+Remote embedding and Helm retain the text-only Nemotron 3 Embed 1B default, with logical model ID `nvidia/nemotron-3-embed-1b`. An explicitly selected Nemotron 3 model also retains its existing local resolution behavior.
 
 Helm deploys `nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.2`. The NIM selects a supported NVFP4 or BF16 engine automatically. For NIM product details, refer to the [NeMo Retriever Text Embedding NIM documentation](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html).
 
@@ -41,6 +55,7 @@ For text inputs, including `text_image` inputs without an image, NeMo Retriever
 Library checks the complete formatted input against the embedding model's token
 limit. Image inputs and `text_image` inputs with an image are outside this
 text-splitting policy.
+For local Nemotron 3.5 image-bearing inputs, the processor expands image tokens before the library checks `max_length`. An oversized input raises an error; the library does not truncate its image tokens. Shorten the text or increase the configured limit within the checkpoint's supported maximum.
 The check includes the model's document or query prefix and special tokens.
 The default configured limits are 8,192 tokens for passages and 128 tokens for
 queries. If the checkpoint declares a smaller supported limit, the checkpoint
@@ -116,9 +131,9 @@ The deterministic split policy reports `truncated=0`.
 It is common to process PDFs by embedding standard text as text and visual elements such as tables and charts as images.
 The following example enables the multimodal model to capture the spatial and structural information of the visual content.
 
-- Set `embed_model_name="nvidia/llama-nemotron-embed-vl-1b-v2"` to override the text-only default with the legacy multimodal model.
+- For local inference, the Nemotron 3.5 default supports combined text and images without a model override.
 - The `embed` method is configured with `embed_modality="text_image"` to embed the extracted tables and charts as images.
-- This configuration is more accurate than text only, with a performance cost.
+- Evaluate retrieval quality and throughput on your data before selecting this modality.
 
 For parameter details, refer to the [Python API guide](nemo-retriever-api-reference.md) (`create_ingestor` and `.embed()`).
 
@@ -130,13 +145,13 @@ ingestor = (
     .files("./data/*.pdf")
     .extract()
     .embed(
-        embed_model_name="nvidia/llama-nemotron-embed-vl-1b-v2",
         embed_modality="text_image",
     )
 )
 results = ingestor.ingest()
 ```
 
+For a remote endpoint, explicitly select a multimodal model that the endpoint supports. The default Nemotron 3 embedding NIM is text-only.
 
 ## Example with Embedding Entire PDF Pages as Images { #example-with-embedding-entire-pdf-pages-as-images }
 
@@ -146,7 +161,7 @@ The following example extracts and embeds each page as an image.
 
 - Set `embed_modality="image"` to use the rendered page image as the embedding input.
 - Set `embed_granularity="page"` to create one result row for each PDF page.
-- Set `embed_model_name="nvidia/llama-nemotron-embed-vl-1b-v2"` to use the legacy multimodal model.
+- For local inference, use the multimodal Nemotron 3.5 default.
 
 These arguments work together. When you set both arguments, the pipeline
 enables page-image rendering during extraction, creates one row for each page,
@@ -163,7 +178,6 @@ ingestor = (
     .files("./data/*.pdf")
     .extract()
     .embed(
-        embed_model_name="nvidia/llama-nemotron-embed-vl-1b-v2",
         embed_modality="image",
         embed_granularity="page",
     )

@@ -46,7 +46,7 @@ from nemo_retriever.ingest.index_mode import (
     resolve_ingest_index_mode,
     validate_requested_index_mode,
 )
-from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL, resolve_embed_model
+from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL, resolve_embed_model, resolve_local_embed_model
 from nemo_retriever.models.embed_model_spec import resolve_embed_model_revision
 
 IngestRunModeValue = Literal["inprocess", "batch"]
@@ -675,7 +675,17 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
     if extract_tuning is not None:
         extract_kwargs["batch_tuning"] = extract_tuning
 
-    embedding_model_name = None if resolved_index_mode == "sparse" else resolve_embed_model(embed.embed_model_name)
+    remote_embedding = bool(str(embed.embed_invoke_url or "").strip())
+    legacy_n3 = bool(embed.embed_model_name) and resolve_embed_model(embed.embed_model_name) == NEMOTRON_3_EMBED_MODEL
+    embedding_model_name = (
+        None
+        if resolved_index_mode == "sparse"
+        else (
+            resolve_embed_model(embed.embed_model_name)
+            if remote_embedding or legacy_n3
+            else resolve_local_embed_model(embed.embed_model_name, backend=embed.local_ingest_embed_backend or "vllm")
+        )
+    )
     embedding_model_revision = None
     if (
         embedding_model_name is not None
@@ -685,7 +695,7 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         embedding_model_revision = resolve_embed_model_revision(embedding_model_name, None)
     embed_runtime_model_name = (
         embedding_model_name
-        if embed.embed_model_name is not None or embed.embed_model_provider_prefix is not None
+        if not remote_embedding or embed.embed_model_name is not None or embed.embed_model_provider_prefix is not None
         else None
     )
     embed_kwargs = build_embed_option_kwargs(

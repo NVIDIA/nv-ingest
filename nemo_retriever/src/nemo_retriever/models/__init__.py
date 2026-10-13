@@ -18,6 +18,9 @@ if TYPE_CHECKING:
 NEMOTRON_3_EMBED_MODEL = "nvidia/nemotron-3-embed-1b"
 NEMOTRON_3_EMBED_BF16_MODEL = "nvidia/Nemotron-3-Embed-1B-BF16"
 NEMOTRON_3_EMBED_NVFP4_MODEL = "nvidia/Nemotron-3-Embed-1B-NVFP4"
+NEMOTRON_35_EMBED_BF16_MODEL = "nvidia/Nemotron-3.5-Embed-1B-BF16"
+NEMOTRON_35_EMBED_NVFP4_MODEL = "nvidia/Nemotron-3.5-Embed-1B-NVFP4"
+DEFAULT_LOCAL_EMBED_MODEL = NEMOTRON_35_EMBED_BF16_MODEL
 VL_EMBED_MODEL = "nvidia/llama-nemotron-embed-vl-1b-v2"
 VL_RERANK_MODEL = "nvidia/llama-nemotron-rerank-vl-1b-v2"
 
@@ -79,11 +82,15 @@ def resolve_local_embed_model(model_name: str | None, *, backend: str) -> str:
             ``"hf"``.
 
     Returns:
-        The resolved Hugging Face checkpoint identifier. The logical Nemotron 3
-        default resolves to NVFP4 for vLLM when every visible CUDA device has
-        native NVFP4 support, and to BF16 otherwise. Other model identifiers
-        are returned after alias resolution.
+        The resolved Hugging Face checkpoint identifier. An omitted model uses
+        Nemotron 3.5: NVFP4 for vLLM when every visible CUDA device supports it,
+        and BF16 otherwise. Explicit Nemotron 3 logical names retain their
+        legacy selection. Explicit Nemotron 3.5 precision IDs remain unchanged.
     """
+    if not model_name:
+        if backend == "vllm" and _cuda_supports_native_nvfp4():
+            return NEMOTRON_35_EMBED_NVFP4_MODEL
+        return DEFAULT_LOCAL_EMBED_MODEL
     resolved = resolve_embed_model(model_name)
     if resolved != NEMOTRON_3_EMBED_MODEL:
         return resolved
@@ -179,6 +186,26 @@ def _create_local_embedder_from_spec(
     effective_query_max_length = (
         min(int(query_max_length), spec.max_input_tokens) if spec.max_input_tokens else int(query_max_length)
     )
+
+    if spec.model_type == "mistral3":
+        from nemo_retriever.models.local.nemotron35_embedder import Nemotron35Embedder
+
+        return Nemotron35Embedder(
+            model_id=model_id,
+            revision=spec.revision,
+            backend=b,
+            device=device,
+            hf_cache_dir=hf_cache_dir,
+            normalize=normalize,
+            output_dimension=spec.output_dimension,
+            dimensions=dimensions,
+            query_prefix=spec.query_prefix,
+            document_prefix=spec.document_prefix,
+            max_length=effective_max_length,
+            query_max_length=effective_query_max_length,
+            gpu_memory_utilization=gpu_memory_utilization,
+            enforce_eager=enforce_eager,
+        )
 
     if spec.family == "vl":
         if b == "hf":

@@ -90,7 +90,7 @@ class LocalEmbedderSpec:
     @property
     def prefix_if_missing(self) -> bool:
         """Whether the selected backend preserves an already-prefixed source."""
-        return self.backend == "hf" and self.checkpoint.family == "text"
+        return self.checkpoint.model_type == "mistral3" or (self.backend == "hf" and self.checkpoint.family == "text")
 
     def create(self) -> Any:
         """Construct the embedder described by this exact resolved spec."""

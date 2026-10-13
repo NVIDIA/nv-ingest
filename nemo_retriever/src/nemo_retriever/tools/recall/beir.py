@@ -149,7 +149,7 @@ class BeirDataset:
 class BeirConfig:
     lancedb_uri: str
     lancedb_table: str
-    embedding_model: str
+    embedding_model: str | None
     loader: str
     dataset_name: str
     split: str = "test"
@@ -887,8 +887,8 @@ def evaluate_lancedb_beir(
     from nemo_retriever.common.params.models import ModelRuntimeParams
 
     embed_kwargs: dict[str, Any] = {
-        "model_name": str(cfg.embedding_model),
-        "embed_model_name": str(cfg.embedding_model),
+        "model_name": cfg.embedding_model,
+        "embed_model_name": cfg.embedding_model,
         "local_ingest_embed_backend": str(cfg.local_query_embed_backend),
         "inference_batch_size": int(cfg.local_hf_batch_size),
         "embed_inference_batch_size": int(cfg.local_hf_batch_size),

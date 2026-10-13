@@ -30,6 +30,7 @@ from nemo_retriever.common.schemas.embedding import (
 from nemo_retriever.models import resolve_local_embed_model
 from nemo_retriever.models.embed_model_spec import EmbedModelSpec, resolve_embed_model_spec
 from nemo_retriever.models.hf_model_registry import HF_MODEL_REVISIONS
+from nemo_retriever.models.inference.retrieval_template import load_retrieval_template
 
 
 def _stable_json(value: Any) -> str:
@@ -138,14 +139,22 @@ class EmbeddingInputPolicy:
     max_tokens: int
     prefix: str
     prefix_if_missing: bool = False
+    retrieval_template: str | None = None
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:
             raise ValueError("Embedding input max_tokens must be positive")
 
     def _formatted_token_count(self, text: str) -> int:
-        formatted = format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
+        formatted = self._format(text)
         return len(self.tokenizer.encode(formatted, add_special_tokens=True))
+
+    def _format(self, text: str) -> str:
+        if self.retrieval_template is not None:
+            from nemo_retriever.models.inference.retrieval_template import render_retrieval_input
+
+            return render_retrieval_input(self.retrieval_template, self.prefix, text)
+        return format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
 
     def _formatted_token_counts(self, texts: list[str]) -> list[int]:
         encode_batch = getattr(self.tokenizer, "encode_batch", None)
@@ -153,10 +162,7 @@ class EmbeddingInputPolicy:
             return [
                 len(token_ids)
                 for token_ids in encode_batch(
-                    [
-                        format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
-                        for text in texts
-                    ],
+                    [self._format(text) for text in texts],
                     add_special_tokens=True,
                 )
             ]
@@ -389,6 +395,9 @@ def resolve_embedding_input_policy(
         max_tokens=effective_max,
         prefix=prefix,
         prefix_if_missing=prefix_if_missing,
+        retrieval_template=(
+            load_retrieval_template(spec.model_id, spec.revision, cache_dir) if spec.model_type == "mistral3" else None
+        ),
     )
 
 

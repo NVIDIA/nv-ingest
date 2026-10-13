@@ -223,7 +223,7 @@ def test_ministral_checkpoint_requires_explicit_non_causal_config(tmp_path, is_c
 def test_other_mistral_checkpoint_formats_remain_rejected(tmp_path, config):
     _write_config(tmp_path, config)
 
-    with pytest.raises(ValueError, match="unsupported model_type"):
+    with pytest.raises(ValueError, match="unsupported (model_type|architectures)"):
         resolve_embed_model_spec(str(tmp_path))
 
 

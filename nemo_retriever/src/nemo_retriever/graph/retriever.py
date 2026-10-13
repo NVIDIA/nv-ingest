@@ -113,8 +113,8 @@ class Retriever:
         from nemo_retriever.common.params import EmbedParams
 
         base: dict[str, Any] = {
-            "model_name": NEMOTRON_3_EMBED_MODEL,
-            "embed_model_name": NEMOTRON_3_EMBED_MODEL,
+            "model_name": None,
+            "embed_model_name": None,
             "input_type": "query",
             "text_column": "text",
             "inference_batch_size": 32,
@@ -131,7 +131,7 @@ class Retriever:
             and overrides["local_ingest_embed_backend"] is None
         ):
             model_id = str(merged.get("embed_model_name") or merged.get("model_name") or "").strip()
-            if resolve_embed_model(model_id) == NEMOTRON_3_EMBED_MODEL:
+            if not model_id or resolve_embed_model(model_id) == NEMOTRON_3_EMBED_MODEL:
                 merged["local_ingest_embed_backend"] = "vllm"
             else:
                 spec = resolve_embed_model_spec(model_id, revision=merged.get("embed_model_revision"))

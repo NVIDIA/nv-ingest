@@ -53,6 +53,7 @@ def _successful_row_count(monkeypatch: pytest.MonkeyPatch) -> None:
     # Most tests fake GraphIngestor; default row counts should look like a successful write.
     counts = itertools.count(1)
     monkeypatch.setattr(ingest_execution, "_count_lancedb_rows", lambda *_, **__: next(counts))
+    monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", lambda: True)
 
 
 def _make_fake_ingestor() -> Any:
@@ -162,7 +163,7 @@ def test_root_ingest_runs_default_execution_chain(monkeypatch, tmp_path) -> None
     assert extract_params.extract_infographics is False
     assert extract_params.extract_page_as_image is True
     assert fake_ingestor.extract.call_args.kwargs == {}
-    assert fake_ingestor.embed.call_args.args == ()
+    assert fake_ingestor.embed.call_args.args[0].embed_model_name == "nvidia/Nemotron-3.5-Embed-1B-NVFP4"
     vdb_upload_params = fake_ingestor.vdb_upload.call_args.args[0]
     assert vdb_upload_params.vdb_op == "lancedb"
     assert vdb_upload_params.vdb_kwargs == {
@@ -170,7 +171,8 @@ def test_root_ingest_runs_default_execution_chain(monkeypatch, tmp_path) -> None
         "table_name": "nemo-retriever",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": "nvidia/nemotron-3-embed-1b",
+        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
+        "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }
     assert "Ingested 1 file(s) → 7 row(s) in LanceDB lancedb/nemo-retriever." in result.output
 
@@ -194,6 +196,21 @@ def test_root_ingest_without_mode_defaults_to_local(monkeypatch, tmp_path) -> No
     assert fake_ingestor.files.call_args.args == ([str(document)],)
 
 
+def test_explicit_n3_keeps_legacy_index_identity(monkeypatch, tmp_path) -> None:
+    fake_ingestor = _make_fake_ingestor()
+    document = tmp_path / "old-model.pdf"
+    document.write_bytes(b"%PDF-1.4\n")
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **kwargs: fake_ingestor)
+    result = RUNNER.invoke(
+        cli_main.app,
+        ["ingest", "local", str(document), "--embed-model-name", NEMOTRON_3_EMBED_MODEL],
+    )
+    assert result.exit_code == 0, result.output
+    params = fake_ingestor.vdb_upload.call_args.args[0]
+    assert params.vdb_kwargs["embedding_model_name"] == NEMOTRON_3_EMBED_MODEL
+    assert "embedding_model_revision" not in params.vdb_kwargs
+
+
 def test_root_ingest_without_mode_accepts_local_options_before_documents(monkeypatch, tmp_path) -> None:
     fake_ingestor = _make_fake_ingestor()
     document = tmp_path / "default-local-options.pdf"
@@ -212,7 +229,8 @@ def test_root_ingest_without_mode_accepts_local_options_before_documents(monkeyp
         "table_name": "nemo-retriever",
         "overwrite": False,
         "hybrid": True,
-        "embedding_model_name": "nvidia/nemotron-3-embed-1b",
+        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
+        "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }
 
 
@@ -486,7 +504,8 @@ def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path) -> N
         "table_name": "docs",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": "nvidia/nemotron-3-embed-1b",
+        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
+        "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }
     assert "Ingested 2 file(s) → 12 row(s) in LanceDB /tmp/lancedb/docs." in result.output
 
@@ -506,7 +525,8 @@ def test_root_ingest_append_forwards_overwrite_false(monkeypatch, tmp_path) -> N
         "table_name": "nemo-retriever",
         "overwrite": False,
         "hybrid": True,
-        "embedding_model_name": "nvidia/nemotron-3-embed-1b",
+        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
+        "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }
 
 
@@ -1902,7 +1922,8 @@ def test_root_ingest_index_mode_hybrid_passes_hybrid_into_vdb_kwargs(monkeypatch
         "table_name": "docs",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": "nvidia/nemotron-3-embed-1b",
+        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
+        "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }
 
 

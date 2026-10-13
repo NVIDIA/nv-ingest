@@ -58,9 +58,13 @@ the `[local]` extra before you run the default `retriever ingest` or
 pip install "nemo-retriever[local]"
 ```
 
-The default logical embedding model is `nvidia/nemotron-3-embed-1b`, and the default local backend is vLLM. NeMo Retriever Library selects `nvidia/Nemotron-3-Embed-1B-NVFP4` when every visible CUDA device has compute capability 10.0 or later. It selects `nvidia/Nemotron-3-Embed-1B-BF16` on older GPUs, unknown devices, or systems without visible CUDA devices. If you explicitly set `--local-ingest-embed-backend hf`, the logical model resolves to the BF16 checkpoint because NVFP4 requires vLLM.
+On this development branch, omitting `--embed-model-name` selects Nemotron 3.5 Embed 1B for local inference. These changes are not part of the documented 26.08.1 release. The default local backend is vLLM. NeMo Retriever Library selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4. Otherwise, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`. With `--local-ingest-embed-backend hf`, it selects BF16 because the compressed-tensors NVFP4 checkpoint requires vLLM.
 
-Nemotron 3 Embed 1B is text-only. To embed images or combined text and images, explicitly set `--embed-model-name nvidia/llama-nemotron-embed-vl-1b-v2` and select the matching modality.
+The Nemotron 3.5 integration is experimental. A durable vLLM bidirectional-attention fix and complete multimodal input-budgeting policy remain required before production use. Temporary benchmark hooks are not part of this branch.
+
+The default modality remains text. Nemotron 3.5 also supports image and combined text-and-image embeddings when you select the matching modality. Its prerelease repositories require access: set `HF_TOKEN` to a token from an authorized Hugging Face account. Do not add query or document prefixes yourself; the library applies the checkpoint's retrieval chat template.
+
+Remote embedding and Helm retain `nvidia/nemotron-3-embed-1b` as the text-only default. Explicitly selected Nemotron 3 checkpoints retain their existing local behavior.
 
 If you installed the base package for Remote NIM with no local GPU, keep that
 install and pass `--embed-invoke-url` instead. Refer to
@@ -229,8 +233,7 @@ For example, a table can store the canonical model
 `nvidia/nemotron-3-embed-1b`. The endpoint and routing prefix
 are intentionally not persisted on the table.
 
-The default embedding model changed from
-`nvidia/llama-nemotron-embed-vl-1b-v2` to `nvidia/nemotron-3-embed-1b`. Before
+The local checkpoint default changes to Nemotron 3.5 Embed 1B on this development branch. This does not change an existing table's recorded model. Before
 you migrate a persistent table, back up its LanceDB directory and retain the
 original corpus. To adopt the new default for a CLI-managed table, re-ingest the
 complete corpus with the same URI and table name and pass `--overwrite`
@@ -418,8 +421,8 @@ These options apply to `retriever ingest`, `retriever ingest local`, and
 | `--table-name` | `nemo-retriever` | LanceDB table name. Must match query-time storage flags. Python `.vdb_upload()` and default `Retriever()` use the same default. |
 | `--overwrite/--append` | overwrite | Overwrite the table by default; use `--append` to add rows. |
 | `--index-mode` | `auto` | Recommended: leave this unset. `auto` creates a hybrid vector + BM25/FTS configuration for new tables and preserves an existing table on append. Use `dense`, `hybrid`, or `sparse` only for explicit experiments or specialized deployments. |
-| `--embed-model-name` | `nvidia/nemotron-3-embed-1b` | Logical default embedding model. Local vLLM resolves it to the NVFP4 checkpoint on Blackwell and BF16 otherwise. |
-| `--local-ingest-embed-backend` | `vllm` | Local embedding backend. Explicit `hf` use resolves the logical default to the BF16 checkpoint. |
+| `--embed-model-name` | unset | Local inference selects Nemotron 3.5 Embed 1B: NVFP4 with native-capable GPUs and vLLM, or BF16 otherwise. Remote inference retains `nvidia/nemotron-3-embed-1b`. |
+| `--local-ingest-embed-backend` | `vllm` | Local embedding backend. With no model override, explicit `hf` use selects the Nemotron 3.5 BF16 checkpoint. |
 | `--method` | profile default | PDF extraction method: `pdfium`, `pdfium_hybrid`, `ocr`, or `nemotron_parse`. The `auto` profile selects `pdfium_hybrid`; `fast-text` selects `pdfium`. An explicit value overrides the profile-selected method. |
 | `--extract-text`, `--extract-tables`, `--extract-charts` | planner default | Enable or disable extraction families. |
 | `--ocr-version` | planner default | OCR engine version for local extraction. |
@@ -493,7 +496,7 @@ retriever ingest /path/to/your/pdfs \
   --embed-model-name acme/my-finetuned-nemotron-embed
 ```
 
-Tested official checkpoints:
+Supported official checkpoint profiles include the following:
 
 - `nvidia/llama-3.2-nv-embedqa-1b-v2`
 - `nvidia/llama-nemotron-embed-1b-v2`
@@ -504,11 +507,13 @@ Tested official checkpoints:
 - `nvidia/Nemotron-3-Embed-1B-BF16`
 - `nvidia/Nemotron-3-Embed-8B-BF16`
 - `nvidia/Nemotron-3-Embed-1B-NVFP4`
+- `nvidia/Nemotron-3.5-Embed-1B-BF16`
+- `nvidia/Nemotron-3.5-Embed-1B-NVFP4`
 
 Equivalent local checkpoints and weight-only fine-tunes are supported. A
 compatible checkpoint must be complete and loadable, declare average pooling,
 and expose a positive output width. Supported architectures include
-`LlamaBidirectionalModel`, `LlamaNemotronVLModel`, and compatible Ministral 3
+`LlamaBidirectionalModel`, `LlamaNemotronVLModel`, `Mistral3Model` embedding checkpoints, and compatible Ministral 3
 dense encoders. A compatible Ministral 3 dense checkpoint must declare
 `model_type: "ministral3"`, `architectures: ["Ministral3Model"]`,
 `is_causal: false`, `pooling: "avg"`, and a positive `hidden_size`. LanceDB
@@ -517,6 +522,8 @@ use 2048, 3072, and 4096 dimensions. Query and document prompts are read from
 `config_sentence_transformers.json` when the checkpoint supplies it.
 Fine-tunes that require prefixes other than `query: ` and `passage: ` must
 retain that prompt metadata.
+
+Nemotron 3.5 uses `model_type: "mistral3"`, `architectures: ["Mistral3Model"]`, and a bidirectional text encoder with masked mean pooling. Its output width comes from `text_config.hidden_size`. The processor supplies its retrieval chat template and image preprocessing. Generic Mistral 3 generation checkpoints are not supported by this embedding profile.
 
 General Mistral 3 Base, Instruct, and vision-language model (VLM) generation
 checkpoints remain unsupported because they do not match the dense encoder
@@ -530,8 +537,8 @@ with `trust_remote_code=True`; only use repositories you trust. The resolved
 model name and revision are recorded on the LanceDB table and reused by local
 query.
 
-For a compatible ModelOpt checkpoint, including FP8 or NVFP4 variants, select
-vLLM for ingest. Local query detects the ModelOpt configuration and selects
+For a compatible ModelOpt or compressed-tensors checkpoint, including FP8 or NVFP4 variants, select
+vLLM for ingest. Local query detects the quantization configuration and selects
 vLLM automatically:
 
 ```bash
@@ -543,7 +550,7 @@ retriever query "What is in this corpus?" \
   --table-name nemo-retriever
 ```
 
-Hugging Face remains the local query backend for non-ModelOpt checkpoints.
+Hugging Face remains the local query backend for checkpoints that do not require vLLM quantization support.
 Local directories must contain `config.json`, and their absolute path must be
 available to every Ray worker or service replica that loads the model.
 

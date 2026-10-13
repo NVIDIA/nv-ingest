@@ -54,6 +54,11 @@ def _patch_embedders(monkeypatch):
     monkeypatch.setitem(sys.modules, "nemo_retriever.models.local.llama_nemotron_embed_1b_v2_embedder", text_mod)
     monkeypatch.setitem(sys.modules, "nemo_retriever.models.local.llama_nemotron_embed_1b_v2_hf_embedder", text_hf_mod)
     monkeypatch.setitem(sys.modules, "nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder", vl_mod)
+    n35_mod = ModuleType("nemo_retriever.models.local.nemotron35_embedder")
+    n35_mod.Nemotron35Embedder = lambda **kwargs: (fake_text_hf if kwargs["backend"] == "hf" else fake_text_vllm)(
+        **kwargs
+    )
+    monkeypatch.setitem(sys.modules, "nemo_retriever.models.local.nemotron35_embedder", n35_mod)
 
     def resolve_spec(model_id, *, revision=None, hf_cache_dir=None):
         config_path = Path(model_id) / "config.json"
@@ -85,6 +90,7 @@ def _patch_embedders(monkeypatch):
             document_prefix="" if instruction_model else "passage: ",
             quantization=quantization.get("quant_algo"),
             requires_vllm=requires_vllm,
+            model_type="mistral3" if "Nemotron-3.5-" in model_id else None,
         )
 
     monkeypatch.setattr("nemo_retriever.models.resolve_embed_model_spec", resolve_spec)
@@ -124,7 +130,7 @@ def test_default_returns_bf16_text_vllm_embedder(monkeypatch, _patch_embedders):
     monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", lambda: False)
     result = create_local_embedder()
     fake_text_vllm.assert_called_once()
-    assert fake_text_vllm.call_args.kwargs["model_id"] == "nvidia/Nemotron-3-Embed-1B-BF16"
+    assert fake_text_vllm.call_args.kwargs["model_id"] == "nvidia/Nemotron-3.5-Embed-1B-BF16"
     assert result is fake_text_vllm.return_value
 
 
@@ -133,7 +139,7 @@ def test_default_uses_nvfp4_on_native_hardware(monkeypatch, _patch_embedders):
     monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", lambda: True)
     result = create_local_embedder(None)
     fake_text_vllm.assert_called_once()
-    assert fake_text_vllm.call_args.kwargs["model_id"] == "nvidia/Nemotron-3-Embed-1B-NVFP4"
+    assert fake_text_vllm.call_args.kwargs["model_id"] == "nvidia/Nemotron-3.5-Embed-1B-NVFP4"
     assert result is fake_text_vllm.return_value
 
 
@@ -169,7 +175,7 @@ def test_default_model_hf_backend_returns_bf16_text_embedder(_patch_embedders):
     _, fake_text_hf, _, _ = _patch_embedders
     result = create_local_embedder(backend="hf")
     fake_text_hf.assert_called_once()
-    assert fake_text_hf.call_args.kwargs["model_id"] == "nvidia/Nemotron-3-Embed-1B-BF16"
+    assert fake_text_hf.call_args.kwargs["model_id"] == "nvidia/Nemotron-3.5-Embed-1B-BF16"
     assert result is fake_text_hf.return_value
 
 
@@ -199,7 +205,7 @@ def test_kwargs_forwarded_to_default_hf_embedder(_patch_embedders):
     kw = fake_text_hf.call_args.kwargs
     assert kw["device"] == "cuda:0"
     assert kw["hf_cache_dir"] == "/models"
-    assert kw["model_id"] == "nvidia/Nemotron-3-Embed-1B-BF16"
+    assert kw["model_id"] == "nvidia/Nemotron-3.5-Embed-1B-BF16"
 
 
 def test_unknown_model_passes_through(_patch_embedders):
