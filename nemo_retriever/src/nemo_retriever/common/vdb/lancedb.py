@@ -1562,7 +1562,8 @@ class LanceDB(VDB):
         :meth:`_iter_stream_rows` followed by the deferred row policy; only the
         vector column is handled as one Arrow operation per chunk. Each yielded
         chunk is sized from per-row byte estimates to stay under
-        ``stream_batch_bytes`` before any Arrow column is built.
+        ``stream_batch_bytes`` before any Arrow column is built, and only that
+        chunk's vectors are copied out of the input batch.
         """
 
         counts = {
@@ -1585,8 +1586,8 @@ class LanceDB(VDB):
                 fields.append(row_fields)
             if not kept:
                 continue
-            vectors = batch.vectors.take(pa.array(kept, type=pa.int64()))
-            lengths = _vector_lengths(vectors)
+            kept_positions = np.asarray(kept, dtype=np.int64)
+            lengths = _vector_lengths(batch.vectors)[kept_positions]
             if stats.vector_dim is None:
                 stats.vector_dim = int(lengths[0])
             vector_dim = int(stats.vector_dim)
@@ -1599,7 +1600,7 @@ class LanceDB(VDB):
             ]
             for chunk in _row_chunks(selected, estimates, max_batch_bytes=self.stream_batch_bytes):
                 policy_kept, fixed_vectors = _apply_bad_vector_policy(
-                    vectors.take(pa.array(chunk, type=pa.int64())),
+                    batch.vectors.take(pa.array(kept_positions[chunk], type=pa.int64())),
                     vector_dim=vector_dim,
                     on_bad_vectors=self.on_bad_vectors,
                     fill_value=self.fill_value,
