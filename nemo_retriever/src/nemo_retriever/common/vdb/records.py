@@ -529,13 +529,14 @@ class CanonicalRecordBatch:
 def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
     """Return an embedding column as a ``list`` Arrow array with one slot per row.
 
-    Arrow-backed list columns are taken as they are. Anything else is normalized
-    per row with :func:`embedding_vector`, so empty and non-list values become
-    null slots, matching the record path.
+    Arrow-backed pandas columns are taken as they are, without touching rows.
+    Anything else is normalized per row with :func:`embedding_vector`, so empty
+    and non-list values become null slots and every element goes through
+    ``float()``, matching the record path.
     """
-    arrow_values = getattr(values, "__arrow_array__", None)
-    if callable(arrow_values):
-        column = pa.array(values)
+    backing = getattr(values, "array", values)
+    if callable(getattr(backing, "__arrow_array__", None)):
+        column = pa.array(backing)
         if isinstance(column, pa.ChunkedArray):
             column = column.combine_chunks()
         if (
@@ -545,10 +546,11 @@ def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
         ):
             return column
         values = column.to_pylist()
-    column = pa.array([embedding_vector(value) for value in values])
-    if pa.types.is_null(column.type):
-        return pa.nulls(length, pa.list_(pa.float32()))
-    return column
+    vectors = [embedding_vector(value) for value in values]
+    return pa.array(
+        [None if vector is None else [None if item is None else float(item) for item in vector] for vector in vectors],
+        type=pa.list_(pa.float64()),
+    )
 
 
 def iter_canonical_record_batches(

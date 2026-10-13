@@ -40,6 +40,8 @@ from nemo_retriever.common.vdb._lancedb_stream import (
     _assert_lancedb_table_ready,
     _bounded_create_is_finalized,
     _bounded_record_batches,
+    _estimated_prepared_row_bytes,
+    _row_chunks,
     _checked_batches,
     _infer_vector_dim_with_spooled_prefix,
     _inspect_vector,
@@ -1558,7 +1560,9 @@ class LanceDB(VDB):
 
         Row selection, drop counts, and the bad-vector policy match
         :meth:`_iter_stream_rows` followed by the deferred row policy; only the
-        vector column is handled as one Arrow operation per batch.
+        vector column is handled as one Arrow operation per chunk. Each yielded
+        chunk is sized from per-row byte estimates to stay under
+        ``stream_batch_bytes`` before any Arrow column is built.
         """
 
         counts = {
@@ -1570,50 +1574,45 @@ class LanceDB(VDB):
         enforce_dim = self.validate_vector_length and self.on_bad_vectors != "error"
         for batch in batches:
             stats.client_records += len(batch.records)
-            texts: list[str] = []
-            metadata: list[str] = []
-            sources: list[str] = []
-            ids: list[str] = []
+            fields: list[dict[str, Any]] = []
             kept: list[int] = []
             for index, record in enumerate(batch.records):
-                fields, _drop_reason = _lancedb_row_fields(record)
-                if fields is None:
+                row_fields, _drop_reason = _lancedb_row_fields(record)
+                if row_fields is None:
                     counts["dropped_no_text"] += 1
                     continue
                 kept.append(index)
-                texts.append(fields["text"])
-                metadata.append(fields["metadata"])
-                sources.append(fields["source"])
-                ids.append(fields["id"])
+                fields.append(row_fields)
             if not kept:
                 continue
             vectors = batch.vectors.take(pa.array(kept, type=pa.int64()))
             lengths = _vector_lengths(vectors)
             if stats.vector_dim is None:
                 stats.vector_dim = int(lengths[0])
+            vector_dim = int(stats.vector_dim)
             selected = np.arange(len(kept))
             if enforce_dim:
-                selected = np.flatnonzero(lengths == stats.vector_dim)
+                selected = np.flatnonzero(lengths == vector_dim)
                 counts["dropped_bad_length"] += len(kept) - selected.size
-                if selected.size == 0:
-                    continue
-                vectors = vectors.take(pa.array(selected, type=pa.int64()))
-            policy_kept, fixed_vectors = _apply_bad_vector_policy(
-                vectors,
-                vector_dim=int(stats.vector_dim),
-                on_bad_vectors=self.on_bad_vectors,
-                fill_value=self.fill_value,
-            )
-            selected = selected[policy_kept]
-            counts["accepted"] += selected.size
-            take = pa.array(selected, type=pa.int64())
-            yield _PreparedColumns(
-                vector=fixed_vectors,
-                text=pa.array(texts, type=pa.string()).take(take),
-                metadata=pa.array(metadata, type=pa.string()).take(take),
-                source=pa.array(sources, type=pa.string()).take(take),
-                id=pa.array(ids, type=pa.string()).take(take),
-            )
+            estimates = [
+                _estimated_prepared_row_bytes(fields[position], vector_dim=vector_dim) for position in selected
+            ]
+            for chunk in _row_chunks(selected, estimates, max_batch_bytes=self.stream_batch_bytes):
+                policy_kept, fixed_vectors = _apply_bad_vector_policy(
+                    vectors.take(pa.array(chunk, type=pa.int64())),
+                    vector_dim=vector_dim,
+                    on_bad_vectors=self.on_bad_vectors,
+                    fill_value=self.fill_value,
+                )
+                chunk_fields = [fields[position] for position in chunk[policy_kept]]
+                counts["accepted"] += len(chunk_fields)
+                yield _PreparedColumns(
+                    vector=fixed_vectors,
+                    text=pa.array([row["text"] for row in chunk_fields], type=pa.string()),
+                    metadata=pa.array([row["metadata"] for row in chunk_fields], type=pa.string()),
+                    source=pa.array([row["source"] for row in chunk_fields], type=pa.string()),
+                    id=pa.array([row["id"] for row in chunk_fields], type=pa.string()),
+                )
         _log_lancedb_result_counts(counts, expected_dim=stats.vector_dim)
 
     def _stream_schema(self, vector_dim: int | None) -> pa.Schema:

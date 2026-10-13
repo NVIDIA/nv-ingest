@@ -17,7 +17,9 @@ lancedb = pytest.importorskip("lancedb", minversion="0.34.0")
 
 from nemo_retriever.common.vdb._lancedb_stream import OversizedVdbRowError
 from nemo_retriever.common.vdb.lancedb import LanceDB
-from nemo_retriever.common.vdb.records import CanonicalRecordBatch, VdbUploadError
+from nemo_retriever.common.vdb import records as records_module
+from nemo_retriever.common.vdb._lancedb_stream import _StreamStats
+from nemo_retriever.common.vdb.records import CanonicalRecordBatch, VdbUploadError, iter_canonical_record_batches
 from nemo_retriever.graph.executor import arrow_table_to_pandas
 from nemo_retriever.operators.vdb import IngestVdbOperator
 
@@ -326,3 +328,41 @@ def test_operator_hands_vectors_to_capable_backends_as_arrow() -> None:
     assert [record["metadata"]["content_metadata"]["id"] for record in records] == ["row-0", "row-2"]
     assert [pytest.approx(vector) for vector in vectors] == [_vector(0), _vector(2)]
     assert all(isinstance(batch.vectors, pa.Array) for batch in columnar.batches)
+
+
+def test_arrow_backed_embedding_column_is_never_expanded_per_row(monkeypatch: pytest.MonkeyPatch) -> None:
+    frames = _frames([_row(0), _row(1)])
+    assert isinstance(frames[0]["embedding"].dtype, pd.ArrowDtype)
+
+    def forbid(value: Any) -> None:
+        raise AssertionError("embedding_vector() must not run for an Arrow-backed column")
+
+    monkeypatch.setattr(records_module, "embedding_vector", forbid)
+    column = records_module.embedding_arrow_column(frames[0]["embedding"], length=2)
+    assert pa.types.is_list(column.type) and pa.types.is_floating(column.type.value_type)
+    assert column.to_pylist() == [pytest.approx(_vector(0)), pytest.approx(_vector(1))]
+
+
+def test_numeric_string_vectors_match_record_path(tmp_path: Path) -> None:
+    rows = [_row(0, embedding=["0.0", "0.25", "0.5", "0.75"]), _row(1)]
+
+    _ingest_both(tmp_path, [pd.DataFrame(rows)])
+
+    table = _assert_tables_equal(tmp_path)
+    assert table.column("vector").to_pylist()[0] == pytest.approx(_vector(0))
+
+
+def test_prepared_chunks_respect_stream_batch_bytes_before_arrow_allocation(tmp_path: Path) -> None:
+    limit = 4096
+    backend = _backend(tmp_path, stream_batch_bytes=limit)
+    frames = _frames([_row(index, text="x" * 300) for index in range(60)], batch_size=60)
+    rows = frames[0].drop(columns=["embedding"]).to_dict("records")
+    vectors = records_module.embedding_arrow_column(frames[0]["embedding"], length=60)
+    (batch,) = iter_canonical_record_batches([(rows, vectors)])
+
+    chunks = list(backend._iter_stream_columns([batch], _StreamStats(vector_dim=DIM)))
+
+    assert len(chunks) > 1
+    schema = backend._stream_schema(DIM)
+    assert sum(len(chunk.vector) for chunk in chunks) == 60
+    assert all(chunk.record_batch(schema).get_total_buffer_size() <= limit for chunk in chunks)
