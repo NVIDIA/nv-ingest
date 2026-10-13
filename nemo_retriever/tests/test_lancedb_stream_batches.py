@@ -410,3 +410,17 @@ def test_mixed_string_and_numeric_vector_elements_match_record_path(tmp_path: Pa
 
     table = _assert_tables_equal(tmp_path)
     assert table.column("vector").to_pylist() == [pytest.approx([0.0, 1.0, 0.5, 0.75]), pytest.approx(_vector(1))]
+
+
+def test_python_float_syntax_in_string_vectors_matches_record_path(tmp_path: Path) -> None:
+    rows = [_row(0, embedding=[" 0.0 ", "0.25", "5e-1", "0.75"]), _row(1, embedding=["1_000.0", "1.25", "1.5", "1.75"])]
+    frame = pd.DataFrame(rows)
+    frame["embedding"] = pd.Series(
+        pa.array(frame["embedding"].tolist(), type=pa.list_(pa.string())),
+        dtype=pd.ArrowDtype(pa.list_(pa.string())),
+    )
+
+    _ingest_both(tmp_path, [frame])
+
+    table = _assert_tables_equal(tmp_path)
+    assert table.column("vector").to_pylist()[1] == pytest.approx([1000.0, 1.25, 1.5, 1.75])
