@@ -136,6 +136,13 @@ def _local_table_lock(uri: str, table_name: str, *, phase: str) -> AbstractConte
     return FileLock(lock_dir / f"{phase}-{table_token}.lock")
 
 
+def _fragment_json(fragment: Any) -> str:
+    """Serialize ``lance.fragment.FragmentMetadata`` to the string ``from_json`` accepts."""
+
+    encoded = fragment.to_json()
+    return encoded if isinstance(encoded, str) else json.dumps(encoded)
+
+
 def _table_mutation_lock(uri: str, table_name: str) -> AbstractContextManager[Any]:
     """Return the process-shared mutation lock for a local LanceDB table."""
 
@@ -861,6 +868,8 @@ class LanceDB(VDB):
         stream_batch_bytes: int = _DEFAULT_STREAM_BATCH_BYTES,
         stream_optimize: bool = False,
         stream_operation_id: str | None = None,
+        worker_write: bool = False,
+        worker_write_rows: int = 8192,
         **kwargs,
     ):
         create_index = kwargs.pop("create_index", None)
@@ -910,6 +919,12 @@ class LanceDB(VDB):
         )
         # Sparse tables store no vector, so they keep the record stream.
         self.supports_stream_ingest_batches = self.supports_stream_ingest and not self.sparse
+        # Spike (3b): opt-in worker-native sink. Ray workers project + write Lance
+        # fragments; the driver commits once. Dense local tables only.
+        self.worker_write = bool(worker_write)
+        self.worker_write_rows = int(worker_write_rows)
+        if self.worker_write and not self.supports_stream_ingest_batches:
+            raise ValueError("worker_write=True requires a dense (non-sparse) local LanceDB table")
         self._service_table_schema = service_table_schema
         self._service_index_mode = str(service_index_mode) if service_index_mode is not None else None
         self._writes_since_optimize = 0
@@ -1917,6 +1932,118 @@ class LanceDB(VDB):
         _assert_lancedb_table_ready(existing_table)
         self._remember_table(self.table_name, existing_table)
         return None
+
+    def _lance_table_uri(self) -> str:
+        path = _filesystem_lancedb_path(self.uri)
+        if path is None:
+            raise ValueError(f"worker_write requires a local LanceDB uri, got {self.uri!r}")
+        return str(path / f"{self.table_name}.lance")
+
+    def write_partition(self, batches: Iterable[CanonicalRecordBatch]) -> dict[str, Any]:
+        """Worker side of the worker-native sink: project one partition and write Lance fragments.
+
+        Runs the same canonical projection as ``stream_ingest_batches`` (``_iter_stream_columns``
+        + ``_bounded_record_batches``) but hands the Arrow batches to ``lance.write_fragments``
+        instead of a LanceDB table. Returns a JSON-safe receipt with the fragment metadata and
+        the row tallies ``commit_partitions`` needs.
+        """
+
+        import lance.fragment
+
+        stats = _StreamStats(vector_dim=self.vector_dim)
+        source = _BatchStreamSource(self, batches)
+        receipt: dict[str, Any] = {"fragments": [], "rows_written": 0, "client_records": 0, "vector_dim": 0}
+        if not source.open(stats):
+            receipt["client_records"] = stats.client_records
+            return receipt
+        schema = self._stream_schema(stats.vector_dim)
+        reader = pa.RecordBatchReader.from_batches(
+            schema,
+            source.arrow_batches(
+                schema=schema, max_batch_bytes=self.stream_batch_bytes, stats=stats, include_digest=False
+            ),
+        )
+        fragments = lance.fragment.write_fragments(reader, self._lance_table_uri(), schema=schema)
+        receipt.update(
+            fragments=[_fragment_json(fragment) for fragment in fragments],
+            rows_written=stats.rows_written,
+            client_records=stats.client_records,
+            vector_dim=int(stats.vector_dim or 0),
+        )
+        return receipt
+
+    def commit_partitions(self, receipts: Iterable[dict[str, Any]]) -> None:
+        """Driver side of the worker-native sink: one Lance commit, then the stream path's finalize.
+
+        Not emulated from ``stream_ingest_batches``: durable recovery markers / ``stream_operation_id``
+        (always ``None`` here), the stream digest, and the single end-of-stream drop-count log.
+        """
+
+        import lance
+        from lance.fragment import FragmentMetadata
+
+        stats = _StreamStats(vector_dim=self.vector_dim)
+        fragments: list[FragmentMetadata] = []
+        for receipt in receipts:
+            stats.client_records += int(receipt["client_records"])
+            stats.rows_written += int(receipt["rows_written"])
+            dim = int(receipt.get("vector_dim") or 0)
+            if dim:
+                if stats.vector_dim is None:
+                    stats.vector_dim = dim
+                elif dim != int(stats.vector_dim):
+                    raise ValueError(f"worker partitions disagree on vector_dim: {dim} vs {stats.vector_dim}")
+            fragments.extend(FragmentMetadata.from_json(encoded) for encoded in receipt["fragments"])
+
+        with self._stream_lock, _table_mutation_lock(self.uri, self.table_name), self._write_lock:
+            db = lancedb.connect(uri=self.uri)
+            try:
+                existing_table = db.open_table(self.table_name)
+            except ValueError as exc:
+                if not _is_missing_lancedb_table_error(exc):
+                    raise
+                existing_table = None
+            base_version: int | None = None
+            base_rows = 0
+            if existing_table is not None:
+                existing_table.checkout_latest()
+                base_version = int(existing_table.version)
+                _assert_lancedb_table_ready(existing_table)
+                if not self.overwrite:
+                    base_rows = int(existing_table.count_rows())
+                    if stats.vector_dim is None and not self.sparse:
+                        stats.vector_dim = _schema_vector_dim(_table_schema(existing_table))
+            if stats.client_records == 0:
+                # Same as the stream path: nothing to write, and no table is created.
+                if existing_table is not None:
+                    self._remember_table(self.table_name, existing_table)
+                return
+
+            schema = self._stream_schema(stats.vector_dim)
+            expected_schema = schema
+            if existing_table is not None and not self.overwrite:
+                _validate_append_schema(existing_table, schema, table_name=self.table_name, uri=self.uri)
+                _validate_append_embedding_model(
+                    existing_table,
+                    self.embedding_model_name,
+                    self.embedding_model_revision,
+                    table_name=self.table_name,
+                    uri=self.uri,
+                )
+                expected_schema = _table_schema(existing_table)
+                operation: Any = lance.LanceOperation.Append(fragments)
+                expected_rows = base_rows + stats.rows_written
+            else:
+                operation = lance.LanceOperation.Overwrite(schema, fragments)
+                expected_rows = stats.rows_written
+            dataset = lance.LanceDataset.commit(self._lance_table_uri(), operation, read_version=base_version)
+            self._finalize_stream_write(
+                markers=None,
+                data_version=int(dataset.version),
+                expected_schema=expected_schema,
+                expected_rows=expected_rows,
+                stats=stats,
+            )
 
     def _write_stream(self, source: _StreamSource, *, operation_id: str | None) -> None:
         """Consume one canonical stream through one coordinated LanceDB mutation."""

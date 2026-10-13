@@ -226,6 +226,42 @@ class IngestVdbOperator(AbstractOperator):
             )
         return submitted_records
 
+    def _supports_worker_write(self) -> bool:
+        """Return whether the opt-in worker-native fragment sink (spike) applies to this VDB."""
+
+        if not getattr(self._vdb, "worker_write", False):
+            return False
+        if not getattr(self._vdb, "supports_stream_ingest_batches", False):
+            raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not support worker_write")
+        if self._sidecar_spec is not None:
+            raise UnsupportedVDBOperation("worker_write does not support vdb sidecar metadata")
+        return True
+
+    def _write_partition(self, frame: pd.DataFrame) -> dict[str, Any]:
+        """Ray-worker side of worker_write: canonical projection of one block, written as Lance fragments."""
+
+        record_batches = iter_canonical_record_batches(
+            _iter_batch_rows_with_vectors([frame], embedding_column=self._embedding_column),
+            embedding_column=self._embedding_column,
+        )
+        submitted_records = 0
+
+        def counted_batches() -> Iterator[CanonicalRecordBatch]:
+            nonlocal submitted_records
+            for batch in record_batches:
+                submitted_records += len(batch.records)
+                yield batch
+
+        receipt = self._vdb.write_partition(counted_batches())
+        receipt["submitted_records"] = submitted_records
+        return receipt
+
+    def _commit_partitions(self, receipts: list[dict[str, Any]]) -> int:
+        """Driver side of worker_write: commit every receipt in one Lance version; return submitted records."""
+
+        self._vdb.commit_partitions(receipts)
+        return sum(int(receipt["submitted_records"]) for receipt in receipts)
+
     def _sidecar_decorator(self) -> Callable[[dict[str, Any]], dict[str, Any]] | None:
         """Return the in-place sidecar merge for one canonical record, or None when unconfigured."""
         spec, lookup = self._sidecar_spec, self._sidecar_lookup

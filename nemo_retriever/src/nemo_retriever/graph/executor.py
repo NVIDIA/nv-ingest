@@ -13,6 +13,7 @@ import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 import nvtx
 import pandas as pd
+import pyarrow as pa
 
 if TYPE_CHECKING:
     import ray.data
@@ -35,6 +36,7 @@ from nemo_retriever.common.ray_resource_hueristics import (
     OCR_GPUS_PER_ACTOR,
 )
 
+import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -744,6 +746,34 @@ class RayDataExecutor(AbstractExecutor):
         return self._ingest(data, return_results=return_results)
 
     @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
+    def _worker_write_ingest(self, dataset: Any, sink_node: Node) -> pd.DataFrame:
+        """Opt-in worker-native sink (spike): Ray tasks project and write Lance fragments; the driver commits once.
+
+        Each task rebuilds the sink operator from ``operator_kwargs`` (as the record path does on
+        workers), runs ``_write_partition`` on one bundle of ``worker_write_rows`` rows, and returns a
+        one-row receipt frame. Receipts are the only data that crosses to the driver.
+        """
+        operator_class, operator_kwargs = sink_node.operator_class, sink_node.operator_kwargs
+        rows_per_task = int(getattr(sink_node.operator._vdb, "worker_write_rows", 0)) or None
+
+        def write_partition(block: pa.Table) -> pd.DataFrame:
+            frame = arrow_table_to_pandas(block)
+            receipt = operator_class(**operator_kwargs)._write_partition(frame)
+            receipt["fragments"] = json.dumps(receipt["fragments"])
+            receipt["input_rows"] = len(frame)
+            return pd.DataFrame([receipt])
+
+        receipt_rows = dataset.map_batches(
+            write_partition,
+            batch_format="pyarrow",
+            batch_size=rows_per_task,
+            zero_copy_batch=True,
+        ).take_all()
+        receipts = [{**row, "fragments": json.loads(row["fragments"])} for row in receipt_rows]
+        submitted_records = sink_node.operator._commit_partitions(receipts)
+        input_rows = sum(int(receipt["input_rows"]) for receipt in receipts)
+        return pd.DataFrame([{"input_rows": input_rows, "submitted_records": submitted_records}])
+
     def _ingest(
         self,
         data: Any,
@@ -764,6 +794,9 @@ class RayDataExecutor(AbstractExecutor):
             data,
             segment="before_stream_ingest",
         )
+
+        if not return_results and validate_batch is None and sink_operator._supports_worker_write():
+            return self._worker_write_ingest(dataset, nodes[sink_index])
 
         terminal_frames: list[pd.DataFrame] = []
         input_rows = 0
