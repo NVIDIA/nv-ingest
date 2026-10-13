@@ -526,12 +526,34 @@ class CanonicalRecordBatch:
     vectors: pa.Array
 
 
+def _deferred_float_text(item: Any) -> str | None:
+    """Spell one embedding element so Arrow's string-to-float cast reproduces ``float(item)``."""
+
+    if item is None or isinstance(item, str):
+        return item
+    try:
+        return repr(float(item))
+    except (TypeError, ValueError):
+        return str(item)
+
+
 def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
     """Return an embedding column as a ``list`` Arrow array with one slot per row.
 
     Arrow-backed pandas columns are taken as they are, without touching rows.
     Anything else is normalized per row with :func:`embedding_vector`, so empty
     and non-list values become null slots, matching the record path.
+
+    Args:
+        values: One embedding column: a pandas ``Series`` (Arrow-backed or
+            object dtype), an Arrow array, or any iterable of per-row vectors.
+        length: Row count of the batch, used when no row carries a vector.
+
+    Returns:
+        A ``list<float>`` array, or ``list<string>`` when an object column
+        contains string elements; the LanceDB policy casts those to floats after
+        its width check, in the order the record path applies ``float()``.
+        Null slots mark rows without an embedding.
     """
     backing = getattr(values, "array", values)
     if callable(getattr(backing, "__arrow_array__", None)):
@@ -547,13 +569,8 @@ def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
         values = column.to_pylist()
     vectors = [embedding_vector(value) for value in values]
     if any(isinstance(item, str) for vector in vectors if vector for item in vector):
-        # Keep strings as strings: the LanceDB policy casts them after the
-        # width check, in the order the record path applies ``float()``.
         return pa.array(
-            [
-                None if vector is None else [None if item is None else str(item) for item in vector]
-                for vector in vectors
-            ],
+            [None if vector is None else [_deferred_float_text(item) for item in vector] for vector in vectors],
             type=pa.list_(pa.string()),
         )
     return pa.array(vectors, type=pa.list_(pa.float64()))
@@ -569,6 +586,22 @@ def iter_canonical_record_batches(
     Each input item pairs graph rows (without their embedding column) with the
     aligned embedding column from :func:`embedding_arrow_column`. Row selection and
     the fail-closed errors match :func:`_iter_client_vdb_records` exactly.
+
+    Args:
+        batches: Pairs of ``(rows, vectors)``; ``vectors[i]`` is row ``i``'s
+            embedding or null.
+        embedding_column: Name of the embedding column, used to find upstream
+            ``{embedding_column}_error`` messages for the error summary.
+
+    Yields:
+        One :class:`CanonicalRecordBatch` per input item that still has
+        uploadable rows; rows without text or image backing are dropped and
+        counted.
+
+    Raises:
+        ValueError: If ``rows`` and ``vectors`` differ in length.
+        VdbUploadError: On exhaustion, if searchable rows lacked embeddings
+            while others had them (no partial write), or if no row converted.
     """
 
     tally = _ConversionTally(embedding_column=embedding_column)

@@ -746,10 +746,12 @@ class _StreamSource:
         raise NotImplementedError
 
     def _recording_failures(self, batches: Iterator[pa.RecordBatch]) -> Iterator[pa.RecordBatch]:
+        """Remember the input-side exception: LanceDB's reader rewraps it before it reaches the caller."""
         try:
             yield from batches
         except Exception as exc:
             self.input_failure = exc
+            logger.error("VDB stream input failed while LanceDB was consuming batches: %s", exc, exc_info=True)
             raise
 
 
@@ -2012,7 +2014,9 @@ class LanceDB(VDB):
                 )
             except (CommitOutcomeUnknown, DataCommittedFinalizationError):
                 raise
-            except Exception as exc:
+            except RuntimeError as exc:
+                # LanceDB's Arrow reader surfaces our generator's exception as a
+                # generic RuntimeError; restore the original so callers keep its type.
                 input_failure = source.input_failure
                 if input_failure is not None and input_failure is not exc:
                     raise input_failure from exc
@@ -2086,6 +2090,23 @@ class LanceDB(VDB):
 
         Same lifecycle, table schema, drop policy, and stored rows as
         :meth:`stream_ingest`; the vector column skips the Python list roundtrip.
+
+        Args:
+            batches: Lazy, single-pass iterable of
+                :class:`~nemo_retriever.common.vdb.records.CanonicalRecordBatch`
+                values, consumed to exhaustion inside one table mutation.
+
+        Returns:
+            None. Rows are committed when the iterable is exhausted.
+
+        Raises:
+            UnsupportedVDBOperation: If this instance does not support the
+                columnar stream (remote URI, private schema, or sparse table).
+            VdbUploadError: If the input iterator fails; nothing is committed.
+            OversizedVdbRowError: If one row exceeds ``stream_batch_bytes``.
+            ValueError: If ``on_bad_vectors="error"`` meets a bad vector.
+            CommitOutcomeUnknown, DataCommittedFinalizationError: As for
+                :meth:`stream_ingest`.
         """
 
         if not self.supports_stream_ingest_batches:
