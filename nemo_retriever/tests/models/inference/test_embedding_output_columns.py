@@ -126,6 +126,21 @@ def test_embed_text_main_text_embed_counts_empty_vector_as_unembedded() -> None:
     assert result["embedding_v1_num_detections"].tolist() == [0]
 
 
+def test_embed_text_main_text_embed_preserves_successful_vector_with_empty_neighbor() -> None:
+    result = embed_text_main_text_embed(
+        pd.DataFrame({"text": ["one", "two"]}),
+        model=_FixedEmbedder(output=[[0.1, 0.2], []]),
+    )
+
+    _assert_embedding_types(result)
+    np.testing.assert_array_equal(
+        np.asarray(result.loc[0, "embedding"], dtype=np.float32),
+        np.asarray([0.1, 0.2], dtype=np.float32),
+    )
+    assert result["embedding"].array.__arrow_array__().to_pylist()[1] is None
+    assert result["embedding_error"].array.__arrow_array__().to_pylist() == [None, None]
+
+
 def test_assign_embedding_columns_masks_empty_vectors_and_preserves_errors() -> None:
     source = pd.DataFrame({"text": ["one", "two", "three"]})
 

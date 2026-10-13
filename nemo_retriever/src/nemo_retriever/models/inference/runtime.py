@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from typing import Any, List, Optional, Sequence
 
-import numpy as np
 import pandas as pd
 
 from nemo_retriever.common.params.models import IMAGE_MODALITIES
@@ -65,7 +64,7 @@ def _embed_group(
                     vectors = model.embed(batch, batch_size=int(inference_batch_size))
                 if hasattr(vectors, "detach"):
                     return vectors.detach().to("cpu").float().numpy()
-                return np.asarray(vectors, dtype=np.float32)
+                return vectors
 
     default_remote_image_batch_size = 4
     default_local_image_batch_size = 8
