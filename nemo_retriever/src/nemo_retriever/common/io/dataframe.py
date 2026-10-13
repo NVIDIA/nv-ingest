@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 from pathlib import Path
 
@@ -23,7 +22,7 @@ def _arrow_table_to_pandas_via_pylist(table: object) -> pd.DataFrame:
     return pd.DataFrame({name: table.column(name).to_pylist() for name in table.column_names})
 
 
-def read_extraction_parquet(path: Path | str | bytes) -> pd.DataFrame:
+def read_extraction_parquet(path: Path | str) -> pd.DataFrame:
     """Load pipeline extraction Parquet (nested list/struct columns).
 
     PyArrow's dataset-based ``read_table`` / default ``pd.read_parquet`` can raise
@@ -31,26 +30,12 @@ def read_extraction_parquet(path: Path | str | bytes) -> pd.DataFrame:
     array outputs``. Read with :class:`pyarrow.parquet.ParquetFile`, prefer
     ``to_pandas``, then fall back to column-wise ``to_pylist()`` (always works for
     nested types), then fastparquet / dataset reader.
-
-    ``path`` may also be the raw bytes of a Parquet file, for example file contents that an
-    executor has already delivered to a worker.
     """
+    path = Path(path)
     import pyarrow.parquet as pq
 
-    if isinstance(path, (bytes, bytearray, memoryview)):
-        payload = bytes(path)
-
-        def source() -> Path | io.BytesIO:
-            return io.BytesIO(payload)
-
-    else:
-        file_path = Path(path)
-
-        def source() -> Path | io.BytesIO:
-            return file_path
-
     try:
-        table = pq.ParquetFile(source()).read()
+        table = pq.ParquetFile(path).read()
         try:
             table = table.combine_chunks()
         except Exception:
@@ -62,15 +47,15 @@ def read_extraction_parquet(path: Path | str | bytes) -> pd.DataFrame:
     except Exception:
         pass
     try:
-        return pd.read_parquet(source(), engine="fastparquet")
+        return pd.read_parquet(path, engine="fastparquet")
     except Exception:
         pass
     try:
-        table = pq.ParquetFile(source()).read()
+        table = pq.ParquetFile(path).read()
         return _arrow_table_to_pandas_via_pylist(table)
     except Exception:
         pass
-    return pd.read_parquet(source())
+    return pd.read_parquet(path)
 
 
 def read_dataframe(path: Path) -> pd.DataFrame:
