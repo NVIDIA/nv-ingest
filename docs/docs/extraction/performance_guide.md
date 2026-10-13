@@ -77,6 +77,88 @@ Related batch-size, CPU, and GPU-per-actor flags are documented in the [CLI inge
 
 Use the Ray dashboard to verify the available-resource snapshot and the planned worker allocation when you tune throughput.
 
+## Profile batch ingestion with Nsight Systems
+
+Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray
+actor processes through the `nvtx` Python package, which is installed with NeMo
+Retriever Library. These host annotations do not require PyTorch or a GPU.
+Use NVIDIA Nsight Systems to correlate these semantic stages
+with CUDA and operating system activity. Start with a representative, bounded
+input because profiler tracing can increase runtime and report size.
+
+Run a batch ingest under `nsys profile` as follows:
+
+```bash
+nsys profile \
+  --trace=nvtx,cuda,osrt \
+  --sample=none \
+  --wait=all \
+  --output=nrl-batch-profile \
+  -- retriever ingest batch /path/to/your/pdfs
+```
+
+The command writes `nrl-batch-profile.nsys-rep`. Open the report in the Nsight
+Systems graphical interface, or run `nsys-ui nrl-batch-profile.nsys-rep` on a
+workstation with the interface installed. Search the timeline for `nrl.batch::`,
+`nrl.model::`, and `nrl.remote::` to find the following ranges.
+
+| Range | Interpretation |
+| --- | --- |
+| `nrl.batch::pipeline.ingest` | One complete `RayDataExecutor` run on the driver, including `return_results=False` summary mode. Use this range for batch pipeline wall-clock time. Driver-side setup before the run, such as building and normalizing manifest branch datasets, is outside this range. |
+| `nrl.batch::pdf_split.batch` | One PDF split actor call that splits a batch of documents into single-page PDFs. |
+| `nrl.batch::pdf_extract.batch` | One PDF extraction actor call that extracts text and images from a batch of pages. |
+| `nrl.batch::page_elements.startup` | One Page Elements actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::page_elements.batch` | One Page Elements actor processing call. |
+| `nrl.batch::table_structure.startup` | One Table Structure actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::table_structure.batch` | One Table Structure actor processing call. |
+| `nrl.batch::ocr.startup` | One OCR actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::ocr.batch` | One OCR actor processing call. |
+| `nrl.batch::embedding.startup` | One embedding actor constructor. A backend that loads lazily can perform more startup work in the first batch. |
+| `nrl.batch::embedding.batch` | One embedding actor processing call. |
+| `nrl.batch::ray.materialize` | Materialization of a terminal Ray dataset into a pandas DataFrame. This range can include lazy upstream execution. |
+| `nrl.batch::pipeline.terminal_stream` | Consumption of the lazy upstream pipeline and streaming of its records to the vector database backend. This range is not pure vector database time. |
+| `nrl.batch::result.concat` | Concatenation of retained frames when the graph ends at a streaming vector database sink and at least one batch was consumed. This range is absent when the sink has downstream nodes or the input has no batches. |
+
+Local and remote (endpoint-backed) Page Elements, Table Structure, OCR, and embedding actors emit the same ranges; for remote actors, the batch range includes network requests to the endpoint.
+
+Local model operations also emit stable, decorator-based ranges. These ranges
+wrap existing high-level methods, so they can include CPU input preparation,
+one or more backend calls, and output processing. Compare them with CUDA
+activity in the Nsight Systems timeline to isolate device execution.
+
+| Range | Interpretation |
+| --- | --- |
+| `nrl.model::llama_nemotron_embed_vl.embed` | One local document text embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_queries` | One local query embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_images` | One local image embedding operation. |
+| `nrl.model::llama_nemotron_embed_vl.embed_text_image` | One local paired text-image embedding operation. |
+| `nrl.model::ocr_v2.invoke` | One end-to-end Nemotron OCR v2 wrapper call, including input conversion and all backend calls. This is the model used by the current local OCR actor. |
+| `nrl.model::page_elements.invoke` | One local Page Elements model call, including the initialization check and model execution. Output scaling runs in the separate `postprocess` call, outside this range. |
+| `nrl.model::table_structure.invoke` | One local Table Structure operation, including input preparation, model execution, and output scaling. |
+| `nrl.model::vlm_captioner.caption_batch` | One local visual language model batch captioning operation. |
+| `nrl.model::parakeet_ctc.decode_batch` | One local Parakeet CTC chunk-batch operation, including feature preparation, model execution, and greedy decoding. |
+
+Remote NVIDIA Inference Microservice (NIM) calls emit
+`nrl.remote::nim.request`. This range covers one HTTP request and its retry and
+backoff lifecycle. Compare it with the enclosing actor batch range to separate
+remote service wait time from local preparation and response processing.
+
+Ranges from concurrent Ray actors can overlap. Their durations include CPU
+preparation, waits, and calls into inference backends. They do not represent
+CUDA kernel time by themselves. In the timeline, compare range boundaries with
+the CUDA activity rows to identify the stage that remains active near pipeline
+completion and to find idle gaps between batches.
+
+You can also print an aggregate NVTX summary:
+
+```bash
+nsys stats --report nvtx_sum nrl-batch-profile.nsys-rep
+```
+
+The summary adds durations from all matching ranges. With concurrent actors,
+the summed duration can exceed wall-clock time, so use the timeline to reason
+about overlap and the critical path.
+
 ## Tune remote OCR request batching
 
 Remote OCR batches cropped regions across the page rows supplied to one OCR actor call. This behavior applies to in-process, batch, and service ingestion with a remote OCR NIM. It preserves page and region output order.

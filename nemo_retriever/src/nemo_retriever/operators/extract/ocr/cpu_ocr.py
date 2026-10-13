@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.operators.abstract_operator import AbstractOperator
@@ -24,6 +25,7 @@ class OCRCPUActor(AbstractOperator, CPUOperator):
 
     DEFAULT_INVOKE_URL = "https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2"
 
+    @nvtx.annotate("nrl.batch::ocr.startup", color="blue")
     def __init__(self, **ocr_kwargs: Any) -> None:
         super().__init__(**ocr_kwargs)
         self.ocr_kwargs = dict(ocr_kwargs)
@@ -55,6 +57,7 @@ class OCRCPUActor(AbstractOperator, CPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::ocr.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return ocr_page_elements(
             data,
