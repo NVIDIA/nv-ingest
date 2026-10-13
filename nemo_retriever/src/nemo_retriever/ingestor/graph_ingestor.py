@@ -1096,7 +1096,7 @@ class GraphIngestor(ingestor):
             result = executor._ingest(
                 executor_input,
                 return_results=False,
-                validate_batch=self._raise_for_stage_errors,
+                validate_batch=self._stage_error_validator(),
             )
         self._rd_dataset = result
         return result
@@ -1591,6 +1591,28 @@ class GraphIngestor(ingestor):
                 role="embed",
             )
         return diagnostics
+
+    def _stage_error_validator(self) -> Callable[[Any], None] | None:
+        """Per-batch stage-error check with no reference to ``self``, or ``None`` when it would be a no-op.
+
+        The closure carries only the diagnostics and column names, so the executor can run it inside
+        Ray write tasks (worker-native sink) as well as on the driver.
+        """
+        if self._error_policy == "collect":
+            return None
+        diagnostics = self._remote_stage_diagnostics()
+        if not diagnostics:
+            return None
+        columns = set(diagnostics.keys())
+        string_error_columns = (self._embed_error_column(),)
+        stage_error_records = self._stage_error_records
+
+        def validate(result: Any) -> None:
+            records = stage_error_records(result, columns=columns, string_error_columns=string_error_columns)
+            if records:
+                raise GraphIngestionError(records, stage_diagnostics=diagnostics)
+
+        return validate
 
     def _raise_for_stage_errors(self, result: Any) -> None:
         if self._error_policy == "collect":
