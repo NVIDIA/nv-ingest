@@ -538,8 +538,10 @@ def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
         column = pa.array(values)
         if isinstance(column, pa.ChunkedArray):
             column = column.combine_chunks()
-        if pa.types.is_list(column.type) or pa.types.is_large_list(column.type) or pa.types.is_fixed_size_list(
-            column.type
+        if (
+            pa.types.is_list(column.type)
+            or pa.types.is_large_list(column.type)
+            or pa.types.is_fixed_size_list(column.type)
         ):
             return column
         values = column.to_pylist()
