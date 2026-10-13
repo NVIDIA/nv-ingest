@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.operators.abstract_operator import AbstractOperator
@@ -24,6 +25,7 @@ class TableStructureActor(AbstractOperator, GPUOperator):
     per actor and runs the structure stage.
     """
 
+    @nvtx.annotate("nrl.batch::table_structure.startup", color="blue")
     def __init__(
         self,
         *,
@@ -85,6 +87,7 @@ class TableStructureActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::table_structure.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return table_structure_ocr_page_elements(
             data,

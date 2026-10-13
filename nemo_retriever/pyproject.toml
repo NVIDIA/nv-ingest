@@ -57,6 +57,7 @@ classifiers = [
 dependencies = [
   # Core orchestration and framework
   "backoff",
+  "nvtx>=0.2.15",
   "ray[data,serve]>=2.56.1",
   "ffmpeg-python",
   "pandas>=2.0,<3",

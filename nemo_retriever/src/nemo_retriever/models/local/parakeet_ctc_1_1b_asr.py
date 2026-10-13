@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from nemo_retriever.common.nvtx import gpu_inference_range
+import nvtx
 
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import get_hf_revision
@@ -332,6 +332,7 @@ class ParakeetCTC1B1ASR:
             results[i] = (text, _segment_words(per_audio_words[i]))
         return results
 
+    @nvtx.annotate("nrl.model::parakeet_ctc.decode_batch", color="blue")
     def _decode_batch(self, audios: List[np.ndarray]) -> List[Tuple[str, List[Tuple[str, Tuple[int, int]]]]]:
         """Forward pass + greedy CTC for a batch of chunks. Returns ``(text, word_alignments)``."""
         import torch
@@ -347,7 +348,7 @@ class ParakeetCTC1B1ASR:
             padding=True,
         )
         inputs = inputs.to(self._model.device, dtype=self._model.dtype)
-        with torch.no_grad(), gpu_inference_range("ParakeetCTC1B", batch_size=len(audios)):
+        with torch.no_grad():
             outputs = self._model(**inputs)
         logits = outputs.logits  # [B, T, V]
 

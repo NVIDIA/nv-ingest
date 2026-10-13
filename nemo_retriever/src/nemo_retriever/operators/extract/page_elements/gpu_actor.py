@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.operators.abstract_operator import AbstractOperator
@@ -22,6 +23,7 @@ class PageElementDetectionActor(AbstractOperator, GPUOperator):
       ds = ds.map_batches(PageElementDetectionActor, fn_constructor_kwargs={...}, batch_format="pandas")
     """
 
+    @nvtx.annotate("nrl.batch::page_elements.startup", color="blue")
     def __init__(self, **detect_kwargs: Any) -> None:
         super().__init__(**detect_kwargs)
         self.detect_kwargs = dict(detect_kwargs)
@@ -46,6 +48,7 @@ class PageElementDetectionActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::page_elements.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return detect_page_elements_v3(
             data,
