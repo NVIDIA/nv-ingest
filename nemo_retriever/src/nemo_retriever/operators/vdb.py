@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator
 from typing import Any
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.common.vdb.adt_vdb import CollectionWriteContext, UnsupportedVDBOperation, VDB
@@ -173,6 +174,7 @@ class IngestVdbOperator(AbstractOperator):
 
         return bool(getattr(self._vdb, "supports_stream_ingest", False))
 
+    @nvtx.annotate("nrl.batch::pipeline.terminal_stream", color="blue")
     def _stream_ingest(self, batches: Iterable[pd.DataFrame]) -> int:
         """Write one backend stream and return the number of canonical records submitted."""
 

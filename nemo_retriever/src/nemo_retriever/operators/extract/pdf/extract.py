@@ -23,6 +23,7 @@ from nemo_retriever.common.api.util.pdf.pdfium import (
     is_scanned_page as _is_scanned_page,
 )
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.models.nim.error_reporter import report_error
@@ -490,6 +491,7 @@ class PDFExtractionCPUActor(AbstractOperator, CPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::pdf_extract.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return pdf_extraction(data, **self.extract_kwargs, **kwargs)
 
