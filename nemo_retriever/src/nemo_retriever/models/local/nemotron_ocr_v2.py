@@ -10,6 +10,7 @@ import os
 from pathlib import Path  # noqa: F401
 
 import numpy as np
+import nvtx
 import torch
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import install_pinned_hf_hub_download
@@ -177,6 +178,7 @@ class NemotronOCRV2(BaseModel):
                     return " ".join(parts).strip()
         return str(obj).strip()
 
+    @nvtx.annotate("nrl.model::ocr_v2.invoke", color="blue")
     def invoke(
         self,
         input_data: Union[torch.Tensor, str, bytes, np.ndarray, io.BytesIO],

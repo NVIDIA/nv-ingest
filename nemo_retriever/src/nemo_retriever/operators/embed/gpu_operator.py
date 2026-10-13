@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import nvtx
+
 from nemo_retriever.common.params import EmbedParams
 from nemo_retriever.models.inference.embedding_input import ensure_embedding_input_policy_for_batch
 from nemo_retriever.models.inference.runtime import embed_text_main_text_embed
@@ -20,6 +22,7 @@ from nemo_retriever.operators.gpu_operator import GPUOperator
 class _BatchEmbedActor(AbstractOperator, GPUOperator):
     """Graph embedding actor that loads a local embedder or calls a remote endpoint."""
 
+    @nvtx.annotate("nrl.batch::embedding.startup", color="blue")
     def __init__(self, params: EmbedParams) -> None:
         super().__init__()
         import warnings
@@ -59,6 +62,7 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::embedding.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         ensure_embedding_input_policy_for_batch(self._kwargs, data)
         return embed_text_main_text_embed(data, model=self._model, **self._kwargs)

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import nvtx
 import pandas as pd
 
 from nemo_retriever.operators.abstract_operator import AbstractOperator
@@ -19,6 +20,7 @@ from nemo_retriever.common.modality.ocr.shared import Image, _error_payload, ocr
 class OCRActor(AbstractOperator, GPUOperator):
     """Ray-friendly callable that initializes Nemotron OCR v2 once per actor."""
 
+    @nvtx.annotate("nrl.batch::ocr.startup", color="blue")
     def __init__(self, **ocr_kwargs: Any) -> None:
         super().__init__(**ocr_kwargs)
         import warnings
@@ -67,6 +69,7 @@ class OCRActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::ocr.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return ocr_page_elements(
             data,

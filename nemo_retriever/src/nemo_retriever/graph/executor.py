@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterator
 import math
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
+import nvtx
 import pandas as pd
 
 if TYPE_CHECKING:
@@ -189,6 +190,7 @@ def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     return frame.to_dict(orient="records")
 
 
+@nvtx.annotate("nrl.batch::ray.materialize", color="blue")
 def ray_dataset_to_pandas(dataset: ray.data.Dataset) -> pd.DataFrame:
     """Materialize a Ray Dataset without returning malformed Arrow arrays.
 
@@ -728,6 +730,7 @@ class RayDataExecutor(AbstractExecutor):
             raise TypeError(f"RayDataExecutor.ingest() does not accept setting(s): {unsupported}")
         return self._ingest(data, return_results=return_results)
 
+    @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def _ingest(
         self,
         data: Any,
@@ -797,7 +800,8 @@ class RayDataExecutor(AbstractExecutor):
             return ray_dataset_to_pandas(downstream)
 
         if terminal_frames:
-            return pd.concat(terminal_frames, ignore_index=True)
+            with nvtx.annotate("nrl.batch::result.concat", color="blue"):
+                return pd.concat(terminal_frames, ignore_index=True)
         schema = dataset.schema()
         names = getattr(schema, "names", None)
         return pd.DataFrame(columns=list(names) if names is not None else None)
