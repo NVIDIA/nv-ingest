@@ -174,7 +174,20 @@ def arrow_table_to_pandas(table: Any) -> pd.DataFrame:
 
 
 def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
-    """Return ``frame.to_dict(orient="records")`` with nested Arrow columns converted per batch."""
+    """Convert a DataFrame to row dicts, converting nested Arrow columns once per batch.
+
+    Equivalent to ``frame.to_dict(orient="records")``. Columns with a nested
+    ``pd.ArrowDtype`` (lists, structs) are converted to Python objects with
+    ``_arrow_to_pylist`` first, so float-list values go through NumPy instead of
+    one Python float per element. Other columns and column labels are left as is.
+
+    Args:
+        frame: Batch to convert. It is not modified.
+
+    Returns:
+        One dict per row, keyed by column label, with the same values and types
+        that ``frame.to_dict(orient="records")`` would return.
+    """
     import pyarrow as pa
 
     nested = {
