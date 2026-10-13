@@ -113,6 +113,48 @@ def test_embed_text_main_text_embed_counts_successful_embedding() -> None:
     assert result["embedding_v1_num_detections"].tolist() == [1]
 
 
+def test_embed_text_main_text_embed_counts_empty_vector_as_unembedded() -> None:
+    result = embed_text_main_text_embed(
+        pd.DataFrame({"text": ["one"]}),
+        model=_FixedEmbedder(output=[[]]),
+    )
+
+    _assert_embedding_types(result)
+    assert result["embedding"].array.__arrow_array__().to_pylist() == [None]
+    assert result["embedding_error"].isna().all()
+    assert result["embedding_v1_counts_by_label"].tolist() == [{"unembedded": 1}]
+    assert result["embedding_v1_num_detections"].tolist() == [0]
+
+
+def test_assign_embedding_columns_masks_empty_vectors_and_preserves_errors() -> None:
+    source = pd.DataFrame({"text": ["one", "two", "three"]})
+
+    result = assign_embedding_columns(
+        source,
+        [[1.0, 2.0], [], None],
+        [None, None, "e"],
+        output_column="embedding",
+    )
+
+    _assert_embedding_types(result)
+    assert result["embedding"].array.__arrow_array__().to_pylist() == [[1.0, 2.0], None, None]
+    assert result["embedding_error"].array.__arrow_array__().to_pylist() == [None, None, "e"]
+    assert source.columns.tolist() == ["text"]
+
+
+def test_assign_embedding_columns_keeps_typed_columns_for_all_empty_vectors() -> None:
+    result = assign_embedding_columns(
+        pd.DataFrame({"text": ["one", "two"]}),
+        [[], []],
+        [None, None],
+        output_column="embedding",
+    )
+
+    _assert_embedding_types(result)
+    assert result["embedding"].isna().all()
+    assert result["embedding_error"].isna().all()
+
+
 @pytest.mark.parametrize(
     "output",
     [
