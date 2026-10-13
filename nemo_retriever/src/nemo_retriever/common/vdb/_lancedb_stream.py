@@ -317,6 +317,32 @@ def _bounded_record_batches(
         yield from emit(columns.record_batch(schema))
 
 
+def _estimated_prepared_row_bytes(fields: dict[str, Any], *, vector_dim: int) -> int:
+    """Conservative Arrow byte estimate for one projected row (vector plus four strings)."""
+
+    return (
+        64
+        + 32
+        + int(vector_dim) * 4
+        + sum(32 + len(str(fields[name]).encode("utf-8")) for name in ("text", "metadata", "source", "id"))
+    )
+
+
+def _row_chunks(positions: np.ndarray, estimates: list[int], *, max_batch_bytes: int) -> Iterator[np.ndarray]:
+    """Split row positions into consecutive chunks whose estimated bytes stay under the limit."""
+
+    start = 0
+    chunk_bytes = 0
+    for index, estimate in enumerate(estimates):
+        if index > start and chunk_bytes + estimate > max_batch_bytes:
+            yield positions[start:index]
+            start = index
+            chunk_bytes = 0
+        chunk_bytes += estimate
+    if start < len(estimates):
+        yield positions[start:]
+
+
 def _vector_lengths(vectors: pa.Array) -> np.ndarray:
     return pc.fill_null(pc.list_value_length(vectors), 0).to_numpy(zero_copy_only=False)
 
