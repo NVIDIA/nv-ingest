@@ -113,8 +113,6 @@ jobs:
     if: ${{ !inputs.skip-docker }}
     needs: determine-version
     runs-on: linux-large-disk
-    outputs:
-      image: ${{ steps.meta.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -235,8 +233,6 @@ jobs:
       - pypi-build
       - helm-build
     runs-on: linux-large-disk
-    outputs:
-      image: ${{ steps.push.outputs.image }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -253,6 +249,20 @@ jobs:
         uses: ./.github/actions/docker-login-ngc
         with:
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Recreate the image reference in this job. GitHub redacts job outputs
+      # derived from secrets, so the build job cannot pass this value through
+      # needs.<job>.outputs without it becoming empty.
+      - name: Set image metadata
+        id: meta
+        run: |
+          if [ -z "$DOCKER_REGISTRY" ]; then
+            echo "::error::DOCKER_REGISTRY secret is not set"
+            exit 1
+          fi
+          echo "image=${DOCKER_REGISTRY}/nrl-service:${{ needs.determine-version.outputs.version }}" >> "$GITHUB_OUTPUT"
+        env:
+          DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
 
       - name: Create HF token file
         env:
@@ -276,15 +286,13 @@ jobs:
           build-args: |
             DOWNLOAD_DEFAULT_TOKENIZER=True
             GIT_COMMIT=${{ github.sha }}
-          tags: ${{ needs.nvingest-docker-build.outputs.image }}
+          tags: ${{ steps.meta.outputs.image }}
           secret-files: hf_token=./scripts/private_local/hf_token.txt
           cache-from: type=gha,scope=nvingest-release
 
       - name: Inspect published image
-        id: push
         run: |
-          IMAGE="${{ needs.nvingest-docker-build.outputs.image }}"
-          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          IMAGE="${{ steps.meta.outputs.image }}"
           docker buildx imagetools inspect "$IMAGE"
 
   helm-publish:
@@ -409,7 +417,7 @@ jobs:
           TAG_RESULT: ${{ needs.tag-release.result }}
           SKIP_DOCKER: ${{ inputs.skip-docker }}
           SKIP_HELM: ${{ inputs.skip-helm-chart }}
-          NVINGEST_IMAGE: ${{ needs.nvingest-docker-publish.outputs.image || needs.nvingest-docker-build.outputs.image }}
+          NVINGEST_IMAGE: ${{ secrets.DOCKER_REGISTRY }}/nrl-service:${{ needs.determine-version.outputs.version }}
           REPO_URL: ${{ github.server_url }}/${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}

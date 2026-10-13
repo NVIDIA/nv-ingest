@@ -261,6 +261,47 @@ def test_pypi_nightly_publish_uses_twine_password_env():
     assert "PYPI_API_TOKEN" not in publish_step["run"]
 
 
+@requires_workflows
+def test_release_docker_image_tag_does_not_cross_job_output_boundary():
+    workflow = _load_workflow("perform-release.yml")
+    workflow_text = (WORKFLOWS / "perform-release.yml").read_text(encoding="utf-8")
+    jobs = workflow["jobs"]
+    build_job = jobs["nvingest-docker-build"]
+    publish_job = jobs["nvingest-docker-publish"]
+
+    assert "outputs" not in build_job
+    assert "outputs" not in publish_job
+    assert "needs.nvingest-docker-build.outputs.image" not in workflow_text
+    assert "needs.nvingest-docker-publish.outputs.image" not in workflow_text
+
+    metadata_step = next(
+        step
+        for step in publish_job["steps"]
+        if step.get("name") == "Set image metadata"
+    )
+    assert metadata_step["env"] == {"DOCKER_REGISTRY": "${{ secrets.DOCKER_REGISTRY }}"}
+    assert (
+        "${DOCKER_REGISTRY}/nrl-service:${{ needs.determine-version.outputs.version }}"
+        in metadata_step["run"]
+    )
+
+    publish_step = next(
+        step
+        for step in publish_job["steps"]
+        if step.get("name") == "Build and push multi-platform image"
+    )
+    assert publish_step["with"]["tags"] == "${{ steps.meta.outputs.image }}"
+
+    announcement_step = next(
+        step
+        for step in jobs["announce"]["steps"]
+        if step.get("name") == "Generate Slack announcement"
+    )
+    assert announcement_step["env"]["NVINGEST_IMAGE"] == (
+        "${{ secrets.DOCKER_REGISTRY }}/nrl-service:${{ needs.determine-version.outputs.version }}"
+    )
+
+
 def test_legacy_nv_ingest_root_compose_stack_is_removed():
     legacy_paths = (
         "docker-compose.yaml",
