@@ -347,6 +347,22 @@ def _vector_lengths(vectors: pa.Array) -> np.ndarray:
     return pc.fill_null(pc.list_value_length(vectors), 0).to_numpy(zero_copy_only=False)
 
 
+def _python_float_vectors(vectors: pa.Array) -> pa.Array:
+    """Coerce non-numeric list elements with Python ``float()``, exactly as :func:`_inspect_vector` does.
+
+    Only reached for string-typed embedding columns, which the embed stage never
+    produces; ordinary float columns skip this.
+    """
+
+    return pa.array(
+        [
+            None if vector is None else [None if item is None else float(item) for item in vector]
+            for vector in vectors.to_pylist()
+        ],
+        type=pa.list_(pa.float64()),
+    )
+
+
 def _apply_bad_vector_policy(
     vectors: pa.Array,
     *,
@@ -360,8 +376,8 @@ def _apply_bad_vector_policy(
     positions and their vectors as ``fixed_size_list<float32, vector_dim>``,
     with wrong-width and NaN vectors dropped, filled, nulled, or rejected the
     same way the row path does. As on the row path, the width check runs
-    first; only correctly sized vectors are then coerced to floats, so a
-    non-numeric value in one of them raises the Arrow conversion error.
+    first; only correctly sized vectors are then coerced with ``float()``, so a
+    non-numeric value in one of them raises ``ValueError``.
     """
 
     fixed_type = pa.list_(pa.float32(), int(vector_dim))
@@ -371,7 +387,7 @@ def _apply_bad_vector_policy(
     sized_vectors = vectors.take(pa.array(sized, type=pa.int64()))
     child_type = sized_vectors.type.value_type
     if not (pa.types.is_floating(child_type) or pa.types.is_integer(child_type)):
-        sized_vectors = sized_vectors.cast(pa.list_(pa.float64()))
+        sized_vectors = _python_float_vectors(sized_vectors)
     has_nan = np.zeros(row_count, dtype=bool)
     if sized.size:
         nan_flags = pc.fill_null(pc.is_nan(pc.list_flatten(sized_vectors)), False).to_numpy(zero_copy_only=False)
