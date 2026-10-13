@@ -291,6 +291,15 @@ must treat an exception from the record iterator as failure of the complete
 write and must not commit the consumed prefix. LanceDB enforces this contract
 by passing all bounded Arrow batches through one native table mutation.
 
+`VDB.stream_ingest_batches(batches)` is the columnar form of the same
+capability. Each item is a `CanonicalRecordBatch` that pairs canonical records
+without `metadata["embedding"]` with one aligned Arrow `list<float>` column
+that holds their vectors. Backends opt in by setting
+`supports_stream_ingest_batches = True`; `IngestVdbOperator` then prefers this
+method, so dense vectors are never expanded into Python lists on the way to
+storage. Row selection and the fail-closed errors match `stream_ingest`.
+LanceDB opts in for dense tables and stores the same rows on both paths.
+
 Existing custom backends retain the global-batch `VDB.run(records)` path unless
 they opt in. For LanceDB, ordinary fixed-table configurations with scheme-less
 local paths or authority-free `file:///` URIs use bounded Arrow batches. Remote
