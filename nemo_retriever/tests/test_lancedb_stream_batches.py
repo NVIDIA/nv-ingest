@@ -66,9 +66,7 @@ def _frames(rows: list[dict[str, Any]], *, batch_size: int = 3) -> list[pd.DataF
             for row in rows
         ]
     )
-    return [
-        arrow_table_to_pandas(table.slice(start, batch_size)) for start in range(0, table.num_rows, batch_size)
-    ]
+    return [arrow_table_to_pandas(table.slice(start, batch_size)) for start in range(0, table.num_rows, batch_size)]
 
 
 def _backend(uri: Path, **overrides: Any) -> LanceDB:
