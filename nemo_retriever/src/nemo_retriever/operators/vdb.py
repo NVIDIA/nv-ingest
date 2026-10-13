@@ -6,17 +6,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from typing import Any
 
 import nvtx
 import pandas as pd
+import pyarrow as pa
 
 from nemo_retriever.common.vdb.adt_vdb import CollectionWriteContext, UnsupportedVDBOperation, VDB
 from nemo_retriever.common.vdb.factory import get_vdb_op_cls
 from nemo_retriever.common.vdb.records import (
+    CanonicalRecordBatch,
     _iter_client_vdb_records,
+    embedding_arrow_column,
     embedding_vector,
+    iter_canonical_record_batches,
     normalize_retrieval_results,
     to_client_vdb_records,
     validate_collection_retrieval_results,
@@ -52,6 +56,23 @@ def _iter_batch_rows(batches: Iterable[pd.DataFrame]) -> Iterator[dict[str, Any]
 
     for batch in batches:
         yield from frame_to_records(batch)
+
+
+def _iter_batch_rows_with_vectors(
+    batches: Iterable[pd.DataFrame], *, embedding_column: str
+) -> Iterator[tuple[list[dict[str, Any]], pa.Array]]:
+    """Yield each batch's graph rows without the embedding column, plus that column as Arrow."""
+
+    from nemo_retriever.graph.executor import frame_to_records
+
+    for batch in batches:
+        if embedding_column in batch.columns:
+            vectors = embedding_arrow_column(batch[embedding_column], length=len(batch))
+            rows = frame_to_records(batch.drop(columns=[embedding_column]))
+        else:
+            vectors = pa.nulls(len(batch), pa.list_(pa.float32()))
+            rows = frame_to_records(batch)
+        yield rows, vectors
 
 
 def query_vectors_from_embedded_dataframe(
@@ -147,23 +168,17 @@ class IngestVdbOperator(AbstractOperator):
         if not self._supports_stream_ingest():
             raise UnsupportedVDBOperation(f"{type(self._vdb).__name__} does not implement stream_ingest()")
 
+        if getattr(self._vdb, "supports_stream_ingest_batches", False):
+            return self._stream_ingest_batches(batches)
+
         records: Iterable[dict[str, Any]] = _iter_client_vdb_records(
             _iter_batch_rows(batches),
             embedding_column=self._embedding_column,
         )
-        if self._sidecar_spec is not None and self._sidecar_lookup is not None:
+        sidecar = self._sidecar_decorator()
+        if sidecar is not None:
             undecorated_records = records
-
-            def with_sidecar() -> Iterator[dict[str, Any]]:
-                for record in undecorated_records:
-                    yield _apply_sidecar_metadata_to_client_record(
-                        record,
-                        lookup=self._sidecar_lookup,
-                        meta_fields=self._sidecar_spec["meta_fields"],
-                        join_key=self._sidecar_spec["meta_join_key"],
-                    )
-
-            records = with_sidecar()
+            records = (sidecar(record) for record in undecorated_records)
 
         record_stream = records
         exhausted = False
@@ -182,6 +197,46 @@ class IngestVdbOperator(AbstractOperator):
                 f"{type(self._vdb).__name__}.stream_ingest() returned before consuming the record stream"
             )
         return submitted_records
+
+    def _stream_ingest_batches(self, batches: Iterable[pd.DataFrame]) -> int:
+        """Stream canonical record batches, keeping each batch's vectors in one Arrow column."""
+
+        record_batches = iter_canonical_record_batches(
+            _iter_batch_rows_with_vectors(batches, embedding_column=self._embedding_column),
+            embedding_column=self._embedding_column,
+        )
+        sidecar = self._sidecar_decorator()
+        exhausted = False
+        submitted_records = 0
+
+        def required_batches() -> Iterator[CanonicalRecordBatch]:
+            nonlocal exhausted, submitted_records
+            for batch in record_batches:
+                if sidecar is not None:
+                    for record in batch.records:
+                        sidecar(record)
+                submitted_records += len(batch.records)
+                yield batch
+            exhausted = True
+
+        self._vdb.stream_ingest_batches(required_batches())
+        if not exhausted:
+            raise RuntimeError(
+                f"{type(self._vdb).__name__}.stream_ingest_batches() returned before consuming the record stream"
+            )
+        return submitted_records
+
+    def _sidecar_decorator(self) -> Callable[[dict[str, Any]], dict[str, Any]] | None:
+        """Return the in-place sidecar merge for one canonical record, or None when unconfigured."""
+        spec, lookup = self._sidecar_spec, self._sidecar_lookup
+        if spec is None or lookup is None:
+            return None
+        return lambda record: _apply_sidecar_metadata_to_client_record(
+            record,
+            lookup=lookup,
+            meta_fields=spec["meta_fields"],
+            join_key=spec["meta_join_key"],
+        )
 
     def postprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
