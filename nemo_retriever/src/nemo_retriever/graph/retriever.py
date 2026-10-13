@@ -672,11 +672,6 @@ class Retriever:
         effective_top_k = int(top_k) if top_k is not None else int(self.top_k)
         return RetrieverPipelineBuilder(self, top_k=effective_top_k)
 
-    def generate_sql(self, query: str) -> str:
-        from nemo_retriever.tabular_data.retrieval import generate_sql
-
-        return generate_sql(query)
-
 
 class RetrieverPipelineBuilder:
     """Fluent builder for live-RAG batch operator graphs.

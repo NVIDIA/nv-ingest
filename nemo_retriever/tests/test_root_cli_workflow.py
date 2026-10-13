@@ -1894,7 +1894,8 @@ def test_root_ingest_quiet_invokes_silencing_and_capture(monkeypatch, tmp_path) 
     assert "Ingested 1 file(s) → 3 row(s) in LanceDB lancedb/nemo-retriever." in result.output
 
 
-def test_root_ingest_index_mode_hybrid_passes_hybrid_into_vdb_kwargs(monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize(("index_mode", "hybrid"), [("hybrid", True), ("dense", False)])
+def test_root_ingest_index_mode_passes_explicit_mode_into_vdb_kwargs(monkeypatch, tmp_path, index_mode, hybrid) -> None:
     fake_ingestor = _make_fake_ingestor()
     doc = tmp_path / "a.pdf"
     doc.write_bytes(b"%PDF-1.4\n")
@@ -1912,7 +1913,7 @@ def test_root_ingest_index_mode_hybrid_passes_hybrid_into_vdb_kwargs(monkeypatch
             "--table-name",
             "docs",
             "--index-mode",
-            "hybrid",
+            index_mode,
         ],
     )
 
@@ -1921,7 +1922,7 @@ def test_root_ingest_index_mode_hybrid_passes_hybrid_into_vdb_kwargs(monkeypatch
         "uri": "/tmp/lancedb",
         "table_name": "docs",
         "overwrite": True,
-        "hybrid": True,
+        "hybrid": hybrid,
         "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
         "embedding_model_revision": "620d28cf72117505a6a650c05193356886d1c107",
     }

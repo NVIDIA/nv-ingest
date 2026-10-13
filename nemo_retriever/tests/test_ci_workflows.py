@@ -292,7 +292,6 @@ def test_dev_compose_helpers_are_feature_scoped():
     compose_dir = REPO_ROOT / "nemo_retriever" / "dev" / "compose"
     expected_services = {
         "judge.compose.yaml": "judge",
-        "neo4j.compose.yaml": "neo4j",
     }
 
     compose_data = {}
@@ -305,27 +304,13 @@ def test_dev_compose_helpers_are_feature_scoped():
         assert set(data["services"]) == {service_name}
         assert "nv-ingest-ms-runtime" not in text
         assert "ngcapikey" not in text
-        assert "neo4jpassword" not in text
 
     judge_environment = compose_data["judge.compose.yaml"]["services"]["judge"]["environment"]
     assert any("NGC_API_KEY or NIM_NGC_API_KEY must be set" in item for item in judge_environment)
 
-    neo4j_environment = compose_data["neo4j.compose.yaml"]["services"]["neo4j"]["environment"]
-    assert "NEO4J_PASSWORD must be set" in neo4j_environment["NEO4J_AUTH"]
-
-    neo4j_healthcheck = compose_data["neo4j.compose.yaml"]["services"]["neo4j"]["healthcheck"]["test"]
-    assert neo4j_healthcheck[0] == "CMD-SHELL"
-    assert "-u" not in neo4j_healthcheck
-    assert "-p" not in neo4j_healthcheck
-    assert any("NEO4J_AUTH%%/*" in part for part in neo4j_healthcheck)
-    assert any("NEO4J_AUTH#*/" in part for part in neo4j_healthcheck)
-
     helper_readme = compose_dir / "README.md"
     assert helper_readme.exists()
     assert "docker compose -f nemo_retriever/dev/compose/judge.compose.yaml up -d judge" in helper_readme.read_text(
-        encoding="utf-8"
-    )
-    assert "docker compose -f nemo_retriever/dev/compose/neo4j.compose.yaml up -d neo4j" in helper_readme.read_text(
         encoding="utf-8"
     )
 
@@ -341,11 +326,6 @@ def test_dev_compose_helpers_are_feature_scoped():
         REPO_ROOT / "nemo_retriever" / "src" / "nemo_retriever" / "tools" / "skill_eval" / "configs" / "skill_eval.yaml"
     ).read_text(encoding="utf-8")
     assert "nemo_retriever/dev/compose/judge.compose.yaml" in skill_eval_config
-
-    neo4j_setup = (
-        REPO_ROOT / "nemo_retriever" / "src" / "nemo_retriever" / "tabular_data" / "neo4j" / "SETUP.md"
-    ).read_text(encoding="utf-8")
-    assert "nemo_retriever/dev/compose/neo4j.compose.yaml" in neo4j_setup
 
 
 def test_default_service_mode_compose_wires_optional_collection_auth():

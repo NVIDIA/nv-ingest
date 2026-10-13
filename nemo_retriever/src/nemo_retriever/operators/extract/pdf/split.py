@@ -10,6 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import traceback
 
+import nvtx
 import pandas as pd
 from nemo_retriever.models.nim.error_reporter import report_error
 from nemo_retriever.common.params import PdfSplitParams
@@ -195,6 +196,7 @@ class PDFSplitCPUActor(AbstractOperator, CPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
+    @nvtx.annotate("nrl.batch::pdf_split.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         return split_pdf_batch(data, params=self.split_params)
 

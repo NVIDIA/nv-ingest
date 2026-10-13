@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 
 from upath import UPath
 
-from nemo_retriever.tabular_data.sql_database import SQLDatabase
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -542,7 +541,7 @@ class ExtractParams(_ParamsModel):
 
     # Extraction options
     method: Literal["pdfium", "pdfium_hybrid", "ocr", "nemotron_parse", "audio"] = Field(
-        default="pdfium",
+        default="pdfium_hybrid",
         description=(
             "Extraction method. PDF extraction supports 'pdfium', 'pdfium_hybrid', 'ocr', and "
             "'nemotron_parse'; 'audio' is retained for the legacy params-driven audio path."
@@ -1072,23 +1071,3 @@ class DedupParams(_ParamsModel):
     content_hash: bool = True
     bbox_iou: bool = True
     iou_threshold: float = Field(default=0.45, ge=0.0, le=1.0)
-
-
-# ---------------------------------------------------------------------------
-# Structured (database) ingestion params
-# ---------------------------------------------------------------------------
-
-
-class TabularExtractParams(_ParamsModel):
-    """Params for step 1: extract schema metadata and write to Neo4j.
-
-    Covers SQLAlchemy reflection of a live database and/or parsing of
-    pre-existing SQL DDL/query files.  Produces Database, Schema, Table,
-    Column, View and Query nodes together with their relationships.
-    The Neo4j connection is provided by get_neo4j_conn() (see
-    tabular_data.neo4j) and is not configured here.
-    """
-
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    connector: Optional[SQLDatabase] = None

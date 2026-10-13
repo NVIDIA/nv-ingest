@@ -41,9 +41,12 @@ from nemo_retriever.graph.ingestor_runtime import (
     default_concurrency_node_names,
 )
 from nemo_retriever.ingestor.manifest import (
+    DEFAULT_AUDIO_SPLIT_INTERVAL,
+    DEFAULT_VIDEO_FRAME_FPS,
     ExtractionBranchPlan,
     ResolvedExtractionInputs,
     build_input_manifest,
+    default_asr_params,
     format_branch_summary,
     plan_extraction_branches,
     resolve_branch_extraction_inputs,
@@ -80,6 +83,7 @@ from nemo_retriever.common.params import (
 from nemo_retriever.common.input_files import (
     PDF_DOCUMENT_INPUT_TYPES,
     _is_explicit_glob_path,
+    expand_input_directories,
     expand_input_file_patterns,
     input_type_for_path,
 )
@@ -448,6 +452,15 @@ def _coerce(params: Any, kwargs: dict[str, Any], *, default_factory: Callable[[]
     return params
 
 
+def _coerce_audio_chunk_params(params: Any, kwargs: dict[str, Any]) -> Any:
+    """Build audio chunk params; size splits default to ``DEFAULT_AUDIO_SPLIT_INTERVAL``."""
+    if kwargs.get("split_type", "size") != "size":
+        return _coerce(params, kwargs, default_factory=AudioChunkParams)
+    return _coerce(
+        params, kwargs, default_factory=lambda: AudioChunkParams(split_interval=DEFAULT_AUDIO_SPLIT_INTERVAL)
+    )
+
+
 class GraphIngestor(ingestor):
     """Ingestor that constructs and executes operator graphs directly.
 
@@ -499,7 +512,8 @@ class GraphIngestor(ingestor):
         show_progress: bool = True,
         error_policy: str = "raise",
     ) -> None:
-        super().__init__(documents=documents)
+        super().__init__()
+        self.files(documents or [])
         if run_mode not in {"batch", "inprocess"}:
             raise ValueError(f"run_mode must be 'batch' or 'inprocess', got {run_mode!r}")
         if error_policy not in {"raise", "collect"}:
@@ -582,8 +596,8 @@ class GraphIngestor(ingestor):
         return self
 
     def files(self, documents: Union[str, List[str]]) -> "GraphIngestor":
-        """Set the input file paths or glob patterns."""
-        self._documents = [documents] if isinstance(documents, str) else list(documents)
+        """Set the input file paths, glob patterns, or directories (expanded to their supported files)."""
+        self._documents = expand_input_directories([documents] if isinstance(documents, str) else list(documents))
         return self
 
     def texts(self, texts: Union[str, Sequence[str]]) -> Self:
@@ -710,8 +724,8 @@ class GraphIngestor(ingestor):
     ) -> "GraphIngestor":
         """Configure audio extraction (extraction_mode='audio')."""
         self._extraction_mode = "audio"
-        self._audio_chunk_params = _coerce(params, kwargs, default_factory=AudioChunkParams)
-        self._asr_params = asr_params or ASRParams()
+        self._audio_chunk_params = _coerce_audio_chunk_params(params, kwargs)
+        self._asr_params = asr_params or default_asr_params()
         self._apply_split_config(split_config)
         self._record_stage("extract")
         return self
@@ -746,9 +760,9 @@ class GraphIngestor(ingestor):
         directly with that file.
         """
         self._extraction_mode = "auto"
-        self._audio_chunk_params = _coerce(params, kwargs, default_factory=AudioChunkParams)
-        self._asr_params = asr_params or ASRParams()
-        self._video_frame_params = video_frame_params or VideoFrameParams()
+        self._audio_chunk_params = _coerce_audio_chunk_params(params, kwargs)
+        self._asr_params = asr_params or default_asr_params()
+        self._video_frame_params = video_frame_params or VideoFrameParams(fps=DEFAULT_VIDEO_FRAME_FPS)
         self._video_text_dedup_params = video_text_dedup_params or VideoFrameTextDedupParams()
         self._av_fuse_params = av_fuse_params or AudioVisualFuseParams()
         if extract_params is not None:

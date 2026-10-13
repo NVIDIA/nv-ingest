@@ -65,11 +65,13 @@ result = (
 Bare `.vdb_upload()` writes to table `nemo-retriever`. Default `Retriever()`
 queries that table.
 
-You can omit `.embed()` if a custom stage provides an embedding in `metadata["embedding"]` or `text_embeddings_1b_v2["embedding"]`. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+By default, `.vdb_upload()` creates new or overwritten tables as hybrid tables, with a full-text search index on `text` next to the vector index. When it appends, it keeps the existing table's mode. To create a dense-only table, set `"hybrid": False` in `vdb_kwargs`.
+
+You can omit `.embed()` if a custom stage provides an embedding in `metadata["embedding"]` or `text_embeddings_1b_v2["embedding"]`. In that case, set `embedding_model_name` in `vdb_kwargs` so that `Retriever` can verify query compatibility. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
 
 ## Keep the embedding model aligned { #lancedb-embedding-model-compatibility }
 
-Dense and hybrid retrieval require query and stored vectors from the same embedding model. New LanceDB tables record the canonical model in `nemo_retriever.embedding_model_name`. A local `Retriever` uses that model automatically and rejects an explicit query model that differs from it. Dense and hybrid queries also reject legacy or third-party tables that do not contain this metadata because compatibility cannot be verified. Local sparse retrieval is exempt because it does not create a dense query vector.
+Dense and hybrid retrieval require query and stored vectors from the same embedding model. New LanceDB tables record the canonical model in `nemo_retriever.embedding_model_name`. In the Python API, `.vdb_upload()` records the model of the `.embed()` stage unless `vdb_kwargs` sets `embedding_model_name`. If a local `.embed()` sets `embed_model_name` to a different model than `model_name`, the library cannot tell which model produces the vectors and records none. In that case, set `embedding_model_name` in `vdb_kwargs`. A local `Retriever` uses that model automatically and rejects an explicit query model that differs from it. Dense and hybrid queries also reject legacy or third-party tables that do not contain this metadata because compatibility cannot be verified. Local sparse retrieval is exempt because it does not create a dense query vector.
 
 The local checkpoint default on this development branch is Nemotron 3.5 Embed 1B. Remote and Helm embedding defaults remain Nemotron 3 Embed 1B. A default change does not migrate an existing table. Before you change the model used by a persistent table:
 
@@ -293,7 +295,7 @@ Existing custom backends retain the global-batch `VDB.run(records)` path unless
 they opt in. For LanceDB, ordinary fixed-table configurations with scheme-less
 local paths or authority-free `file:///` URIs use bounded Arrow batches. Remote
 stores and private service schemas retain the
-global-batch path. `PutVdbOperator` does not use streaming ingest.
+global-batch path.
 
 For Ray batch ingestion, configure LanceDB streaming behavior in the LanceDB
 `vdb_kwargs`:
@@ -325,8 +327,8 @@ the exception instructs you to resume with the original explicit
 `stream_operation_id`. If the original attempt did not set an ID, do not replay
 records after a known commit and finalization failure.
 
-These settings apply only to `LanceDB.stream_ingest()`. Legacy `run()` and
-`put()` calls reject non-default streaming settings instead of ignoring them.
+These settings apply only to `LanceDB.stream_ingest()`. Legacy `run()` calls
+reject non-default streaming settings instead of ignoring them.
 
 `RayDataExecutor.build_dataset()` remains lazy and builds the complete legacy
 graph, including the global VDB stage. In-process and service execution do not
