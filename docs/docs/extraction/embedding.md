@@ -76,6 +76,8 @@ For local Nemotron 3.5 `text_image` ingestion, `max_length` covers the combined 
 
 The library counts tokens with the checkpoint's processor before inference. If paired text does not fit, it splits the text losslessly and repeats the unchanged full image for every child row. Children preserve source and page metadata and receive the same `metadata["embedding_split"]` provenance described below. This policy does not crop images or truncate image tokens. Repeating an image can increase inference work and the number of stored vectors.
 
+Processor truncation is disabled for image-bearing admission and inference. The vLLM adapter rejects a request if its expanded token count differs from the checkpoint processor's admission count.
+
 If the image and template leave no text budget, planning raises an actionable error. Increase `max_length` within the checkpoint's supported maximum. Direct `embed_text_image()` calls cannot change the number of returned vectors and reject oversized pairs instead of splitting them.
 
 For a registered revision-pinned model, an explicitly revision-pinned model,

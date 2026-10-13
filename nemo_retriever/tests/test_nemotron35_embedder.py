@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 """N3.5 compatibility regressions without network access or model weights."""
 
 from types import SimpleNamespace
@@ -407,3 +411,16 @@ def test_vllm_multimodal_disables_implicit_truncation_and_special_tokens(monkeyp
     }
     request = embedder._model.embed.call_args.args[0][0]
     assert request["mm_processor_kwargs"]["text_kwargs"] == {"add_special_tokens": False, "truncation": False}
+
+
+def test_vllm_multimodal_rejects_silent_processor_truncation(monkeypatch):
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="vllm", max_length=20)
+    embedder._template = TEMPLATE
+    embedder._processor = MagicMock(return_value={"attention_mask": torch.ones(1, 10, dtype=torch.long)})
+    embedder._model = MagicMock()
+    embedder._model.embed.return_value = [
+        SimpleNamespace(prompt_token_ids=[1] * 5, outputs=SimpleNamespace(embedding=[1.0] * 2048))
+    ]
+    monkeypatch.setattr("nemo_retriever.models.inference.vllm._pooling_params_for_normalize", lambda normalize: None)
+    with pytest.raises(ValueError, match=r"expected=\[10\], actual=\[5\]"):
+        embedder._encode(["text"], images=[object()])
