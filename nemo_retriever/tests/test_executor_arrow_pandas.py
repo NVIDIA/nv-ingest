@@ -461,3 +461,37 @@ def test_frame_to_records_converts_nested_arrow_columns() -> None:
     ]
     assert isinstance(frame[0].dtype, pd.ArrowDtype)
     assert isinstance(frame["payload"].dtype, pd.ArrowDtype)
+
+
+def test_frame_to_records_converts_duplicate_nested_arrow_columns() -> None:
+    from nemo_retriever.graph.executor import frame_to_records
+
+    index = [10, 20]
+    list_dtype = pd.ArrowDtype(pa.list_(pa.float32()))
+    frame = pd.concat(
+        [
+            pd.Series([[1.0, 2.0], [3.0]], index=index, dtype=list_dtype, name="embedding"),
+            pd.Series([[9.0], [8.0, 7.0]], index=index, dtype=list_dtype, name="embedding"),
+            pd.Series(["a", "b"], index=index, name="text"),
+        ],
+        axis=1,
+    )
+    original_dtypes = frame.dtypes.copy()
+    expected_frame = pd.DataFrame(
+        [
+            [[1.0, 2.0], [9.0], "a"],
+            [[3.0], [8.0, 7.0], "b"],
+        ],
+        columns=["embedding", "embedding", "text"],
+        index=index,
+        dtype=object,
+    )
+
+    with pytest.warns(UserWarning, match="DataFrame columns are not unique"):
+        expected = expected_frame.to_dict(orient="records")
+    with pytest.warns(UserWarning, match="DataFrame columns are not unique"):
+        result = frame_to_records(frame)
+
+    assert result == expected
+    assert result == [{"embedding": [9.0], "text": "a"}, {"embedding": [8.0, 7.0], "text": "b"}]
+    assert frame.dtypes.equals(original_dtypes)

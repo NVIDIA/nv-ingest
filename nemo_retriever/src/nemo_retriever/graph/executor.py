@@ -180,6 +180,7 @@ def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     ``pd.ArrowDtype`` (lists, structs) are converted to Python objects with
     ``_arrow_to_pylist`` first, so float-list values go through NumPy instead of
     one Python float per element. Other columns and column labels are left as is.
+    Duplicate labels follow the same last-value-wins behavior as ``frame.to_dict``.
 
     Args:
         frame: Batch to convert. It is not modified.
@@ -190,16 +191,17 @@ def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
     """
     import pyarrow as pa
 
-    nested = {
-        name: pd.Series(_arrow_to_pylist(pa.array(frame[name])), index=frame.index, dtype=object)
-        for name, dtype in frame.dtypes.items()
+    positions = [
+        index
+        for index, dtype in enumerate(frame.dtypes)
         if isinstance(dtype, pd.ArrowDtype) and pa.types.is_nested(dtype.pyarrow_dtype)
-    }
-    if not nested:
+    ]
+    if not positions:
         return frame.to_dict(orient="records")
     frame = frame.copy(deep=False)
-    for name, values in nested.items():
-        frame[name] = values
+    for index in positions:
+        values = _arrow_to_pylist(pa.array(frame.iloc[:, index]))
+        frame.isetitem(index, pd.Series(values, index=frame.index, dtype=object))
     return frame.to_dict(orient="records")
 
 
