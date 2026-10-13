@@ -123,6 +123,37 @@ def test_caption_images_persists_caption_in_arrow_backed_images_column():
     assert result.iloc[0]["images"][0]["text"] == "a red square"
 
 
+def test_caption_images_captions_arrow_backed_infographic_column():
+    pa = pytest.importorskip("pyarrow")
+
+    from nemo_retriever.graph.executor import arrow_table_to_pandas
+    from nemo_retriever.operators.extract.caption.caption import caption_images
+
+    df = arrow_table_to_pandas(
+        pa.Table.from_pylist(
+            [
+                {
+                    "path": "/data/document.pdf",
+                    "text": "page text",
+                    "page_image": {"image_b64": _make_test_png_b64((256, 256))},
+                    "images": [],
+                    "infographic": [{"bbox_xyxy_norm": [0.0, 0.0, 1.0, 1.0], "text": "ocr text"}],
+                }
+            ]
+        )
+    )
+    assert isinstance(df["infographic"].dtype, pd.ArrowDtype)
+    mock_model = MagicMock()
+    mock_model.caption_batch.return_value = ["an infographic"]
+
+    result = caption_images(df, model=mock_model, caption_infographics=True)
+
+    mock_model.caption_batch.assert_called_once()
+    infographic = result.iloc[0]["infographic"][0]
+    assert infographic["caption"] == "an infographic"
+    assert infographic["text"] == "ocr text"
+
+
 def test_caption_images_does_not_use_pdf_page_image_when_images_is_empty():
     from nemo_retriever.operators.extract.caption.caption import caption_images
 

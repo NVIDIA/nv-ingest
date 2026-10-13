@@ -455,8 +455,8 @@ def caption_images(
 
         # Infographics — crop from page image.
         if has_infographics:
-            infographics = row.get("infographic")
-            if isinstance(infographics, list):
+            infographics = _as_image_list(row.get("infographic"))
+            if infographics is not None:
                 page_image = row.get("page_image")
                 page_b64 = page_image.get("image_b64") if isinstance(page_image, dict) else None
                 if page_b64:
@@ -466,7 +466,7 @@ def caption_images(
                         if item.get("caption"):
                             continue  # already captioned
                         bbox = item.get("bbox_xyxy_norm")
-                        if not bbox or len(bbox) < 4:
+                        if bbox is None or len(bbox) < 4:
                             continue
                         cropped_b64, _ = _crop_b64_image_by_norm_bbox(page_b64, bbox_xyxy_norm=bbox)
                         if cropped_b64 and _image_meets_min_size(cropped_b64):
