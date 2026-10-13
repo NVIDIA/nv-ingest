@@ -140,6 +140,7 @@ def test_auto_remote_page_embedding_without_local_extraction_resolves_to_cpu() -
     graph = build_graph(
         extraction_mode="auto",
         extract_params=ExtractParams(
+            method="pdfium",
             extract_text=True,
             extract_images=False,
             extract_tables=False,

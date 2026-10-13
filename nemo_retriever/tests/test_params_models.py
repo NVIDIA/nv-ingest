@@ -51,8 +51,8 @@ class TestExtractParams:
                 ExtractParams(**{field: value})
 
     def test_normal_and_selected_parse_configurations_are_valid(self) -> None:
-        assert ExtractParams().method == "pdfium"
-        assert ExtractParams(invoke_url="http://generic").method == "pdfium"
+        assert ExtractParams().method == "pdfium_hybrid"
+        assert ExtractParams(invoke_url="http://generic").method == "pdfium_hybrid"
         params = ExtractParams(
             method="nemotron_parse",
             nemotron_parse_invoke_url="https://integrate.api.nvidia.com/v1/chat/completions",
