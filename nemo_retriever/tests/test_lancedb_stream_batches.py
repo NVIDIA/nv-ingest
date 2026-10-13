@@ -401,3 +401,12 @@ def test_correct_width_uncoercible_vector_fails_on_both_paths(tmp_path: Path) ->
         IngestVdbOperator(vdb=record_backend)._stream_ingest(iter(frames))
     with pytest.raises(Exception):
         IngestVdbOperator(vdb=_backend(tmp_path / "arrow"))._stream_ingest(iter(frames))
+
+
+def test_mixed_string_and_numeric_vector_elements_match_record_path(tmp_path: Path) -> None:
+    rows = [_row(0, embedding=["0.0", True, 0.5, 0.75]), _row(1, embedding=[1.0, "1.25", 1.5, 1.75])]
+
+    _ingest_both(tmp_path, [pd.DataFrame(rows)])
+
+    table = _assert_tables_equal(tmp_path)
+    assert table.column("vector").to_pylist() == [pytest.approx([0.0, 1.0, 0.5, 0.75]), pytest.approx(_vector(1))]
