@@ -8,9 +8,10 @@ This integration remains experimental while the checkpoints require private repo
 
 When you omit the local embedding model, the library selects a checkpoint as follows:
 
-- With the default `vllm` backend, it selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4.
+- For in-process inference with the default `vllm` backend, it selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4.
 - On other devices, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`.
 - With the `hf` backend, it selects the BF16 checkpoint. The compressed-tensors NVFP4 checkpoint requires vLLM.
+- For Ray batch execution, automatic selection uses BF16 because cluster GPU counts do not establish worker GPU architectures. Explicit precision checkpoint IDs remain unchanged; select NVFP4 only when every eligible worker supports it.
 
 The default modality remains `text`. Nemotron 3.5 also supports `image` and `text_image` inputs when you explicitly select those modalities.
 

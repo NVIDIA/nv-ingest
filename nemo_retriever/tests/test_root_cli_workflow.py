@@ -13,6 +13,7 @@ import os
 import re
 import sys
 from typing import Any
+from unittest.mock import MagicMock
 from unittest.mock import create_autospec
 
 import pytest
@@ -464,7 +465,12 @@ def test_root_ingest_service_mode_rejects_local_only_options(tmp_path, flag: str
     assert flag in result.output
 
 
-def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path) -> None:
+@pytest.mark.parametrize("requested_model", [None, "nvidia/Nemotron-3.5-Embed-1B-NVFP4"])
+def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path, requested_model) -> None:
+    from nemo_retriever.models.hf_model_registry import get_hf_revision
+
+    driver_probe = MagicMock(side_effect=AssertionError("Batch defaults must not probe driver CUDA"))
+    monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", driver_probe)
     fake_ingestor = _make_fake_ingestor()
     create_calls: list[dict[str, Any]] = []
     first_document = tmp_path / "a.pdf"
@@ -480,19 +486,23 @@ def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path) -> N
     monkeypatch.setattr(ingest_execution, "create_ingestor", fake_create_ingestor)
     monkeypatch.setattr(ingest_execution, "_count_lancedb_rows", lambda *_, **__: 12)
 
-    result = RUNNER.invoke(
-        cli_main.app,
-        [
-            "ingest",
-            "batch",
-            str(first_document),
-            str(globbed_document.parent),
-            "--lancedb-uri",
-            "/tmp/lancedb",
-            "--table-name",
-            "docs",
-        ],
-    )
+    arguments = [
+        "ingest",
+        "batch",
+        str(first_document),
+        str(globbed_document.parent),
+        "--lancedb-uri",
+        "/tmp/lancedb",
+        "--table-name",
+        "docs",
+    ]
+    if requested_model:
+        arguments.extend(["--embed-model-name", requested_model])
+    result = RUNNER.invoke(cli_main.app, arguments)
+
+    expected_model = requested_model or "nvidia/Nemotron-3.5-Embed-1B-BF16"
+    assert fake_ingestor.embed.call_args.args[0].model_name == expected_model
+    driver_probe.assert_not_called()
 
     assert result.exit_code == 0
     assert create_calls == [{"run_mode": "batch"}]
@@ -504,8 +514,9 @@ def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path) -> N
         "table_name": "docs",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
-        "embedding_model_revision": "ac586a0326b2f253290c8a3d7a29a54012fe6996",
+        "embedding_model_name": expected_model,
+        "embedding_model_revision": get_hf_revision(expected_model),
+        **({"vector_dim": None} if requested_model else {}),
     }
     assert "Ingested 2 file(s) → 12 row(s) in LanceDB /tmp/lancedb/docs." in result.output
 

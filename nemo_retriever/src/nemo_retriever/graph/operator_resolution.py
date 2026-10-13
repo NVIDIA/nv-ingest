@@ -62,7 +62,11 @@ def resolve_graph(
             local = issubclass(resolved_class, BatchEmbedGPUActor)
             if local:
                 model_name = resolve_local_embed_model(
-                    params.embed_model_name or params.model_name, backend=params.local_ingest_embed_backend
+                    params.embed_model_name or params.model_name,
+                    backend=params.local_ingest_embed_backend,
+                    # Ray's counts do not prove the architecture of eligible
+                    # workers. Use a worker-safe BF16 default, never driver CUDA.
+                    allow_native_nvfp4=not isinstance(resources, ClusterResources),
                 )
                 revision = resolve_embed_model_revision(model_name, params.embed_model_revision)
                 # Resolve once before actor creation. Both the worker and sink

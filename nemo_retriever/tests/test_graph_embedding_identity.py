@@ -9,22 +9,27 @@ from unittest.mock import MagicMock
 import pytest
 
 from nemo_retriever.common.params import EmbedParams, VdbUploadParams
-from nemo_retriever.common.ray_resource_hueristics import Resources
+from nemo_retriever.common.ray_resource_hueristics import ClusterResources, Resources
 from nemo_retriever.graph.ingestor_runtime import build_post_extract_graph
 from nemo_retriever.graph.operator_resolution import resolve_graph
-from nemo_retriever.models import NEMOTRON_35_EMBED_BF16_MODEL, NEMOTRON_35_EMBED_NVFP4_MODEL
+from nemo_retriever.models import (
+    NEMOTRON_3_EMBED_BF16_MODEL,
+    NEMOTRON_3_EMBED_MODEL,
+    NEMOTRON_35_EMBED_BF16_MODEL,
+    NEMOTRON_35_EMBED_NVFP4_MODEL,
+)
 from nemo_retriever.models.hf_model_registry import get_hf_revision
 from nemo_retriever.operators.vdb import IngestVdbOperator
 
 
-def resolved_stages(tmp_path, params, *, gpu_count=1, vdb_kwargs=None):
+def resolved_stages(tmp_path, params, *, gpu_count=1, vdb_kwargs=None, resources=None):
     graph = build_post_extract_graph(
         embed_params=params,
         vdb_upload_params=VdbUploadParams(vdb_kwargs={"uri": str(tmp_path), **(vdb_kwargs or {})}),
         stage_order=("embed",),
         reshape_content_before_embed=False,
     )
-    resolved = resolve_graph(graph, Resources(cpu_count=8, gpu_count=gpu_count))
+    resolved = resolve_graph(graph, resources or Resources(cpu_count=8, gpu_count=gpu_count))
     embed_node = resolved.roots[0]
     sink_node = embed_node.children[0]
     assert sink_node.operator_class is IngestVdbOperator
@@ -89,3 +94,50 @@ def test_explicit_sink_identity_and_dimension_are_preserved(tmp_path, monkeypatc
     )
     assert sink_kwargs["vdb_kwargs"]["embedding_model_name"] == "explicit/model"
     assert sink_kwargs["vdb_kwargs"]["vector_dim"] == 1024
+
+
+@pytest.mark.parametrize(
+    "requested_model,expected",
+    [(None, NEMOTRON_35_EMBED_BF16_MODEL), (NEMOTRON_3_EMBED_MODEL, NEMOTRON_3_EMBED_BF16_MODEL)],
+)
+@pytest.mark.parametrize("driver_has_blackwell", [True, False])
+def test_ray_default_does_not_use_driver_gpu_architecture(
+    tmp_path, monkeypatch, requested_model, expected, driver_has_blackwell
+):
+    driver_probe = MagicMock(return_value=driver_has_blackwell)
+    monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", driver_probe)
+    # The same scheduler snapshot can represent Hopper, mixed, or unknown
+    # workers, regardless of whether the driver itself has Blackwell GPUs.
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=16, gpu_count=2),
+        available_resources=Resources(cpu_count=16, gpu_count=1),
+    )
+    original_params = EmbedParams(model_name=requested_model)
+    actor_params, sink_kwargs = resolved_stages(tmp_path, original_params, resources=cluster)
+    metadata = sink_kwargs["vdb_kwargs"]
+    assert actor_params.model_name == actor_params.embed_model_name == metadata["embedding_model_name"] == expected
+    assert actor_params.embed_model_revision == metadata["embedding_model_revision"] == get_hf_revision(expected)
+    driver_probe.assert_not_called()
+    assert original_params.model_name == requested_model
+    from nemo_retriever.graph.retriever import Retriever
+
+    query_kwargs = Retriever()._resolve_embed_kwargs(expected, None, metadata["embedding_model_revision"])
+    assert query_kwargs["model_name"] == query_kwargs["embed_model_name"] == expected
+    assert query_kwargs["embed_model_revision"] == actor_params.embed_model_revision
+    driver_probe.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "checkpoint", [NEMOTRON_35_EMBED_BF16_MODEL, NEMOTRON_35_EMBED_NVFP4_MODEL, NEMOTRON_3_EMBED_BF16_MODEL]
+)
+def test_ray_preserves_explicit_checkpoint_precision(tmp_path, monkeypatch, checkpoint):
+    driver_probe = MagicMock(side_effect=AssertionError("Driver CUDA must not select worker checkpoints"))
+    monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", driver_probe)
+    cluster = ClusterResources(
+        total_resources=Resources(cpu_count=8, gpu_count=1),
+        available_resources=Resources(cpu_count=8, gpu_count=1),
+    )
+    actor_params, sink_kwargs = resolved_stages(tmp_path, EmbedParams(model_name=checkpoint), resources=cluster)
+    assert actor_params.model_name == sink_kwargs["vdb_kwargs"]["embedding_model_name"] == checkpoint
+    assert actor_params.embed_model_revision == sink_kwargs["vdb_kwargs"]["embedding_model_revision"]
+    driver_probe.assert_not_called()

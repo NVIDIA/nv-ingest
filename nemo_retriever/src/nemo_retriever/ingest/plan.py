@@ -673,7 +673,11 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         else (
             resolve_embed_model(embed.embed_model_name)
             if remote_embedding or legacy_n3
-            else resolve_local_embed_model(embed.embed_model_name, backend=embed.local_ingest_embed_backend or "vllm")
+            else resolve_local_embed_model(
+                embed.embed_model_name,
+                backend=embed.local_ingest_embed_backend or "vllm",
+                allow_native_nvfp4=validated_run_mode != "batch",
+            )
         )
     )
     embedding_model_revision = None

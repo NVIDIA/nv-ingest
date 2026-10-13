@@ -394,7 +394,10 @@ class Retriever:
         configured_model = self._embedding_model_from_kwargs(self.embed_kwargs)
         explicit_model = runtime_model or configured_model
         model_name = explicit_model or index_model
-        model_name = resolve_embed_model(model_name)
+        # A persisted revision describes a concrete checkpoint, not a logical
+        # precision alias that can be reselected on the query driver's GPUs.
+        if not (explicit_model is None and index_revision):
+            model_name = resolve_embed_model(model_name)
         resolved["model_name"] = model_name
         resolved["embed_model_name"] = model_name
         if runtime_model and "embed_model_revision" not in resolved:

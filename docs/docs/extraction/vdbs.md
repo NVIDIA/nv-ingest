@@ -81,6 +81,8 @@ The local checkpoint default on this development branch is Nemotron 3.5 Embed 1B
 
 New local Nemotron 3.5 indexes record the resolved precision-specific checkpoint and its pinned revision. Query uses that recorded identity rather than choosing a different precision from the current GPU. BF16 and NVFP4 checkpoint IDs remain distinct for index compatibility checks.
 
+Ray batch execution conservatively selects BF16 for an automatic checkpoint choice because the driver's CUDA devices do not establish worker GPU compatibility. An explicit precision checkpoint remains unchanged. The worker, writer, and later query share the selected checkpoint and revision.
+
 An untagged dense or hybrid table must be rebuilt; selecting a model cannot establish which embedding space its existing vectors use. The dedicated VectorDB service checks its configured legacy table during startup and checks collection-scoped tables when they are read or written. Rebuild or replace persisted tables before access, or retain the old model configuration for a tagged table.
 
 ## LanceDB Overview { #why-lancedb }

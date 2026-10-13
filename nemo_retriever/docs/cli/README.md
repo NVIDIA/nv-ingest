@@ -58,7 +58,9 @@ the `[local]` extra before you run the default `retriever ingest` or
 pip install "nemo-retriever[local]"
 ```
 
-On this development branch, omitting `--embed-model-name` selects Nemotron 3.5 Embed 1B for local inference. These changes are not part of the documented 26.08.1 release. The default local backend is vLLM. NeMo Retriever Library selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4. Otherwise, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`. With `--local-ingest-embed-backend hf`, it selects BF16 because the compressed-tensors NVFP4 checkpoint requires vLLM.
+On this development branch, omitting `--embed-model-name` selects Nemotron 3.5 Embed 1B for local inference. These changes are not part of the documented 26.08.1 release. The default local backend is vLLM. For in-process ingest, NeMo Retriever Library selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4. Otherwise, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`. With `--local-ingest-embed-backend hf`, it selects BF16 because the compressed-tensors NVFP4 checkpoint requires vLLM.
+
+`retriever ingest batch` automatically selects BF16 because Ray cluster GPU counts do not establish worker GPU architectures. Explicit precision checkpoint IDs remain unchanged. Select NVFP4 explicitly only when every eligible worker supports it; the driver's GPU alone does not establish that compatibility.
 
 The Nemotron 3.5 integration remains experimental while checkpoint access is private. Its model-specific vLLM adapter preserves bidirectional text attention without patching vendor model classes. Validate retrieval quality before production use.
 
@@ -421,7 +423,7 @@ These options apply to `retriever ingest`, `retriever ingest local`, and
 | `--table-name` | `nemo-retriever` | LanceDB table name. Must match query-time storage flags. Python `.vdb_upload()` and default `Retriever()` use the same default. |
 | `--overwrite/--append` | overwrite | Overwrite the table by default; use `--append` to add rows. |
 | `--index-mode` | `auto` | Recommended: leave this unset. `auto` creates a hybrid vector + BM25/FTS configuration for new tables and preserves an existing table on append. Use `dense`, `hybrid`, or `sparse` only for explicit experiments or specialized deployments. |
-| `--embed-model-name` | unset | Local inference selects Nemotron 3.5 Embed 1B: NVFP4 with native-capable GPUs and vLLM, or BF16 otherwise. Remote inference retains `nvidia/nemotron-3-embed-1b`. |
+| `--embed-model-name` | unset | In-process inference selects Nemotron 3.5 Embed 1B: NVFP4 with native-capable GPUs and vLLM, or BF16 otherwise. Ray batch automatically selects BF16. Explicit precision IDs remain unchanged. Remote inference retains `nvidia/nemotron-3-embed-1b`. |
 | `--local-ingest-embed-backend` | `vllm` | Local embedding backend. With no model override, explicit `hf` use selects the Nemotron 3.5 BF16 checkpoint. |
 | `--method` | profile default | PDF extraction method: `pdfium`, `pdfium_hybrid`, `ocr`, or `nemotron_parse`. The `auto` profile selects `pdfium_hybrid`; `fast-text` selects `pdfium`. An explicit value overrides the profile-selected method. |
 | `--extract-text`, `--extract-tables`, `--extract-charts` | planner default | Enable or disable extraction families. |
