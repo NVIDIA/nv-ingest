@@ -13,10 +13,12 @@ from nemo_retriever.models import (
     resolve_embed_model,
     resolve_local_embed_model,
 )
-from nemo_retriever.models.embed_model_spec import _spec_from_config, validate_embed_model_backend
+from nemo_retriever.models.embed_model_spec import (
+    _spec_from_config,
+    validate_embed_model_backend,
+)
 from nemo_retriever.models.inference.retrieval_template import render_retrieval_input
 from nemo_retriever.models.local.nemotron35_embedder import Nemotron35Embedder
-
 
 TEMPLATE = (
     "{{ messages[0].content.rstrip(' ') ~ ' ' }}{% for m in messages[1:] %}"
@@ -31,7 +33,7 @@ def config(quantized=False):
         architectures=["Mistral3Model"],
         pooling="avg",
         text_config=dict(model_type="ministral3", is_causal=False, hidden_size=2048),
-        quantization_config={"quant_method": "compressed-tensors"} if quantized else None,
+        quantization_config=({"quant_method": "compressed-tensors"} if quantized else None),
     )
 
 
@@ -92,7 +94,8 @@ def test_hf_masked_pooling_normalization_and_positions():
     def tokenize(prompts, **kwargs):
         assert prompts == ["passage: text", "passage: shorter"]
         return Batch(
-            input_ids=torch.tensor([[1, 2, 3], [1, 2, 0]]), attention_mask=torch.tensor([[1, 1, 1], [1, 1, 0]])
+            input_ids=torch.tensor([[1, 2, 3], [1, 2, 0]]),
+            attention_mask=torch.tensor([[1, 1, 1], [1, 1, 0]]),
         )
 
     def forward(**kwargs):
@@ -135,7 +138,10 @@ def test_vllm_receives_rendered_tokens_and_normalizes_once(monkeypatch):
     e._model = MagicMock()
     e._model.embed.return_value = [SimpleNamespace(outputs=SimpleNamespace(embedding=[2.0] * 2048))]
     params = object()
-    monkeypatch.setattr("nemo_retriever.models.inference.vllm._pooling_params_for_normalize", lambda normalize: params)
+    monkeypatch.setattr(
+        "nemo_retriever.models.inference.vllm._pooling_params_for_normalize",
+        lambda normalize: params,
+    )
     result = e.embed(["text"])
     assert e._model.embed.call_args.args[0] == [{"prompt_token_ids": [1, 2]}]
     assert e._model.embed.call_args.kwargs["pooling_params"] is params
@@ -150,6 +156,7 @@ def test_multimodal_expansion_overflow_fails_before_inference():
     with pytest.raises(ValueError, match="after image expansion"):
         e._encode(["text"], images=[object()])
     e._model.embed.assert_not_called()
+    assert e._processor.call_args.kwargs["truncation"] is False
 
 
 def test_admission_uses_the_same_template():
@@ -164,3 +171,239 @@ def test_admission_uses_the_same_template():
     policy = EmbeddingInputPolicy(SimpleNamespace(encode=encode), 128, "query: ", retrieval_template=TEMPLATE)
     assert policy._formatted_token_count("Literal [IMG]") == 3
     assert seen == ["query: Literal [‌IMG]"]
+
+
+def test_admission_does_not_add_special_tokens_twice():
+    from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
+
+    tokenizer = MagicMock()
+    tokenizer.encode.return_value = [1, 2]
+    policy = EmbeddingInputPolicy(tokenizer, 10, "query:", retrieval_template=TEMPLATE, add_special_tokens=False)
+    assert policy._formatted_token_count("text") == 2
+    tokenizer.encode.assert_called_once_with("query: text", add_special_tokens=False)
+
+
+@pytest.mark.parametrize("causal", [True, None])
+def test_bidirectional_attention_rejects_other_profiles(causal):
+    from nemo_retriever.models.inference.nemotron35_vllm import (
+        create_bidirectional_attention,
+    )
+
+    model = SimpleNamespace(
+        config=SimpleNamespace(model_type="mistral3"),
+        text_config=SimpleNamespace(model_type="ministral3", is_causal=causal),
+    )
+    with pytest.raises(ValueError, match="bidirectional"):
+        create_bidirectional_attention(
+            model,
+            attention_cls=MagicMock(),
+            attention_type="encoder",
+            pp_indices=MagicMock(),
+        )
+
+
+def test_bidirectional_attention_preserves_shards_sliding_window_and_quantization():
+    from nemo_retriever.models.inference.nemotron35_vllm import (
+        create_bidirectional_attention,
+    )
+
+    model = SimpleNamespace(
+        config=SimpleNamespace(model_type="mistral3"),
+        text_config=SimpleNamespace(
+            model_type="ministral3",
+            is_causal=False,
+            num_hidden_layers=4,
+            layer_types=[
+                "full_attention",
+                "full_attention",
+                "sliding_attention",
+                "full_attention",
+            ],
+            sliding_window=128,
+        ),
+        model_config=SimpleNamespace(
+            get_num_attention_heads=lambda parallel: 4,
+            get_head_size=lambda: 64,
+            get_num_kv_heads=lambda parallel: 2,
+        ),
+        parallel_config=object(),
+        cache_config=object(),
+        quant_config=object(),
+        pp_group=SimpleNamespace(rank_in_group=1, world_size=2),
+    )
+    attention = MagicMock(side_effect=lambda **kwargs: kwargs)
+    result = create_bidirectional_attention(
+        model,
+        attention_cls=attention,
+        attention_type="encoder_only",
+        pp_indices=lambda layers, rank, size: (2, 4),
+    )
+    assert set(result) == {2, 3}
+    assert result[2]["attn_type"] == "encoder_only"
+    assert result[2]["per_layer_sliding_window"] == 128
+    assert result[3]["per_layer_sliding_window"] is None
+    assert result[2]["quant_config"] is model.quant_config
+
+
+def test_multimodal_admission_splits_losslessly_and_preserves_full_image():
+    import pandas as pd
+    from nemo_retriever.models.inference.embedding_input import (
+        EmbeddingInputPolicy,
+        prepare_embedding_inputs,
+    )
+
+    tokenizer = SimpleNamespace(
+        encode=lambda text, **kwargs: list(text.encode("ascii")),
+        decode=lambda ids, **kwargs: bytes(ids).decode("ascii"),
+    )
+    # The image contributes five tokens; the template/prefix contributes nine.
+    policy = EmbeddingInputPolicy(
+        tokenizer,
+        18,
+        "passage:",
+        retrieval_template=TEMPLATE,
+        add_special_tokens=False,
+        image=True,
+        formatted_token_counter=lambda prompt: len(prompt.replace("[IMG] ", "")) + 5,
+    )
+    source = pd.DataFrame(
+        [
+            {
+                "text": "abcdefghij",
+                "_image_b64": "FULL_PAGE",
+                "_embed_modality": pd.NA,
+                "metadata": {"id": "page"},
+            },
+        ]
+    )
+    result = prepare_embedding_inputs(
+        source,
+        policy=None,
+        default_modality="text_image",
+        multimodal_planner=lambda text, image: policy.plan([text])[0],
+    )
+    assert "".join(result.frame.text) == "abcdefghij"
+    assert len(result.frame) > 1
+    assert result.frame._image_b64.tolist() == ["FULL_PAGE"] * len(result.frame)
+    assert all(policy._formatted_token_count(text) <= 18 for text in result.frame.text)
+    assert all(meta["embedding_split"]["chunk_count"] == len(result.frame) for meta in result.frame.metadata)
+    assert source.iloc[0].metadata == {"id": "page"}
+    assert result.split_child_positions == frozenset(range(len(result.frame)))
+
+
+def test_image_budget_counter_is_used_instead_of_tokenizer_batch_fast_path():
+    from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
+
+    tokenizer = MagicMock()
+    policy = EmbeddingInputPolicy(tokenizer, 20, "p:", formatted_token_counter=lambda prompt: len(prompt) + 10)
+    assert policy.plan(["short"])[0].formatted_tokens == 17
+    tokenizer.encode_batch.assert_not_called()
+
+
+def test_registration_uses_a_unique_lazy_architecture(monkeypatch):
+    import sys
+    from nemo_retriever.models.inference.nemotron35_vllm import register_nemotron35_vllm
+
+    registry = MagicMock()
+    monkeypatch.setitem(sys.modules, "vllm", SimpleNamespace(ModelRegistry=registry))
+    register_nemotron35_vllm()
+    registry.register_model.assert_called_once_with(
+        "NRLNemotron35EmbeddingModel",
+        "nemo_retriever.models.local.nemotron35_vllm:NRLNemotron35EmbeddingModel",
+    )
+
+
+def test_hf_load_disables_causality_on_text_attention_only(monkeypatch):
+    import transformers
+
+    text_attention = SimpleNamespace(is_causal=True)
+    vision_attention = SimpleNamespace(is_causal=True)
+    model = MagicMock()
+    model.to.return_value = model
+    model.eval.return_value = model
+    model.language_model.modules.return_value = [text_attention]
+    model.vision_tower = vision_attention
+    monkeypatch.setattr(transformers.AutoModel, "from_pretrained", MagicMock(return_value=model))
+    monkeypatch.setattr(transformers.AutoProcessor, "from_pretrained", MagicMock())
+    monkeypatch.setattr(
+        "nemo_retriever.models.local.nemotron35_embedder.load_retrieval_template",
+        lambda *args: TEMPLATE,
+    )
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="hf")
+    embedder._ensure_loaded()
+    assert text_attention.is_causal is False
+    assert vision_attention.is_causal is True
+
+
+def test_image_without_remaining_text_budget_fails_before_embedding(monkeypatch):
+    from nemo_retriever.models.local import llama_nemotron_embed_vl_1b_v2_embedder as vl
+
+    image = MagicMock()
+    monkeypatch.setattr(vl, "_b64_to_pil", lambda value: image)
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", max_length=10)
+    embedder._model = MagicMock()
+    embedder._template = TEMPLATE
+    embedder._processor = MagicMock(return_value={"attention_mask": torch.ones(1, 10)})
+    with pytest.raises(ValueError, match="no text budget"):
+        embedder.plan_text_image("content", "image")
+    image.close.assert_called_once()
+    embedder._model.embed.assert_not_called()
+    assert embedder._processor.call_args.kwargs["truncation"] is False
+
+
+def test_runtime_runs_multimodal_admission_without_text_policy(monkeypatch):
+    import pandas as pd
+    from nemo_retriever.models.inference import runtime
+    from nemo_retriever.models.inference.embedding_input import (
+        EmbeddingSplitChild,
+        EmbeddingSplitPlan,
+    )
+
+    calls = []
+
+    class Model:
+        def plan_text_image(self, text, image, *, query):
+            calls.append((text, image, query))
+            return EmbeddingSplitPlan(20, (EmbeddingSplitChild("abc", 0, 3), EmbeddingSplitChild("def", 3, 6)))
+
+    def embed_group(frame, **kwargs):
+        result = frame.copy()
+        result["text_embeddings_1b_v2"] = [{"embedding": [1.0, 0.0], "error": None} for _ in range(len(frame))]
+        return result
+
+    monkeypatch.setattr(runtime, "_embed_group", embed_group)
+    frame = pd.DataFrame([{"text": "abcdef", "_image_b64": "full_page", "metadata": {}}])
+    result = runtime.embed_text_main_text_embed(frame, model=Model(), embed_modality="text_image")
+    assert calls == [("abcdef", "full_page", False)]
+    assert result.text.tolist() == ["abc", "def"]
+    assert result._image_b64.tolist() == ["full_page", "full_page"]
+    assert result.text_embeddings_1b_v2_has_embedding.all()
+
+
+@pytest.mark.parametrize("endpoint_key", ["embedding_endpoint", "embed_invoke_url"])
+def test_remote_default_admission_retains_n3_tokenizer(monkeypatch, endpoint_key):
+    from nemo_retriever.models.inference import embedding_input
+
+    resolve = MagicMock()
+    monkeypatch.setattr(embedding_input, "resolve_embedding_input_policy", resolve)
+    embedding_input.configure_embedding_input_policy({endpoint_key: "https://nim.example/v1"})
+    assert resolve.call_args.args[0] == NEMOTRON_3_EMBED_MODEL
+
+
+def test_vllm_multimodal_disables_implicit_truncation_and_special_tokens(monkeypatch):
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="vllm", max_length=20)
+    embedder._template = TEMPLATE
+    embedder._processor = MagicMock(return_value={"attention_mask": torch.ones(1, 10)})
+    embedder._model = MagicMock()
+    embedder._model.embed.return_value = [
+        SimpleNamespace(prompt_token_ids=[1] * 10, outputs=SimpleNamespace(embedding=[1.0] * 2048))
+    ]
+    monkeypatch.setattr("nemo_retriever.models.inference.vllm._pooling_params_for_normalize", lambda normalize: None)
+    embedder._encode(["text"], images=[object()])
+    assert embedder._processor.call_args.kwargs["truncation"] is False
+    assert embedder._model.embed.call_args.kwargs["tokenization_kwargs"] == {
+        "add_special_tokens": False,
+        "truncation": False,
+    }
+    request = embedder._model.embed.call_args.args[0][0]
+    assert request["mm_processor_kwargs"]["text_kwargs"] == {"add_special_tokens": False, "truncation": False}

@@ -18,8 +18,14 @@ from nemo_retriever.common.schemas.embedding import (
     requires_text_admission,
 )
 from nemo_retriever.models import _DEFAULT_EMBED_MODEL, resolve_embed_model
-from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy, prepare_embedding_inputs
-from nemo_retriever.models.inference.main_text_embed import TextEmbeddingConfig, create_text_embeddings_for_df
+from nemo_retriever.models.inference.embedding_input import (
+    EmbeddingInputPolicy,
+    prepare_embedding_inputs,
+)
+from nemo_retriever.models.inference.main_text_embed import (
+    TextEmbeddingConfig,
+    create_text_embeddings_for_df,
+)
 from nemo_retriever.models.nim.error_reporter import report_error
 
 logger = logging.getLogger(__name__)
@@ -142,12 +148,18 @@ def embed_text_main_text_embed(
 
     resolved_model_name = resolve_embed_model(model_name)
 
-    if embedding_input_policy is not None:
+    multimodal_planner = None
+    if endpoint is None and callable(getattr(type(model), "plan_text_image", None)):
+        from functools import partial
+
+        multimodal_planner = partial(model.plan_text_image, query=str(input_type).strip().lower() == "query")
+    if embedding_input_policy is not None or multimodal_planner is not None:
         preparation = prepare_embedding_inputs(
             batch_df,
             policy=embedding_input_policy,
             text_column=text_column,
             default_modality=embed_modality,
+            multimodal_planner=multimodal_planner,
         )
         prepared_df = preparation.frame
         current_split_child_positions = preparation.split_child_positions
@@ -260,7 +272,14 @@ def embed_text_main_text_embed(
 
     totals = {
         label: sum(int(counts.get(label, 0)) for counts in counts_by_label)
-        for label in ("overlength", "split", "split_child", "failed", "embedded", "unembedded")
+        for label in (
+            "overlength",
+            "split",
+            "split_child",
+            "failed",
+            "embedded",
+            "unembedded",
+        )
     }
     summary = (
         f"Embedding summary: input_rows={input_row_count} output_rows={len(out_df.index)} "

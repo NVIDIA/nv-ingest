@@ -3,12 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Native HF/vLLM adapter for dense Mistral3 retrieval checkpoints."""
+
 from dataclasses import dataclass, field
 from typing import Any, Sequence
 
 import torch
 
-from nemo_retriever.models.inference.retrieval_template import load_retrieval_template, render_retrieval_input
+from nemo_retriever.models.inference.retrieval_template import (
+    load_retrieval_template,
+    render_retrieval_input,
+)
 
 
 @dataclass
@@ -62,9 +66,20 @@ class Nemotron35Embedder:
                 .to(self.device or ("cuda" if torch.cuda.is_available() else "cpu"))
                 .eval()
             )
+            # Ministral3 initializes attention modules as causal even when
+            # the checkpoint requests a bidirectional mask. SDPA can omit an
+            # all-visible mask, then consult this module flag instead.
+            for module in self._model.language_model.modules():
+                if hasattr(module, "is_causal"):
+                    module.is_causal = False
         else:
+            from nemo_retriever.models.inference.nemotron35_vllm import (
+                NEMOTRON35_VLLM_ARCHITECTURE,
+                register_nemotron35_vllm,
+            )
             from nemo_retriever.models.inference.vllm import create_vllm_llm
 
+            register_nemotron35_vllm()
             # Include room for processor-expanded images; per-request limits are
             # validated separately. Do not reinterpret this as a causal LLM.
             self._model = create_vllm_llm(
@@ -75,6 +90,11 @@ class Nemotron35Embedder:
                 enforce_eager=self.enforce_eager,
                 limit_mm_per_prompt={"image": 1},
                 download_dir=self.hf_cache_dir,
+                model_impl="vllm",
+                hf_overrides={
+                    "architectures": [NEMOTRON35_VLLM_ARCHITECTURE],
+                    "is_causal": False,
+                },
             )
 
     def _encode(self, texts, *, query=False, images=None, batch_size=64):
@@ -106,6 +126,7 @@ class Nemotron35Embedder:
                     text=current,
                     images=images[i : i + step],
                     padding=True,
+                    truncation=False,
                     add_special_tokens=False,
                     return_tensors="pt",
                 )
@@ -124,7 +145,9 @@ class Nemotron35Embedder:
                     mask = batch["attention_mask"].unsqueeze(-1).float()
                     vectors = ((hidden * mask).sum(1) / mask.sum(1).clamp_min(1)).cpu()
             else:
-                from nemo_retriever.models.inference.vllm import _pooling_params_for_normalize
+                from nemo_retriever.models.inference.vllm import (
+                    _pooling_params_for_normalize,
+                )
 
                 # Raw tokens prevent a second template pass or duplicate BOS/EOS.
                 requests = []
@@ -134,9 +157,29 @@ class Nemotron35Embedder:
                         request = {"prompt_token_ids": ids}
                     else:
                         # vLLM owns image expansion; do not send HF-expanded IDs.
-                        request = {"prompt": current[j], "multi_modal_data": {"image": images[i + j]}}
+                        request = {
+                            "prompt": current[j],
+                            "multi_modal_data": {"image": images[i + j]},
+                            "mm_processor_kwargs": {
+                                "text_kwargs": {"truncation": False, "add_special_tokens": False},
+                            },
+                        }
                     requests.append(request)
-                responses = self._model.embed(requests, pooling_params=_pooling_params_for_normalize(False))
+                inference_kwargs = {}
+                if images is not None:
+                    # Match admission, independent of checkpoint defaults.
+                    inference_kwargs["tokenization_kwargs"] = {"add_special_tokens": False, "truncation": False}
+                responses = self._model.embed(
+                    requests, pooling_params=_pooling_params_for_normalize(False), **inference_kwargs
+                )
+                if images is not None:
+                    expected_lengths = batch["attention_mask"].sum(1).tolist()
+                    actual_lengths = [len(response.prompt_token_ids) for response in responses]
+                    if actual_lengths != expected_lengths:
+                        raise ValueError(
+                            "vLLM image token expansion does not match checkpoint processor admission: "
+                            f"expected={expected_lengths}, actual={actual_lengths}."
+                        )
                 vectors = torch.tensor([r.outputs.embedding for r in responses], dtype=torch.float32)
             if vectors.shape != (len(current), self.output_dimension) or not torch.isfinite(vectors).all():
                 raise ValueError("Checkpoint returned invalid dense embedding vectors.")
@@ -149,8 +192,56 @@ class Nemotron35Embedder:
     def embed_queries(self, texts: Sequence[str], *, batch_size=64):
         return self._encode([str(t) for t in texts], query=True, batch_size=batch_size)
 
+    def plan_text_image(self, text: str, image_b64: str, *, query=False):
+        """Split paired text losslessly against the exact expanded image budget.
+
+        The caller repeats the unchanged source image and records split
+        provenance for every child. Direct embedding methods remain strict:
+        they cannot change row cardinality and therefore reject overflow.
+        """
+        from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
+        from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+            _b64_to_pil,
+        )
+
+        self._ensure_loaded()
+        limit = self.query_max_length if query else self.max_length
+        prefix = self.query_prefix if query else self.document_prefix
+        image = _b64_to_pil(image_b64)
+        try:
+
+            def expanded_count(prompt):
+                batch = self._processor(
+                    text=[prompt],
+                    images=[image],
+                    truncation=False,
+                    add_special_tokens=False,
+                    return_tensors="pt",
+                )
+                return int(batch["attention_mask"].sum())
+
+            policy = EmbeddingInputPolicy(
+                tokenizer=self._processor.tokenizer,
+                max_tokens=limit,
+                prefix=prefix,
+                retrieval_template=self._template,
+                add_special_tokens=False,
+                image=True,
+                formatted_token_counter=expanded_count,
+            )
+            if policy._formatted_token_count("") >= limit:
+                raise ValueError(
+                    f"Image and retrieval template leave no text budget within max_length={limit}; "
+                    "increase the configured limit within the checkpoint maximum. The image is not truncated."
+                )
+            return policy.plan([text])[0]
+        finally:
+            image.close()
+
     def embed_text_image(self, texts, images_b64, *, batch_size=64):
-        from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import _b64_to_pil
+        from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
+            _b64_to_pil,
+        )
 
         images = []
         try:

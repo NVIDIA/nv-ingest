@@ -60,7 +60,7 @@ pip install "nemo-retriever[local]"
 
 On this development branch, omitting `--embed-model-name` selects Nemotron 3.5 Embed 1B for local inference. These changes are not part of the documented 26.08.1 release. The default local backend is vLLM. NeMo Retriever Library selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4. Otherwise, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`. With `--local-ingest-embed-backend hf`, it selects BF16 because the compressed-tensors NVFP4 checkpoint requires vLLM.
 
-The Nemotron 3.5 integration is experimental. A durable vLLM bidirectional-attention fix and complete multimodal input-budgeting policy remain required before production use. Temporary benchmark hooks are not part of this branch.
+The Nemotron 3.5 integration remains experimental while checkpoint access is private. Its model-specific vLLM adapter preserves bidirectional text attention without patching vendor model classes. Validate retrieval quality before production use.
 
 The default modality remains text. Nemotron 3.5 also supports image and combined text-and-image embeddings when you select the matching modality. Its prerelease repositories require access: set `HF_TOKEN` to a token from an authorized Hugging Face account. Do not add query or document prefixes yourself; the library applies the checkpoint's retrieval chat template.
 
@@ -524,6 +524,8 @@ Fine-tunes that require prefixes other than `query: ` and `passage: ` must
 retain that prompt metadata.
 
 Nemotron 3.5 uses `model_type: "mistral3"`, `architectures: ["Mistral3Model"]`, and a bidirectional text encoder with masked mean pooling. Its output width comes from `text_config.hidden_size`. The processor supplies its retrieval chat template and image preprocessing. Generic Mistral 3 generation checkpoints are not supported by this embedding profile.
+
+For local Nemotron 3.5 paired text-and-image ingestion, the configured passage limit includes the template, processor-expanded image tokens, and text. Oversized paired text is split losslessly, with the unchanged full image repeated for each child. If the image and template leave no text budget, the library raises an error rather than truncating the image. Refer to [Embedding input limits](../../../docs/docs/extraction/embedding.md#text-input-overflow) for the policy and split metadata.
 
 General Mistral 3 Base, Instruct, and vision-language model (VLM) generation
 checkpoints remain unsupported because they do not match the dense encoder

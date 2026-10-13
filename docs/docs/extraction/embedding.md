@@ -4,7 +4,7 @@
 
 This development branch defaults to the Nemotron 3.5 Embed 1B family for local inference. These changes are not part of the documented 26.08.1 release.
 
-This integration remains experimental. The durable vLLM bidirectional-attention fix and complete multimodal input-budgeting policy are not included in this branch. Do not treat successful model loading as production retrieval validation.
+This integration remains experimental while the checkpoints require private repository access. Validate retrieval quality on your data before deployment; successful model loading alone is not production retrieval validation.
 
 When you omit the local embedding model, the library selects a checkpoint as follows:
 
@@ -17,6 +17,8 @@ The default modality remains `text`. Nemotron 3.5 also supports `image` and `tex
 The prerelease checkpoints require Hugging Face repository access. Set `HF_TOKEN` to a token from an account with access before loading them. Do not include tokens in source files or shared configuration.
 
 For Nemotron 3.5, local inference uses the checkpoint's processor and retrieval chat template for query and document formatting. Pass unformatted content; do not add `query: ` or `passage: ` yourself. By default, the local backends produce normalized, masked mean-pooled embeddings.
+
+The local adapters preserve the checkpoint's bidirectional text attention. The vLLM path registers an NRL-specific embedding model; it does not patch vendor model classes or change attention for unrelated models.
 
 The 1B checkpoints produce 2,048-dimensional vectors. This adapter supports only the checkpoint's full output dimension; reduced-dimension overrides are rejected.
 
@@ -53,9 +55,7 @@ results = ingestor.ingest()
 
 For text inputs, including `text_image` inputs without an image, NeMo Retriever
 Library checks the complete formatted input against the embedding model's token
-limit. Image inputs and `text_image` inputs with an image are outside this
-text-splitting policy.
-For local Nemotron 3.5 image-bearing inputs, the processor expands image tokens before the library checks `max_length`. An oversized input raises an error; the library does not truncate its image tokens. Shorten the text or increase the configured limit within the checkpoint's supported maximum.
+limit. Local Nemotron 3.5 paired text-and-image inputs also use admission planning, as described below. Legacy and remote image-bearing inputs retain their existing behavior.
 The check includes the model's document or query prefix and special tokens.
 The default configured limits are 8,192 tokens for passages and 128 tokens for
 queries. If the checkpoint declares a smaller supported limit, the checkpoint
@@ -71,6 +71,12 @@ losslessly, not truncated.
 `TextChunkParams.max_tokens` controls earlier text chunking, not the final
 formatted embedding-input limit. `EmbedParams.query_max_length` controls the
 separate query limit.
+
+For local Nemotron 3.5 `text_image` ingestion, `max_length` covers the combined retrieval template, expanded image tokens, and text. The default passage limit remains 8,192 tokens; it is not a separate text budget plus an image allowance.
+
+The library counts tokens with the checkpoint's processor before inference. If paired text does not fit, it splits the text losslessly and repeats the unchanged full image for every child row. Children preserve source and page metadata and receive the same `metadata["embedding_split"]` provenance described below. This policy does not crop images or truncate image tokens. Repeating an image can increase inference work and the number of stored vectors.
+
+If the image and template leave no text budget, planning raises an actionable error. Increase `max_length` within the checkpoint's supported maximum. Direct `embed_text_image()` calls cannot change the number of returned vectors and reject oversized pairs instead of splitting them.
 
 For a registered revision-pinned model, an explicitly revision-pinned model,
 or a local checkpoint, the library loads the tokenizer and prompt configuration
