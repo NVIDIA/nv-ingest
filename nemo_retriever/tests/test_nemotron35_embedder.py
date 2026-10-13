@@ -8,7 +8,8 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")
 
 from nemo_retriever.models import (
     NEMOTRON_3_EMBED_MODEL,
