@@ -7,6 +7,7 @@
 Only the supported Mistral3 retrieval profile uses this path. Legacy text
 embedders retain their prefix-only contract. No generation wrappers are added.
 """
+
 from functools import lru_cache
 from pathlib import Path
 
