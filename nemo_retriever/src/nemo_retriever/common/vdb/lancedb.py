@@ -138,6 +138,19 @@ def _local_table_lock(uri: str, table_name: str, *, phase: str) -> AbstractConte
 
 # Data-file version LanceDB 0.34's writer emits for its default ``data_storage_version="stable"``.
 _WORKER_WRITE_STORAGE_VERSION = "2.1"
+# Rows per Arrow batch handed to ``lance.write_fragments``. pylance writes one page per input batch
+# for fixed-size-list vectors (``max_page_bytes``/``max_rows_per_group`` do not split it), while the
+# LanceDB writer splits the stream into 1024-row groups (8 MiB pages for 2048-d float32). 64 MiB pages
+# made index-bypass (brute-force) vector scans ~5x slower on 360k rows; ANN was unaffected.
+_WORKER_WRITE_ROWS_PER_BATCH = 1024
+
+
+def _rebatched(batches: Iterable[pa.RecordBatch], rows: int) -> Iterator[pa.RecordBatch]:
+    """Yield ``batches`` re-sliced so that no batch exceeds ``rows`` rows."""
+
+    for batch in batches:
+        for start in range(0, batch.num_rows, rows):
+            yield batch.slice(start, min(rows, batch.num_rows - start))
 
 
 def _fragment_json(fragment: Any) -> str:
@@ -1981,8 +1994,11 @@ class LanceDB(VDB):
         schema = self._stream_schema(stats.vector_dim)
         reader = pa.RecordBatchReader.from_batches(
             schema,
-            source.arrow_batches(
-                schema=schema, max_batch_bytes=self.stream_batch_bytes, stats=stats, include_digest=False
+            _rebatched(
+                source.arrow_batches(
+                    schema=schema, max_batch_bytes=self.stream_batch_bytes, stats=stats, include_digest=False
+                ),
+                _WORKER_WRITE_ROWS_PER_BATCH,
             ),
         )
         fragments = lance.fragment.write_fragments(
