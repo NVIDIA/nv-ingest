@@ -751,7 +751,12 @@ class _StreamSource:
             yield from batches
         except Exception as exc:
             self.input_failure = exc
-            logger.error("VDB stream input failed while LanceDB was consuming batches: %s", exc, exc_info=True)
+            # Type only: conversion errors can quote row content, and the
+            # exception itself is re-raised to the caller with full context.
+            logger.error(
+                "VDB stream input failed (%s) while LanceDB was consuming batches; nothing was committed.",
+                type(exc).__name__,
+            )
             raise
 
 
@@ -2102,7 +2107,9 @@ class LanceDB(VDB):
         Raises:
             UnsupportedVDBOperation: If this instance does not support the
                 columnar stream (remote URI, private schema, or sparse table).
-            VdbUploadError: If the input iterator fails; nothing is committed.
+            Exception: Whatever the input iterator raised (for example
+                ``VdbUploadError`` from record conversion) propagates with its
+                original type; nothing is committed.
             OversizedVdbRowError: If one row exceeds ``stream_batch_bytes``.
             ValueError: If ``on_bad_vectors="error"`` meets a bad vector.
             CommitOutcomeUnknown, DataCommittedFinalizationError: As for
