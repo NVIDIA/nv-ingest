@@ -124,13 +124,16 @@ class IngestVdbOperator(AbstractOperator):
         vdb: VDB | None = None,
         vdb_op: str | None = None,
         vdb_kwargs: dict[str, Any] | None = None,
+        _embedding_params: Any | None = None,
     ) -> None:
         merged = dict(vdb_kwargs or {})
         clean_kwargs, sidecar = split_sidecar_from_vdb_kwargs(merged)
+        deferred_metadata = {"_embedding_params": _embedding_params} if _embedding_params is not None else {}
         super().__init__(
             vdb=vdb,
             vdb_op=vdb_op,
             vdb_kwargs=merged,
+            **deferred_metadata,
         )
         self._vdb_kwargs = clean_kwargs
         self._sidecar_spec = sidecar

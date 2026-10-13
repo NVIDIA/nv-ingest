@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.
+# SPDX-FileCopyrightText: Copyright (checkpoint_config) 2026, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -61,10 +61,10 @@ def test_resolve_mistral3_metadata(quantized):
 
 
 def test_reject_causal_text_encoder():
-    c = config()
-    c["text_config"]["is_causal"] = True
+    checkpoint_config = config()
+    checkpoint_config["text_config"]["is_causal"] = True
     with pytest.raises(ValueError, match="bidirectional"):
-        _spec_from_config("model", None, c)
+        _spec_from_config("model", None, checkpoint_config)
 
 
 @pytest.mark.parametrize("prefix", ["query:", "query: "])
@@ -88,8 +88,8 @@ def test_local_defaults_preserve_remote_and_explicit_precisions(monkeypatch):
 
 
 def test_hf_masked_pooling_normalization_and_positions():
-    e = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="hf")
-    e._template = TEMPLATE
+    embedder = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="hf")
+    embedder._template = TEMPLATE
     seen = []
 
     class Batch(dict):
@@ -109,8 +109,8 @@ def test_hf_masked_pooling_normalization_and_positions():
         hidden[1, 2] = 999  # PAD must not influence pooling.
         return SimpleNamespace(last_hidden_state=hidden)
 
-    e._processor = SimpleNamespace(tokenizer=tokenize)
-    e._model = SimpleNamespace(device="cpu", __call__=forward)
+    embedder._processor = SimpleNamespace(tokenizer=tokenize)
+    embedder._model = SimpleNamespace(device="cpu", __call__=forward)
 
     class Model:
         device = "cpu"
@@ -118,50 +118,50 @@ def test_hf_masked_pooling_normalization_and_positions():
         def __call__(self, **kwargs):
             return forward(**kwargs)
 
-    e._model = Model()
-    out = e.embed(["text", "shorter"])
+    embedder._model = Model()
+    out = embedder.embed(["text", "shorter"])
     assert torch.equal(out[0], out[1])
     assert torch.allclose(out.norm(dim=1), torch.ones(2))
     assert seen[0]["position_ids"].tolist() == [[0, 1, 2], [0, 1, 0]]
 
 
 def test_invalid_image_counts_fail_before_loading():
-    e = Nemotron35Embedder("model", None, "query: ", "passage: ")
+    embedder = Nemotron35Embedder("model", None, "query: ", "passage: ")
     with pytest.raises(ValueError, match="counts must match"):
-        e._encode(["a"], images=[])
+        embedder._encode(["a"], images=[])
 
 
 def test_vllm_receives_rendered_tokens_and_normalizes_once(monkeypatch):
-    e = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="vllm", normalize=False)
-    e._template = TEMPLATE
-    e._processor = SimpleNamespace(
+    embedder = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="vllm", normalize=False)
+    embedder._template = TEMPLATE
+    embedder._processor = SimpleNamespace(
         tokenizer=lambda *args, **kwargs: {
             "input_ids": torch.tensor([[1, 2, 0]]),
             "attention_mask": torch.tensor([[1, 1, 0]]),
         }
     )
-    e._model = MagicMock()
-    e._model.embed.return_value = [SimpleNamespace(outputs=SimpleNamespace(embedding=[2.0] * 2048))]
+    embedder._model = MagicMock()
+    embedder._model.embed.return_value = [SimpleNamespace(outputs=SimpleNamespace(embedding=[2.0] * 2048))]
     params = object()
     monkeypatch.setattr(
         "nemo_retriever.models.inference.vllm._pooling_params_for_normalize",
         lambda normalize: params,
     )
-    result = e.embed(["text"])
-    assert e._model.embed.call_args.args[0] == [{"prompt_token_ids": [1, 2]}]
-    assert e._model.embed.call_args.kwargs["pooling_params"] is params
+    result = embedder.embed(["text"])
+    assert embedder._model.embed.call_args.args[0] == [{"prompt_token_ids": [1, 2]}]
+    assert embedder._model.embed.call_args.kwargs["pooling_params"] is params
     assert torch.equal(result, torch.full((1, 2048), 2.0))
 
 
 def test_multimodal_expansion_overflow_fails_before_inference():
-    e = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="vllm", max_length=2)
-    e._template = TEMPLATE
-    e._processor = MagicMock(return_value={"attention_mask": torch.ones(1, 3, dtype=torch.long)})
-    e._model = MagicMock()
+    embedder = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="vllm", max_length=2)
+    embedder._template = TEMPLATE
+    embedder._processor = MagicMock(return_value={"attention_mask": torch.ones(1, 3, dtype=torch.long)})
+    embedder._model = MagicMock()
     with pytest.raises(ValueError, match="after image expansion"):
-        e._encode(["text"], images=[object()])
-    e._model.embed.assert_not_called()
-    assert e._processor.call_args.kwargs["truncation"] is False
+        embedder._encode(["text"], images=[object()])
+    embedder._model.embed.assert_not_called()
+    assert embedder._processor.call_args.kwargs["truncation"] is False
 
 
 def test_admission_uses_the_same_template():

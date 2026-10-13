@@ -5,9 +5,12 @@
 """Native HF/vLLM adapter for dense Mistral3 retrieval checkpoints."""
 
 from dataclasses import dataclass, field
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 import torch
+
+if TYPE_CHECKING:
+    from nemo_retriever.models.inference.embedding_input import EmbeddingSplitPlan
 
 from nemo_retriever.models.inference.retrieval_template import (
     load_retrieval_template,
@@ -35,7 +38,8 @@ class Nemotron35Embedder:
     _processor: Any = field(default=None, init=False, repr=False)
     _template: str | None = field(default=None, init=False, repr=False)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
+        """Validate configuration; raise ValueError for unsupported backend, limits, or dimensions."""
         if self.backend not in {"hf", "vllm"}:
             raise ValueError("Nemotron 3.5 embedding backend must be 'hf' or 'vllm'.")
         if min(self.max_length, self.query_max_length) <= 0:
@@ -44,7 +48,8 @@ class Nemotron35Embedder:
             raise ValueError("This checkpoint profile supports only its full embedding dimension.")
 
     @property
-    def is_remote(self):
+    def is_remote(self) -> bool:
+        """Return False because this adapter owns local HF or in-process vLLM inference."""
         return False
 
     def _ensure_loaded(self):
@@ -186,18 +191,83 @@ class Nemotron35Embedder:
             outputs.append(torch.nn.functional.normalize(vectors, dim=-1) if self.normalize else vectors)
         return torch.cat(outputs)
 
-    def embed(self, texts: Sequence[str], *, batch_size=64):
+    def embed(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
+        """Embed document text with the checkpoint's document template.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Documents in output order. Formatted text is truncated to max_length.
+        batch_size : int
+            Requested microbatch size, clamped to at least one; HF caps it at eight.
+
+        Returns
+        -------
+        torch.Tensor
+            CPU float32 vectors of shape (len(texts), output_dimension), including
+            an empty tensor for no inputs. Vectors are L2-normalized if normalize is True.
+
+        Raises
+        ------
+        ValueError
+            If the checkpoint returns incorrectly shaped or nonfinite vectors.
+        OSError, RuntimeError
+            If checkpoint loading or backend inference fails.
+        """
         return self._encode([str(t) for t in texts], batch_size=batch_size)
 
-    def embed_queries(self, texts: Sequence[str], *, batch_size=64):
+    def embed_queries(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
+        """Embed queries with the checkpoint's query template.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Queries in output order. Formatted queries are truncated to query_max_length.
+        batch_size : int
+            Requested microbatch size, clamped to at least one; HF caps it at eight.
+
+        Returns
+        -------
+        torch.Tensor
+            CPU float32 vectors of shape (len(texts), output_dimension), or an
+            empty tensor for no queries. Vectors are normalized when normalize is True.
+
+        Raises
+        ------
+        ValueError
+            If inference returns incorrectly shaped or nonfinite vectors.
+        OSError, RuntimeError
+            If checkpoint loading or backend inference fails.
+        """
         return self._encode([str(t) for t in texts], query=True, batch_size=batch_size)
 
-    def plan_text_image(self, text: str, image_b64: str, *, query=False):
+    def plan_text_image(self, text: str, image_b64: str, *, query: bool = False) -> "EmbeddingSplitPlan":
         """Split paired text losslessly against the exact expanded image budget.
 
         The caller repeats the unchanged source image and records split
         provenance for every child. Direct embedding methods remain strict:
         they cannot change row cardinality and therefore reject overflow.
+
+        Parameters
+        ----------
+        text : str
+            Source text to preserve across split children.
+        image_b64 : str
+            Base64-encoded image repeated unchanged with each child.
+        query : bool
+            Use the query template and query_max_length instead of document settings.
+
+        Returns
+        -------
+        EmbeddingSplitPlan
+            Expanded token count and lossless text children, if splitting is needed.
+
+        Raises
+        ------
+        ValueError
+            If the image and template leave no text budget within the configured limit.
+        OSError, RuntimeError
+            If image decoding, checkpoint loading, or processor execution fails.
         """
         from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
         from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
@@ -238,7 +308,36 @@ class Nemotron35Embedder:
         finally:
             image.close()
 
-    def embed_text_image(self, texts, images_b64, *, batch_size=64):
+    def embed_text_image(
+        self, texts: Sequence[str], images_b64: Sequence[str], *, batch_size: int = 64
+    ) -> torch.Tensor:
+        """Embed paired document text and images without silently truncating either.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Document text aligned one-to-one with images_b64.
+        images_b64 : Sequence[str]
+            Base64-encoded images. Full page images are accepted; the checkpoint
+            processor applies its native resizing and expands image tokens.
+        batch_size : int
+            Requested microbatch size, clamped to at least one; HF caps it at two.
+
+        Returns
+        -------
+        torch.Tensor
+            CPU float32 vectors of shape (len(texts), output_dimension), or an
+            empty tensor for no pairs. Vectors are normalized when normalize is True.
+
+        Raises
+        ------
+        ValueError
+            If input counts differ, expanded text/template/image tokens exceed
+            max_length, vLLM token expansion differs, or returned vectors are invalid.
+            Use plan_text_image for lossless splitting before embedding overlong pairs.
+        OSError, RuntimeError
+            If image decoding, checkpoint loading, or backend inference fails.
+        """
         from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
             _b64_to_pil,
         )
@@ -252,10 +351,50 @@ class Nemotron35Embedder:
             for image in images:
                 image.close()
 
-    def embed_images(self, images_b64, *, batch_size=64):
+    def embed_images(self, images_b64: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:
+        """Embed images using empty document text and the document template.
+
+        Parameters
+        ----------
+        images_b64 : Sequence[str]
+            Base64-encoded images in output order, including full rendered pages.
+        batch_size : int
+            Requested microbatch size, clamped to at least one; HF caps it at two.
+
+        Returns
+        -------
+        torch.Tensor
+            CPU float32 vectors of shape (len(images_b64), output_dimension), or
+            an empty tensor. Vectors are normalized when normalize is True.
+
+        Raises
+        ------
+        ValueError
+            If expanded image/template tokens exceed max_length, vLLM expansion
+            differs, or returned vectors are invalid. Images are not silently clipped.
+        OSError, RuntimeError
+            If image decoding, checkpoint loading, or backend inference fails.
+        """
         return self.embed_text_image([""] * len(images_b64), images_b64, batch_size=batch_size)
 
-    def unload(self):
+    def unload(self) -> None:
+        """Release model and processor references and empty the CUDA allocator cache.
+
+        Parameters
+        ----------
+        None
+            No arguments are required. Calling this method repeatedly is supported.
+
+        Returns
+        -------
+        None
+            Later embedding calls lazily reload the checkpoint.
+
+        Raises
+        ------
+        RuntimeError
+            If clearing the CUDA allocator cache fails.
+        """
         self._model = self._processor = None
         if torch.cuda.is_available():
             torch.cuda.empty_cache()

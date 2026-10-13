@@ -92,11 +92,11 @@ class TestQueriesGraphExecution:
         assert df["text"].tolist() == ["q"]
 
     @pytest.mark.parametrize("embed_kwargs", [{}, {"local_ingest_embed_backend": None}])
-    def test_default_embed_params_use_nemotron_vllm(self, embed_kwargs: dict[str, Any]) -> None:
+    def test_default_embed_params_defer_model_to_index_metadata(self, embed_kwargs: dict[str, Any]) -> None:
         params = Retriever(embed_kwargs=embed_kwargs)._merge_embed_params()
 
-        assert params.model_name == "nvidia/nemotron-3-embed-1b"
-        assert params.embed_model_name == "nvidia/nemotron-3-embed-1b"
+        assert params.model_name is None
+        assert params.embed_model_name is None
         assert params.local_ingest_embed_backend == "vllm"
 
     def test_merge_embed_params_per_call_overrides(self) -> None:

@@ -4,11 +4,29 @@
 
 """Worker-safe registration and attention construction for N3.5 retrieval."""
 
+from typing import Any, Callable
+
 NEMOTRON35_VLLM_ARCHITECTURE = "NRLNemotron35EmbeddingModel"
 
 
 def register_nemotron35_vllm() -> None:
-    """Register only the NRL architecture, without importing CUDA model code."""
+    """Register only the NRL architecture, without importing CUDA model code.
+
+    Parameters
+    ----------
+    None
+        Registers the project's fixed architecture name and lazy worker import path.
+
+    Returns
+    -------
+    None
+        The worker can construct the architecture through vLLM's model registry.
+
+    Raises
+    ------
+    ImportError
+        If vLLM is not installed in the current environment.
+    """
     from vllm import ModelRegistry
 
     ModelRegistry.register_model(
@@ -17,8 +35,38 @@ def register_nemotron35_vllm() -> None:
     )
 
 
-def create_bidirectional_attention(model, *, attention_cls, attention_type, pp_indices):
-    """Construct noncausal text attention without changing vendor model classes."""
+def create_bidirectional_attention(
+    model: Any,
+    *,
+    attention_cls: Callable[..., Any],
+    attention_type: Any,
+    pp_indices: Callable[[int, int, int], tuple[int, int]],
+) -> dict[int, Any]:
+    """Construct noncausal text attention without changing vendor model classes.
+
+    Parameters
+    ----------
+    model : Any
+        vLLM Transformers model with checkpoint, parallel, cache, and quantization configs.
+    attention_cls : Callable[..., Any]
+        Constructor for encoder-only attention layers.
+    attention_type : Any
+        vLLM attention-kind enum forwarded to each attention layer.
+    pp_indices : Callable[[int, int, int], tuple[int, int]]
+        Compute the pipeline shard's start and exclusive end layer indices.
+
+    Returns
+    -------
+    dict[int, Any]
+        Attention instances indexed by global text-layer number for this shard.
+
+    Raises
+    ------
+    ValueError
+        If the checkpoint is not a bidirectional Mistral3/Ministral3 retrieval model.
+    RuntimeError
+        If constructing the backend attention layers fails.
+    """
     text = model.text_config
     if (
         model.config.model_type != "mistral3"
