@@ -227,7 +227,7 @@ class IngestVdbOperator(AbstractOperator):
         return submitted_records
 
     def _supports_worker_write(self) -> bool:
-        """Return whether the opt-in worker-native fragment sink (spike) applies to this VDB."""
+        """Return whether the opt-in worker-native fragment sink (``worker_write``) applies to this VDB."""
 
         if not getattr(self._vdb, "worker_write", False):
             return False

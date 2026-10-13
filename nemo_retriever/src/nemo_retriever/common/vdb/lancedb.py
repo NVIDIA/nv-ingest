@@ -136,6 +136,10 @@ def _local_table_lock(uri: str, table_name: str, *, phase: str) -> AbstractConte
     return FileLock(lock_dir / f"{phase}-{table_token}.lock")
 
 
+# Data-file version LanceDB 0.34's writer emits for its default ``data_storage_version="stable"``.
+_WORKER_WRITE_STORAGE_VERSION = "2.1"
+
+
 def _fragment_json(fragment: Any) -> str:
     """Serialize ``lance.fragment.FragmentMetadata`` to the string ``from_json`` accepts."""
 
@@ -919,8 +923,9 @@ class LanceDB(VDB):
         )
         # Sparse tables store no vector, so they keep the record stream.
         self.supports_stream_ingest_batches = self.supports_stream_ingest and not self.sparse
-        # Spike (3b): opt-in worker-native sink. Ray workers project + write Lance
-        # fragments; the driver commits once. Dense local tables only.
+        # Opt-in worker-native sink: Ray workers project + write Lance fragments
+        # (``write_partition``), the driver commits once (``commit_partitions``).
+        # Dense local tables only; ``worker_write_rows`` bounds rows per write task.
         self.worker_write = bool(worker_write)
         self.worker_write_rows = int(worker_write_rows)
         if self.worker_write and not self.supports_stream_ingest_batches:
@@ -1939,6 +1944,23 @@ class LanceDB(VDB):
             raise ValueError(f"worker_write requires a local LanceDB uri, got {self.uri!r}")
         return str(path / f"{self.table_name}.lance")
 
+    def _worker_write_storage_version(self) -> str:
+        """Lance data-file version for worker-written fragments.
+
+        Appends reuse the table's version; new/overwritten tables use the version the LanceDB
+        writer (``create_table``/``add``) produces, so fragment-written tables scan like
+        stream-written ones. pylance's own default ("stable") is newer than LanceDB's.
+        """
+
+        import lance
+
+        if not self.overwrite:
+            try:
+                return str(lance.dataset(self._lance_table_uri()).data_storage_version)
+            except ValueError:
+                pass
+        return _WORKER_WRITE_STORAGE_VERSION
+
     def write_partition(self, batches: Iterable[CanonicalRecordBatch]) -> dict[str, Any]:
         """Worker side of the worker-native sink: project one partition and write Lance fragments.
 
@@ -1963,7 +1985,12 @@ class LanceDB(VDB):
                 schema=schema, max_batch_bytes=self.stream_batch_bytes, stats=stats, include_digest=False
             ),
         )
-        fragments = lance.fragment.write_fragments(reader, self._lance_table_uri(), schema=schema)
+        fragments = lance.fragment.write_fragments(
+            reader,
+            self._lance_table_uri(),
+            schema=schema,
+            data_storage_version=self._worker_write_storage_version(),
+        )
         receipt.update(
             fragments=[_fragment_json(fragment) for fragment in fragments],
             rows_written=stats.rows_written,
@@ -1975,8 +2002,9 @@ class LanceDB(VDB):
     def commit_partitions(self, receipts: Iterable[dict[str, Any]]) -> None:
         """Driver side of the worker-native sink: one Lance commit, then the stream path's finalize.
 
-        Not emulated from ``stream_ingest_batches``: durable recovery markers / ``stream_operation_id``
-        (always ``None`` here), the stream digest, and the single end-of-stream drop-count log.
+        Differences from ``stream_ingest_batches``: no durable recovery markers / ``stream_operation_id``
+        (the single commit is the recovery point), no stream digest, and drop counts are tallied per
+        partition instead of one end-of-stream log line.
         """
 
         import lance

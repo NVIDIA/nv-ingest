@@ -9,6 +9,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 import math
+import json
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 import nvtx
@@ -36,7 +37,6 @@ from nemo_retriever.common.ray_resource_hueristics import (
     OCR_GPUS_PER_ACTOR,
 )
 
-import json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -745,7 +745,6 @@ class RayDataExecutor(AbstractExecutor):
             raise TypeError(f"RayDataExecutor.ingest() does not accept setting(s): {unsupported}")
         return self._ingest(data, return_results=return_results)
 
-    @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def _worker_write_ingest(
         self,
         dataset: Any,
@@ -753,7 +752,7 @@ class RayDataExecutor(AbstractExecutor):
         *,
         validate_batch: Callable[[pd.DataFrame], None] | None = None,
     ) -> pd.DataFrame:
-        """Opt-in worker-native sink (spike): Ray tasks project and write Lance fragments; the driver commits once.
+        """Opt-in worker-native LanceDB sink: Ray tasks project and write Lance fragments; the driver commits once.
 
         Each task rebuilds the sink operator from ``operator_kwargs`` (as the record path does on
         workers), runs ``_write_partition`` on one bundle of ``worker_write_rows`` rows, and returns a
@@ -783,6 +782,7 @@ class RayDataExecutor(AbstractExecutor):
         input_rows = sum(int(receipt["input_rows"]) for receipt in receipts)
         return pd.DataFrame([{"input_rows": input_rows, "submitted_records": submitted_records}])
 
+    @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def _ingest(
         self,
         data: Any,

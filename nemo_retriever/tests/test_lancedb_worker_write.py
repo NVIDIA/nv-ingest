@@ -77,7 +77,11 @@ def test_worker_write_matches_columnar_stream(tmp_path: Path) -> None:
     assert actual.schema.field("vector").type == pa.list_(pa.float32(), DIM)
     assert actual.num_rows == 6
     assert actual.equals(expected), f"{actual.to_pylist()} != {expected.to_pylist()}"
-    assert len(lance.dataset(str(tmp_path / "worker" / "chunks.lance")).get_fragments()) == 4
+    worker_dataset = lance.dataset(str(tmp_path / "worker" / "chunks.lance"))
+    assert len(worker_dataset.get_fragments()) == 4
+    # Same data-file version as the LanceDB writer, so fragment-written tables scan like stream-written ones.
+    stream_dataset = lance.dataset(str(tmp_path / "stream" / "chunks.lance"))
+    assert worker_dataset.data_storage_version == stream_dataset.data_storage_version == "2.1"
 
 
 def test_worker_write_overwrite_then_append(tmp_path: Path) -> None:
