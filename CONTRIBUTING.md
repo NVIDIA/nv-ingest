@@ -16,6 +16,7 @@ External contributions will be welcome soon, and they are greatly appreciated! E
      - [Node failure decorator (try/except)](#node-failure-decorator-tryexcept)
      - [filter_by_task decorator](#filter_by_task-decorator)
    - [Adding a New Stage or Module](#adding-a-new-stage-or-module)
+   - [Adding a New Text-Generation Task](#adding-a-new-text-generation-task)
    - [Common Practices for Writing Unit Tests](#common-practices-for-writing-unit-tests)
      - [General Guidelines](#general-guidelines)
      - [Mocking External Services](#mocking-external-services)
@@ -286,6 +287,99 @@ function is provided.
 ### Adding a New Stage or Module
 
 #### TODO(Devin): Add details about adding a new stage or module once we have router node functionality in place.
+
+### Adding a New Text-Generation Task
+
+Text-generation tasks are stateless strategy classes that turn logical inputs
+(for example, a question plus retrieved context) into exactly one completion
+call and parse the provider's response. They live in
+`nemo_retriever/src/nemo_retriever/models/llm/tasks/`.
+
+Existing tasks are good references:
+
+- `generic.py` - `GenericPromptTask`, a validated prompt-template task
+- `rag_answer.py` - `RagAnswerTask`, question and context answering
+- `summarize.py` - `SummarizeTask`, document summarization
+
+#### 1. Subclass TextGenerationTask
+
+Create `tasks/<your_task>.py` and subclass the ABC in `tasks/base.py`:
+
+```python
+from nemo_retriever.models.llm.tasks.base import TextGenerationTask
+from nemo_retriever.models.llm.types import GenerationRequest
+
+
+class MyTask(TextGenerationTask):
+    """One-line description of what the task produces."""
+
+    # Logical inputs callers must provide (validated by the lifecycle).
+    required_inputs = ("document", "focus")
+
+    # Override sampling defaults only when your task needs different ones.
+    _default_sampling = {"temperature": 0.2, "top_p": None, "max_tokens": 1024}
+
+    def build_request(self, **inputs: object) -> GenerationRequest:
+        """Build one provider-neutral request from the logical inputs."""
+        ...
+```
+
+`build_request` is the only method you must implement. Two optional hooks:
+
+- `parse(self, raw_text: str) -> str` - post-process the completion text. The
+  default returns `raw_text.strip()`; override it to strip think tags, extract
+  structured output, or normalize formatting.
+- `_preflight_error(self, **inputs) -> Optional[str]` - return an error code
+  when no provider request should be made (for example, empty input). The
+  lifecycle raises it as a non-retryable `request`-phase failure.
+
+Callers run tasks through `TextGenerationTask.invoke(client, **inputs)`, which
+drives the strict build, complete, and parse lifecycle - your task never calls
+the provider directly.
+
+Design rules the lifecycle enforces (see `base.py`):
+
+- **Stateless** - a task instance holds configuration, never per-call state.
+- **One completion call** per invocation; no hidden retries inside the task.
+- **Declared inputs** - everything `build_request` consumes must be listed in
+  `required_inputs`.
+- **Strict failures** - errors surface as `GenerationTaskError` with a `phase`
+  of `request`, `transport`, `response`, or `parse`, a stable `code`, and a
+  sanitized `public_message`.
+
+#### 2. Validate at Construction Time
+
+Follow `generic.py`: validate templates and configuration in `__init__` (or a
+module-level helper) and fail fast with a clear `ValueError` or `TypeError`,
+not at request time. If your task accepts a prompt template, require a
+one-to-one match between template fields and declared inputs.
+
+#### 3. Register the Task
+
+Export the task from `tasks/__init__.py` so it is importable from the package
+root:
+
+```python
+from nemo_retriever.models.llm.tasks.my_task import MyTask
+
+__all__ = [..., "MyTask"]
+```
+
+#### 4. Test It
+
+Add unit tests alongside the existing task tests in
+`nemo_retriever/tests/test_generation_tasks.py`, covering:
+
+- request building from valid inputs, including template edge cases
+- rejection of missing or extra inputs
+- response parsing, including empty-output handling and think-tag stripping
+  where applicable
+- error mapping: each failure phase raises `GenerationTaskError` with the
+  correct `code` and `retryable` flag
+
+Follow the [Workflow](#workflow) steps and sign your commits per the
+[DCO](#developer-certificate-of-origin-dco) section before opening a pull
+request.
 
 ### Common Practices for Writing Unit Tests
 
