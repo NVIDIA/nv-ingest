@@ -29,16 +29,22 @@ def decode_base64_image(image_b64: str) -> Image.Image:
     ------
     ValueError
         If the input cannot be decoded or read as an image.
+        Unexpected implementation errors propagate without being relabeled.
     ImportError
         If Pillow is not installed.
     """
     import base64
+    import binascii
     import io
 
     from PIL import Image
 
     try:
-        with Image.open(io.BytesIO(base64.b64decode(image_b64))) as image:
+        image_bytes = base64.b64decode(image_b64)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError(f"Failed to decode base64 image: {exc}") from exc
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as image:
             return image.convert("RGB")
-    except Exception as exc:
+    except (OSError, Image.DecompressionBombError) as exc:
         raise ValueError(f"Failed to decode base64 image: {exc}") from exc
