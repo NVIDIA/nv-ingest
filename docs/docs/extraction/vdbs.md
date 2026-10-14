@@ -314,6 +314,8 @@ For Ray batch ingestion, configure LanceDB streaming behavior in the LanceDB
 | `stream_batch_bytes` | Maximum Arrow bytes in one packed batch. The default is 256 MiB. |
 | `stream_optimize` | Runs LanceDB optimization after a successful streamed write. The default is `False`. |
 | `stream_operation_id` | Enables durable retries for one caller-persisted operation ID. The identity covers stored rows after configured filtering and table-result settings. The default is `None`. |
+| `worker_write` | Writes Lance fragments from the Ray workers and commits them once from the driver, instead of streaming every block through the driver. Requires a local, dense (non-sparse) table, `pylance` on the workers, and `ingest(return_results=False)`. The default is `False`. |
+| `worker_write_rows` | Maximum rows per worker write task when `worker_write` is `True`. The default is `8192`. |
 
 Without `stream_operation_id`, LanceDB keeps bounded Arrow packing and applies
 the records with one table mutation. This default stores no durable idempotency
@@ -338,6 +340,13 @@ records after a known commit and finalization failure.
 
 These settings apply only to `LanceDB.stream_ingest()`. Legacy `run()` calls
 reject non-default streaming settings instead of ignoring them.
+
+With `worker_write`, each Ray write task projects one block and writes it as Lance
+fragments with the same page layout as the streaming writer. The driver receives
+only fragment receipts, commits one table version, and then runs the same index
+build and validation as the streaming path. Hybrid tables get their full-text
+index in that step. The worker path does not support `stream_operation_id`
+recovery markers or sidecar metadata, and it does not record a stream digest.
 
 `RayDataExecutor.build_dataset()` remains lazy and builds the complete legacy
 graph, including the global VDB stage. In-process and service execution do not
