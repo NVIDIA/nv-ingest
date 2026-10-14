@@ -164,7 +164,8 @@ def test_root_ingest_runs_default_execution_chain(monkeypatch, tmp_path) -> None
     assert extract_params.extract_infographics is False
     assert extract_params.extract_page_as_image is True
     assert fake_ingestor.extract.call_args.kwargs == {}
-    assert fake_ingestor.embed.call_args.args[0].embed_model_name == "nvidia/Nemotron-3.5-Embed-1B-NVFP4"
+    # Graph actor selection, not the CLI driver, chooses the default checkpoint.
+    assert fake_ingestor.embed.call_args.args == ()
     vdb_upload_params = fake_ingestor.vdb_upload.call_args.args[0]
     assert vdb_upload_params.vdb_op == "lancedb"
     assert vdb_upload_params.vdb_kwargs == {
@@ -172,8 +173,6 @@ def test_root_ingest_runs_default_execution_chain(monkeypatch, tmp_path) -> None
         "table_name": "nemo-retriever",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
-        "embedding_model_revision": "ac586a0326b2f253290c8a3d7a29a54012fe6996",
     }
     assert "Ingested 1 file(s) → 7 row(s) in LanceDB lancedb/nemo-retriever." in result.output
 
@@ -230,8 +229,6 @@ def test_root_ingest_without_mode_accepts_local_options_before_documents(monkeyp
         "table_name": "nemo-retriever",
         "overwrite": False,
         "hybrid": True,
-        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
-        "embedding_model_revision": "ac586a0326b2f253290c8a3d7a29a54012fe6996",
     }
 
 
@@ -500,8 +497,10 @@ def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path, requ
         arguments.extend(["--embed-model-name", requested_model])
     result = RUNNER.invoke(cli_main.app, arguments)
 
-    expected_model = requested_model or "nvidia/Nemotron-3.5-Embed-1B-BF16"
-    assert fake_ingestor.embed.call_args.args[0].model_name == expected_model
+    if requested_model:
+        assert fake_ingestor.embed.call_args.args[0].model_name == requested_model
+    else:
+        assert fake_ingestor.embed.call_args.args == ()
     driver_probe.assert_not_called()
 
     assert result.exit_code == 0
@@ -514,9 +513,15 @@ def test_root_ingest_passes_vdb_options_and_run_mode(monkeypatch, tmp_path, requ
         "table_name": "docs",
         "overwrite": True,
         "hybrid": True,
-        "embedding_model_name": expected_model,
-        "embedding_model_revision": get_hf_revision(expected_model),
-        **({"vector_dim": None} if requested_model else {}),
+        **(
+            {
+                "embedding_model_name": requested_model,
+                "embedding_model_revision": get_hf_revision(requested_model),
+                "vector_dim": None,
+            }
+            if requested_model
+            else {}
+        ),
     }
     assert "Ingested 2 file(s) → 12 row(s) in LanceDB /tmp/lancedb/docs." in result.output
 
@@ -536,8 +541,6 @@ def test_root_ingest_append_forwards_overwrite_false(monkeypatch, tmp_path) -> N
         "table_name": "nemo-retriever",
         "overwrite": False,
         "hybrid": True,
-        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
-        "embedding_model_revision": "ac586a0326b2f253290c8a3d7a29a54012fe6996",
     }
 
 
@@ -1934,8 +1937,6 @@ def test_root_ingest_index_mode_passes_explicit_mode_into_vdb_kwargs(monkeypatch
         "table_name": "docs",
         "overwrite": True,
         "hybrid": hybrid,
-        "embedding_model_name": "nvidia/Nemotron-3.5-Embed-1B-NVFP4",
-        "embedding_model_revision": "ac586a0326b2f253290c8a3d7a29a54012fe6996",
     }
 
 

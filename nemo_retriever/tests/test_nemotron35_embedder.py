@@ -350,10 +350,10 @@ def test_hf_load_disables_causality_on_text_attention_only(monkeypatch, missing_
 
 
 def test_image_without_remaining_text_budget_fails_before_embedding(monkeypatch):
-    from nemo_retriever.models.local import llama_nemotron_embed_vl_1b_v2_embedder as vl
+    from nemo_retriever.models.inference import image as image_utils
 
     image = MagicMock()
-    monkeypatch.setattr(vl, "_b64_to_pil", lambda value: image)
+    monkeypatch.setattr(image_utils, "decode_base64_image", lambda value: image)
     embedder = Nemotron35Embedder("model", None, "query:", "passage:", max_length=10)
     embedder._model = MagicMock()
     embedder._template = TEMPLATE

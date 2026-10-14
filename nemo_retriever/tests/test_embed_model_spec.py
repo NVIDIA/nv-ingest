@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import os.path
 from types import SimpleNamespace
 
 import huggingface_hub
@@ -76,6 +77,35 @@ def test_local_text_checkpoint_is_resolved_from_model_type(tmp_path):
     assert spec.revision is None
     assert spec.requires_vllm is False
     assert spec.max_input_tokens == 8192
+
+
+@pytest.mark.parametrize("path_style", ["absolute", "relative", "tilde"])
+def test_local_template_uses_same_path_resolution_as_checkpoint(tmp_path, monkeypatch, path_style):
+    from nemo_retriever.models.inference.retrieval_template import load_retrieval_template
+
+    _write_config(tmp_path, _text_config())
+    template = "{{ messages[0].content }} {{ messages[1].content }}"
+    (tmp_path / "chat_template.jinja").write_text(template, encoding="utf-8")
+    if path_style == "tilde":
+        model_id = "~/" + tmp_path.name
+        expanduser = os.path.expanduser
+        monkeypatch.setattr(
+            os.path, "expanduser", lambda value: str(tmp_path.parent) if value == "~" else expanduser(value)
+        )
+    elif path_style == "relative":
+        monkeypatch.chdir(tmp_path.parent)
+        model_id = "./" + tmp_path.name
+    else:
+        model_id = str(tmp_path)
+    monkeypatch.setattr(
+        huggingface_hub, "hf_hub_download", lambda *args, **kwargs: pytest.fail("Local checkpoint must not access Hub")
+    )
+    load_retrieval_template.cache_clear()
+    try:
+        assert resolve_embed_model_spec(model_id).revision is None
+        assert load_retrieval_template(model_id, None) == template
+    finally:
+        load_retrieval_template.cache_clear()
 
 
 def test_vl_checkpoint_uses_declared_document_input_limit(tmp_path):

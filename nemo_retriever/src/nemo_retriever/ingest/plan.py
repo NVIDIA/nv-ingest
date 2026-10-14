@@ -667,9 +667,12 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
 
     remote_embedding = bool(str(embed.embed_invoke_url or "").strip())
     legacy_n3 = bool(embed.embed_model_name) and resolve_embed_model(embed.embed_model_name) == NEMOTRON_3_EMBED_MODEL
+    # Unspecified defaults depend on the selected graph actor: GPU actors
+    # use local N3.5, while CPU actors supply the hosted N3 endpoint. The
+    # resolved graph shares that actor's identity with the index writer.
     embedding_model_name = (
         None
-        if resolved_index_mode == "sparse"
+        if resolved_index_mode == "sparse" or (not remote_embedding and not embed.embed_model_name)
         else (
             resolve_embed_model(embed.embed_model_name)
             if remote_embedding or legacy_n3

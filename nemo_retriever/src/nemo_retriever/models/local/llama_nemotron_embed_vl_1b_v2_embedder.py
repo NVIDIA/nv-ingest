@@ -13,6 +13,7 @@ import torch
 
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.embed_model_spec import resolve_embed_model_revision
+from nemo_retriever.models.inference.image import decode_base64_image
 
 
 def _l2_normalize(x: torch.Tensor, eps: float = 1e-12) -> torch.Tensor:
@@ -26,18 +27,6 @@ def _to_normalized_cpu(out: Any) -> torch.Tensor:
     if isinstance(out, torch.Tensor):
         return _l2_normalize(out.detach().cpu())
     return _l2_normalize(torch.as_tensor(out, dtype=torch.float32).cpu())
-
-
-def _b64_to_pil(b64_str: str):
-    import base64
-    import io
-
-    from PIL import Image
-
-    try:
-        return Image.open(io.BytesIO(base64.b64decode(b64_str))).convert("RGB")
-    except Exception as exc:
-        raise ValueError(f"Failed to decode base64 image: {exc}") from exc
 
 
 @dataclass
@@ -306,7 +295,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
             return torch.empty((0, self.output_dimension), dtype=torch.float32)
 
         prompt_dicts = [
-            {"prompt": f"{self.document_prefix}<image> ", "multi_modal_data": {"image": _b64_to_pil(b64)}}
+            {"prompt": f"{self.document_prefix}<image> ", "multi_modal_data": {"image": decode_base64_image(b64)}}
             for b64 in valid_b64
         ]
         vectors = embed_multimodal_with_vllm_llm(
@@ -336,7 +325,7 @@ class LlamaNemotronEmbedVL1BV2VLLMEmbedder:
             return torch.empty((0, self.output_dimension), dtype=torch.float32)
 
         prompt_dicts = [
-            {"prompt": f"{self.document_prefix}<image> {text}", "multi_modal_data": {"image": _b64_to_pil(b64)}}
+            {"prompt": f"{self.document_prefix}<image> {text}", "multi_modal_data": {"image": decode_base64_image(b64)}}
             for text, b64 in zip(paired_texts, paired_b64)
         ]
         vectors = embed_multimodal_with_vllm_llm(

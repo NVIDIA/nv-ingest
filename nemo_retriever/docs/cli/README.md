@@ -50,7 +50,7 @@ configuration, local embed backend selection, or local media controls.
 
 ## Quick start
 
-Local ingest embeds on the local GPU when `--embed-invoke-url` is unset. Install
+Local ingest embeds on an available local GPU when `--embed-invoke-url` is unset. Install
 the `[local]` extra before you run the default `retriever ingest` or
 `retriever ingest batch` commands:
 
@@ -60,13 +60,15 @@ pip install "nemo-retriever[local]"
 
 On this development branch, omitting `--embed-model-name` selects Nemotron 3.5 Embed 1B for local inference. These changes are not part of the documented 26.08.1 release. The default local backend is vLLM. For in-process ingest, NeMo Retriever Library selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4. Otherwise, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`. With `--local-ingest-embed-backend hf`, it selects BF16 because the compressed-tensors NVFP4 checkpoint requires vLLM.
 
-`retriever ingest batch` automatically selects BF16 because Ray cluster GPU counts do not establish worker GPU architectures. Explicit Nemotron 3.5 precision checkpoint IDs remain unchanged. The CLI treats explicit Nemotron 3 precision IDs as the logical Nemotron 3 model and selects BF16 in batch mode. Select Nemotron 3.5 NVFP4 explicitly only when every eligible worker supports it; the driver's GPU alone does not establish that compatibility.
+For local GPU embedding, `retriever ingest batch` automatically selects BF16 because Ray cluster GPU counts do not establish worker GPU architectures. Explicit Nemotron 3.5 precision checkpoint IDs remain unchanged. The CLI treats explicit Nemotron 3 precision IDs as the logical Nemotron 3 model and selects BF16 in batch mode. Select Nemotron 3.5 NVFP4 explicitly only when every eligible worker supports it; the driver's GPU alone does not establish that compatibility.
 
 The Nemotron 3.5 integration remains experimental while checkpoint access is private. Its model-specific vLLM adapter preserves bidirectional text attention without patching vendor model classes. Validate retrieval quality before production use.
 
 The default modality remains text. Nemotron 3.5 also supports image and combined text-and-image embeddings when you select the matching modality. Its prerelease repositories require access: set `HF_TOKEN` to a token from an authorized Hugging Face account. Do not add query or document prefixes yourself; the library applies the checkpoint's retrieval chat template.
 
 Remote embedding and Helm retain `nvidia/nemotron-3-embed-1b` as the text-only default. Explicitly selected Nemotron 3 checkpoints retain their existing local behavior.
+
+When graph execution selects the CPU embedding actor without an explicit URL, it uses `https://integrate.api.nvidia.com/v1/embeddings`. This hosted fallback retains the Nemotron 3 default, including the model identity recorded on the index. Set `NVIDIA_API_KEY` or `NGC_API_KEY` before ingest.
 
 If you installed the base package for Remote NIM with no local GPU, keep that
 install and pass `--embed-invoke-url` instead. Refer to
@@ -423,7 +425,7 @@ These options apply to `retriever ingest`, `retriever ingest local`, and
 | `--table-name` | `nemo-retriever` | LanceDB table name. Must match query-time storage flags. Python `.vdb_upload()` and default `Retriever()` use the same default. |
 | `--overwrite/--append` | overwrite | Overwrite the table by default; use `--append` to add rows. |
 | `--index-mode` | `auto` | Recommended: leave this unset. `auto` creates a hybrid vector + BM25/FTS configuration for new tables and preserves an existing table on append. Use `dense`, `hybrid`, or `sparse` only for explicit experiments or specialized deployments. |
-| `--embed-model-name` | unset | In-process inference selects Nemotron 3.5 Embed 1B: NVFP4 with native-capable GPUs and vLLM, or BF16 otherwise. Ray batch automatically selects BF16. Explicit Nemotron 3.5 precision IDs remain unchanged. The CLI treats explicit Nemotron 3 precision IDs as the logical Nemotron 3 model and selects BF16 in batch mode. Remote inference retains `nvidia/nemotron-3-embed-1b`. |
+| `--embed-model-name` | unset | Local GPU inference selects Nemotron 3.5 Embed 1B: NVFP4 with native-capable GPUs and vLLM, or BF16 otherwise. Ray batch GPU embedding automatically selects BF16. Explicit Nemotron 3.5 precision IDs remain unchanged. The CLI treats explicit Nemotron 3 precision IDs as the logical Nemotron 3 model and selects BF16 for batch GPU embedding. Remote inference, including implicit hosted CPU fallback, retains `nvidia/nemotron-3-embed-1b`. |
 | `--local-ingest-embed-backend` | `vllm` | Local embedding backend. With no model override, explicit `hf` use selects the Nemotron 3.5 BF16 checkpoint. |
 | `--method` | profile default | PDF extraction method: `pdfium`, `pdfium_hybrid`, `ocr`, or `nemotron_parse`. The `auto` profile selects `pdfium_hybrid`; `fast-text` selects `pdfium`. An explicit value overrides the profile-selected method. |
 | `--extract-text`, `--extract-tables`, `--extract-charts` | planner default | Enable or disable extraction families. |

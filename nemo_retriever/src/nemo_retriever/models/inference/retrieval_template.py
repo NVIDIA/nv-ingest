@@ -11,11 +11,14 @@ embedders retain their prefix-only contract. No generation wrappers are added.
 from functools import lru_cache
 from pathlib import Path
 
+from nemo_retriever.models.embed_model_spec import _local_config_path
+
 
 @lru_cache(maxsize=16)
 def load_retrieval_template(model_id: str, revision: str | None, cache_dir: str | None = None) -> str:
-    if Path(model_id).is_dir():
-        path = Path(model_id) / "chat_template.jinja"
+    local_config = _local_config_path(model_id)
+    if local_config is not None:
+        path = local_config.parent / "chat_template.jinja"
     else:
         from huggingface_hub import hf_hub_download
 

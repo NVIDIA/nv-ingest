@@ -9,9 +9,9 @@ This integration remains experimental while the checkpoints require private repo
 When you omit the local embedding model, the library selects a checkpoint as follows:
 
 - For in-process inference with the default `vllm` backend, it selects `nvidia/Nemotron-3.5-Embed-1B-NVFP4` when every visible CUDA device supports native NVFP4.
-- On other devices, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`.
+- On other supported local GPUs, it selects `nvidia/Nemotron-3.5-Embed-1B-BF16`.
 - With the `hf` backend, it selects the BF16 checkpoint. The compressed-tensors NVFP4 checkpoint requires vLLM.
-- For Ray batch execution, automatic selection uses BF16 because cluster GPU counts do not establish worker GPU architectures. Explicit Nemotron 3.5 precision checkpoint IDs remain unchanged; select Nemotron 3.5 NVFP4 only when every eligible worker supports it.
+- For Ray batch GPU execution, automatic selection uses BF16 because cluster GPU counts do not establish worker GPU architectures. Explicit Nemotron 3.5 precision checkpoint IDs remain unchanged; select Nemotron 3.5 NVFP4 only when every eligible worker supports it.
 
 The `retriever ingest batch` CLI treats explicit Nemotron 3 precision IDs as the logical Nemotron 3 model and selects BF16.
 
@@ -30,6 +30,8 @@ Before changing an existing index's model or precision, validate retrieval quali
 ## Remote and Helm defaults
 
 Remote embedding and Helm retain the text-only Nemotron 3 Embed 1B default, with logical model ID `nvidia/nemotron-3-embed-1b`. An explicitly selected Nemotron 3 model also retains its existing local resolution behavior.
+
+When graph execution selects the CPU embedding actor without an explicit endpoint, it calls `https://integrate.api.nvidia.com/v1/embeddings`. This hosted fallback retains the Nemotron 3 default and records that model on the index. Set `NVIDIA_API_KEY` or `NGC_API_KEY` before ingest.
 
 Helm deploys `nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.2`. The NIM selects a supported NVFP4 or BF16 engine automatically. For NIM product details, refer to the [NeMo Retriever Text Embedding NIM documentation](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html).
 

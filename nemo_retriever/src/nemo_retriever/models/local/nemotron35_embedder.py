@@ -270,14 +270,12 @@ class Nemotron35Embedder:
             If image decoding, checkpoint loading, or processor execution fails.
         """
         from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
-        from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-            _b64_to_pil,
-        )
+        from nemo_retriever.models.inference.image import decode_base64_image
 
         self._ensure_loaded()
         limit = self.query_max_length if query else self.max_length
         prefix = self.query_prefix if query else self.document_prefix
-        image = _b64_to_pil(image_b64)
+        image = decode_base64_image(image_b64)
         try:
 
             def expanded_count(prompt):
@@ -338,14 +336,12 @@ class Nemotron35Embedder:
         OSError, RuntimeError
             If image decoding, checkpoint loading, or backend inference fails.
         """
-        from nemo_retriever.models.local.llama_nemotron_embed_vl_1b_v2_embedder import (
-            _b64_to_pil,
-        )
+        from nemo_retriever.models.inference.image import decode_base64_image
 
         images = []
         try:
             for value in images_b64:
-                images.append(_b64_to_pil(value))
+                images.append(decode_base64_image(value))
             return self._encode(list(texts), images=images, batch_size=batch_size)
         finally:
             for image in images:

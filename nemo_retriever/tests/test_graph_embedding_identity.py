@@ -87,6 +87,78 @@ def test_cpu_and_remote_defaults_remain_n3(tmp_path, remote):
     assert "embedding_model_revision" not in metadata
 
 
+@pytest.mark.parametrize("run_mode", ["inprocess", "batch"])
+@pytest.mark.parametrize("gpu_count", [0, 1])
+@pytest.mark.parametrize("with_embed_options", [False, True])
+def test_cli_default_is_resolved_by_selected_actor(tmp_path, monkeypatch, run_mode, gpu_count, with_embed_options):
+    from nemo_retriever.ingest.plan import (
+        IngestEmbedOptions,
+        IngestPlanRequest,
+        IngestRuntimeOptions,
+        IngestSourceOptions,
+        IngestStorageOptions,
+        resolve_ingest_plan,
+    )
+    from nemo_retriever.models.inference.shared import build_embed_kwargs
+    from nemo_retriever.operators.embed.cpu_operator import _BatchEmbedCPUActor
+    from nemo_retriever.operators.embed.gpu_operator import _BatchEmbedActor as BatchEmbedGPUActor
+
+    document = tmp_path / "input.pdf"
+    document.write_bytes(b"%PDF-1.4\n")
+    driver_probe = MagicMock(return_value=True)
+    monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", driver_probe)
+    plan = resolve_ingest_plan(
+        IngestPlanRequest(
+            source=IngestSourceOptions(documents=[str(document)]),
+            runtime=IngestRuntimeOptions(run_mode=run_mode),
+            # Exercise non-model options as well as the entirely omitted embed params.
+            embed=IngestEmbedOptions(embed_granularity="page") if with_embed_options else IngestEmbedOptions(),
+            storage=IngestStorageOptions(lancedb_uri=str(tmp_path / "index")),
+        )
+    )
+    driver_probe.assert_not_called()
+    params = plan.embed_params or EmbedParams()
+    assert params.model_name is None
+    assert params.embed_model_name is None
+    assert "embedding_model_name" not in plan.vdb_params.vdb_kwargs
+    assert "embedding_model_revision" not in plan.vdb_params.vdb_kwargs
+    resources = Resources(cpu_count=8, gpu_count=gpu_count)
+    if run_mode == "batch":
+        resources = ClusterResources(total_resources=resources, available_resources=resources)
+    graph = build_post_extract_graph(
+        embed_params=params,
+        vdb_upload_params=plan.vdb_params,
+        stage_order=("embed",),
+        reshape_content_before_embed=False,
+    )
+    resolved = resolve_graph(graph, resources)
+    embed_node = resolved.roots[0]
+    metadata = embed_node.children[0].operator_kwargs["vdb_kwargs"]
+    params = embed_node.operator_kwargs["params"]
+    if gpu_count:
+        expected = NEMOTRON_35_EMBED_BF16_MODEL if run_mode == "batch" else NEMOTRON_35_EMBED_NVFP4_MODEL
+        assert embed_node.operator_class is BatchEmbedGPUActor
+        assert params.model_name == params.embed_model_name == metadata["embedding_model_name"] == expected
+        assert params.embed_model_revision == metadata["embedding_model_revision"] == get_hf_revision(expected)
+    else:
+        import pandas as pd
+        from nemo_retriever.models.inference import runtime
+
+        assert embed_node.operator_class is _BatchEmbedCPUActor
+        assert metadata["embedding_model_name"] == NEMOTRON_3_EMBED_MODEL
+        assert "embedding_model_revision" not in metadata
+        # The CPU actor adds the hosted endpoint, then request construction must use N3.
+        kwargs = build_embed_kwargs(params)
+        kwargs["embedding_endpoint"] = _BatchEmbedCPUActor.DEFAULT_EMBED_INVOKE_URL
+        request = MagicMock(side_effect=lambda frame, **options: (frame, {}))
+        monkeypatch.setattr(runtime, "create_text_embeddings_for_df", request)
+        runtime.embed_text_main_text_embed(pd.DataFrame([{"text": "document"}]), **kwargs)
+        request.assert_called_once()
+        assert request.call_args.kwargs["transform_config"].embedding_model == metadata["embedding_model_name"]
+        assert request.call_args.kwargs["task_config"]["endpoint_url"] == _BatchEmbedCPUActor.DEFAULT_EMBED_INVOKE_URL
+        driver_probe.assert_not_called()
+
+
 def test_explicit_sink_identity_and_dimension_are_preserved(tmp_path, monkeypatch):
     monkeypatch.setattr("nemo_retriever.models._cuda_supports_native_nvfp4", lambda: False)
     _, sink_kwargs = resolved_stages(
