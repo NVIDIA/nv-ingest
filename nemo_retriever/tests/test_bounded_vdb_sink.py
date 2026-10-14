@@ -27,6 +27,7 @@ from nemo_retriever.common.vdb._lancedb_stream_state import (
 )
 from nemo_retriever.common.vdb.adt_vdb import UnsupportedVDBOperation
 from nemo_retriever.common.vdb.lancedb import LanceDB
+import nemo_retriever.common.vdb.lancedb as lancedb_module
 from nemo_retriever.common.vdb.records import VdbUploadError
 from nemo_retriever.operators.vdb import IngestVdbOperator
 
@@ -305,15 +306,14 @@ def test_stream_controls_are_rejected_by_legacy_mutations(tmp_path: Path, contro
 
 def test_stream_optimize_runs_after_the_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _backend(tmp_path, stream_operation_id="seed").stream_ingest([_record(0)])
-    table_type = type(_table(tmp_path))
-    original_optimize = table_type.optimize
+    original_optimize = lancedb_module._optimize_lancedb_table
     optimized_row_counts: list[int] = []
 
-    def observed_optimize(table, *args, **kwargs):
+    def observed_optimize(table):
         optimized_row_counts.append(int(table.count_rows()))
-        return original_optimize(table, *args, **kwargs)
+        return original_optimize(table)
 
-    monkeypatch.setattr(table_type, "optimize", observed_optimize)
+    monkeypatch.setattr(lancedb_module, "_optimize_lancedb_table", observed_optimize)
     _backend(
         tmp_path,
         overwrite=False,
