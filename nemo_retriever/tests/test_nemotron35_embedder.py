@@ -318,9 +318,17 @@ def test_registration_uses_a_unique_lazy_architecture(monkeypatch):
     )
 
 
-def test_hf_load_disables_causality_on_text_attention_only(monkeypatch):
+@pytest.mark.parametrize("missing_parent_export", [False, True])
+def test_hf_load_disables_causality_on_text_attention_only(monkeypatch, missing_parent_export):
+    import importlib
+
     import transformers
 
+    embedder_module = importlib.import_module(Nemotron35Embedder.__module__)
+    if missing_parent_export:
+        # Import-safety tests can reload the parent while this child stays cached.
+        local_package = importlib.import_module("nemo_retriever.models.local")
+        monkeypatch.delattr(local_package, "nemotron35_embedder", raising=False)
     text_attention = SimpleNamespace(is_causal=True)
     vision_attention = SimpleNamespace(is_causal=True)
     model = MagicMock()
@@ -331,7 +339,8 @@ def test_hf_load_disables_causality_on_text_attention_only(monkeypatch):
     monkeypatch.setattr(transformers.AutoModel, "from_pretrained", MagicMock(return_value=model))
     monkeypatch.setattr(transformers.AutoProcessor, "from_pretrained", MagicMock())
     monkeypatch.setattr(
-        "nemo_retriever.models.local.nemotron35_embedder.load_retrieval_template",
+        embedder_module,
+        "load_retrieval_template",
         lambda *args: TEMPLATE,
     )
     embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="hf")
