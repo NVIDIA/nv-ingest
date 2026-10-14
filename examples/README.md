@@ -17,6 +17,7 @@ Start with these guides and notebooks:
 For advanced scenarios, use these guides and notebooks:
 
 - [Build a Custom Vector Database Operator](building_vdb_operator.ipynb)
+- [Reindex with a New Embedding Model](reindex_embedding_model.ipynb) — extract once to Parquet, then reindex with Gemma 300M, Nemotron 3 Embed 1B, and Nemotron 3 Embed 8B and evaluate retrieval
 - [Try Enterprise RAG Blueprint](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
 - [Multimodal RAG with LangChain](langchain_multimodal_rag.ipynb)
 - [Multimodal RAG with LlamaIndex](llama_index_multimodal_rag.ipynb)

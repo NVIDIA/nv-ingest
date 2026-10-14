@@ -54,6 +54,17 @@ def _ministral_config(**overrides):
     return config
 
 
+def _gemma_config(**overrides):
+    config = {
+        "model_type": "gemma3_text",
+        "architectures": ["Gemma3TextModel"],
+        "hidden_size": 768,
+        "use_bidirectional_attention": True,
+    }
+    config.update(overrides)
+    return config
+
+
 def _vl_config(**overrides):
     config = {
         "model_type": "llama_nemotron_vl",
@@ -122,7 +133,7 @@ def test_local_modelopt_checkpoint_requires_vllm(tmp_path, config, family, quant
 def test_local_checkpoint_rejects_unsupported_architecture(tmp_path):
     _write_config(tmp_path, {"model_type": "bert"})
 
-    with pytest.raises(ValueError, match="supported Nemotron embed model types"):
+    with pytest.raises(ValueError, match="supported dense embed model types"):
         resolve_embed_model_spec(str(tmp_path))
 
 
@@ -193,6 +204,44 @@ def test_ministral_checkpoint_requires_explicit_non_causal_config(tmp_path, is_c
 
     with pytest.raises(ValueError, match="dense Ministral3 embedding profiles require is_causal=false"):
         resolve_embed_model_spec(str(tmp_path))
+
+
+def test_gemma_checkpoint_is_resolved_with_prompt_metadata(tmp_path):
+    _write_config(tmp_path, _gemma_config())
+    _write_prompt_config(
+        tmp_path,
+        {
+            "query": "task: search result | query: ",
+            "document": "title: none | text: ",
+        },
+    )
+    _write_sentence_config(tmp_path, max_seq_length=2048)
+
+    spec = resolve_embed_model_spec(str(tmp_path))
+
+    assert spec.family == "text"
+    assert spec.output_dimension == 768
+    assert spec.query_prefix == "task: search result | query: "
+    assert spec.document_prefix == "title: none | text: "
+    assert spec.max_input_tokens == 2048
+    assert spec.requires_vllm is True
+
+
+@pytest.mark.parametrize("use_bidirectional_attention", [False, None])
+def test_gemma_checkpoint_requires_bidirectional_attention(tmp_path, use_bidirectional_attention):
+    _write_config(tmp_path, _gemma_config(use_bidirectional_attention=use_bidirectional_attention))
+
+    with pytest.raises(ValueError, match="Gemma 3 embedding profiles require use_bidirectional_attention=true"):
+        resolve_embed_model_spec(str(tmp_path))
+
+
+def test_gemma_checkpoint_rejects_hf_backend(tmp_path):
+    from nemo_retriever.models.embed_model_spec import validate_embed_model_backend
+
+    _write_config(tmp_path, _gemma_config())
+
+    with pytest.raises(ValueError, match="requires backend='vllm'"):
+        validate_embed_model_backend(resolve_embed_model_spec(str(tmp_path)), "hf")
 
 
 @pytest.mark.parametrize(
