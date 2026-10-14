@@ -138,11 +138,15 @@ def _local_table_lock(uri: str, table_name: str, *, phase: str) -> AbstractConte
 
 # Data-file version LanceDB 0.34's writer emits for its default ``data_storage_version="stable"``.
 _WORKER_WRITE_STORAGE_VERSION = "2.1"
-# Rows per Arrow batch handed to ``lance.write_fragments``. pylance writes one page per input batch
-# for fixed-size-list vectors (``max_page_bytes``/``max_rows_per_group`` do not split it), while the
-# LanceDB writer splits the stream into 1024-row groups (8 MiB pages for 2048-d float32). 64 MiB pages
-# made index-bypass (brute-force) vector scans ~5x slower on 360k rows; ANN was unaffected.
-_WORKER_WRITE_ROWS_PER_BATCH = 1024
+# Rows per Lance page for fixed-size-list vector columns. Lance flushes a vector page only at the
+# boundary of an Arrow batch, after the page reached its ~8 MiB target, so a batch larger than that
+# becomes one oversized page (``max_rows_per_group``/``max_bytes_per_file`` do not split it). 1024
+# rows x 2048-d float32 is one 8 MiB page, the layout the streaming writer gets from
+# ``_bounded_record_batches``; 8192-row batches gave 64 MiB pages and 5-10x slower index-bypass
+# (brute-force) vector scans, with ANN unaffected. ``write_fragments`` and ``compact_files`` both
+# take their batch size from here so worker-written and compacted tables keep the writer's layout.
+_LANCE_ROWS_PER_PAGE = 1024
+_WORKER_WRITE_ROWS_PER_BATCH = _LANCE_ROWS_PER_PAGE
 
 
 def _rebatched(batches: Iterable[pa.RecordBatch], rows: int) -> Iterator[pa.RecordBatch]:
@@ -151,6 +155,22 @@ def _rebatched(batches: Iterable[pa.RecordBatch], rows: int) -> Iterator[pa.Reco
     for batch in batches:
         for start in range(0, batch.num_rows, rows):
             yield batch.slice(start, min(rows, batch.num_rows - start))
+
+
+def _optimize_lancedb_table(table: Any) -> None:
+    """``table.optimize()`` with compaction pinned to ``_LANCE_ROWS_PER_PAGE``-row pages.
+
+    LanceDB's ``optimize()`` compacts with Lance's default read batch, which rewrites the vector column
+    into pages of thousands of rows and slows brute-force scans 5-10x (stream- and worker-written tables
+    alike). Running the three optimize steps (compact, prune, index update) through pylance lets
+    compaction keep the writer's page size.
+    """
+
+    dataset = table.to_lance()
+    dataset.optimize.compact_files(batch_size=_LANCE_ROWS_PER_PAGE)
+    dataset.cleanup_old_versions()
+    dataset.optimize.optimize_indices()
+    table.checkout_latest()
 
 
 def _fragment_json(fragment: Any) -> str:
@@ -1032,7 +1052,7 @@ class LanceDB(VDB):
         ):
             return
         try:
-            table.optimize()
+            _optimize_lancedb_table(table)
         except Exception as exc:
             self._last_optimization = {
                 "status": "error",
@@ -1828,7 +1848,7 @@ class LanceDB(VDB):
         if self.stream_optimize:
             with self._index_lock, _table_index_lock(self.uri, self.table_name):
                 fresh_table.checkout_latest()
-                fresh_table.optimize()
+                _optimize_lancedb_table(fresh_table)
 
         fresh_table.checkout_latest()
         if not _schemas_have_same_fields(_table_schema(fresh_table), expected_schema):
