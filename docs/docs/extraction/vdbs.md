@@ -71,13 +71,17 @@ You can omit `.embed()` if a custom stage provides an embedding in `metadata["em
 
 ## Keep the embedding model aligned { #lancedb-embedding-model-compatibility }
 
-Dense and hybrid retrieval require query and stored vectors from the same embedding model. New LanceDB tables record the canonical model in `nemo_retriever.embedding_model_name`. In the Python API, `.vdb_upload()` records the model of the `.embed()` stage unless `vdb_kwargs` sets `embedding_model_name`. If a local `.embed()` sets `embed_model_name` to a different model than `model_name`, the library cannot tell which model produces the vectors and records none. In that case, set `embedding_model_name` in `vdb_kwargs`. A local `Retriever` uses that model automatically and rejects an explicit query model that differs from it. Dense and hybrid queries also reject legacy or third-party tables that do not contain this metadata because compatibility cannot be verified. Local sparse retrieval is exempt because it does not create a dense query vector.
+Dense and hybrid retrieval require query and stored vectors from the same embedding model. New LanceDB tables record the canonical model in `nemo_retriever.embedding_model_name`. In the Python API, `.embed().vdb_upload()` resolves the concrete local checkpoint and immutable revision after selecting the embedding backend. The embedding actor and LanceDB writer share that identity, including when you omit the model override. Explicit `embedding_model_name` settings in `vdb_kwargs` remain authoritative. Remote and CPU embedding defaults remain unchanged. A local `Retriever` uses the recorded model and revision automatically and rejects an explicit query model that differs from it. Dense and hybrid queries also reject legacy or third-party tables that do not contain this metadata because compatibility cannot be verified. Local sparse retrieval is exempt because it does not create a dense query vector.
 
-The default changed from `nvidia/llama-nemotron-embed-vl-1b-v2` to `nvidia/nemotron-3-embed-1b`. Before you migrate a persistent table:
+The local checkpoint default on this development branch is Nemotron 3.5 Embed 1B. Remote and Helm embedding defaults remain Nemotron 3 Embed 1B. A default change does not migrate an existing table. Before you change the model used by a persistent table:
 
 1. Back up the LanceDB directory or persistent volume and retain the original corpus and ingest configuration.
 2. To keep the existing embedding space, query a tagged table with its recorded model. For a service deployment, explicitly set `serviceConfig.vectordb.embedModel` to the model used to create the table before startup.
 3. To adopt the new default, rebuild the table and re-ingest the complete corpus. For a CLI-managed table, run `retriever ingest` with the same URI and table name and pass `--overwrite` explicitly. Do not append new-model embeddings to the old table.
+
+New local Nemotron 3.5 indexes record the resolved precision-specific checkpoint and its pinned revision. Query uses that recorded identity rather than choosing a different precision from the current GPU. BF16 and NVFP4 checkpoint IDs remain distinct for index compatibility checks.
+
+Ray batch execution conservatively selects BF16 for an automatic checkpoint choice because the driver's CUDA devices do not establish worker GPU compatibility. An explicit precision checkpoint remains unchanged. The worker, writer, and later query share the selected checkpoint and revision.
 
 An untagged dense or hybrid table must be rebuilt; selecting a model cannot establish which embedding space its existing vectors use. The dedicated VectorDB service checks its configured legacy table during startup and checks collection-scoped tables when they are read or written. Rebuild or replace persisted tables before access, or retain the old model configuration for a tagged table.
 

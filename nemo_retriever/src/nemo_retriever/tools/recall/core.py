@@ -136,7 +136,7 @@ def print_run_summary(
 class RecallConfig:
     vdb_op: str = "lancedb"
     vdb_kwargs: dict[str, Any] = field(default_factory=dict)
-    query_embedder: str = NEMOTRON_3_EMBED_MODEL
+    query_embedder: str | None = None
     embedding_http_endpoint: Optional[str] = None
     embedding_grpc_endpoint: Optional[str] = None
     embedding_endpoint: Optional[str] = None
@@ -584,8 +584,8 @@ def retrieve_and_score(
     queries = df_query["query"].astype(str).tolist()
     gold = df_query["golden_answer"].astype(str).tolist()
     vdb_inner = dict(cfg.vdb_kwargs or {})
-    query_embedder = str(cfg.query_embedder or NEMOTRON_3_EMBED_MODEL)
     embedding_endpoint, embedding_use_grpc = _resolve_embedding_endpoint(cfg)
+    query_embedder = cfg.query_embedder or (NEMOTRON_3_EMBED_MODEL if embedding_endpoint else None)
     if embedding_use_grpc:
         raise ValueError(
             "RecallConfig gRPC query embedding is not supported with the graph-based Retriever. "

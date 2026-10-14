@@ -171,6 +171,8 @@ def create_vllm_llm(
     enforce_eager: bool = False,
     hf_overrides: Optional[dict] = None,
     limit_mm_per_prompt: Optional[dict] = None,
+    download_dir: Optional[str] = None,
+    model_impl: Optional[str] = None,
 ) -> Any:
     """
     Create and return a vLLM LLM instance for embedding (pooling runner).
@@ -211,6 +213,10 @@ def create_vllm_llm(
     }
     if revision is not None:
         kwargs["revision"] = revision
+    if download_dir is not None:
+        kwargs["download_dir"] = download_dir
+    if model_impl is not None:
+        kwargs["model_impl"] = model_impl
     if max_model_len is not None:
         kwargs["max_model_len"] = max_model_len
     if hf_overrides is not None:

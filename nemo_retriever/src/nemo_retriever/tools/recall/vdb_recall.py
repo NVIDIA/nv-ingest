@@ -11,7 +11,6 @@ from typing import Any, Dict, List, Optional
 import typer
 import pandas as pd  # noqa: F401
 from rich.console import Console
-from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL
 
 from nemo_retriever.tools.recall.core import (  # noqa: F401
     RecallConfig,
@@ -112,10 +111,10 @@ def recall_with_main(
         "--embedding-grpc-endpoint",
         help="gRPC embedding endpoint (e.g. 'localhost:8013').",
     ),
-    embedding_model: str = typer.Option(
-        NEMOTRON_3_EMBED_MODEL,
+    embedding_model: Optional[str] = typer.Option(
+        None,
         "--embedding-model",
-        help="Embedding model name.",
+        help="Embedding model override. By default, use the model recorded in the index.",
     ),
     embedding_api_key: Optional[str] = typer.Option(None, "--embedding-api-key", help="Embedding API key (optional)."),
     lancedb_uri: str = typer.Option("lancedb", "--lancedb-uri", help="LanceDB database URI (directory path)."),
@@ -166,7 +165,7 @@ def recall_with_main(
             "table_name": str(table_name),
             "vector_column_name": str(vector_column_name),
         },
-        query_embedder=str(embedding_model),
+        query_embedder=embedding_model,
         embedding_endpoint=query_embedding_endpoint,
         embedding_api_key=(embedding_api_key or ""),
         embedding_use_grpc=query_embedding_use_grpc,
@@ -247,10 +246,10 @@ def run(
         "--embedding-grpc-endpoint",
         help="gRPC embedding endpoint (e.g. 'localhost:8013').",
     ),
-    embedding_model: str = typer.Option(
-        NEMOTRON_3_EMBED_MODEL,
+    embedding_model: Optional[str] = typer.Option(
+        None,
         "--embedding-model",
-        help="Embedding model name.",
+        help="Embedding model override. By default, use the model recorded in the index.",
     ),
     embedding_api_key: Optional[str] = typer.Option(None, "--embedding-api-key", help="Embedding API key (optional)."),
     local_hf_device: Optional[str] = typer.Option(
@@ -305,7 +304,7 @@ def run(
             "table_name": str(table_name),
             "vector_column_name": str(vector_column_name),
         },
-        query_embedder=str(embedding_model),
+        query_embedder=embedding_model,
         embedding_endpoint=query_embedding_endpoint,
         embedding_api_key=(embedding_api_key or ""),
         embedding_use_grpc=query_embedding_use_grpc,

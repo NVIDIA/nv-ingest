@@ -609,9 +609,17 @@ def _append_ordered_transform_stages(
             )
 
     if vdb_upload_params is not None:
+        vdb_kwargs = resolve_vdb_upload_kwargs(vdb_upload_params, embed_params)
+        infer_identity = (
+            embed_params is not None
+            and vdb_upload_params.vdb_op == "lancedb"
+            and not vdb_kwargs.get("sparse")
+            and "embedding_model_name" not in vdb_upload_params.vdb_kwargs
+        )
         graph = graph >> IngestVdbOperator(
             vdb_op=vdb_upload_params.vdb_op,
-            vdb_kwargs=resolve_vdb_upload_kwargs(vdb_upload_params, embed_params),
+            vdb_kwargs=vdb_kwargs,
+            _embedding_params=embed_params if infer_identity else None,
         )
 
     if webhook_params is not None and getattr(webhook_params, "endpoint_url", None):

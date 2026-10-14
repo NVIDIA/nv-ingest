@@ -13,7 +13,7 @@ from nemo_retriever.common.vdb.lancedb_capabilities import (
     _table_schema,
     inspect_lancedb_table_object,
 )
-from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL, resolve_embed_model
+from nemo_retriever.models import NEMOTRON_3_EMBED_MODEL, resolve_embed_model, resolve_local_embed_model
 from nemo_retriever.models.embed_model_spec import resolve_embed_model_revision
 
 RequestedIngestIndexMode = Literal["auto", "dense", "hybrid", "sparse"]
@@ -99,13 +99,23 @@ def lancedb_index_mode_kwargs(mode: ResolvedIngestIndexMode) -> dict[str, bool]:
     return {"sparse": True} if mode == "sparse" else {"hybrid": mode == "hybrid"}
 
 
-def _embedding_model_kwargs(embed_params: Any) -> dict[str, Any]:
+def _embedding_model_kwargs(embed_params: Any, *, local: bool = False) -> dict[str, Any]:
     """Describe the embed stage so the table records the model that produced its vectors."""
     kwargs: dict[str, Any] = {}
     if embed_params.embed_model_name or embed_params.model_name or embed_params.dimensions:
         # Infer the width instead of assuming the default model's 2048-d vectors.
         kwargs["vector_dim"] = None
     remote = str(embed_params.embed_invoke_url or embed_params.embedding_endpoint or "").strip()
+    if local and not remote:
+        model_name = resolve_local_embed_model(
+            embed_params.embed_model_name or embed_params.model_name,
+            backend=embed_params.local_ingest_embed_backend,
+        )
+        revision = resolve_embed_model_revision(model_name, embed_params.embed_model_revision)
+        kwargs.update(vector_dim=None, embedding_model_name=model_name)
+        if revision:
+            kwargs["embedding_model_revision"] = revision
+        return kwargs
     if not remote and embed_params.embed_model_name not in (None, embed_params.model_name):
         # A local actor would use embed_model_name, a CPU-only fallback model_name; don't guess.
         return kwargs

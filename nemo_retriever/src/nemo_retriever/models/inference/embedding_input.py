@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,14 +22,19 @@ from nemo_retriever.common.modality.txt.tokenizer_provider import (
 )
 from nemo_retriever.common.schemas.embedding import (
     SelectedEmbeddingText,
+    embedding_runtime_modality,
     embedding_split_metadata,
     format_embedding_input,
     requires_text_admission,
     select_embedding_text,
 )
-from nemo_retriever.models import resolve_local_embed_model
-from nemo_retriever.models.embed_model_spec import EmbedModelSpec, resolve_embed_model_spec
+from nemo_retriever.models import resolve_embed_model, resolve_local_embed_model
+from nemo_retriever.models.embed_model_spec import (
+    EmbedModelSpec,
+    resolve_embed_model_spec,
+)
 from nemo_retriever.models.hf_model_registry import HF_MODEL_REVISIONS
+from nemo_retriever.models.inference.retrieval_template import load_retrieval_template
 
 
 def _stable_json(value: Any) -> str:
@@ -138,26 +143,38 @@ class EmbeddingInputPolicy:
     max_tokens: int
     prefix: str
     prefix_if_missing: bool = False
+    retrieval_template: str | None = None
+    add_special_tokens: bool = True
+    image: bool = False
+    formatted_token_counter: Callable[[str], int] | None = None
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:
             raise ValueError("Embedding input max_tokens must be positive")
 
     def _formatted_token_count(self, text: str) -> int:
-        formatted = format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
-        return len(self.tokenizer.encode(formatted, add_special_tokens=True))
+        formatted = self._format(text)
+        if self.formatted_token_counter is not None:
+            return self.formatted_token_counter(formatted)
+        return len(self.tokenizer.encode(formatted, add_special_tokens=self.add_special_tokens))
+
+    def _format(self, text: str) -> str:
+        if self.retrieval_template is not None:
+            from nemo_retriever.models.inference.retrieval_template import (
+                render_retrieval_input,
+            )
+
+            return render_retrieval_input(self.retrieval_template, self.prefix, text, image=self.image)
+        return format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
 
     def _formatted_token_counts(self, texts: list[str]) -> list[int]:
         encode_batch = getattr(self.tokenizer, "encode_batch", None)
-        if callable(encode_batch):
+        if callable(encode_batch) and self.formatted_token_counter is None:
             return [
                 len(token_ids)
                 for token_ids in encode_batch(
-                    [
-                        format_embedding_input(text, self.prefix, prefix_if_missing=self.prefix_if_missing)
-                        for text in texts
-                    ],
-                    add_special_tokens=True,
+                    [self._format(text) for text in texts],
+                    add_special_tokens=self.add_special_tokens,
                 )
             ]
         return [self._formatted_token_count(text) for text in texts]
@@ -260,9 +277,10 @@ def _split_row_updates(
 def prepare_embedding_inputs(
     frame: pd.DataFrame,
     *,
-    policy: EmbeddingInputPolicy,
+    policy: EmbeddingInputPolicy | None,
     text_column: str = "text",
     default_modality: str = "text",
+    multimodal_planner: Callable[[str, str], EmbeddingSplitPlan] | None = None,
 ) -> EmbeddingPreparationResult:
     """Apply pure admission plans to a DataFrame and attach child provenance."""
 
@@ -278,22 +296,30 @@ def prepare_embedding_inputs(
 
     rows = [row for _, row in frame.iterrows()]
     text_admission = [requires_text_admission(row, default_modality=default_modality) for row in rows]
-    if not any(text_admission):
+    if not any(text_admission) and multimodal_planner is None:
         return unchanged()
 
     selected_inputs: list[SelectedEmbeddingText | None] = []
     text_positions: list[int] = []
     texts: list[str] = []
+    plans: list[EmbeddingSplitPlan | None] = [None] * len(rows)
     for position, (row, needs_text_admission) in enumerate(zip(rows, text_admission)):
-        selected = select_embedding_text(row, text_column=text_column) if needs_text_admission else None
+        paired_image = (
+            multimodal_planner is not None
+            and not needs_text_admission
+            and embedding_runtime_modality(row, default_modality=default_modality) == "text_image"
+        )
+        selected = select_embedding_text(row, text_column=text_column) if needs_text_admission or paired_image else None
         selected_inputs.append(selected)
-        if selected is not None:
+        if selected is not None and paired_image:
+            plans[position] = multimodal_planner(selected.content, row["_image_b64"])
+        elif selected is not None and policy is not None:
             text_positions.append(position)
             texts.append(selected.content)
 
-    plans: list[EmbeddingSplitPlan | None] = [None] * len(rows)
-    for position, plan in zip(text_positions, policy.plan(texts)):
-        plans[position] = plan
+    if policy is not None:
+        for position, plan in zip(text_positions, policy.plan(texts)):
+            plans[position] = plan
 
     if not any(plan is not None and plan.requires_split for plan in plans):
         return unchanged()
@@ -389,6 +415,10 @@ def resolve_embedding_input_policy(
         max_tokens=effective_max,
         prefix=prefix,
         prefix_if_missing=prefix_if_missing,
+        retrieval_template=(
+            load_retrieval_template(spec.model_id, spec.revision, cache_dir) if spec.model_type == "mistral3" else None
+        ),
+        add_special_tokens=spec.model_type != "mistral3",
     )
 
 
@@ -400,8 +430,12 @@ def configure_embedding_input_policy(kwargs: dict[str, Any]) -> EmbeddingInputPo
         if input_type.strip().lower() == "query"
         else int(kwargs.get("max_length", 8192))
     )
+    model_name = kwargs.get("embed_model_name") or kwargs.get("model_name")
+    if kwargs.get("embedding_endpoint") or kwargs.get("embed_invoke_url"):
+        # Remote defaults must not load the private local N3.5 tokenizer.
+        model_name = resolve_embed_model(model_name)
     policy = resolve_embedding_input_policy(
-        kwargs.get("embed_model_name") or kwargs.get("model_name"),
+        model_name,
         configured_max_tokens=configured_max_tokens,
         input_type=input_type,
         revision=kwargs.get("embed_model_revision"),

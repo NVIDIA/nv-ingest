@@ -221,6 +221,9 @@ all = [
 [project.scripts]
 retriever = "nemo_retriever.__main__:main"
 
+[project.entry-points."vllm.general_plugins"]
+nrl_nemotron35_embedding = "nemo_retriever.models.inference.nemotron35_vllm:register_nemotron35_vllm"
+
 # uv-only developer install: include every published extra plus the published
 # dev extra, then overlay the prerelease Nemotron selection without exposing it
 # in wheel metadata.

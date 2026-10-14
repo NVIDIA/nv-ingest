@@ -565,7 +565,8 @@ def test_policy_resolver_caps_runtime_length_at_checkpoint_support(monkeypatch, 
         "nvidia/Nemotron-3-Embed-1B-BF16",
     ],
 )
-def test_default_remote_policy_uses_pinned_nemotron3_checkpoint(model_name) -> None:
+@pytest.mark.parametrize("endpoint_key", ["embedding_endpoint", "embed_invoke_url"])
+def test_default_remote_policy_uses_pinned_nemotron3_checkpoint(model_name, endpoint_key) -> None:
     from nemo_retriever.models.hf_model_registry import HF_MODEL_REVISIONS
     from nemo_retriever.models.inference import embedding_input
 
@@ -581,11 +582,48 @@ def test_default_remote_policy_uses_pinned_nemotron3_checkpoint(model_name) -> N
         patch.object(embedding_input, "resolve_embed_model_spec", return_value=checkpoint) as resolve,
         patch.object(embedding_input, "load_chunk_tokenizer") as tokenizer,
     ):
-        policy = resolve_embedding_input_policy(model_name, configured_max_tokens=8192, input_type="passage")
+        policy = embedding_input.configure_embedding_input_policy(
+            {
+                endpoint_key: "https://nim.example/v1/embeddings",
+                "model_name": model_name,
+                "max_length": 8192,
+                "input_type": "passage",
+            }
+        )
 
     assert resolve.call_args.args[0] == model_id
     tokenizer.assert_called_once_with(model_id, cache_dir=None, revision=HF_MODEL_REVISIONS[model_id])
     assert policy.prefix == "passage: "
+
+
+def test_default_local_policy_uses_pinned_nemotron35_checkpoint() -> None:
+    from nemo_retriever.models import NEMOTRON_35_EMBED_BF16_MODEL
+    from nemo_retriever.models.hf_model_registry import HF_MODEL_REVISIONS
+    from nemo_retriever.models.inference import embedding_input
+
+    model_id = NEMOTRON_35_EMBED_BF16_MODEL
+    checkpoint = Mock(
+        model_id=model_id,
+        revision=HF_MODEL_REVISIONS[model_id],
+        model_type="mistral3",
+        max_input_tokens=32768,
+        document_prefix="passage:",
+        document_prefix_declared=True,
+    )
+    with (
+        patch.object(embedding_input, "resolve_embed_model_spec", return_value=checkpoint) as resolve,
+        patch.object(embedding_input, "load_chunk_tokenizer") as tokenizer,
+        patch.object(embedding_input, "load_retrieval_template", return_value="checkpoint-template") as template,
+    ):
+        policy = embedding_input.configure_embedding_input_policy({"max_length": 8192})
+
+    assert resolve.call_args.args[0] == model_id
+    tokenizer.assert_called_once_with(model_id, cache_dir=None, revision=HF_MODEL_REVISIONS[model_id])
+    template.assert_called_once_with(model_id, HF_MODEL_REVISIONS[model_id], None)
+    assert policy.prefix == "passage:"
+    assert policy.max_tokens == 8192
+    assert policy.retrieval_template == "checkpoint-template"
+    assert policy.add_special_tokens is False
 
 
 def test_policy_resolver_rejects_missing_checkpoint_input_limit(monkeypatch, tmp_path) -> None:
