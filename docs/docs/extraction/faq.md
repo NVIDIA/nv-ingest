@@ -60,7 +60,7 @@ No. Chart-labeled PDF regions are not routed through Omni captioning. Refer to [
 
 For scanned documents, or documents with complex layouts,
 you can use [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse) as an alternate PDF extraction method by setting `method="nemotron_parse"`.
-Nemotron Parse does not produce chart modality rows. For chart detection and chart-filtered retrieval, use the default **pdfium** layout path instead (refer to [Charts and infographics](multimodal-extraction.md#charts-and-infographics)).
+When you explicitly select Nemotron Parse 2.0, the library routes its `<class_Chart>` output to chart modality rows. Parse v1.2 remains the local and self-hosted default. For model selection and chart routing, refer to [Select Nemotron Parse 2.0](nemo-retriever-api-reference.md#select-nemotron-parse-2-0) and [Charts and infographics](multimodal-extraction.md#charts-and-infographics).
 For more information, refer to [Nemotron Parse](https://build.nvidia.com/nvidia/nemotron-parse).
 
 ## Why does Helm report deployed while PersistentVolumeClaims stay Pending? { #helm-deployed-pending-pvcs }

@@ -56,6 +56,15 @@ inherits the NIMService resource name, so the mapping is fixed:
 {{- $ocrURL := include "nemo-retriever.nim.endpointURL" (dict "context" $ctx "key" "ocr" "serviceName" $ctx.Values.nimOperator.ocr.nimServiceName "configKey" "ocrInvokeUrl" "invokePath" "/v1/ocr") -}}
 {{- $nemotronParseURL := include "nemo-retriever.nim.endpointURL" (dict "context" $ctx "key" "nemotron_parse" "serviceName" "nemotron-parse" "configKey" "nemotronParseInvokeUrl" "invokePath" "/v1/chat/completions") -}}
 {{- $nemotronParseModel := $ctx.Values.serviceConfig.nimEndpoints.nemotronParseModel | default "" -}}
+{{- /* Infer the model only for the auto-wired operator endpoint. */ -}}
+{{- if and (not $nemotronParseModel) (not $ctx.Values.serviceConfig.nimEndpoints.nemotronParseInvokeUrl) $nemotronParseURL -}}
+{{- $parseRepository := $ctx.Values.nimOperator.nemotron_parse.image.repository | default "" -}}
+{{- if regexMatch "(^|/)nemotron-parse-v1\\.2$" $parseRepository -}}
+{{- $nemotronParseModel = "nvidia/nemotron-parse-v1.2" -}}
+{{- else if regexMatch "(^|/)nemotron-parse-v2\\.0$" $parseRepository -}}
+{{- $nemotronParseModel = "nvidia/nemotron-parse-v2.0" -}}
+{{- end -}}
+{{- end -}}
 {{- $embedURL := include "nemo-retriever.nim.endpointURL" (dict "context" $ctx "key" "vlm_embed" "serviceName" $ctx.Values.nimOperator.vlm_embed.nimServiceName "configKey" "embedInvokeUrl" "invokePath" "/v1/embeddings") -}}
 {{- $rerankURL := include "nemo-retriever.nim.endpointURL" (dict "context" $ctx "key" "rerankqa" "serviceName" "llama-nemotron-rerank-vl-1b-v2" "configKey" "rerankInvokeUrl" "invokePath" "/v1/ranking") -}}
 {{- /*

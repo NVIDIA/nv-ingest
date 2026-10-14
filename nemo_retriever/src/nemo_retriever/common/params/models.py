@@ -25,8 +25,8 @@ from pydantic import (
 
 from nemo_retriever.common.modality.caption.model_profiles import DEFAULT_LOCAL_CAPTION_MODEL_ID
 from nemo_retriever.common.params.utils import (
-    NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL,
     validate_nemotron_parse_endpoint_list,
+    validate_nemotron_parse_local_model,
 )
 from nemo_retriever.common.remote_auth import resolve_remote_api_key
 
@@ -611,16 +611,8 @@ class ExtractParams(_ParamsModel):
             )
         if self.method == "nemotron_parse":
             parse_endpoints = validate_nemotron_parse_endpoint_list(self.nemotron_parse_invoke_url or self.invoke_url)
-            if (
-                not parse_endpoints
-                and self.nemotron_parse_model is not None
-                and self.nemotron_parse_model != NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL
-            ):
-                raise ValueError(
-                    f"Local Nemotron Parse supports only `{NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL}` in this release; "
-                    f"received `{self.nemotron_parse_model}`. Configure `nemotron_parse_invoke_url` or `invoke_url` "
-                    "to use a compatible remote model."
-                )
+            if not parse_endpoints:
+                validate_nemotron_parse_local_model(self.nemotron_parse_model)
         if not self.use_page_elements:
             consumers = [("use_table_structure", self.use_table_structure and self.extract_tables)]
             enabled = [name for name, on in consumers if on]

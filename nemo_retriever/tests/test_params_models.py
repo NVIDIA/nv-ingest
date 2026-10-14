@@ -70,16 +70,22 @@ class TestExtractParams:
 
         assert params.nemotron_parse_model == "nvidia/NVIDIA-Nemotron-Parse-2.0"
 
-    def test_unsupported_local_parse_model_is_rejected(self) -> None:
+    @pytest.mark.parametrize("model", ["nvidia/NVIDIA-Nemotron-Parse-v1.2", "nvidia/NVIDIA-Nemotron-Parse-2.0"])
+    def test_supported_local_parse_models_are_accepted(self, model: str) -> None:
+        assert ExtractParams(method="nemotron_parse", nemotron_parse_model=model).nemotron_parse_model == model
+
+    @pytest.mark.parametrize("model", ["custom/parse", "nvidia/nemotron-parse-v2.0", "nvidia/nemotron-parse-2.0", ""])
+    def test_unsupported_local_parse_model_is_rejected(self, model: str) -> None:
         with pytest.raises(ValidationError, match="Local Nemotron Parse supports only") as exc_info:
             ExtractParams(
                 method="nemotron_parse",
-                nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-2.0",
+                nemotron_parse_model=model,
             )
 
         error = str(exc_info.value)
         assert "nvidia/NVIDIA-Nemotron-Parse-v1.2" in error
         assert "nvidia/NVIDIA-Nemotron-Parse-2.0" in error
+        assert model in error
         assert "nemotron_parse_invoke_url" in error
 
     @pytest.mark.parametrize(

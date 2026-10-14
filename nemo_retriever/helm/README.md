@@ -492,6 +492,58 @@ helm install "${REL}" ./nemo_retriever/helm -n "${NS}" --create-namespace \
 >
 > This matches the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md) and avoids silently pulling ≈ 62 GiB of Omni weights, loading a large two-GPU LLM, or claiming extra dedicated GPUs on a "default" install. Refer to the [model hardware requirements](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/prerequisites-support-matrix.md#model-hardware-requirements) table for per-NIM GPU and disk costs.
 
+### Nemotron Parse (optional)
+
+Nemotron Parse remains disabled by default. Enable
+`nimOperator.nemotron_parse.enabled=true` to deploy the Parse NIM and set the
+service's default PDF extraction method to `nemotron_parse`.
+The default Parse image is
+`nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant`. With the NIM Operator
+CRDs present and `nims.enabled=true`, the chart wires its in-cluster URL and
+matching `nvidia/nemotron-parse-v1.2` model into the service.
+
+To deploy the optional Parse 2.0 NIM, override both image fields.
+For an existing Parse deployment, first follow
+[Changing a NIM image repository or tag](#changing-nim-image-repository-or-tag)
+because the operator cache's `modelPuller` field is immutable.
+
+```bash
+helm upgrade --install retriever ./nemo_retriever/helm \
+  --set nimOperator.nemotron_parse.enabled=true \
+  --set nimOperator.nemotron_parse.image.repository=nvcr.io/nim/nvidia/nemotron-parse-v2.0 \
+  --set nimOperator.nemotron_parse.image.tag=2.0.8-variant
+```
+
+For this `2.0.8-variant` NIM image, NVIDIA documents a 1,024-token output
+limit on A10G and L40S. The library requests up to 9,000 tokens per page.
+Validate the selected NIM profile with a representative PDF. Refer to the
+[versioned Parse 2.0 support matrix](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/support-matrix.html#nemotron-parse-v2-0)
+and [release notes](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/release-notes.html#nemotron-parse-v2-0).
+
+The chart infers `nvidia/nemotron-parse-v2.0` from that image repository.
+An explicit `serviceConfig.nimEndpoints.nemotronParseModel` takes precedence.
+An explicit `nemotronParseInvokeUrl` also disables inference from the
+operator-managed image. For an external endpoint or an unrecognized image
+repository, set the model explicitly; the chart can still wire the URL.
+
+To use an external self-hosted Parse 2.0 endpoint, add the following values
+to your existing service deployment configuration.
+
+```yaml
+serviceConfig:
+  nimEndpoints:
+    nemotronParseInvokeUrl: http://parse.svc:8000/v1/chat/completions
+    nemotronParseModel: nvidia/nemotron-parse-v2.0
+```
+
+For NVIDIA-hosted Parse 2.0, use
+`https://integrate.api.nvidia.com/v1/chat/completions` with model
+`nvidia/nemotron-parse-2.0` instead. The hosted default remains
+`nvidia/nemotron-parse`. Parse endpoint and model settings belong to the
+server; SDK clients cannot override the deployed Parse model. Refer to
+[Nemotron Parse endpoint contracts](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/prerequisites-support-matrix.md#nemotron-parse-hosted-vs-self-hosted)
+and [Python examples](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/nemo-retriever-api-reference.md#select-nemotron-parse-2-0).
+
 The chart auto-wires the operator-managed in-cluster URLs of the three
 "core" NIMs into the service's `nim_endpoints` block:
 
@@ -766,6 +818,8 @@ client entrypoint. Refer to [Health probes](#health-probes).
 | `serviceConfig.resources.maxUploadBytes`          | `500000000` | Maximum upload file size in bytes; requests exceeding the limit are rejected before buffering. |
 | `serviceConfig.sidecarStore.maxPayloadBytes`      | `33554432` | Maximum sidecar metadata upload size in bytes. The service rejects a larger upload with HTTP `413` before buffering the complete payload. This value cannot exceed `serviceConfig.resources.maxUploadBytes`. |
 | `serviceConfig.nimEndpoints.*InvokeUrl`           | `""`    | Override the auto-resolved NIM Operator URL. Available knobs: `pageElementsInvokeUrl`, `tableStructureInvokeUrl`, `ocrInvokeUrl`, `embedInvokeUrl`, `rerankInvokeUrl` (refer to [Query-time reranking](#query-time-reranking)), and `captionInvokeUrl` (refer to [Image captioning (Omni 30B)](#image-captioning-omni-30b)). |
+| `serviceConfig.nimEndpoints.nemotronParseInvokeUrl` | `""` | Parse chat-completions URL. Explicit values override the operator-managed URL. Refer to [Nemotron Parse](#nemotron-parse-optional). |
+| `serviceConfig.nimEndpoints.nemotronParseModel` | `""` | Parse model ID. Inferred from a recognized operator-managed v1.2 or v2.0 image repository when no explicit endpoint or model is set. Set it explicitly for external endpoints or unrecognized repositories. |
 | `serviceConfig.nimEndpoints.rerankModelName`      | `""`    | Model id sent to the remote reranker. Auto-set to `nvidia/llama-nemotron-rerank-vl-1b-v2` whenever a rerank URL is resolved. |
 | `serviceConfig.nimEndpoints.captionModelName`     | `""`    | Model id sent to the remote VLM. Auto-set to `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` whenever a caption URL is resolved. |
 | `serviceConfig.nimEndpoints.rerankInvokeUrl`      | `""`    | Ranking API URL used by `POST /v1/query` when `rerank=true`. Auto-wired from the optional `rerankqa` NIM when enabled; override to point at a hosted or external ranking endpoint. |
@@ -1270,7 +1324,7 @@ gated on three conditions ALL holding:
 | `nimOperator.vlm_embed.env` | `NIM_HTTP_API_PORT=8000`, `NIM_TRITON_LOG_VERBOSE=1`, `OMP_NUM_THREADS=1`, `NIM_ENGINE_COUNT=1` | Environment for the default text embed NIM. Overrides replace the complete list. `NIM_PERFORMANCE_MODE=1` is optional. |
 | `nimOperator.rerankqa.enabled`         | `false` | VL reranker NIM (optional). Set `true` to opt in — refer to [Query-time reranking](#query-time-reranking). Default `false` so chart installs honor the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md) and do not silently provision an extra ≈ 3.1 GiB GPU NIM. The image points at the **VL** SKU (`llama-nemotron-rerank-vl-1b-v2`) per [prerequisites-support-matrix.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/prerequisites-support-matrix.md#default-helm-nims) — the text-only `llama-nemotron-rerank-1b-v2` silently degrades multimodal reranking and is not the documented POR. |
 | `nimOperator.rerankqa.image`           | `nvcr.io/nim/nvidia/llama-nemotron-rerank-vl-1b-v2:2.3.0` | Default optional VL reranker NIM image. |
-| `nimOperator.nemotron_parse.enabled`   | `false` | Structured-parse NIM (optional). Set `true` to deploy Parse. Enabling this NIM also sets the default PDF extract method to `nemotron_parse`. Default `false` so chart installs honor the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md). Image tags follow the [image tag conventions](#image-tag-conventions). |
+| `nimOperator.nemotron_parse.enabled`   | `false` | Structured-parse NIM (optional). Set `true` to deploy Parse. Enabling this NIM also sets the default PDF extract method to `nemotron_parse`. The default image remains v1.2; opt in to 2.0 with the [Parse image override](#nemotron-parse-optional). Default `false` so chart installs honor the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md). Image tags follow the [image tag conventions](#image-tag-conventions). |
 | `nimOperator.nemotron_3_nano_omni_30b_a3b_reasoning.enabled` | `false` | Omni 30B caption NIM (optional). Set `true` to enable image captioning — refer to [Image captioning (Omni 30B)](#image-captioning-omni-30b). This VLM is also a supported configurable `/v1/answer` backend. Enabling this key does not enable `/v1/answer`. Refer to [Answer generation (operator-managed LLM)](#answer-generation-llm). Default `false` so chart installs do not silently pull ≈ 62 GiB of BF16 weights or claim a second dedicated GPU. Image tag follows the [image tag conventions](#image-tag-conventions). |
 | `nimOperator.answer_llm.enabled`       | `false` | Generic answer-generation LLM NIM (optional; Nemotron 3.5 Lightning defaults). Set `true` to enable `/v1/answer` — refer to [Answer generation (operator-managed LLM)](#answer-generation-llm). This opt-in does not enable agentic retrieval. Refer to [Agentic retrieval (self-hosted Nemotron 3.5 Lightning)](#agentic-retrieval-llm) for agentic endpoint configuration. Default `false` so installs do not silently claim an answer-generation GPU. |
 | `nimOperator.answer_llm.model`         | `openai/nvidia/nemotron-3.5-lightning-30b-a3b` | LiteLLM/OpenAI model id inherited by `serviceConfig.llm.model` when the operator-managed answer LLM is enabled and no explicit service model is set. |

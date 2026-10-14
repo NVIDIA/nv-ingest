@@ -163,11 +163,18 @@ def test_auto_remote_page_embedding_without_local_extraction_resolves_to_cpu() -
     assert resolved.roots[0].operator_class is MultiTypeExtractCPUActor
 
 
-def test_batch_graph_forwards_resolvable_hosted_parse_contract() -> None:
+@pytest.mark.parametrize(
+    ("endpoint", "model", "profile"),
+    [
+        ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-parse", "hosted_tool_call"),
+        ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-parse-2.0", "hosted_v2_0_tagged"),
+        ("http://parse:8000/v1/chat/completions", "nvidia/nemotron-parse-v2.0", "v2_0_tagged"),
+        (None, "nvidia/NVIDIA-Nemotron-Parse-2.0", None),
+    ],
+)
+def test_batch_graph_forwards_selected_parse_model(endpoint, model, profile) -> None:
     from nemo_retriever.operators.extract.parse.nemotron_parse import _resolve_nemotron_parse_contract
 
-    endpoint = "https://integrate.api.nvidia.com/v1/chat/completions"
-    model = "nvidia/nemotron-parse"
     graph = build_graph(
         extraction_mode="pdf",
         extract_params=ExtractParams(
@@ -188,13 +195,15 @@ def test_batch_graph_forwards_resolvable_hosted_parse_contract() -> None:
         collect(root)
     parse_node = next(node for node in nodes if node.operator.__class__.__name__ == "NemotronParseActor")
 
-    assert parse_node.operator_kwargs["nemotron_parse_invoke_url"] == endpoint
+    assert parse_node.operator_kwargs.get("nemotron_parse_invoke_url") == endpoint
     assert parse_node.operator_kwargs["nemotron_parse_model"] == model
+    if endpoint is None:
+        return
     contract = _resolve_nemotron_parse_contract(
         parse_node.operator_kwargs["nemotron_parse_invoke_url"],
         parse_node.operator_kwargs["nemotron_parse_model"],
     )
-    assert (contract.model, contract.profile.value) == (model, "hosted_tool_call")
+    assert (contract.model, contract.profile.value) == (model, profile)
 
 
 def test_auto_extract_extension_sets_share_manifest_registry() -> None:
@@ -1085,7 +1094,18 @@ class TestMultiTypeExtractOperator:
         ]
         assert len({id(resources) for _name, resources in calls}) == 1
 
-    def test_parse_pipeline_resolves_nemotron_parse_through_archetype_resolution(self, monkeypatch):
+    @pytest.mark.parametrize(
+        ("endpoint", "model", "profile"),
+        [
+            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-parse", "hosted_tool_call"),
+            ("https://integrate.api.nvidia.com/v1/chat/completions", "nvidia/nemotron-parse-2.0", "hosted_v2_0_tagged"),
+            ("http://parse:8000/v1/chat/completions", "nvidia/nemotron-parse-v2.0", "v2_0_tagged"),
+            (None, "nvidia/NVIDIA-Nemotron-Parse-2.0", None),
+        ],
+    )
+    def test_parse_pipeline_resolves_nemotron_parse_through_archetype_resolution(
+        self, monkeypatch, endpoint, model, profile
+    ):
         from nemo_retriever.operators.graph_ops.multi_type_extract_operator import MultiTypeExtractCPUActor
         from nemo_retriever.common.ray_resource_hueristics import Resources
 
@@ -1119,8 +1139,6 @@ class TestMultiTypeExtractOperator:
             lambda: Resources(cpu_count=8, gpu_count=1),
         )
 
-        endpoint = "https://integrate.api.nvidia.com/v1/chat/completions"
-        model = "nvidia/nemotron-parse"
         op = MultiTypeExtractCPUActor(
             extraction_mode="pdf",
             extract_params=ExtractParams(
@@ -1136,14 +1154,16 @@ class TestMultiTypeExtractOperator:
         pd.testing.assert_frame_equal(result, batch_df)
         assert [name for name, _resources, _kwargs in calls] == ["NemotronParseActor"]
         parse_kwargs = calls[0][2]
-        assert parse_kwargs["nemotron_parse_invoke_url"] == endpoint
+        assert parse_kwargs.get("nemotron_parse_invoke_url") == endpoint
         assert parse_kwargs["nemotron_parse_model"] == model
+        if endpoint is None:
+            return
         from nemo_retriever.operators.extract.parse.nemotron_parse import _resolve_nemotron_parse_contract
 
         contract = _resolve_nemotron_parse_contract(
             parse_kwargs["nemotron_parse_invoke_url"], parse_kwargs["nemotron_parse_model"]
         )
-        assert (contract.model, contract.profile.value) == (model, "hosted_tool_call")
+        assert (contract.model, contract.profile.value) == (model, profile)
 
 
 class TestFileListLoaderOperator:

@@ -222,7 +222,7 @@ class NemotronParseV12(BaseModel):
 
     @property
     def model_name(self) -> str:
-        return "NVIDIA-Nemotron-Parse-v1.2"
+        return self._model_path.rsplit("/", 1)[-1]
 
     @property
     def model_type(self) -> str:
@@ -246,7 +246,7 @@ class NemotronParseV12(BaseModel):
         return {
             "type": "text",
             "format": "string",
-            "description": "Generated structured parse text from Nemotron Parse v1.2.",
+            "description": f"Generated structured parse text from {self.model_name}.",
         }
 
     @property

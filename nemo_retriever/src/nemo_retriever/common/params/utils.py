@@ -14,6 +14,20 @@ if TYPE_CHECKING:
 
 
 NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL = "nvidia/NVIDIA-Nemotron-Parse-v1.2"
+NEMOTRON_PARSE_LOCAL_V2_MODEL = "nvidia/NVIDIA-Nemotron-Parse-2.0"
+NEMOTRON_PARSE_LOCAL_MODELS = frozenset({NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL, NEMOTRON_PARSE_LOCAL_V2_MODEL})
+
+
+def validate_nemotron_parse_local_model(model_name: str | None) -> str:
+    """Resolve the local default or reject unsupported models before loading."""
+    model = NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL if model_name is None else model_name
+    if model not in NEMOTRON_PARSE_LOCAL_MODELS:
+        supported = ", ".join(f"`{name}`" for name in sorted(NEMOTRON_PARSE_LOCAL_MODELS))
+        raise ValueError(
+            f"Local Nemotron Parse supports only {supported}; received `{model}`. "
+            "Configure `nemotron_parse_invoke_url` or `invoke_url` to use a compatible remote model."
+        )
+    return model
 
 
 def validate_nemotron_parse_endpoint_list(invoke_url: str | None) -> tuple[str, ...]:
@@ -26,8 +40,9 @@ def validate_nemotron_parse_endpoint_list(invoke_url: str | None) -> tuple[str, 
         raise ValueError(
             "Nemotron Parse endpoint lists cannot mix NVIDIA Build and self-hosted endpoints. "
             "One `nemotron_parse_model` and request contract apply to the entire endpoint list, but NVIDIA Build "
-            "requires `nvidia/nemotron-parse` with the hosted tool-call contract and self-hosted Parse requires a "
-            "versioned model with a tagged contract. Configure a homogeneous endpoint list or use separate "
+            "uses `nvidia/nemotron-parse` with the image-only tool-call contract or "
+            "`nvidia/nemotron-parse-2.0` with the hosted tagged contract, and self-hosted Parse uses a "
+            "versioned model with its tagged contract. Configure a homogeneous endpoint list or use separate "
             "ingestors for NVIDIA Build and self-hosted Parse."
         )
     return invoke_urls

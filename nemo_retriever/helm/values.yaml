@@ -551,8 +551,10 @@ serviceConfig:
     # operator-managed Parse NIM is enabled, its in-cluster URL is used
     # unless this explicit endpoint is set.
     nemotronParseInvokeUrl: ""
-    # Optional model override. Leave empty to infer the hosted
-    # nvidia/nemotron-parse or self-hosted v1.2 contract from the URL.
+    # Optional model override. Leave empty to infer the operator-managed
+    # Parse v1.2 or v2.0 model from its image repository. For external
+    # endpoints, set the matching model explicitly (hosted Parse defaults
+    # to nvidia/nemotron-parse; hosted 2.0 uses nvidia/nemotron-parse-2.0).
     nemotronParseModel: ""
     embedInvokeUrl: ""
     # Optional remote reranker used by POST /v1/query with rerank=true.

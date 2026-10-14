@@ -17,6 +17,7 @@ __all__ = [
     "NemotronOCRV2",
     "NemotronTableStructureV1",
     "NemotronParseV12",
+    "NemotronParse20",
     "NemotronRerankV2",
     "NemotronRerankVLV2",
     "NemotronVLMCaptioner",
@@ -45,6 +46,10 @@ def __getattr__(name: str):
         from nemo_retriever.models.local.nemotron_parse_v1_2 import NemotronParseV12
 
         return NemotronParseV12
+    if name == "NemotronParse20":
+        from nemo_retriever.models.local.nemotron_parse_2_0 import NemotronParse20
+
+        return NemotronParse20
     if name == "NemotronRerankV2":
         from nemo_retriever.models.local.nemotron_rerank_v2 import NemotronRerankV2
 

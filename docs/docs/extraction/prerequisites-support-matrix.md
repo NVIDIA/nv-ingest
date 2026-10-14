@@ -132,7 +132,7 @@ The production Helm chart reconciles NIM microservices through `nimOperator.<key
 | `ocr` | [nemotron-ocr-v2](https://build.nvidia.com/nvidia/nemotron-ocr-v2) | `nvcr.io/nim/nvidia/nemotron-ocr-v2:2.0.1` | Image OCR | Yes |
 | `vlm_embed` | [nemotron-3-embed-1b](https://build.nvidia.com/nvidia/nemotron-3-embed-1b) | `nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.2` | Text embedding | Yes |
 | `rerankqa` | [llama-nemotron-rerank-vl-1b-v2](https://build.nvidia.com/nvidia/llama-nemotron-rerank-vl-1b-v2) | `nvcr.io/nim/nvidia/llama-nemotron-rerank-vl-1b-v2:2.3.0` | Reranking for improved retrieval accuracy | No |
-| `nemotron_parse` | [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse) | `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant` | Optional PDF `method="nemotron_parse"`. Enabling the Helm Parse NIM also sets the service default method to `nemotron_parse`. The Python `ExtractParams` default and the CLI `auto` profile select `pdfium_hybrid`. | No |
+| `nemotron_parse` | [nemotron-parse](https://build.nvidia.com/nvidia/nemotron-parse) | `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant` | Optional PDF `method="nemotron_parse"`. Enabling the Helm Parse NIM also sets the service default method to `nemotron_parse`. You can select Parse 2.0 with an image override. The Python `ExtractParams` default and the CLI `auto` profile select `pdfium_hybrid`. | No |
 | `nemotron_3_nano_omni_30b_a3b_reasoning` | [nemotron-3-nano-omni-30b-a3b-reasoning](https://build.nvidia.com/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning) | `nvcr.io/nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:2.0.4-variant` | Image captioning when you enable the caption stage. This VLM is also a supported configurable `/v1/answer` backend. Enabling this key does not enable `/v1/answer`. Refer to [Answer generation](#answer-generation). | No |
 | `audio` | [parakeet-1-1b-ctc-en-us](https://docs.nvidia.com/nim/speech/latest/reference/support-matrix/index.html) | `nvcr.io/nim/nvidia/parakeet-1-1b-ctc-en-us:1.5.0` | [Audio and video](audio-video.md) transcription | No |
 | `answer_llm` | [nemotron-3.5-lightning-30b-a3b](https://build.nvidia.com/nvidia/nemotron-3.5-lightning-30b-a3b) | `nvcr.io/nim/nvidia/nemotron-3.5-lightning-30b-a3b:2.0.9-variant` | Optional `/v1/answer` generation. The generic slot defaults to Nemotron 3.5 Lightning. You can override it to another OpenAI-compatible LLM or VLM, including Omni. Enabling this key does not configure agentic retrieval. Refer to [Self-hosted Helm Nemotron 3.5 Lightning](workflow-agentic-retrieval.md#self-hosted-helm-lightning) for agentic configuration. Not part of the default extraction pipeline. | No |
@@ -163,7 +163,7 @@ When you call [NVIDIA-hosted NIMs](deployment-options.md#when-to-use-nvidia-host
 | nemotron-ocr-v2 | `https://ai.api.nvidia.com/v1/cv/nvidia/nemotron-ocr-v2` | Chart default OCR SKU; library CPU actors default to this URL when no OCR invoke URL is set. **Local OCR language selectors (`--ocr-lang`, API `ocr_lang`) are not sent on remote requests** — hosted OCR v2 uses its own language behavior |
 | nemotron-3-embed-1b | `https://integrate.api.nvidia.com/v1/embeddings` with model ID `nvidia/nemotron-3-embed-1b` | Core text embedding |
 | llama-nemotron-rerank-vl-1b-v2 | `https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-vl-1b-v2/reranking` | Optional VL reranker |
-| nemotron-parse | `https://integrate.api.nvidia.com/v1/chat/completions` with model ID `nvidia/nemotron-parse` | Optional `method="nemotron_parse"`. Hosted Build and self-hosted Parse v1.2 use different request contracts. Refer to [Nemotron Parse: hosted Build endpoint vs self-hosted NIM](#nemotron-parse-hosted-vs-self-hosted) |
+| nemotron-parse | `https://integrate.api.nvidia.com/v1/chat/completions` with model ID `nvidia/nemotron-parse` | Optional `method="nemotron_parse"`. Select `nvidia/nemotron-parse-2.0` explicitly for hosted Parse 2.0. Refer to [Nemotron Parse endpoint contracts](#nemotron-parse-hosted-vs-self-hosted). |
 | nemotron-3-nano-omni-30b-a3b-reasoning | `https://integrate.api.nvidia.com/v1/chat/completions` with model ID `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` | Optional image captioning. Also a supported configurable `/v1/answer` VLM backend when you point `serviceConfig.llm` at this endpoint. Enabling the Omni caption Helm key does not enable `/v1/answer`. |
 | nemotron-3.5-lightning-30b-a3b | `https://integrate.api.nvidia.com/v1/chat/completions` with model ID `nvidia/nemotron-3.5-lightning-30b-a3b` | Default hosted generator and judge for evaluation tools, and the hosted counterpart to the optional Helm answer LLM. Helm uses the same raw model ID behind the LiteLLM `openai/` prefix. Agentic CLI runs default to local in-process vLLM. Refer to [Answer generation](#answer-generation) and [local in-process vLLM](workflow-agentic-retrieval.md#local-in-process-vllm). |
 | parakeet-1-1b-ctc-en-us | `grpc.nvcf.nvidia.com:443` (function ID from [build.nvidia.com](https://build.nvidia.com/)) | Optional ASR; refer to [Parakeet hosted inference](audio-video.md#parakeet-hosted-inference-build-nvidia) |
@@ -172,11 +172,20 @@ When you call [NVIDIA-hosted NIMs](deployment-options.md#when-to-use-nvidia-host
 
 !!! note "Nemotron Parse: hosted Build and self-hosted NIM contracts"
 
-    NVIDIA Build and self-hosted Nemotron Parse use distinct request contracts:
+    Select the model ID for your deployment. The library uses the matching request contract:
 
-    - **Hosted Build** (`https://integrate.api.nvidia.com/v1/chat/completions`) resolves to model ID `nvidia/nemotron-parse` and uses an image-only tool-call contract.
-    - **Self-hosted Parse v1.2** uses `nvidia/nemotron-parse-v1.2` and the tagged text-prompt contract. The Helm chart defaults to `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant`.
-    To use hosted Build, set `nemotron_parse_invoke_url` to the Build chat-completions URL and set `method="nemotron_parse"`. You can normally omit `nemotron_parse_model` so the library selects the model automatically. If you set `nemotron_parse_model` explicitly, it must match the endpoint contract.
+    - **Hosted default** uses `nvidia/nemotron-parse` at `https://integrate.api.nvidia.com/v1/chat/completions` with an image-only tool-call contract.
+    - **Hosted Parse 2.0** uses `nvidia/nemotron-parse-2.0` at the same URL with a tagged task prompt, `temperature=0`, and an 8,192-token limit. Select this model explicitly. Refer to the [hosted Parse 2.0 API reference](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-parse-2_0-infer).
+    - **Self-hosted Parse v1.2** uses `nvidia/nemotron-parse-v1.2` with a tagged task prompt. The Helm chart retains `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant` as its default Parse image.
+    - **Self-hosted Parse 2.0** uses `nvidia/nemotron-parse-v2.0` with a tagged task prompt, a 9,000-token limit, `top_k=1`, repetition penalty `1.1`, and preserved special tokens. Hosted Parse 2.0 omits `top_k`, `repetition_penalty`, and `skip_special_tokens`.
+
+    Set `method="nemotron_parse"` and `nemotron_parse_invoke_url` for remote inference. Omitting `nemotron_parse_model` selects the hosted default or self-hosted v1.2 model. To use 2.0, select its deployment-specific ID explicitly.
+
+    Local Hugging Face inference defaults to `nvidia/NVIDIA-Nemotron-Parse-v1.2`. Set `nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-2.0"` for local Parse 2.0. Refer to [Select Nemotron Parse 2.0](nemo-retriever-api-reference.md#select-nemotron-parse-2-0) for end-to-end examples.
+
+    When the chart manages the Parse NIM, it infers the model from the selected v1.2 or v2.0 image repository. Explicit endpoint or model settings take precedence. To select Parse 2.0, enable Parse and set `nimOperator.nemotron_parse.image.repository=nvcr.io/nim/nvidia/nemotron-parse-v2.0` and `nimOperator.nemotron_parse.image.tag=2.0.8-variant`. For external or unrecognized image repositories, configure the model explicitly. Refer to [Nemotron Parse with Helm](https://github.com/NVIDIA/NeMo-Retriever/blob/main/nemo_retriever/helm/README.md#nemotron-parse-optional).
+
+    Legacy self-hosted Parse v1.0 and v1.1 tool-call profiles are no longer supported. Use a supported v1.2 or 2.0 deployment.
 
     Each endpoint list must contain only hosted Build endpoints or only compatible self-hosted endpoints. The library rejects a list that mixes hosted Build and self-hosted endpoints because one extraction workflow uses one model ID and request contract. Setting `nemotron_parse_model` explicitly does not make a mixed list valid. To use both deployment types, configure separate ingestors or extraction workflows for each endpoint contract.
 
@@ -251,8 +260,8 @@ Model repositories and NIM references are linked in [Core and Advanced Pipeline 
 | Core Features | — | Total Disk Space | ~150GB | ~150GB | ~150GB | ~150GB | ~150GB | ~150GB | ~150GB | ~150GB | ~150GB |
 | Audio/video extraction (parakeet-1-1b-ctc-en-us) | ~4.0 GiB (`model.safetensors`; the repo also ships `parakeet-ctc-1.1b.nemo` of similar size—use one format to avoid roughly doubling disk use) | Additional Dedicated GPUs | Not supported⁴ | Not supported⁴ | Not supported⁴ | 1¹ | 1¹ | 1¹ | 1¹ | 1¹ | Not supported⁴ |
 | | — | Additional Disk Space | Not supported⁴ | Not supported⁴ | Not supported⁴ | ~37GB¹ | ~37GB¹ | ~37GB¹ | ~37GB¹ | ~37GB¹ | Not supported⁴ |
-| nemotron-parse | ~3.5 GiB | Additional Dedicated GPUs | Not supported | 1 | Not supported | 1 | 1 | 1 | 1 | 1 | 1 |
-| nemotron-parse | — | Additional Disk Space | Not supported | ~16GB | Not supported | ~16GB | ~16GB | ~16GB | ~16GB | ~16GB | ~16GB |
+| nemotron-parse (v1.2) | ~3.5 GiB | Additional Dedicated GPUs | Not supported | 1 | Not supported | 1 | 1 | 1 | 1 | 1 | 1 |
+| nemotron-parse (v1.2) | — | Additional Disk Space | Not supported | ~16GB | Not supported | ~16GB | ~16GB | ~16GB | ~16GB | ~16GB | ~16GB |
 | Omni caption or answer (nemotron-3-nano-omni-30b-a3b-reasoning) | ~62 GiB (BF16); ~33 GiB (FP8); ~21 GiB (NVFP4) | Additional Dedicated GPUs | 1 | 1 | 1 | 1 | 1 | Not supported | Not supported | 2 | Not supported³ |
 | Omni caption or answer (nemotron-3-nano-omni-30b-a3b-reasoning) | — | Additional Disk Space (HF) | ~21–62GB | ~21–62GB | ~21–62GB | ~21–62GB | ~21–62GB | Not supported | Not supported | ~21–62GB | Not supported³ |
 | Omni caption or answer (nemotron-3-nano-omni-30b-a3b-reasoning) | — | Additional Disk Space (NIM) | ~80GB | ~80GB | ~80GB | ~80GB | ~80GB | Not supported | Not supported | ~80GB | Not supported³ |
@@ -260,6 +269,8 @@ Model repositories and NIM references are linked in [Core and Advanced Pipeline 
 | Answer generation (nemotron-3.5-lightning-30b-a3b, default `answer_llm`) | — | NIMCache PVC | 250Gi⁶ | 250Gi⁶ | Not verified⁶ | 250Gi⁶ | 250Gi⁶ | Not verified⁶ | Not supported⁶ | 250Gi⁶ | Not verified⁶ |
 | Reranker | ~3.1 GiB (llama-nemotron-rerank-vl-1b-v2) | With Core Pipeline | Yes | Yes | Yes | Yes | Yes | No* | No* | No* | No* |
 | Reranker | — | Standalone (recall only) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+
+The Parse hardware rows describe the default v1.2 NIM. For an opt-in Parse 2.0 deployment, refer to the [Parse 2.0 NIM support matrix for `2.0.8-variant`](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/support-matrix.html#nemotron-parse-v2-0). The [Parse 2.0 NIM release notes](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/release-notes.html#nemotron-parse-v2-0) document a 1,024-token output limit on A10G and L40S. This is below the library's 9,000-token request budget. Validate the selected NIM profile with a representative PDF before deployment.
 
 ¹ On other supported GPUs, Parakeet ASR (`parakeet-1-1b-ctc-en-us:1.5.0`) may require a runtime TensorRT engine build (no prebuilt profile in the chart image).
 

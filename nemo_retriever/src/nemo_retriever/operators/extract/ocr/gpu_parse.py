@@ -16,7 +16,7 @@ from nemo_retriever.common.modality.ocr.shared import _error_payload, nemotron_p
 
 
 class NemotronParseActor(AbstractOperator, GPUOperator):
-    """Ray-friendly callable that initializes Nemotron Parse v1.2 once per actor."""
+    """Ray-friendly callable that initializes Nemotron Parse once per actor."""
 
     def __init__(
         self,

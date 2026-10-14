@@ -322,9 +322,16 @@ When you run PDF extraction with `method="nemotron_parse"`, a mismatched model a
 HTTP 400: Content cannot be a plain string. The model does not support text input.
 ```
 
-This can occur when you send a versioned self-hosted model (for example `nvidia/nemotron-parse-v1.2`) to the NVIDIA-hosted Build endpoint, which expects the image-only `nvidia/nemotron-parse` contract. The library may replace the raw HTTP error with a targeted model/contract mismatch hint.
+This can occur when the selected model ID does not match the endpoint's request contract. For example, self-hosted IDs `nvidia/nemotron-parse-v1.2` and `nvidia/nemotron-parse-v2.0` do not identify NVIDIA-hosted models. A self-hosted image and configured model with different versions can also fail. The library can replace a raw HTTP error with a targeted model/contract mismatch hint.
 
-To use hosted Build, omit `nemotron_parse_model` so the library selects `nvidia/nemotron-parse` automatically, or set `nemotron_parse_model="nvidia/nemotron-parse"` explicitly. Send `nvidia/nemotron-parse-v1.2` only to a compatible self-hosted chat endpoint.
+Use the following model IDs with `method="nemotron_parse"`:
+
+- **NVIDIA-hosted default:** Omit `nemotron_parse_model`, or set `nvidia/nemotron-parse`. This model uses the image-only tool-call contract.
+- **NVIDIA-hosted Parse 2.0:** Set `nemotron_parse_model="nvidia/nemotron-parse-2.0"` at `https://integrate.api.nvidia.com/v1/chat/completions`. This model uses a tagged task prompt.
+- **Self-hosted Parse:** Set `nvidia/nemotron-parse-v1.2` or `nvidia/nemotron-parse-v2.0` to match the deployed image. Omitting the model selects v1.2.
+- **Local Hugging Face Parse:** Omit the invoke URL and select `nvidia/NVIDIA-Nemotron-Parse-v1.2` or `nvidia/NVIDIA-Nemotron-Parse-2.0`. Other local IDs fail validation before inference.
+
+Self-hosted v1.0 and v1.1 tool-call profiles are no longer supported. Upgrade those deployments to v1.2 or 2.0.
 
 Do not combine hosted Build and self-hosted endpoints in one `nemotron_parse_invoke_url` list. The library rejects this configuration because one workflow cannot send different model IDs and request contracts to individual endpoints. Setting `nemotron_parse_model` does not override this restriction. Use a homogeneous endpoint list, or configure separate ingestors or extraction workflows for hosted Build and self-hosted capacity. For more information, refer to [Nemotron Parse: hosted Build and self-hosted NIM contracts](prerequisites-support-matrix.md#nemotron-parse-hosted-vs-self-hosted).
 
