@@ -20,6 +20,7 @@ from urllib.parse import urlsplit
 import base64
 import io
 import json
+import re
 import time
 import traceback
 
@@ -42,6 +43,7 @@ from nemo_retriever.common.params.utils import (
     NEMOTRON_PARSE_LOCAL_V2_MODEL,
     validate_nemotron_parse_endpoint_list,
     validate_nemotron_parse_local_model,
+    validate_nemotron_parse_text_in_pic,
 )
 
 try:
@@ -59,6 +61,21 @@ NEMOTRON_PARSE_V2_MODEL = "nvidia/nemotron-parse-v2.0"
 NEMOTRON_PARSE_HOSTED_MODEL = "nvidia/nemotron-parse"
 NEMOTRON_PARSE_HOSTED_V2_MODEL = "nvidia/nemotron-parse-2.0"
 NEMOTRON_PARSE_DEFAULT_TASK_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
+
+
+def _resolve_nemotron_parse_task_prompt(task_prompt: str, predict_text_in_pic: bool | None) -> str:
+    """Override only the picture-text control, preserving other task-prompt tokens."""
+    prompt = str(task_prompt)
+    if predict_text_in_pic is None:
+        return prompt
+    token = "<predict_text_in_pic>" if predict_text_in_pic else "<predict_no_text_in_pic>"
+    pattern = r"<predict_(?:no_)?text_in_pic>"
+    match = re.search(pattern, prompt)
+    if match is None:
+        return prompt + token
+    prompt = re.sub(pattern, "", prompt)
+    return prompt[: match.start()] + token + prompt[match.start() :]
+
 
 # Map Nemotron Parse class labels to the pipeline content channels.
 _PARSE_CLASS_TO_CHANNEL: Dict[str, str] = {
@@ -300,6 +317,7 @@ def nemotron_parse_pages(
     extract_infographics: bool = False,
     nemotron_parse_model: Optional[str] = None,
     task_prompt: str = NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,
+    nemotron_parse_predict_text_in_pic: Optional[bool] = None,
     remote_retry: RemoteRetryParams | None = None,
     nim_client: NIMClient | None = None,
     **kwargs: Any,
@@ -325,6 +343,8 @@ def nemotron_parse_pages(
     use_remote = bool(invoke_url)
     if use_remote:
         validate_nemotron_parse_endpoint_list(invoke_url)
+    validate_nemotron_parse_text_in_pic(invoke_url, nemotron_parse_model, nemotron_parse_predict_text_in_pic)
+    task_prompt = _resolve_nemotron_parse_task_prompt(task_prompt, nemotron_parse_predict_text_in_pic)
     if not use_remote and model is None:
         raise ValueError("A local `model` is required when `invoke_url` is not provided.")
 
@@ -531,6 +551,7 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
         extract_infographics: bool = False,
         nemotron_parse_invoke_url: Optional[str] = None,
         nemotron_parse_model: Optional[str] = None,
+        nemotron_parse_predict_text_in_pic: Optional[bool] = None,
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
@@ -546,9 +567,13 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
         validate_nemotron_parse_endpoint_list(self._invoke_url)
         if not self._invoke_url:
             self._nemotron_parse_model = validate_nemotron_parse_local_model(nemotron_parse_model)
+        validate_nemotron_parse_text_in_pic(
+            self._invoke_url, self._nemotron_parse_model, nemotron_parse_predict_text_in_pic
+        )
+        self._nemotron_parse_predict_text_in_pic = nemotron_parse_predict_text_in_pic
         self._api_key = api_key
         self._request_timeout_s = float(request_timeout_s)
-        self._task_prompt = str(task_prompt)
+        self._task_prompt = _resolve_nemotron_parse_task_prompt(task_prompt, nemotron_parse_predict_text_in_pic)
         self._remote_retry = RemoteRetryParams(
             remote_max_pool_workers=int(remote_max_pool_workers),
             remote_max_retries=int(remote_max_retries),
@@ -585,6 +610,7 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
             model=self._model,
             invoke_url=self._invoke_url,
             nemotron_parse_model=self._nemotron_parse_model,
+            nemotron_parse_predict_text_in_pic=self._nemotron_parse_predict_text_in_pic,
             api_key=self._api_key,
             request_timeout_s=self._request_timeout_s,
             task_prompt=self._task_prompt,
@@ -637,6 +663,7 @@ class NemotronParseCPUActor(AbstractOperator, CPUOperator):
         extract_infographics: bool = False,
         nemotron_parse_invoke_url: Optional[str] = None,
         nemotron_parse_model: Optional[str] = None,
+        nemotron_parse_predict_text_in_pic: Optional[bool] = None,
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
@@ -652,9 +679,11 @@ class NemotronParseCPUActor(AbstractOperator, CPUOperator):
         )
         self._nemotron_parse_model = nemotron_parse_model
         validate_nemotron_parse_endpoint_list(self._invoke_url)
+        validate_nemotron_parse_text_in_pic(self._invoke_url, nemotron_parse_model, nemotron_parse_predict_text_in_pic)
+        self._nemotron_parse_predict_text_in_pic = nemotron_parse_predict_text_in_pic
         self._api_key = api_key
         self._request_timeout_s = float(request_timeout_s)
-        self._task_prompt = str(task_prompt)
+        self._task_prompt = _resolve_nemotron_parse_task_prompt(task_prompt, nemotron_parse_predict_text_in_pic)
         self._remote_retry = RemoteRetryParams(
             remote_max_pool_workers=int(remote_max_pool_workers),
             remote_max_retries=int(remote_max_retries),
@@ -676,6 +705,7 @@ class NemotronParseCPUActor(AbstractOperator, CPUOperator):
             model=self._model,
             invoke_url=self._invoke_url,
             nemotron_parse_model=self._nemotron_parse_model,
+            nemotron_parse_predict_text_in_pic=self._nemotron_parse_predict_text_in_pic,
             api_key=self._api_key,
             request_timeout_s=self._request_timeout_s,
             task_prompt=self._task_prompt,
@@ -732,6 +762,7 @@ class NemotronParseActor(ArchetypeOperator):
         extract_infographics: bool = False,
         nemotron_parse_invoke_url: Optional[str] = None,
         nemotron_parse_model: Optional[str] = None,
+        nemotron_parse_predict_text_in_pic: Optional[bool] = None,
         invoke_url: Optional[str] = None,
         api_key: Optional[str] = None,
         request_timeout_s: float = 120.0,
@@ -748,6 +779,7 @@ class NemotronParseActor(ArchetypeOperator):
             extract_infographics=extract_infographics,
             nemotron_parse_invoke_url=nemotron_parse_invoke_url,
             nemotron_parse_model=nemotron_parse_model,
+            nemotron_parse_predict_text_in_pic=nemotron_parse_predict_text_in_pic,
             invoke_url=invoke_url,
             api_key=api_key,
             request_timeout_s=request_timeout_s,

@@ -137,6 +137,9 @@ class IngestExtractOptions:
     table_output_format: TableOutputFormatValue | None = None
     extract_api_key: str | None = None
     batch: IngestExtractBatchOptions = field(default_factory=IngestExtractBatchOptions)
+    nemotron_parse_model: str | None = None
+    nemotron_parse_invoke_url: str | None = None
+    nemotron_parse_predict_text_in_pic: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -653,6 +656,9 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
                 "ocr_lang": extract.ocr_lang,
                 "table_structure_invoke_url": extract.table_structure_invoke_url,
                 "table_output_format": extract.table_output_format,
+                "nemotron_parse_model": extract.nemotron_parse_model,
+                "nemotron_parse_invoke_url": extract.nemotron_parse_invoke_url,
+                "nemotron_parse_predict_text_in_pic": extract.nemotron_parse_predict_text_in_pic,
                 "api_key": extract.extract_api_key,
             }.items()
             if value is not None

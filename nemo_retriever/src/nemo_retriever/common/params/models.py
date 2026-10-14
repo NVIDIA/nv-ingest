@@ -27,6 +27,7 @@ from nemo_retriever.common.modality.caption.model_profiles import DEFAULT_LOCAL_
 from nemo_retriever.common.params.utils import (
     validate_nemotron_parse_endpoint_list,
     validate_nemotron_parse_local_model,
+    validate_nemotron_parse_text_in_pic,
 )
 from nemo_retriever.common.remote_auth import resolve_remote_api_key
 
@@ -574,6 +575,10 @@ class ExtractParams(_ParamsModel):
     table_structure_invoke_url: Optional[str] = None
     nemotron_parse_invoke_url: Optional[str] = None
     nemotron_parse_model: Optional[str] = None
+    nemotron_parse_predict_text_in_pic: Optional[bool] = Field(
+        default=None,
+        description="Extract text inside pictures with a tagged Parse task prompt; None preserves the existing prompt.",
+    )
 
     # Output columns
     output_column: str = "page_elements_v3"
@@ -603,16 +608,23 @@ class ExtractParams(_ParamsModel):
                 "extract_nested_images=True requires extract_images=True because nested images extend image output."
             )
         if self.method != "nemotron_parse" and (
-            self.nemotron_parse_invoke_url is not None or self.nemotron_parse_model is not None
+            self.nemotron_parse_invoke_url is not None
+            or self.nemotron_parse_model is not None
+            or self.nemotron_parse_predict_text_in_pic is not None
         ):
             raise ValueError(
-                "`nemotron_parse_invoke_url` and `nemotron_parse_model` require "
+                "`nemotron_parse_invoke_url`, `nemotron_parse_model`, and `nemotron_parse_predict_text_in_pic` require "
                 "`method='nemotron_parse'`; Parse-specific configuration is otherwise ignored."
             )
         if self.method == "nemotron_parse":
             parse_endpoints = validate_nemotron_parse_endpoint_list(self.nemotron_parse_invoke_url or self.invoke_url)
             if not parse_endpoints:
                 validate_nemotron_parse_local_model(self.nemotron_parse_model)
+            validate_nemotron_parse_text_in_pic(
+                self.nemotron_parse_invoke_url or self.invoke_url,
+                self.nemotron_parse_model,
+                self.nemotron_parse_predict_text_in_pic,
+            )
         if not self.use_page_elements:
             consumers = [("use_table_structure", self.use_table_structure and self.extract_tables)]
             enabled = [name for name, on in consumers if on]

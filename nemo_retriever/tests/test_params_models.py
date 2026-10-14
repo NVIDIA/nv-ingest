@@ -46,6 +46,8 @@ class TestExtractParams:
         for field, value in (
             ("nemotron_parse_invoke_url", "http://parse:8000/v1/chat/completions"),
             ("nemotron_parse_model", "nvidia/nemotron-parse"),
+            ("nemotron_parse_predict_text_in_pic", True),
+            ("nemotron_parse_predict_text_in_pic", False),
         ):
             with pytest.raises(ValidationError, match="method='nemotron_parse'"):
                 ExtractParams(**{field: value})

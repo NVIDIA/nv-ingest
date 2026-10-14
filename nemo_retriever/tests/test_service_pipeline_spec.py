@@ -512,6 +512,26 @@ def test_resolve_extract_params_preserves_parse_fields_for_parse_method() -> Non
     assert resolved.nemotron_parse_model == "nvidia/nemotron-parse-v1.2"
 
 
+@pytest.mark.parametrize("predict_text_in_pic", [True, False])
+def test_resolve_parse_picture_text_control_preserves_server_owned_settings(predict_text_in_pic: bool) -> None:
+    base = {
+        "method": "nemotron_parse",
+        "nemotron_parse_invoke_url": "http://server/v1/chat/completions",
+        "nemotron_parse_model": "nvidia/nemotron-parse-v2.0",
+    }
+    resolved = _resolve_extract_params(
+        base,
+        {
+            "nemotron_parse_invoke_url": "http://attacker/v1/chat/completions",
+            "nemotron_parse_model": "attacker/model",
+            "nemotron_parse_predict_text_in_pic": predict_text_in_pic,
+        },
+    )
+    assert resolved.nemotron_parse_invoke_url == base["nemotron_parse_invoke_url"]
+    assert resolved.nemotron_parse_model == base["nemotron_parse_model"]
+    assert resolved.nemotron_parse_predict_text_in_pic is predict_text_in_pic
+
+
 def test_merge_preserves_server_embed_endpoints() -> None:
     base = {"embed_invoke_url": "http://server/embed", "api_key": "k"}
     override = {"embed_invoke_url": "http://attacker/", "inference_batch_size": 8}

@@ -155,8 +155,9 @@ For local `nemotron_parse` extraction, omit `nemotron_parse_model` to use
 `nvidia/NVIDIA-Nemotron-Parse-v1.2`, or select
 `nvidia/NVIDIA-Nemotron-Parse-2.0` explicitly. These are the supported local
 Hugging Face model IDs. Other local IDs raise a Pydantic `ValidationError`
-before pipeline execution. Both `nemotron_parse_model` and
-`nemotron_parse_invoke_url` require `method="nemotron_parse"`.
+before pipeline execution. The `nemotron_parse_model`,
+`nemotron_parse_invoke_url`, and `nemotron_parse_predict_text_in_pic` options
+require `method="nemotron_parse"` when you set them explicitly.
 
 ### Select Nemotron Parse 2.0 { #select-nemotron-parse-2-0 }
 
@@ -174,6 +175,7 @@ result = (
         ExtractParams(
             method="nemotron_parse",
             nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-2.0",
+            nemotron_parse_predict_text_in_pic=True,
         )
     )
     .ingest()
@@ -209,6 +211,66 @@ For a self-hosted Parse 2.0 NIM, replace the URL with your NIM's
 selects `nvidia/nemotron-parse` for NVIDIA-hosted inference or
 `nvidia/nemotron-parse-v1.2` for self-hosted inference.
 Refer to [Nemotron Parse endpoint contracts](prerequisites-support-matrix.md#nemotron-parse-hosted-vs-self-hosted).
+
+Set `nemotron_parse_predict_text_in_pic` on `ExtractParams` to control text
+extraction inside pictures. The following values select the task prompt.
+
+| Value | Behavior |
+| --- | --- |
+| `True` | Selects `<predict_text_in_pic>`. |
+| `False` | Selects `<predict_no_text_in_pic>`. |
+| `None` (default) | Retains the existing prompt and model defaults. |
+
+This option preserves the bounding-box, class, and Markdown tokens needed
+for structured output. If you pass both `task_prompt` and the boolean to a
+Parse actor directly, the boolean overrides only the picture-text token.
+
+Explicit `True` or `False` works with local models and remote tagged-output
+models at `/v1/chat/completions` endpoints, including explicitly selected
+hosted Parse 2.0. It is unsupported for the image-only hosted default,
+`nvidia/nemotron-parse`, and remote endpoints that cannot carry a task prompt.
+These combinations raise a configuration error before inference.
+
+You can also select the model, endpoint, and picture-text behavior through
+the typed ingest plan interface. `IngestExtractOptions` exposes the same
+three options, all with a default of `None`. The following example resolves
+a hosted Parse 2.0 request into a pipeline, embeds the results, and uploads
+them to the configured LanceDB table.
+
+```python
+from nemo_retriever.ingest.execution import build_ingest_pipeline
+from nemo_retriever.ingest.plan import (
+    IngestExtractOptions,
+    IngestPlanRequest,
+    IngestSourceOptions,
+    IngestStorageOptions,
+    resolve_ingest_plan,
+)
+
+request = IngestPlanRequest(
+    source=IngestSourceOptions(documents=["report.pdf"]),
+    extract=IngestExtractOptions(
+        method="nemotron_parse",
+        nemotron_parse_model="nvidia/nemotron-parse-2.0",
+        nemotron_parse_invoke_url="https://integrate.api.nvidia.com/v1/chat/completions",
+        nemotron_parse_predict_text_in_pic=False,
+    ),
+    storage=IngestStorageOptions(
+        lancedb_uri="parse-2-0-index",
+        table_name="reports",
+    ),
+)
+plan = resolve_ingest_plan(request)
+result = build_ingest_pipeline(plan).ingest()
+```
+
+The typed pipeline uses the configured embedding defaults. Install the
+local inference dependencies for local embedding, or configure a remote
+embedding endpoint with `IngestEmbedOptions`. To select local Parse 2.0 in
+the request, omit `nemotron_parse_invoke_url` and use
+`nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-2.0"`. For batch execution,
+set `runtime=IngestRuntimeOptions(run_mode="batch")` in the request. Import
+both option classes from `nemo_retriever.ingest.plan`.
 
 In service mode, the server owns the Parse endpoint and model selection.
 Configure `nim_endpoints.nemotron_parse_invoke_url` and

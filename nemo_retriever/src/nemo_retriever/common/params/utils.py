@@ -48,6 +48,33 @@ def validate_nemotron_parse_endpoint_list(invoke_url: str | None) -> tuple[str, 
     return invoke_urls
 
 
+def validate_nemotron_parse_text_in_pic(
+    invoke_url: str | None, model_name: str | None, predict_text_in_pic: bool | None
+) -> None:
+    """Reject explicit picture-text controls when the remote contract has no task prompt."""
+    if predict_text_in_pic is None:
+        return
+    endpoints = validate_nemotron_parse_endpoint_list(invoke_url)
+    if not endpoints:
+        return
+    if any("/v1/chat/completions" not in urlsplit(endpoint).path for endpoint in endpoints):
+        raise ValueError(
+            "`nemotron_parse_predict_text_in_pic` requires a tagged `/v1/chat/completions` endpoint; "
+            "other remote Parse paths cannot carry a task prompt."
+        )
+    model = str(model_name or "").strip().lower()
+    if not model and all(
+        (urlsplit(endpoint).hostname or "").lower() == "integrate.api.nvidia.com" for endpoint in endpoints
+    ):
+        model = "nvidia/nemotron-parse"
+    if model == "nvidia/nemotron-parse":
+        raise ValueError(
+            "`nemotron_parse_predict_text_in_pic` is unsupported by the image-only hosted-default "
+            "`nvidia/nemotron-parse` contract. Select `nvidia/nemotron-parse-2.0` for hosted Parse 2.0 "
+            "or use a compatible tagged Parse endpoint."
+        )
+
+
 def coerce_params[T](params: T | None, model_cls: type[T], kwargs: dict[str, Any]) -> T:
     """Merge *params* and *kwargs* into an instance of *model_cls*.
 

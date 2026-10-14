@@ -827,6 +827,8 @@ def build_graph(
                 parse_kwargs["api_key"] = extract_params.api_key
             if extract_params.nemotron_parse_model:
                 parse_kwargs["nemotron_parse_model"] = extract_params.nemotron_parse_model
+            if extract_params.nemotron_parse_predict_text_in_pic is not None:
+                parse_kwargs["nemotron_parse_predict_text_in_pic"] = extract_params.nemotron_parse_predict_text_in_pic
             parse_kwargs.update(_nim_remote_http_kwargs(extract_params))
             graph = graph >> NemotronParseActor(**parse_kwargs)
         else:
