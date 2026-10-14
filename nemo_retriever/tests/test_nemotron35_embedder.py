@@ -131,6 +131,98 @@ def test_invalid_image_counts_fail_before_loading():
         embedder._encode(["a"], images=[])
 
 
+@pytest.mark.parametrize("cuda_available", [False, True])
+def test_vllm_unload_shuts_down_before_reload(monkeypatch, cuda_available):
+    import importlib
+
+    import transformers
+    from nemo_retriever.models.inference import nemotron35_vllm, vllm
+
+    embedder_module = importlib.import_module(Nemotron35Embedder.__module__)
+    events = []
+    engines = []
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="vllm")
+
+    def create_engine(*args, **kwargs):
+        engine = MagicMock()
+        engine_index = len(engines)
+        events.append(f"load-{engine_index}")
+
+        def shutdown(*, timeout):
+            assert timeout == 30.0
+            assert embedder._model is engine
+            events.append(f"shutdown-{engine_index}")
+
+        engine.llm_engine.engine_core.shutdown.side_effect = shutdown
+        engine.embed.return_value = [SimpleNamespace(outputs=SimpleNamespace(embedding=[1.0] * 2048))]
+        engines.append(engine)
+        return engine
+
+    processor = SimpleNamespace(
+        tokenizer=lambda *args, **kwargs: {
+            "input_ids": torch.tensor([[1, 2]]),
+            "attention_mask": torch.tensor([[1, 1]]),
+        }
+    )
+    monkeypatch.setattr(embedder_module, "load_retrieval_template", lambda *args: TEMPLATE)
+    monkeypatch.setattr(transformers.AutoProcessor, "from_pretrained", MagicMock(return_value=processor))
+    monkeypatch.setattr(nemotron35_vllm, "register_nemotron35_vllm", lambda: None)
+    monkeypatch.setattr(vllm, "create_vllm_llm", create_engine)
+    monkeypatch.setattr(vllm, "_pooling_params_for_normalize", lambda normalize: object())
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: cuda_available)
+    empty_cache = MagicMock()
+    monkeypatch.setattr(torch.cuda, "empty_cache", empty_cache)
+
+    first = embedder.embed(["document"])
+    embedder.unload()
+    assert events == ["load-0", "shutdown-0"]
+    assert embedder._model is embedder._processor is embedder._template is None
+    assert empty_cache.call_count == int(cuda_available)
+    embedder.unload()
+    engines[0].llm_engine.engine_core.shutdown.assert_called_once_with(timeout=30.0)
+    second = embedder.embed(["document"])
+    assert events == ["load-0", "shutdown-0", "load-1"]
+    assert embedder._model is engines[1]
+    assert first.shape == second.shape == (1, 2048)
+    for engine in engines:
+        engine.embed.assert_called_once()
+    embedder.unload()
+    assert events[-1] == "shutdown-1"
+
+
+def test_vllm_unload_retains_references_if_shutdown_fails(monkeypatch):
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="vllm")
+    engine = MagicMock()
+    engine.llm_engine.engine_core.shutdown.side_effect = RuntimeError("shutdown failed")
+    processor = object()
+    embedder._model = engine
+    embedder._processor = processor
+    embedder._template = TEMPLATE
+    empty_cache = MagicMock()
+    monkeypatch.setattr(torch.cuda, "empty_cache", empty_cache)
+
+    with pytest.raises(RuntimeError, match="shutdown failed"):
+        embedder.unload()
+    assert embedder._model is engine
+    assert embedder._processor is processor
+    assert embedder._template == TEMPLATE
+    empty_cache.assert_not_called()
+    engine.llm_engine.engine_core.shutdown.side_effect = None
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    embedder.unload()
+    assert embedder._model is None
+
+
+def test_hf_unload_does_not_attempt_vllm_shutdown(monkeypatch):
+    embedder = Nemotron35Embedder("model", None, "query:", "passage:", backend="hf")
+    model = MagicMock()
+    embedder._model = model
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    embedder.unload()
+    model.llm_engine.engine_core.shutdown.assert_not_called()
+    assert embedder._model is None
+
+
 def test_vllm_receives_rendered_tokens_and_normalizes_once(monkeypatch):
     embedder = Nemotron35Embedder("model", None, "query: ", "passage: ", backend="vllm", normalize=False)
     embedder._template = TEMPLATE

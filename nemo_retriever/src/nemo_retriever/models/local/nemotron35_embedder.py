@@ -374,7 +374,10 @@ class Nemotron35Embedder:
         return self.embed_text_image([""] * len(images_b64), images_b64, batch_size=batch_size)
 
     def unload(self) -> None:
-        """Release model and processor references and empty the CUDA allocator cache.
+        """Shut down owned vLLM workers, then release local inference resources.
+
+        vLLM engine shutdown uses a 30-second timeout. Backend shutdown errors
+        propagate unchanged rather than allowing a second engine to be loaded.
 
         Parameters
         ----------
@@ -384,13 +387,17 @@ class Nemotron35Embedder:
         Returns
         -------
         None
-            Later embedding calls lazily reload the checkpoint.
+            Model, processor, and template references are cleared after successful
+            shutdown. Later embedding calls lazily reload the checkpoint.
 
         Raises
         ------
         RuntimeError
-            If clearing the CUDA allocator cache fails.
+            If engine shutdown or clearing the CUDA allocator cache fails.
+            References are retained if shutdown fails so cleanup can be retried.
         """
-        self._model = self._processor = None
+        if self.backend == "vllm" and self._model is not None:
+            self._model.llm_engine.engine_core.shutdown(timeout=30.0)
+        self._model = self._processor = self._template = None
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
