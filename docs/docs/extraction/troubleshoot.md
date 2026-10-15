@@ -354,6 +354,14 @@ For field meanings and error-policy behavior, refer to
 Parse 2.0 remains an explicit model selection; these steps do not change the
 local Parse v1.2 or self-hosted NIM defaults.
 
+With vLLM `0.25.1`, `TQDM_DISABLE=1` can cause `ZeroDivisionError` in
+`offline_utils._run_engine` after generation because its disabled progress bar
+reports zero elapsed time. The Retriever CLI sets this environment variable
+to suppress progress bars. Local Parse v1.2 and 2.0 explicitly pass
+`use_tqdm=False` to vLLM generation to avoid this failure without changing
+decoding settings. Upgrade the library if an older deployment reports this
+error.
+
 ## Nemotron Parse model and endpoint mismatch { #nemotron-parse-model-endpoint-mismatch }
 
 When you run PDF extraction with `method="nemotron_parse"`, a mismatched model and endpoint can fail with an error similar to the following:

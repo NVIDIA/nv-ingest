@@ -211,7 +211,9 @@ class NemotronParseV12(BaseModel):
             }
             for img in inputs
         ]
-        outputs = self._llm.generate(prompts, self._sampling_params)
+        # A globally disabled tqdm reports zero elapsed time; vLLM's progress
+        # accounting divides by that value. Library inference needs no bar.
+        outputs = self._llm.generate(prompts, self._sampling_params, use_tqdm=False)
         return [out.outputs[0].text.strip() for out in outputs]
 
     def __call__(

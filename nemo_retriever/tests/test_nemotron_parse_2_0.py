@@ -127,10 +127,11 @@ def test_direct_local_actor_rejects_unsupported_model_before_loading(monkeypatch
     loader.assert_not_called()
 
 
-def test_local_v2_uses_pinned_checkpoint_and_preserves_tags():
+def test_local_v2_uses_pinned_checkpoint_and_preserves_tags(monkeypatch):
     from nemo_retriever.models.local import NemotronParse20
     from nemo_retriever.models.local import nemotron_parse_v1_2 as mod
 
+    monkeypatch.setenv("TQDM_DISABLE", "1")
     output = SimpleNamespace(outputs=[SimpleNamespace(text=TAGGED_OUTPUT)])
     with (
         patch.object(mod, "_patch_vllm_nemotron_parse_processor"),
@@ -152,6 +153,7 @@ def test_local_v2_uses_pinned_checkpoint_and_preserves_tags():
         "max_tokens": 9000,
         "skip_special_tokens": False,
     }
+    assert llm.return_value.generate.call_args.kwargs["use_tqdm"] is False
     assert model.model_name == "NVIDIA-Nemotron-Parse-2.0"
     assert model.model_name in model.output["description"]
 
