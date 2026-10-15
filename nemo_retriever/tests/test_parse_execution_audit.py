@@ -220,7 +220,7 @@ def test_checkpoint_tied_head_patch_guards_and_idempotence(monkeypatch, top_tied
 
 def test_bad_image_does_not_claim_success_or_hide_other_page_success(monkeypatch):
     def decode(payload):
-        if payload["image_b64"] == "bad":
+        if payload == "bad":
             raise ValueError("Corrupt page image")
         return object()
 
