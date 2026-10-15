@@ -444,6 +444,30 @@ class TestNemotronParseActor:
         assert client.kwargs["extra_body"] == {"max_tokens": 8192}
         assert client.kwargs["repetition_penalty"] == 1.1
 
+    def test_malformed_table_keeps_native_latex_without_dropping_page(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        table = r"\begin{tabular}{cc}\multicolumn{2}{c}{\multirow{2}{*}{Group} \\ \end{tabular}"
+        raw = (
+            "<x_0.1><y_0.1>Before<x_0.8><y_0.2><class_Text>"
+            f"<x_0.1><y_0.3>{table}<x_0.8><y_0.6><class_Table>"
+            "<x_0.1><y_0.7>After<x_0.8><y_0.8><class_Text>"
+        )
+        client = MagicMock()
+        client.invoke_chat_completions_images.return_value = [raw]
+
+        result = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+            invoke_url="http://nemotron-parse:8000/v1/chat/completions",
+            extract_text=True,
+            extract_tables=True,
+            nim_client=client,
+        )
+
+        assert result.at[0, "nemotron_parse_v1_2"]["error"] is None
+        assert result.at[0, "text"] == "Before\n\nAfter"
+        assert [item["text"] for item in result.at[0, "table"]] == [table]
+
     def test_remote_chat_completions_supports_legacy_tool_call_protocol(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
 
