@@ -91,6 +91,7 @@ The following sections summarize user-visible changes included in 26.08.1 and fo
 
 ### Retriever Service and deployment { #retriever-service-and-deployment }
 
+- Fixed split-topology Helm rendering so common `service.*` Pod, container, environment, volume, scheduling, and shutdown settings apply to the gateway, realtime, and batch workloads. `service.securityContext` also applies to worker `wait-for-gateway` init containers.
 - Helm maps `serviceConfig.nimEndpoints.rerankInvokeUrl` / `rerankModelName` into `nim_endpoints.rerank_invoke_url` / `rerank_model_name`, and auto-wires those fields when `nimOperator.rerankqa.enabled=true`, so `/v1/query` with `rerank=true` works in split topology.
 - Split topology renders an internal gateway startup Service so realtime and batch init containers can reach `GET /v1/live` before the gateway passes its deep `/v1/health` readiness check. This removes the clean-install deadlock that required manually patching `publishNotReadyAddresses` on the gateway Service.
 - Retriever Service exposes agentic retrieval on `POST /v1/query` when `agentic.enabled` is true. Refer to [Workflow: Agentic retrieval](workflow-agentic-retrieval.md).

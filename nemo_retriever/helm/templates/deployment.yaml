@@ -257,16 +257,25 @@ spec:
     metadata:
       labels:
         {{- include "nemo-retriever.role.selectorLabels" (dict "context" $ "role" $role) | nindent 8 }}
+        {{- with $svc.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") $ | sha256sum }}
+        {{- with $svc.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: {{ include "nemo-retriever.serviceAccountName" $ }}
       {{- include "nemo-retriever.imagePullSecrets" $ | nindent 6 }}
+      {{- with $svc.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- with $svc.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      terminationGracePeriodSeconds: {{ $roleCfg.terminationGracePeriodSeconds | default 15 }}
+      terminationGracePeriodSeconds: {{ $svc.terminationGracePeriodSeconds }}
       {{- with $roleCfg.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -279,10 +288,18 @@ spec:
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with $svc.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- if ne $role "gateway" }}
       initContainers:
         - name: wait-for-gateway
           image: busybox:1.37
+          {{- with $svc.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - sh
             - -c
@@ -300,6 +317,10 @@ spec:
         - name: nemo-retriever
           image: "{{ include "nemo-retriever.runtime.image.repository" $ }}:{{ include "nemo-retriever.runtime.image.tag" $ }}"
           imagePullPolicy: {{ include "nemo-retriever.runtime.image.pullPolicy" $ }}
+          {{- with $svc.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           args:
             - retriever
             - service
@@ -367,6 +388,10 @@ spec:
             {{- with $svc.env }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- with $svc.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- $resources := deepCopy $roleCfg.resources }}
             {{- $roleGpuEnabled := and (hasKey $roleCfg "gpu") (index $roleCfg "gpu").enabled }}
@@ -397,6 +422,9 @@ spec:
             - name: scope-token
               mountPath: {{ $scopeTokenMountPath | quote }}
               readOnly: true
+            {{- end }}
+            {{- with $svc.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- if $svc.startupProbe.enabled }}
           startupProbe:
@@ -437,6 +465,9 @@ spec:
         - name: retriever-results
           persistentVolumeClaim:
             claimName: {{ include "nemo-retriever.retrieverResultsPvcName" $ }}
+        {{- end }}
+        {{- with $svc.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
         {{- end }}
 {{- end }}
 {{- end }}

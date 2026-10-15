@@ -68,6 +68,10 @@ topology:
     enabled: false
 ```
 
+In `topology.mode: split`, `service.securityContext` applies to the gateway,
+realtime, and batch service containers. It also applies to the
+`wait-for-gateway` init containers in the realtime and batch Deployments.
+
 When **`persistence.enabled=true`**, you can keep the default log path under `persistence.mountPath` (`/var/lib/nemo-retriever`) because the PVC is mounted and SCC-assigned `fsGroup` applies. When persistence is off, always relocate logs to `/tmp` (or another path backed by `service.extraVolumes`).
 
 ### Audio and video (ffmpeg) on restricted OpenShift { #audio-and-video-ffmpeg-on-restricted-openshift }
@@ -202,7 +206,9 @@ oc get pods -n nemo-retriever
 oc describe pod -l app.kubernetes.io/name=nemo-retriever -n nemo-retriever
 ```
 
-You should see SCC-assigned numeric `runAsUser` on containers that declare a `securityContext` block, and no PSA warnings after overrides are applied.
+You should see SCC-assigned numeric `runAsUser` on the service and
+`wait-for-gateway` init containers that declare a `securityContext` block, and
+no PSA warnings after overrides are applied.
 
 ### Example install with NIM Operator (in-cluster NIMs)
 

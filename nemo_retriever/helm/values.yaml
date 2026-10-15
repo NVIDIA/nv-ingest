@@ -88,7 +88,10 @@ service:
   # state are process-local.
   replicas: 1
 
-  # Pod-level scheduling controls.
+  # Pod-level scheduling controls. In topology.mode=split, podAnnotations,
+  # podLabels, priorityClassName, and topologySpreadConstraints apply to
+  # gateway, realtime, and batch Pods. nodeSelector, tolerations, and
+  # affinity stay per-role under topology.<role>.
   podAnnotations: {}
   podLabels: {}
   nodeSelector: {}
@@ -111,6 +114,7 @@ service:
             topologyKey: kubernetes.io/hostname
   topologySpreadConstraints: []
   priorityClassName: ""
+  # Standalone and split gateway/realtime/batch Pods use this value.
   terminationGracePeriodSeconds: 60
 
   podSecurityContext:
@@ -118,6 +122,10 @@ service:
     runAsUser: 1000
     runAsGroup: 1000
     fsGroup: 1000
+  # Container securityContext. In topology.mode=split this applies to
+  # gateway, realtime, and batch containers and to wait-for-gateway
+  # init containers. Set a restricted-compatible context when the
+  # cluster enforces PSA restricted.
   securityContext: {}
 
   serviceAccount:
@@ -193,13 +201,15 @@ service:
     env: {}
 
   # Extra env vars (after the chart-managed ones). Use `envFrom` to pull
-  # whole Secrets/ConfigMaps in.
+  # whole Secrets/ConfigMaps in. In topology.mode=split, envFrom applies
+  # to gateway, realtime, and batch containers.
   env: []
   #  - name: PYTHONFAULTHANDLER
   #    value: "1"
   envFrom: []
 
   # Extra arbitrary volumes / mounts (e.g. for shipping CA bundles).
+  # In topology.mode=split these apply to gateway, realtime, and batch Pods.
   extraVolumes: []
   extraVolumeMounts: []
 
@@ -228,6 +238,12 @@ networkService:
 #   1. gateway  — lightweight proxy that routes uploads to the correct backend
 #   2. realtime — worker pod(s) for low-latency page processing
 #   3. batch    — worker pod(s) for throughput-oriented document processing
+#
+# Those Deployments inherit common service.* keys (securityContext,
+# podLabels, podAnnotations, priorityClassName, topologySpreadConstraints,
+# envFrom, extraVolumes, extraVolumeMounts, terminationGracePeriodSeconds).
+# Realtime and batch wait-for-gateway init containers use
+# service.securityContext.
 #
 # External traffic always enters through the gateway Service; realtime and
 # batch Services are ClusterIP-only and not directly exposed.

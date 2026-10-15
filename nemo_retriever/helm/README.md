@@ -663,6 +663,20 @@ short list of knobs you'll touch first.
 | `service.resources.limits`    | `96 / 96Gi`                        |       |
 | `service.gpu.enabled`         | `false`                            | The service does **not** need a GPU. |
 
+When `topology.mode` is `split`, the chart applies common `service` keys
+to the gateway, realtime, and batch Deployments.
+Those keys are `service.securityContext`, `service.podLabels`,
+`service.podAnnotations`, `service.priorityClassName`,
+`service.topologySpreadConstraints`, `service.envFrom`,
+`service.extraVolumes`, `service.extraVolumeMounts`, and
+`service.terminationGracePeriodSeconds` (default `60`).
+Per-role `topology.<role>.nodeSelector`, `tolerations`, and `affinity`
+still control placement for each Deployment.
+Realtime and batch `wait-for-gateway` init containers use
+`service.securityContext`.
+Set a restricted-compatible container `securityContext` on that key when
+the cluster enforces Pod Security Admission `restricted`.
+
 For audio and video extraction, set `service.installFfmpeg=true` when your
 cluster allows runtime package installation. **OpenShift restricted-v2** blocks
 that path — use a prebuilt service image instead; refer to [Audio and video on restricted OpenShift](./openshift.md#audio-and-video-ffmpeg-on-restricted-openshift).
