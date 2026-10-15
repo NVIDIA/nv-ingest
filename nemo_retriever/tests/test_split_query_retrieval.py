@@ -63,13 +63,15 @@ class _HybridVdb:
         ]
 
 
-def test_long_query_preserves_hybrid_alignment_and_original_groups(monkeypatch):
+@pytest.mark.parametrize("run_mode", ["local", "service"])
+def test_long_query_preserves_hybrid_alignment_and_original_groups(monkeypatch, run_mode):
     vdb = _HybridVdb()
-    op = RetrieveVdbOperator(vdb=vdb)
-    op._query_text_column = "text"
-    graph = _SplitEmbed() >> op
-    retriever = Retriever(embed_kwargs={"model_name": "test", "local_ingest_embed_backend": "hf"})
-    monkeypatch.setattr(Retriever, "_get_graph", lambda *args, **kwargs: graph)
+    monkeypatch.setattr("nemo_retriever.operators.embed.operators._BatchEmbedActor", _SplitEmbed)
+    monkeypatch.setattr("nemo_retriever.operators.embed.cpu_operator._BatchEmbedCPUActor", _SplitEmbed)
+    embed_kwargs = {"model_name": "test", "local_ingest_embed_backend": "hf"}
+    if run_mode == "service":
+        embed_kwargs["embedding_endpoint"] = "http://test.invalid/embed"
+    retriever = Retriever(run_mode=run_mode, embed_kwargs=embed_kwargs, vdb_kwargs={"vdb": vdb})
     queries = ["a" * 200, "short", "a" * 200]
     hits = retriever._execute_queries_graph(
         queries, effective_top_k=2, retrieval_top_k=2, vdb_call_kwargs={"where": "tenant = 'one'"}, embed_extra=None
