@@ -293,7 +293,7 @@ def analyze_document_with_nim(control_message: IngestControlMessage) -> IngestCo
         infer_protocol="http"
     )
 
-    df = control_message.get_payload()
+    df = control_message.payload()
 
     for idx, row in df.iterrows():
         if row.get("content"):
@@ -331,7 +331,7 @@ def batch_image_analysis_udf(control_message: IngestControlMessage) -> IngestCon
         auth_token=os.getenv("NGC_API_KEY")
     )
 
-    df = control_message.get_payload()
+    df = control_message.payload()
     image_rows = []
     images = []
 
@@ -403,7 +403,7 @@ def robust_nim_udf(control_message: IngestControlMessage) -> IngestControlMessag
         print(f"Failed to create NIM client: {e}")
         return control_message
 
-    df = control_message.get_payload()
+    df = control_message.payload()
 
     for idx, row in df.iterrows():
         try:
