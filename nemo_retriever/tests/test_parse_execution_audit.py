@@ -64,7 +64,9 @@ def test_workflow_summary_adds_optional_coverage_without_changing_other_summarie
     assert result.to_summary_dict()["parse_inference"] == coverage
 
 
-@pytest.mark.parametrize("outputs,status", [([""], "succeeded"), ([], "failed"), (["", ""], "failed")])
+@pytest.mark.parametrize(
+    "outputs,status", [([""], "succeeded"), ([], "failed"), (["", ""], "failed"), ([None], "failed")]
+)
 def test_inference_requires_response_per_image_and_accepts_blank_pages(monkeypatch, outputs, status):
     monkeypatch.setattr("nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image", lambda _: object())
     batch = pd.DataFrame({"page_image": [{"image_b64": "image"}, {}], "text": ["", "Native"]})
@@ -229,3 +231,32 @@ def test_bad_image_does_not_claim_success_or_hide_other_page_success(monkeypatch
     out = nemotron_parse_pages(data, model=SimpleNamespace(invoke_batch=lambda *a, **k: [""]), extract_text=True)
     assert [p["inference_status"] for p in out["nemotron_parse_v1_2"]] == ["failed", "succeeded"]
     assert out.at[0, "nemotron_parse_v1_2"]["error"]["message"] == "Corrupt page image"
+
+
+@pytest.mark.parametrize("persistent", [False, True])
+@pytest.mark.parametrize(
+    "response,status",
+    [
+        ({}, "failed"),
+        ({"choices": []}, "failed"),
+        ({"choices": [{"message": {"content": None}}]}, "failed"),
+        ({"choices": [{"message": {"content": ""}}]}, "succeeded"),
+    ],
+)
+def test_remote_parse_requires_completed_response_but_accepts_blank_text(monkeypatch, persistent, response, status):
+    from nemo_retriever.models.nim.nim import NIMClient
+
+    monkeypatch.setattr("nemo_retriever.models.nim.nim._post_with_retries", lambda **k: response)
+    client = NIMClient() if persistent else None
+    try:
+        out = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}], "text": ["Native"]}),
+            invoke_url="http://parse:8000/v1/chat/completions",
+            nemotron_parse_model="nvidia/nemotron-parse-v2.0",
+            nim_client=client,
+            extract_text=True,
+        )
+        assert out.at[0, "nemotron_parse_v1_2"]["inference_status"] == status
+    finally:
+        if client is not None:
+            client.shutdown()

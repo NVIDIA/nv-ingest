@@ -20,19 +20,25 @@ from typing import Any, Dict, List, Optional, Sequence
 from nemo_retriever.models.nim.nim import _parse_invoke_urls, _post_with_retries
 
 
-def extract_chat_completion_text(response_json: Any) -> str:
+def extract_chat_completion_text(response_json: Any, *, require_response: bool = False) -> str:
     """Extract generated text from an OpenAI-compatible chat completions response."""
     try:
         choice = response_json["choices"][0]["message"]
         # Some models return output via tool_calls
         tool_calls = choice.get("tool_calls")
         if tool_calls:
-            return str(tool_calls[0]["function"]["arguments"]).strip()
+            arguments = tool_calls[0]["function"]["arguments"]
+            if isinstance(arguments, str) or not require_response:
+                return str(arguments).strip()
         content = choice.get("content")
-        if content:
+        if isinstance(content, str):
+            return content.strip()
+        if content and not require_response:
             return str(content).strip()
     except (KeyError, IndexError, TypeError):
         pass
+    if require_response:
+        raise ValueError("Inference response is missing a completed chat message with text or tool output")
     return ""
 
 
@@ -167,6 +173,7 @@ def invoke_chat_completions_images(
     max_pool_workers: int = 16,
     max_retries: int = 10,
     max_429_retries: int = 5,
+    require_response: bool = False,
 ) -> List[str]:
     """Convenience wrapper: one chat completion request per base64 image.
 
@@ -189,6 +196,7 @@ def invoke_chat_completions_images(
             extra_body=extra_body,
             max_retries=max_retries,
             max_429_retries=max_429_retries,
+            require_response=require_response,
         )
     finally:
         client.shutdown()

@@ -413,6 +413,7 @@ def nemotron_parse_pages(
                         api_key=api_key,
                         timeout_s=float(request_timeout_s),
                         task_prompt=None if uses_tool_call_routing else task_prompt,
+                        require_response=True,
                         repetition_penalty=(
                             None
                             if contract.profile
@@ -455,13 +456,15 @@ def nemotron_parse_pages(
                 # Local vLLM Parse model: uses task_prompt and returns tagged text.
                 invoke_batch = getattr(model, "invoke_batch", None)
                 if invoke_batch is not None:
-                    raw_texts = [str(t or "").strip() for t in invoke_batch(batch_images, task_prompt=task_prompt)]
+                    raw_texts = list(invoke_batch(batch_images, task_prompt=task_prompt))
                 else:
-                    raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "").strip() for img in batch_images]
+                    raw_texts = [model.invoke(img, task_prompt=task_prompt) for img in batch_images]
             if len(raw_texts) != len(batch_indices):
                 raise ValueError(
                     f"Nemotron Parse returned {len(raw_texts)} responses for {len(batch_indices)} page images"
                 )
+            if any(not isinstance(text, str) for text in raw_texts):
+                raise ValueError("Nemotron Parse returned a missing or non-text inference response")
         except BaseException as e:
             if (
                 contract is not None

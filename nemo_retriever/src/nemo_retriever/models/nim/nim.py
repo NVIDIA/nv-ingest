@@ -415,6 +415,7 @@ class NIMClient:
         extra_body: Optional[Dict[str, Any]] = None,
         max_retries: int = 10,
         max_429_retries: int = 5,
+        require_response: bool = False,
     ) -> List[str]:
         """Concurrent chat completions using the persistent thread pool."""
         from nemo_retriever.models.nim.chat_completions import extract_chat_completion_text
@@ -449,7 +450,7 @@ class NIMClient:
                 max_429_retries=int(max_429_retries),
                 trace_context=trace_context,
             )
-            return idx, extract_chat_completion_text(response_json)
+            return idx, extract_chat_completion_text(response_json, require_response=require_response)
 
         futures = {
             self._executor.submit(_invoke_one, i, msgs, invoke_urls[i % len(invoke_urls)]): i
@@ -475,6 +476,7 @@ class NIMClient:
         extra_body: Optional[Dict[str, Any]] = None,
         max_retries: int = 10,
         max_429_retries: int = 5,
+        require_response: bool = False,
     ) -> List[str]:
         """Chat completions wrapper: one request per base64 image."""
         if not image_b64_list:
@@ -510,6 +512,7 @@ class NIMClient:
             extra_body=merged_extra,
             max_retries=max_retries,
             max_429_retries=max_429_retries,
+            require_response=require_response,
         )
 
     # -- lifecycle --------------------------------------------------------

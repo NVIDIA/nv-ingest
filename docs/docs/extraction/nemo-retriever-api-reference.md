@@ -335,6 +335,12 @@ Each page's `nemotron_parse_v1_2` diagnostic payload includes an
 | `failed` | Model initialization, inference, or response validation failed. Inspect the adjacent `error` payload. |
 | `skipped` | The page was not submitted for inference, for example because its rendered image was missing. |
 
+A completed response containing an explicit empty string remains valid for a
+blank page. Missing or non-string local model responses fail validation.
+For chat-completions endpoints, responses without a choice, message, or
+supported text or tool output also fail validation. These malformed responses
+do not count as successful blank-page inference.
+
 These statuses describe execution, not output correctness. Inspect structured
 output and evaluate retrieval quality separately. Do not count missing status
 fields or native PDF text as successful Parse inference.
