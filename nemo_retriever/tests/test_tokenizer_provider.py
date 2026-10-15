@@ -11,8 +11,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 from tokenizers import Tokenizer
-from tokenizers.models import WordLevel
-from tokenizers.pre_tokenizers import Whitespace
+from tokenizers.decoders import ByteLevel as ByteLevelDecoder
+from tokenizers.models import BPE, WordLevel
+from tokenizers.pre_tokenizers import ByteLevel, Whitespace
 
 import nemo_retriever.common.modality.txt.tokenizer_provider as provider
 import nemo_retriever.operators.extract.html.ray_data as html_actor_module
@@ -80,6 +81,60 @@ def test_txt_and_html_chunk_without_transformers(
 
     assert txt["text"].tolist() == ["hello world"]
     assert html["text"].tolist() == ["hello world"]
+
+
+@pytest.mark.parametrize("local_checkpoint", [False, True])
+@pytest.mark.parametrize("truncation,padding", [(True, False), (False, True), (True, True)])
+def test_chunk_tokenizer_ignores_serialized_truncation_and_padding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    local_checkpoint: bool,
+    truncation: bool,
+    padding: bool,
+) -> None:
+    tokenizer_path = tmp_path / "tokenizer.json"
+    _write_tokenizer(tokenizer_path)
+    serialized_tokenizer = Tokenizer.from_file(str(tokenizer_path))
+    if truncation:
+        serialized_tokenizer.enable_truncation(max_length=2048)
+    if padding:
+        serialized_tokenizer.enable_padding(pad_id=0, pad_token="[UNK]", pad_to_multiple_of=8)
+    serialized_tokenizer.save(str(tokenizer_path))
+    original_artifact = tokenizer_path.read_bytes()
+    monkeypatch.setattr(provider, "hf_hub_download_with_pinned_revision", lambda **_kwargs: str(tokenizer_path))
+    provider.load_chunk_tokenizer.cache_clear()
+    model_id = str(tmp_path) if local_checkpoint else "nvidia/llama-nemotron-embed-vl-1b-v2"
+
+    tokenizer = provider.load_chunk_tokenizer(model_id)
+    long_text = "hello " * 2051
+
+    assert tokenizer.encode(long_text) == [1] * 2051
+    assert tokenizer.encode("hello") == [1]
+    assert tokenizer.encode_batch([long_text, "hello world", "hello"]) == [[1] * 2051, [1, 2], [1]]
+    assert tokenizer_path.read_bytes() == original_artifact
+
+
+def test_serialized_truncation_does_not_bypass_lossless_embedding_admission(tmp_path: Path) -> None:
+    from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy
+
+    alphabet = sorted(ByteLevel.alphabet())
+    serialized_tokenizer = Tokenizer(BPE({character: index for index, character in enumerate(alphabet)}, []))
+    serialized_tokenizer.pre_tokenizer = ByteLevel(add_prefix_space=False, use_regex=False)
+    serialized_tokenizer.decoder = ByteLevelDecoder()
+    serialized_tokenizer.enable_truncation(max_length=4)
+    serialized_tokenizer.enable_padding(pad_id=0, pad_token=alphabet[0], pad_to_multiple_of=8)
+    serialized_tokenizer.save(str(tmp_path / "tokenizer.json"))
+    provider.load_chunk_tokenizer.cache_clear()
+    tokenizer = provider.load_chunk_tokenizer(str(tmp_path))
+    policy = EmbeddingInputPolicy(tokenizer=tokenizer, max_tokens=8, prefix="", add_special_tokens=False)
+    text = "hello world " * 5
+
+    plan = policy.plan([text])[0]
+
+    assert plan.formatted_tokens == len(text)
+    assert plan.requires_split
+    assert "".join(child.content for child in plan.children) == text
+    assert all(len(tokenizer.encode(child.content)) <= policy.max_tokens for child in plan.children)
 
 
 def test_load_chunk_tokenizer_surfaces_actionable_error(
