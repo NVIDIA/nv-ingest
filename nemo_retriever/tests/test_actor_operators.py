@@ -474,7 +474,7 @@ class TestNemotronParseActor:
         assert client.kwargs["model"] == NEMOTRON_PARSE_V2_MODEL
         assert client.kwargs["task_prompt"] == NEMOTRON_PARSE_DEFAULT_TASK_PROMPT
         assert client.kwargs["extra_body"] == {
-            "max_tokens": 9000,
+            "max_tokens": 8192,
             "top_k": 1,
             "skip_special_tokens": False,
         }
