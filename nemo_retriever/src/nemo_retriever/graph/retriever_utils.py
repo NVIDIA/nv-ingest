@@ -10,6 +10,8 @@ from typing import Any
 
 import pandas as pd
 
+from nemo_retriever.query.expansion import QUERY_INDEX_COLUMN
+
 _RESERVED_RETRIEVE_KWARGS = frozenset({"query_texts", "refine_factor"})
 
 
@@ -31,11 +33,11 @@ def hits_lists_to_rerank_dataframe(
     table, etc.).
     """
     rows: list[dict[str, Any]] = []
-    for q, hits in zip(query_texts, hits_per_query):
+    for index, (q, hits) in enumerate(zip(query_texts, hits_per_query)):
         for h in hits:
-            rows.append({"query": q, "text": str(h.get("text", "")), "_hit": dict(h)})
+            rows.append({"query": q, "text": str(h.get("text", "")), "_hit": dict(h), QUERY_INDEX_COLUMN: index})
     if not rows:
-        return pd.DataFrame(columns=["query", "text", "_hit"])
+        return pd.DataFrame(columns=["query", "text", "_hit", QUERY_INDEX_COLUMN])
     return pd.DataFrame(rows)
 
 
@@ -54,12 +56,17 @@ def rerank_long_dataframe_to_hits(
 
     work = df.copy()
     # Per-query score ordering (global sort in NemotronRerank is disabled for multi-query batches).
-    work["_q_order"] = work["query"].map({q: i for i, q in enumerate(query_texts)}).fillna(len(query_texts))
+    has_query_indices = QUERY_INDEX_COLUMN in work.columns
+    work["_q_order"] = (
+        work[QUERY_INDEX_COLUMN]
+        if has_query_indices
+        else work["query"].map({q: i for i, q in enumerate(query_texts)}).fillna(len(query_texts))
+    )
     work = work.sort_values(["_q_order", score_column], ascending=[True, False]).drop(columns=["_q_order"])
 
     out: list[list[dict[str, Any]]] = []
-    for q in query_texts:
-        sub = work[work["query"] == q]
+    for index, q in enumerate(query_texts):
+        sub = work[work[QUERY_INDEX_COLUMN] == index] if has_query_indices else work[work["query"] == q]
         picked: list[dict[str, Any]] = []
         for _, row in sub.head(int(top_k)).iterrows():
             hit = dict(row["_hit"])

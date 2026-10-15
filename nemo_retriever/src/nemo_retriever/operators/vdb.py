@@ -231,6 +231,7 @@ class RetrieveVdbOperator(AbstractOperator):
         vdb_op: str | None = None,
         vdb_kwargs: dict[str, Any] | None = None,
         explode_for_rerank: bool = False,
+        _query_text_column: str | None = None,
     ) -> None:
         merged = dict(vdb_kwargs or {})
         clean_kwargs, _sidecar = split_sidecar_from_vdb_kwargs(merged)
@@ -240,11 +241,31 @@ class RetrieveVdbOperator(AbstractOperator):
             vdb_op=vdb_op,
             vdb_kwargs=clean_kwargs,
             explode_for_rerank=explode_for_rerank,
+            _query_text_column=_query_text_column,
         )
         self._vdb_kwargs = clean_kwargs
         self._retrieval_vdb_kwargs = clean_kwargs
         self._vdb = _construct_vdb(vdb=vdb, vdb_op=vdb_op, vdb_kwargs=clean_kwargs)
         self._explode_for_rerank = bool(explode_for_rerank)
+        self._query_text_column = _query_text_column
+
+    def run(self, data: Any, **kwargs: Any) -> Any:
+        if self._query_text_column is None:
+            return super().run(data, **kwargs)
+        from nemo_retriever.query.expansion import QUERY_INDEX_COLUMN, regroup_query_hits
+
+        if not isinstance(data, pd.DataFrame) or not {QUERY_INDEX_COLUMN, self._query_text_column} <= set(data.columns):
+            raise ValueError("Query embedding output must preserve query indices and text columns")
+        query_texts = list(kwargs.get("query_texts") or [])
+        vectors = self.preprocess(data, **kwargs)
+        aligned = {**kwargs, "query_texts": data[self._query_text_column].tolist()}
+        hits = self.process(vectors, **aligned)
+        chunks = hits[0] if isinstance(hits, tuple) else hits
+        grouped = regroup_query_hits(
+            chunks, data[QUERY_INDEX_COLUMN].tolist(), query_count=len(query_texts), top_k=int(kwargs.get("top_k", 10))
+        )
+        result = (grouped, hits[1]) if isinstance(hits, tuple) else grouped
+        return self.postprocess(result, **kwargs)
 
     def get_index_metadata(self, key: str, **kwargs: Any) -> str | None:
         """Read one index metadata value through the configured VDB."""

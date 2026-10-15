@@ -29,6 +29,7 @@ from nemo_retriever.common.vdb.lancedb_capabilities import (
 )
 from nemo_retriever.common.vdb.records import RetrievalHit, normalize_retrieval_results
 from nemo_retriever.query.shaping import shape_query_hits
+from nemo_retriever.query.expansion import QUERY_INDEX_COLUMN
 from nemo_retriever.operators.vdb import RetrieveVdbOperator
 
 logger = logging.getLogger(__name__)
@@ -176,6 +177,7 @@ class Retriever:
         vdb_init = _coerce_vdb_init(self.vdb_kwargs)
         retrieve = RetrieveVdbOperator(
             explode_for_rerank=self.rerank,
+            _query_text_column=str(embed_params.text_column),
             **vdb_init,
         )
 
@@ -226,10 +228,10 @@ class Retriever:
             # actual retrieval to their configured inner retriever.
             text_col = str({**dict(self.embed_kwargs or {}), **dict(embed_extra or {})}.get("text_column") or "text")
         df = pd.DataFrame({text_col: query_texts})
-
-        # Hybrid retrieval relies on these ordered query strings staying aligned
-        # with the embedded rows produced from ``df``. If this query graph grows
-        # distributed/shuffled stages, carry row-local query text or IDs instead.
+        if self.graph is None:
+            # Embedding admission can expand a long query into several rows.
+            # Preserve its positional identity, including repeated query strings.
+            df[QUERY_INDEX_COLUMN] = range(len(query_texts))
         graph = self._get_graph(embed_extra=embed_extra)
 
         exec_kwargs: dict[str, Any] = {

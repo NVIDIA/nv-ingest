@@ -88,7 +88,8 @@ class TestQueriesGraphExecution:
         assert kw["where"] == "x"
         df = _args[0]
         assert isinstance(df, pd.DataFrame)
-        assert list(df.columns) == ["text"]
+        assert list(df.columns) == ["text", "_nrl_query_index"]
+        assert df["_nrl_query_index"].tolist() == [0]
         assert df["text"].tolist() == ["q"]
 
     @pytest.mark.parametrize("embed_kwargs", [{}, {"local_ingest_embed_backend": None}])

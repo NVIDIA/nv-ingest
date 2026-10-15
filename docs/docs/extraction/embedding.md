@@ -77,6 +77,19 @@ losslessly, not truncated.
 formatted embedding-input limit. `EmbedParams.query_max_length` controls the
 separate query limit.
 
+With its default query graph, `Retriever` searches every split query chunk
+using the chunk's embedding and matching text for hybrid retrieval. It combines
+the chunk rankings for each original query with equal-weight reciprocal rank
+fusion: `score(hit) = sum(1 / (60 + rank))`, with ranks starting at 1.
+Each hit contributes at most once per chunk. Equal scores retain first-encounter
+order. Queries that do not split retain their existing ranking and scores.
+
+`Retriever.queries()` returns one result group per input query, in input order,
+including repeated identical inputs. `top_k` limits the final hits for each
+original query. When enabled, reranking runs after fusion and uses the original
+full query text. Caller-supplied query graphs and direct vector retrieval retain
+their own result contracts.
+
 For local Nemotron 3.5 `text_image` ingestion, `max_length` covers the combined retrieval template, expanded image tokens, and text. The default passage limit remains 8,192 tokens; it is not a separate text budget plus an image allowance.
 
 The library counts tokens with the checkpoint's processor before inference. If paired text does not fit, it splits the text losslessly and repeats the unchanged full image for every child row. Children preserve source and page metadata and receive the same `metadata["embedding_split"]` provenance described below. This policy does not crop images or truncate image tokens. Repeating an image can increase inference work and the number of stored vectors.

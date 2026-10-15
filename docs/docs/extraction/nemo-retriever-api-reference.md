@@ -505,6 +505,13 @@ for row in result.dataframe.to_dict(orient="records"):
 
 `Retriever` embeds queries, retrieves from a vector database, and can rerank results. Pass `embed_kwargs` that match `EmbedParams`, `vdb_kwargs` for `RetrieveVdbOperator`, and `rerank_kwargs` for `NemotronRerankActor`.
 
+With the default query graph, `Retriever.queries()` returns one hit list per
+input query, preserving input order and repeated identical inputs. Overlength
+queries are split losslessly, searched, and fused before optional reranking
+with the original full query text. `top_k` limits the final hits per original
+query. For the fusion policy, refer to
+[Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+
 `Retriever.answer()` requires an `LLMClient` and returns `AnswerResult`. Pass an `AnswerJudge` only when you also pass `reference`. Those types are documented in [LLM clients, tasks, and results](#llm-clients-tasks-and-results).
 
 `Retriever.pipeline()` returns `RetrieverPipelineBuilder`. `generate()` accepts a `LiteLLMClient` instance or `model=` keyword arguments. `judge()` accepts an `LLMJudge` instance or `model=` keyword arguments. When you include both `.judge()` and `.score()`, call `.judge()` first. `.score()` derives `failure_mode` from the `judge_score` present at that step. A later `.judge()` does not recompute `failure_mode`.
