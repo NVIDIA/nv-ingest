@@ -515,7 +515,9 @@ helm upgrade --install retriever ./nemo_retriever/helm \
 ```
 
 For this `2.0.8-variant` NIM image, NVIDIA documents a 1,024-token output
-limit on A10G and L40S. The library requests up to 9,000 tokens per page.
+limit on A10G and L40S. The library requests up to 8,192 output tokens per
+page, reserving headroom for the task prompt within the NIM's 9,000-token
+context limit.
 Validate the selected NIM profile with a representative PDF. Refer to the
 [versioned Parse 2.0 support matrix](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/support-matrix.html#nemotron-parse-v2-0)
 and [release notes](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/release-notes.html#nemotron-parse-v2-0).

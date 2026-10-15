@@ -33,7 +33,7 @@ TAGGED_OUTPUT = (
         (
             "http://parse:8000/v1/chat/completions",
             "nvidia/nemotron-parse-v2.0",
-            {"max_tokens": 9000, "top_k": 1, "repetition_penalty": 1.1, "skip_special_tokens": False},
+            {"max_tokens": 8192, "top_k": 1, "repetition_penalty": 1.1, "skip_special_tokens": False},
         ),
         (
             "https://integrate.api.nvidia.com/v1/chat/completions",
@@ -158,7 +158,7 @@ def test_local_v2_uses_pinned_checkpoint_and_preserves_tags():
 @pytest.mark.parametrize(
     ("model", "decoding"),
     [
-        ("nvidia/nemotron-parse-v2.0", {"max_tokens": 9000, "top_k": 1, "skip_special_tokens": False}),
+        ("nvidia/nemotron-parse-v2.0", {"max_tokens": 8192, "top_k": 1, "skip_special_tokens": False}),
         ("nvidia/nemotron-parse-2.0", {"max_tokens": 8192}),
     ],
 )
@@ -174,3 +174,28 @@ def test_lower_level_v2_payload_matches_endpoint_decoding(model, decoding):
         assert not {"repetition_penalty", "top_k", "skip_special_tokens"} & payload.keys()
     else:
         assert payload["repetition_penalty"] == 1.1
+
+
+@pytest.mark.parametrize("picture_text", [None, False, True])
+def test_self_hosted_v2_reserves_context_for_task_prompt(monkeypatch, picture_text):
+    """Reproduce the 2.0.8-variant NIM's 9,000-token total-context admission."""
+
+    def context_limited_post(**kwargs):
+        payload = kwargs["payload"]
+        prompt = payload["messages"][0]["content"][0]["text"]
+        # Character count bounds these short tag-only task prompts conservatively.
+        if payload["max_tokens"] + len(prompt) > 9000:
+            raise ValueError("NIM context limit includes the task prompt")
+        return {"choices": [{"message": {"content": TAGGED_OUTPUT}}]}
+
+    monkeypatch.setattr("nemo_retriever.models.nim.nim._post_with_retries", context_limited_post)
+    batch = pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}], "text": ["Native"]})
+    result = nemotron_parse_pages(
+        batch,
+        invoke_url="http://parse:8000/v1/chat/completions",
+        nemotron_parse_model="nvidia/nemotron-parse-v2.0",
+        nemotron_parse_predict_text_in_pic=picture_text,
+        extract_text=True,
+    )
+    assert result.at[0, "text"].startswith("Body text")
+    assert result.at[0, "nemotron_parse_v1_2"]["error"] is None

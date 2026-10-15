@@ -177,7 +177,7 @@ When you call [NVIDIA-hosted NIMs](deployment-options.md#when-to-use-nvidia-host
     - **Hosted default** uses `nvidia/nemotron-parse` at `https://integrate.api.nvidia.com/v1/chat/completions` with an image-only tool-call contract.
     - **Hosted Parse 2.0** uses `nvidia/nemotron-parse-2.0` at the same URL with a tagged task prompt, `temperature=0`, and an 8,192-token limit. Select this model explicitly. Refer to the [hosted Parse 2.0 API reference](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-parse-2_0-infer).
     - **Self-hosted Parse v1.2** uses `nvidia/nemotron-parse-v1.2` with a tagged task prompt. The Helm chart retains `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant` as its default Parse image.
-    - **Self-hosted Parse 2.0** uses `nvidia/nemotron-parse-v2.0` with a tagged task prompt, a 9,000-token limit, `top_k=1`, repetition penalty `1.1`, and preserved special tokens. Hosted Parse 2.0 omits `top_k`, `repetition_penalty`, and `skip_special_tokens`.
+    - **Self-hosted Parse 2.0** uses `nvidia/nemotron-parse-v2.0` with a tagged task prompt, an 8,192-token output limit, `top_k=1`, repetition penalty `1.1`, and preserved special tokens. This output budget reserves task-prompt headroom within the `2.0.8-variant` NIM's 9,000-token context limit. Hosted Parse 2.0 omits `top_k`, `repetition_penalty`, and `skip_special_tokens`.
 
     Set `method="nemotron_parse"` and `nemotron_parse_invoke_url` for remote inference. Omitting `nemotron_parse_model` selects the hosted default or self-hosted v1.2 model. To use 2.0, select its deployment-specific ID explicitly.
 
@@ -270,7 +270,7 @@ Model repositories and NIM references are linked in [Core and Advanced Pipeline 
 | Reranker | ~3.1 GiB (llama-nemotron-rerank-vl-1b-v2) | With Core Pipeline | Yes | Yes | Yes | Yes | Yes | No* | No* | No* | No* |
 | Reranker | — | Standalone (recall only) | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
-The Parse hardware rows describe the default v1.2 NIM. For an opt-in Parse 2.0 deployment, refer to the [Parse 2.0 NIM support matrix for `2.0.8-variant`](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/support-matrix.html#nemotron-parse-v2-0). The [Parse 2.0 NIM release notes](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/release-notes.html#nemotron-parse-v2-0) document a 1,024-token output limit on A10G and L40S. This is below the library's 9,000-token request budget. Validate the selected NIM profile with a representative PDF before deployment.
+The Parse hardware rows describe the default v1.2 NIM. For an opt-in Parse 2.0 deployment, refer to the [Parse 2.0 NIM support matrix for `2.0.8-variant`](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/support-matrix.html#nemotron-parse-v2-0). The [Parse 2.0 NIM release notes](https://docs.nvidia.com/nim/vision-language-models/2.0.8-variant/release-notes.html#nemotron-parse-v2-0) document a 1,024-token output limit on A10G and L40S. This is below the library's 8,192-token output request budget. Validate the selected NIM profile with a representative PDF before deployment.
 
 ¹ On other supported GPUs, Parakeet ASR (`parakeet-1-1b-ctc-en-us:1.5.0`) may require a runtime TensorRT engine build (no prebuilt profile in the chart image).
 

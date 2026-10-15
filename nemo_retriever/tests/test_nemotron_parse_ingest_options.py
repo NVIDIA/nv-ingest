@@ -135,7 +135,7 @@ def test_typed_parse_options_reach_inference(tmp_path, monkeypatch, graph_path, 
             assert {
                 key: payload[key] for key in ("max_tokens", "top_k", "skip_special_tokens", "repetition_penalty")
             } == {
-                "max_tokens": 9000,
+                "max_tokens": 8192,
                 "top_k": 1,
                 "skip_special_tokens": False,
                 "repetition_penalty": 1.1,

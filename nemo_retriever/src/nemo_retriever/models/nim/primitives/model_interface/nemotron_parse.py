@@ -316,7 +316,8 @@ class NemotronParseModelInterface(ModelInterface):
         else:
             payload["repetition_penalty"] = self._repetition_penalty
             if normalized == "nvidia/nemotron-parse-v2.0":
-                payload.update(max_tokens=9000, top_k=1, skip_special_tokens=False)
+                # The NIM context includes the task prompt; reserve headroom.
+                payload.update(max_tokens=8192, top_k=1, skip_special_tokens=False)
 
         return payload
 

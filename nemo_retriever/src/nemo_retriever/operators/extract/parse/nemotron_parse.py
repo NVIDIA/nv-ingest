@@ -397,7 +397,8 @@ def nemotron_parse_pages(
                     if contract.profile == _NemotronParseContractProfile.V2_0_TAGGED:
                         # Parse 2.0 NIMs require their documented decoding options.
                         extra_body = {
-                            "max_tokens": 9000,
+                            # The NIM context includes the task prompt; reserve headroom.
+                            "max_tokens": 8192,
                             "top_k": 1,
                             "skip_special_tokens": False,
                         }
