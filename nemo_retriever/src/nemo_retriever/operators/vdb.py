@@ -250,12 +250,68 @@ class RetrieveVdbOperator(AbstractOperator):
         self._query_text_column = _query_text_column
 
     def run(self, data: Any, **kwargs: Any) -> Any:
+        """Retrieve hits, regrouping expanded rows for the default query graph.
+
+        Without ``_query_text_column``, use the standard operator lifecycle:
+        extract vectors from an embedded DataFrame when needed, retrieve, and
+        optionally prepare the hits for reranking. Direct vector callers and
+        caller-supplied graphs retain this path's existing result contract.
+
+        The default query graph sets ``_query_text_column``. This path searches
+        each embedded row with its matching chunk text, then fuses split-row
+        rankings into one group per original query using reciprocal rank fusion
+        with ``k=60``. Unsplit rankings and scores remain unchanged.
+
+        Parameters
+        ----------
+        data : Any
+            Precomputed query vectors or an embedded pandas DataFrame for the
+            standard path. The expansion path requires an embedded DataFrame
+            with ``_nrl_query_index`` and the configured query text column.
+            Preserve both columns through embedding. Each integer index refers
+            to a position in the original ``query_texts`` sequence; repeated
+            query strings still have distinct indices. The text column contains
+            each row's admitted chunk text, not the original full query.
+        **kwargs : Any
+            Retrieval options passed to the VDB. For the expansion path,
+            ``query_texts`` must contain the original full input query strings
+            in input order. ``top_k`` limits the fused candidates per original
+            query and defaults to 10. When reranking is enabled, these original
+            strings pair with the fused hits. Collection retrieval requires
+            both ``scope`` and ``collection_name``.
+
+        Returns
+        -------
+        Any
+            Ranked hit lists in input query order. With ``explode_for_rerank``
+            and nonempty ``query_texts``, list results become a long DataFrame
+            containing the original queries and hit payloads for the downstream
+            reranker; this method does not rerank them itself. Collection
+            results retain their ``(hit_lists, metadata)`` tuple: the expansion
+            path regroups only the hit lists and preserves the metadata
+            unchanged. Tuple results are not expanded into a rerank DataFrame.
+
+        Raises
+        ------
+        ValueError
+            If expansion columns, embeddings, original query indices, or
+            per-row retrieval groups are missing or invalid. Preserve the index
+            and text columns through embedding, provide the original full
+            ``query_texts``, and require one VDB result group per embedded row.
+            Every original query must retain at least one embedded row. For a
+            collection configuration error, provide both ``scope`` and
+            ``collection_name``. Backend validation errors also propagate.
+        """
         if self._query_text_column is None:
             return super().run(data, **kwargs)
         from nemo_retriever.query.expansion import QUERY_INDEX_COLUMN, regroup_query_hits
 
         if not isinstance(data, pd.DataFrame) or not {QUERY_INDEX_COLUMN, self._query_text_column} <= set(data.columns):
-            raise ValueError("Query embedding output must preserve query indices and text columns")
+            raise ValueError(
+                f"Query embedding output must be a pandas DataFrame containing {QUERY_INDEX_COLUMN!r} "
+                f"and {self._query_text_column!r}; preserve these columns through embedding and pass "
+                "the original full input query strings as query_texts"
+            )
         query_texts = list(kwargs.get("query_texts") or [])
         vectors = self.preprocess(data, **kwargs)
         aligned = {**kwargs, "query_texts": data[self._query_text_column].tolist()}

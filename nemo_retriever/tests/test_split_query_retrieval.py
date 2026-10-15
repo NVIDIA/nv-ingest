@@ -108,12 +108,18 @@ def test_rerank_uses_original_full_queries_and_keeps_duplicate_inputs_separate()
 
 
 def test_chunk_fusion_uses_ranks_deduplicates_once_per_chunk_and_is_stable():
-    a, b = {"text": "a", "_distance": 0.1}, {"text": "b", "_distance": 0.2}
-    hits = regroup_query_hits([[a, a, b], [{**b, "_distance": 9.0}]], [0, 0], query_count=1, top_k=2)[0]
-    assert [hit["text"] for hit in hits] == ["b", "a"]
+    first_hit = {"text": "first", "_distance": 0.1}
+    second_hit = {"text": "second", "_distance": 0.2}
+    hits = regroup_query_hits(
+        [[first_hit, first_hit, second_hit], [{**second_hit, "_distance": 9.0}]],
+        [0, 0],
+        query_count=1,
+        top_k=2,
+    )[0]
+    assert [hit["text"] for hit in hits] == ["second", "first"]
     assert hits[0]["_relevance_score"] == pytest.approx(1 / 63 + 1 / 61)
-    tied = regroup_query_hits([[a], [b]], [0, 0], query_count=1, top_k=2)[0]
-    assert [hit["text"] for hit in tied] == ["a", "b"]
+    tied = regroup_query_hits([[first_hit], [second_hit]], [0, 0], query_count=1, top_k=2)[0]
+    assert [hit["text"] for hit in tied] == ["first", "second"]
 
 
 def test_reordered_rows_preserve_original_order_and_empty_results():
