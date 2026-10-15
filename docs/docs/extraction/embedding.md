@@ -90,6 +90,9 @@ or a local checkpoint, the library loads the tokenizer and prompt configuration
 for that exact model version. If the text does not fit, the library splits it
 into deterministic contiguous token ranges that fit. This split does not
 truncate text and occurs before either local or remote embedding.
+The tokenizer used for text counting and splitting disables checkpoint-defined
+truncation and padding so it measures the complete input. This does not change
+the inference tokenizer's settings.
 If the exact tokenizer, selected prompt prefix, or checkpoint-supported token
 limit is unavailable, embedding stage setup fails before inference rather than
 guessing an admission policy.

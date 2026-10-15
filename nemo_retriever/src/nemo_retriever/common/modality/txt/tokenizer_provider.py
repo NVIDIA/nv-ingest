@@ -89,7 +89,11 @@ def load_chunk_tokenizer(
             )
         from tokenizers import Tokenizer
 
-        return _FastTokenizer(Tokenizer.from_file(tokenizer_path))
+        tokenizer = Tokenizer.from_file(tokenizer_path)
+        # Count and split the full input, independent of serialized inference settings.
+        tokenizer.no_truncation()
+        tokenizer.no_padding()
+        return _FastTokenizer(tokenizer)
     except Exception as exc:
         raise TokenizerUnavailableError(
             "Unable to load the exact tokenizer required for text chunking: "
