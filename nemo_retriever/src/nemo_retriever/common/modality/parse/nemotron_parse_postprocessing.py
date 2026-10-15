@@ -167,7 +167,8 @@ def _extract_merged_commands(s: str):
 
 
 def _replace_italic(text: str) -> str:
-    pattern = re.compile(r"(?<!\\)_(.*?)(?<!\\)_")
+    # "__" is two markers, not an empty italic span.
+    pattern = re.compile(r"(?<![\\_])_(?!_)(.+?)(?<!\\)_")
 
     def italic_replacer(match):
         content = match.group(1).replace(r"\_", "_")
@@ -177,7 +178,8 @@ def _replace_italic(text: str) -> str:
 
 
 def _replace_bold(text: str) -> str:
-    pattern = re.compile(r"(?<!\\)\*\*(.*?)(?<!\\)\*\*")
+    # "****" is not an empty bold span.
+    pattern = re.compile(r"(?<![\\*])\*\*(?!\*)(.+?)(?<!\\)\*\*")
 
     def bold_replacer(match):
         content = match.group(1).replace(r"\*", "*")
