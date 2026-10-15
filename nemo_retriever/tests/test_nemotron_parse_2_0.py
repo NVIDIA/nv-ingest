@@ -5,6 +5,7 @@
 """Parse 2.0 request contracts, local loading, and output compatibility."""
 
 from types import SimpleNamespace
+from contextlib import nullcontext
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
@@ -17,7 +18,6 @@ from nemo_retriever.operators.extract.parse.nemotron_parse import (
     _route_parsed_elements,
     nemotron_parse_pages,
 )
-
 
 TAGGED_OUTPUT = (
     "<x_0><y_0>Body text<x_1><y_1><class_Text>"
@@ -135,6 +135,7 @@ def test_local_v2_uses_pinned_checkpoint_and_preserves_tags():
     with (
         patch.object(mod, "_patch_vllm_nemotron_parse_processor"),
         patch.object(mod, "configure_global_hf_cache_base"),
+        patch.object(NemotronParse20, "_vllm_runtime", return_value=nullcontext()),
         patch("vllm.LLM") as llm,
         patch("vllm.SamplingParams") as sampling,
     ):
@@ -143,7 +144,7 @@ def test_local_v2_uses_pinned_checkpoint_and_preserves_tags():
         assert model.invoke_batch([Image.new("RGB", (2, 2))]) == [TAGGED_OUTPUT]
 
     assert llm.call_args.kwargs["model"] == "nvidia/NVIDIA-Nemotron-Parse-2.0"
-    assert llm.call_args.kwargs["revision"] == "635b84d9b09bb9526b9a684d0b2c953d3cc3df05"
+    assert llm.call_args.kwargs["revision"] == "b6742064f4a8cf22a10383ece5e7fbead355ac04"
     assert sampling.call_args.kwargs == {
         "temperature": 0,
         "top_k": 1,

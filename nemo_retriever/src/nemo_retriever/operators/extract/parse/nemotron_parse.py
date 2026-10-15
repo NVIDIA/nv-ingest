@@ -93,6 +93,7 @@ _PARSE_CLASS_TO_CHANNEL: Dict[str, str] = {
 
 def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
     return {
+        "inference_status": "failed",
         "timing": None,
         "error": {
             "stage": str(stage),
@@ -353,7 +354,9 @@ def nemotron_parse_pages(
     all_chart: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_infographic: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_text: List[Optional[str]] = [None] * n_rows
-    all_meta: List[Dict[str, Any]] = [{"timing": None, "error": None} for _ in range(n_rows)]
+    all_meta: List[Dict[str, Any]] = [
+        {"timing": None, "error": None, "inference_status": "skipped"} for _ in range(n_rows)
+    ]
 
     t0_total = time.perf_counter()
 
@@ -374,6 +377,7 @@ def nemotron_parse_pages(
             batch_indices.append(idx)
         except Exception as e:
             all_meta[idx] = {
+                "inference_status": "failed",
                 "timing": None,
                 "error": {
                     "stage": "nemotron_parse_pages_decode",
@@ -454,6 +458,10 @@ def nemotron_parse_pages(
                     raw_texts = [str(t or "").strip() for t in invoke_batch(batch_images, task_prompt=task_prompt)]
                 else:
                     raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "").strip() for img in batch_images]
+            if len(raw_texts) != len(batch_indices):
+                raise ValueError(
+                    f"Nemotron Parse returned {len(raw_texts)} responses for {len(batch_indices)} page images"
+                )
         except BaseException as e:
             if (
                 contract is not None
@@ -484,7 +492,7 @@ def nemotron_parse_pages(
                 "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
             }
             for i in batch_indices:
-                all_meta[i] = {"timing": None, "error": err}
+                all_meta[i] = {"timing": None, "error": err, "inference_status": "failed"}
             raw_texts = []
 
     # -- Phase 3: route parsed elements into content channels ------------
@@ -503,8 +511,10 @@ def nemotron_parse_pages(
             all_infographic[idx] = fp_infographics
             if fp_text is not None:
                 all_text[idx] = fp_text
+            all_meta[idx]["inference_status"] = "succeeded"
         except BaseException as e:
             all_meta[idx] = {
+                "inference_status": "failed",
                 "timing": None,
                 "error": {
                     "stage": "nemotron_parse_pages_route",

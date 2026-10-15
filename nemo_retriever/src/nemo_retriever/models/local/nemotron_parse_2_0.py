@@ -12,6 +12,11 @@ from nemo_retriever.models.local.nemotron_parse_v1_2 import NemotronParseV12
 class NemotronParse20(NemotronParseV12):
     """NVIDIA Nemotron Parse 2.0 local wrapper backed by vLLM."""
 
+    def _vllm_runtime(self, model_path: str, revision: str):
+        from nemo_retriever.models.local.nemotron_parse_2_0_runtime import parse_vllm_runtime
+
+        return parse_vllm_runtime(model_path, revision)
+
     def __init__(
         self,
         model_path: str = "nvidia/NVIDIA-Nemotron-Parse-2.0",

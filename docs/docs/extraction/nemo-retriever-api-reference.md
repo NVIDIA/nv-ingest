@@ -13,8 +13,8 @@ observe one or more of the following:
 - Python configuration or dependency exceptions, such as `ValueError`,
   `ImportError`, or `RuntimeError`.
 - `GraphIngestionError` for row-level failures from explicitly configured
-  remote NIM stages in `run_mode="inprocess"` or `"batch"` when
-  `error_policy="raise"` (the default).
+  remote NIM stages or explicitly selected local Nemotron Parse in
+  `run_mode="inprocess"` or `"batch"` when `error_policy="raise"` (the default).
 - HTTP status codes or gRPC errors returned by a remote NIM or by the
   Retriever service. These are transport or upstream-service statuses, not
   NeMo Retriever-specific error codes.
@@ -281,8 +281,10 @@ refer to [Nemotron Parse with Helm](https://github.com/NVIDIA/NeMo-Retriever/blo
 ### Choose raise or collect behavior
 
 For graph run modes, `error_policy="raise"` raises `GraphIngestionError` when
-an explicitly configured remote NIM stage reports a row-level error. The
-exception retains the underlying records in `exc.records`. When available, its
+an explicitly configured remote NIM stage or explicitly selected local
+Nemotron Parse reports a row-level error. This applies to `.ingest()`,
+`.ingest_stream()`, and `.aingest_stream()`. The exception retains the
+underlying records in `exc.records`. When available, its
 message identifies the stage, invoke URL, and HTTP status in a form similar to
 `[stage=OCR NIM url=https://... http=503]`, followed by a troubleshooting hint.
 
@@ -296,26 +298,66 @@ visible. In service mode, failures are also available from
 
 ### What the raise error policy covers
 
-The strict policy applies only to stages where you explicitly configure a
-remote NIM invoke URL. It does not raise for local-only PDFium parsing,
+The strict policy applies to stages where you explicitly configure a remote
+NIM invoke URL and to local extraction selected with
+`method="nemotron_parse"`. It does not raise for local-only PDFium parsing,
 caption, audio or video, or ASR failures, even when those stages populate
 row-level error fields.
 
-| Configured invoke URL | DataFrame column scanned | Stage label in messages |
+| Explicit configuration | DataFrame column scanned | Stage label in messages |
 | --- | --- | --- |
 | `page_elements_invoke_url` | `output_column` (default `page_elements_v3`) | Page Elements NIM |
 | `ocr_invoke_url` | `ocr` | OCR NIM |
 | `table_structure_invoke_url` | `table_structure_ocr_v1` | Table Structure NIM |
 | `nemotron_parse_invoke_url` or `invoke_url` | `nemotron_parse_v1_2` | Nemotron Parse NIM |
+| `method="nemotron_parse"` without an invoke URL | `nemotron_parse_v1_2` | Local Nemotron Parse |
 | `embed_invoke_url` or `embedding_endpoint` | `output_column` (default `text_embeddings_1b_v2`) | Embedding NIM |
 
 Nemotron Parse retains the `nemotron_parse_v1_2` metadata and error column
-when you select Parse 2.0.
+when you select Parse 2.0. Model initialization failures and incomplete batch
+responses are errors even when native PDF text is available. In collect mode,
+that text can remain in the result alongside the Parse error. Text presence
+alone does not prove that Parse inference succeeded.
 
 Caption and ASR use remote endpoints but are outside this raise path today.
 Remote caption failures can abort the whole ingest instead of returning a
 partial DataFrame. ASR failures can omit affected rows while logging a
 warning, which can look like an empty transcript unless you inspect logs.
+
+### Verify Nemotron Parse inference { #verify-nemotron-parse-inference }
+
+Each page's `nemotron_parse_v1_2` diagnostic payload includes an
+`inference_status` with one of the following values.
+
+| Value | Meaning |
+| --- | --- |
+| `succeeded` | Inference returned a response for this input page. A legitimate blank-page response can contain no extracted text. |
+| `failed` | Model initialization, inference, or response validation failed. Inspect the adjacent `error` payload. |
+| `skipped` | The page was not submitted for inference, for example because its rendered image was missing. |
+
+These statuses describe execution, not output correctness. Inspect structured
+output and evaluate retrieval quality separately. Do not count missing status
+fields or native PDF text as successful Parse inference.
+
+When you execute a resolved ingest plan through `execute_ingest_plan()`,
+`IngestExecutionResult.to_summary_dict()` includes an optional
+`parse_inference` mapping for Parse extraction. It summarizes unique source
+pages from the returned diagnostic columns without rerunning ingestion.
+Duplicate modality rows do not inflate the page count, and a duplicate success
+cannot mask a failure or missing evidence for the same page. The mapping
+contains the following counts.
+
+| Count | Meaning |
+| --- | --- |
+| `pages_seen` | Unique source pages represented in the result. |
+| `pages_succeeded` | Pages with successful inference evidence. |
+| `pages_failed` | Pages with failed inference evidence. |
+| `pages_skipped` | Pages skipped before inference. |
+| `pages_missing_evidence` | Pages without a valid source/page identity or recognized inference status. |
+
+Compare these counts with the expected input page count before treating a
+Parse run as complete. An extraction row count can differ from the number of
+pages because one page can produce several modality rows.
 
 ### Row-level error payloads
 
@@ -706,6 +748,20 @@ Import these names from `nemo_retriever.models.llm`. That package path is the su
 same constructor options as `NemotronParseV12`, with a different default
 `model_path`. For document ingestion, select the model through `ExtractParams`
 as shown in [Select Nemotron Parse 2.0](#select-nemotron-parse-2-0).
+
+The opt-in Parse 2.0 path pins revision
+`b6742064f4a8cf22a10383ece5e7fbead355ac04`. Its lightweight encoder
+configuration avoids a recursive configuration-code import from
+`nvidia/C-RADIOv2-H` during vLLM startup. Direct Transformers inference still
+loads C-RADIO. The library applies the checkpoint's
+`vllm_tied_patch/sitecustomize.py` compatibility patch in the parent process
+and spawned vLLM workers while preserving existing `PYTHONPATH` entries.
+The patch ties the head only when the model configuration requests tied
+embeddings and the checkpoint does not supply explicit output-head weights.
+
+For disconnected deployments, cache this exact revision before enabling
+offline mode. Refer to [Local Parse inference fails or returns only native PDF
+text](troubleshoot.md#local-parse-inference-evidence).
 
 ::: nemo_retriever.models.local.nemotron_parse_2_0.NemotronParse20
     options:

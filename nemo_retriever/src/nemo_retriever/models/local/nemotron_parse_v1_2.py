@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Union
 
@@ -106,15 +107,16 @@ class NemotronParseV12(BaseModel):
         configure_global_hf_cache_base(hf_cache_dir)
         revision = get_hf_revision(model_path)
 
-        self._llm = LLM(
-            model=model_path,
-            revision=revision,
-            trust_remote_code=True,
-            dtype="bfloat16",
-            max_num_seqs=max_num_seqs,
-            limit_mm_per_prompt={"image": 1},
-            gpu_memory_utilization=gpu_memory_utilization,
-        )
+        with self._vllm_runtime(model_path, revision):
+            self._llm = LLM(
+                model=model_path,
+                revision=revision,
+                trust_remote_code=True,
+                dtype="bfloat16",
+                max_num_seqs=max_num_seqs,
+                limit_mm_per_prompt={"image": 1},
+                gpu_memory_utilization=gpu_memory_utilization,
+            )
 
         self._sampling_params = SamplingParams(
             temperature=0,
@@ -123,6 +125,9 @@ class NemotronParseV12(BaseModel):
             max_tokens=self._max_tokens,
             skip_special_tokens=False,
         )
+
+    def _vllm_runtime(self, model_path: str, revision: str):
+        return nullcontext()
 
     # ------------------------------------------------------------------
     # Input normalisation

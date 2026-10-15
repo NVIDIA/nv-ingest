@@ -13,6 +13,7 @@ from nemo_retriever.ingestor.manifest import format_branch_summary
 from nemo_retriever.ingestor import Ingestor, create_ingestor
 from nemo_retriever.common.vdb.lancedb import LanceDB
 from nemo_retriever.common.vdb.records import to_sparse_client_vdb_records
+from nemo_retriever.common.modality.parse.inference_audit import summarize_parse_inference
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class IngestExecutionResult:
     lancedb_uri: str
     table_name: str
     run_metadata: dict[str, Any]
+    parse_inference: dict[str, int] | None = None
 
     @property
     def documents(self) -> list[str]:
@@ -52,6 +54,7 @@ class IngestExecutionResult:
             "table_name": self.table_name,
             "n_rows": self.n_rows,
             "result_n_rows": self.result_n_rows,
+            **({"parse_inference": self.parse_inference} if self.parse_inference is not None else {}),
         }
 
 
@@ -143,6 +146,11 @@ def execute_ingest_plan(
             "profile": plan.profile,
             "branch_summary": format_branch_summary(plan.branches),
         },
+        parse_inference=(
+            summarize_parse_inference(result)
+            if getattr(plan.extract_params, "method", None) == "nemotron_parse"
+            else None
+        ),
     )
 
 

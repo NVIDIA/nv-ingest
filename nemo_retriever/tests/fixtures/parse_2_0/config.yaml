@@ -1,0 +1,378 @@
+# Checkpoint fixture: nvidia/NVIDIA-Nemotron-Parse-2.0 at b6742064f4a8cf22a10383ece5e7fbead355ac04
+architectures:
+- NemotronParseForConditionalGeneration
+auto_map:
+  AutoConfig: hf_nemotron_parse_config.NemotronParseConfig
+  AutoModel: hf_nemotron_parse_modeling.NemotronParseForConditionalGeneration
+  AutoImageProcessor: hf_nemotron_parse_processor.NemotronParseImageProcessor
+  AutoProcessor: hf_nemotron_parse_processor.NemotronParseProcessor
+bos_token_id: 0
+decoder:
+  _attn_implementation: sdpa
+  _name_or_path: ''
+  activation_dropout: 0.0
+  activation_function: gelu
+  add_cross_attention: true
+  add_final_layer_norm: true
+  architectures: null
+  attention_dropout: 0.0
+  bad_words_ids: null
+  begin_suppress_tokens: null
+  bos_token_id: 0
+  chunk_size_feed_forward: 0
+  classifier_dropout: 0.0
+  cross_attention_hidden_size: null
+  d_model: 1024
+  decoder_attention_heads: 16
+  decoder_ffn_dim: 4096
+  decoder_layerdrop: 0.0
+  decoder_layers: 10
+  decoder_start_token_id: null
+  diversity_penalty: 0.0
+  do_sample: false
+  dropout: 0.1
+  early_stopping: false
+  encoder_attention_heads: 16
+  encoder_ffn_dim: 4096
+  encoder_layerdrop: 0.0
+  encoder_layers: 12
+  encoder_no_repeat_ngram_size: 0
+  eos_token_id: 2
+  exponential_decay_length_penalty: null
+  finetuning_task: null
+  forced_bos_token_id: null
+  forced_eos_token_id: 2
+  hidden_size: 1024
+  id2label:
+    '0': LABEL_0
+    '1': LABEL_1
+    '2': LABEL_2
+  init_std: 0.02
+  is_decoder: true
+  is_encoder_decoder: false
+  label2id:
+    LABEL_0: 0
+    LABEL_1: 1
+    LABEL_2: 2
+  length_penalty: 1.0
+  max_length: 20
+  min_length: 0
+  model_type: nemotron_parse_text
+  no_repeat_ngram_size: 0
+  num_beam_groups: 1
+  num_beams: 1
+  num_hidden_layers: 12
+  num_return_sequences: 1
+  output_attentions: false
+  output_hidden_states: false
+  output_scores: false
+  pad_token_id: 1
+  prefix: null
+  problem_type: null
+  pruned_heads: {}
+  remove_invalid_values: false
+  repetition_penalty: 1.0
+  return_dict: true
+  return_dict_in_generate: false
+  scale_embedding: true
+  sep_token_id: null
+  suppress_tokens: null
+  task_specific_params: null
+  temperature: 1.0
+  tf_legacy_loss: false
+  tie_encoder_decoder: false
+  tie_word_embeddings: true
+  tokenizer_class: null
+  top_k: 50
+  top_p: 1.0
+  torch_dtype: bfloat16
+  torchscript: false
+  transformers_version: 5.6.1
+  typical_p: 1.0
+  use_bfloat16: true
+  use_cache: true
+  vocab_size: 72256
+decoder_start_token_id: 2
+encoder:
+  attn_implementation: eager
+  _name_or_path: nvidia/C-RADIOv2-H
+  processor_normalizes: true
+  adaptor_configs: {}
+  adaptor_names: null
+  add_cross_attention: false
+  architectures:
+  - RADIOModel
+  args:
+    aa: null
+    amp: true
+    amp_dtype: bfloat16
+    amp_impl: native
+    aug_repeats: 0
+    aug_splits: 0
+    bn_eps: null
+    bn_momentum: null
+    cache_dir: null
+    channels_last: false
+    checkpoint_hist: 10
+    chk_keep_forever: 100
+    class_map: ''
+    clip_grad: null
+    clip_mode: norm
+    cls_token_per_teacher: true
+    coco_annotations_file: /datasets/coco2017-adlsa/annotations/captions_val2017.json
+    coco_image_dir: /datasets/coco2017-adlsa/val2017
+    color_jitter: 0.4
+    cooldown_epochs: 0
+    cpe_max_size: 2048
+    crd_loss: false
+    crd_loss_weight: 0.8
+    crop_pct: null
+    cutmix: 0.0
+    cutmix_minmax: null
+    dataset_download: false
+    debug_full_knn: false
+    decay_epochs: 90
+    decay_milestones:
+    - 90
+    - 180
+    - 270
+    decay_rate: 0.1
+    depchain: true
+    dist_bn: reduce
+    dist_norm_weight: 0.0
+    distributed: true
+    drop: 0.0
+    drop_block: null
+    drop_connect: null
+    drop_path: null
+    dtype: bfloat16
+    epoch_repeats: 0.0
+    eval: false
+    eval_metric: knn_top1
+    eval_teacher: false
+    eval_teacher_only: false
+    eval_throughput: false
+    fast_norm: false
+    fd_loss_fn: MSE
+    feature_normalization: SHIP_NORM
+    feature_summarizer: cls_token
+    feature_upscale_factor: null
+    force_new_wandb_id: false
+    force_spectral_reparam: true
+    freeze_bn: false
+    fsdp: false
+    fuser: ''
+    gp: null
+    grad_accum_steps: 1
+    grad_checkpointing: false
+    head_init_bias: null
+    head_init_scale: null
+    head_warmup: 5
+    head_weight_decay: 0.001
+    hflip: 0.5
+    img_size: null
+    in_chans: null
+    initial_checkpoint: null
+    input_size: null
+    interpolation: ''
+    layer_decay: null
+    local_rank: 0
+    log_interval: 50
+    log_mlflow: false
+    log_wandb: true
+    loss_auto_balance: false
+    lr_base: 0.1
+    lr_base_scale: ''
+    lr_base_size: 256
+    lr_cycle_decay: 0.5
+    lr_cycle_limit: 1
+    lr_cycle_mul: 1.0
+    lr_k_decay: 1.0
+    lr_noise: null
+    lr_noise_pct: 0.67
+    lr_noise_std: 1.0
+    mean: null
+    mesa: false
+    min_lr: 0
+    mixup: 0.0
+    mixup_mode: batch
+    mixup_off_epoch: 0
+    mixup_prob: 1.0
+    mixup_switch_prob: 0.5
+    mlp_hidden_size: 1520
+    mlp_num_inner: 3
+    mlp_version: v2
+    model: vit_huge_patch16_224
+    model_kwargs: {}
+    model_norm: false
+    momentum: 0.9
+    no_aug: false
+    no_ddp_bb: true
+    no_prefetcher: false
+    no_resume_opt: false
+    num_classes: null
+    opt_betas: null
+    opt_eps: null
+    patience_epochs: 10
+    pin_mem: false
+    prefetcher: true
+    pretrained: false
+    rank: 0
+    ratio:
+    - 0.75
+    - 1.3333333333333333
+    recount: 1
+    recovery_interval: 0
+    register_multiple: 8
+    remode: pixel
+    reprob: 0.0
+    reset_loss_state: false
+    resplit: false
+    save_images: false
+    scale:
+    - 0.5
+    - 1.0
+    sched: cosine
+    seed: 42
+    smoothing: 0.1
+    spectral_heads: false
+    spectral_reparam: false
+    split_bn: false
+    start_epoch: null
+    std: null
+    stream_teachers: true
+    sync_bn: false
+    synchronize_step: false
+    teachers:
+    - fd_normalize: false
+      feature_distillation: true
+      input_size: 378
+      model: ViT-H-14-378-quickgelu
+      name: clip
+      pretrained: dfn5b
+      type: open_clip
+      use_summary: true
+    - fd_normalize: false
+      feature_distillation: true
+      input_size: 378
+      model: ViT-SO400M-14-SigLIP-384
+      name: siglip
+      pretrained: webli
+      type: open_clip
+      use_summary: true
+    - fd_normalize: false
+      feature_distillation: true
+      input_size: 378
+      model: dinov2_vitg14_reg
+      name: dino_v2
+      type: dino_v2
+      use_summary: true
+    - fd_normalize: false
+      feature_distillation: true
+      input_size: 1024
+      model: vit-h
+      name: sam
+      type: sam
+      use_summary: false
+    torchcompile: null
+    torchscript: false
+    train_interpolation: random
+    train_split: train
+    tta: 0
+    use_coco: false
+    use_multi_epochs_loader: false
+    val_ema_only: false
+    val_split: val
+    vflip: 0.0
+    vitdet_version: 1
+    wandb_entity: ''
+    wandb_job_type: ''
+    wandb_name: ''
+    wandb_project: ''
+    warmup_lr: 1.0e-05
+    warmup_prefix: false
+    worker_seeding: all
+    workers: 8
+    world_size: 256
+  auto_map:
+    AutoConfig: nvidia/C-RADIOv2-H--hf_model.RADIOConfig
+    AutoModel: nvidia/C-RADIOv2-H--hf_model.RADIOModel
+  bad_words_ids: null
+  begin_suppress_tokens: null
+  bos_token_id: null
+  chunk_size_feed_forward: 0
+  cross_attention_hidden_size: null
+  decoder_start_token_id: null
+  diversity_penalty: 0.0
+  do_sample: false
+  early_stopping: false
+  encoder_no_repeat_ngram_size: 0
+  eos_token_id: null
+  exponential_decay_length_penalty: null
+  feature_normalizer_config: null
+  finetuning_task: null
+  forced_bos_token_id: null
+  forced_eos_token_id: null
+  id2label:
+    '0': LABEL_0
+    '1': LABEL_1
+  inter_feature_normalizer_config: null
+  is_decoder: false
+  is_encoder_decoder: false
+  label2id:
+    LABEL_0: 0
+    LABEL_1: 1
+  length_penalty: 1.0
+  max_length: 20
+  max_resolution: 2048
+  min_length: 0
+  model_type: ''
+  no_repeat_ngram_size: 0
+  num_beam_groups: 1
+  num_beams: 1
+  num_return_sequences: 1
+  output_attentions: false
+  output_hidden_states: false
+  output_scores: false
+  pad_token_id: null
+  patch_size: 16
+  preferred_resolution:
+  - 768
+  - 768
+  prefix: null
+  problem_type: null
+  pruned_heads: {}
+  remove_invalid_values: false
+  repetition_penalty: 1.0
+  return_dict: true
+  return_dict_in_generate: false
+  sep_token_id: null
+  suppress_tokens: null
+  task_specific_params: null
+  temperature: 1.0
+  tf_legacy_loss: false
+  tie_encoder_decoder: false
+  tie_word_embeddings: true
+  tokenizer_class: null
+  top_k: 50
+  top_p: 1.0
+  torch_dtype: bfloat16
+  torchscript: false
+  transformers_version: 5.6.1
+  typical_p: 1.0
+  use_bfloat16: false
+  version: radio_v2.5-h
+  vitdet_window_size: null
+eos_token_id: 2
+image_size:
+- 2048
+- 1664
+is_encoder_decoder: true
+max_sequence_length: 9000
+model_type: nemotron_parse
+pad_token_id: 1
+tie_word_embeddings: true
+torch_dtype: bfloat16
+transformers_version: 5.6.1
+vocab_size: 72256
+class_token_start_idx: 52315

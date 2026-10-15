@@ -226,11 +226,13 @@ def _format_stage_error_message(
         diagnostics=diagnostics,
         observed_status_codes=observed_status_codes,
     )
+    local_parse = any(diag.role == "nemotron_parse" and diag.invoke_url is None for diag in diagnostics.values())
     body = (
-        "Graph ingestion detected row-level errors from an explicitly "
-        "configured remote NIM endpoint"
-        f"{more}. " + "; ".join(details)
+        "Graph ingestion detected row-level errors in configured extraction stages"
+        if local_parse
+        else "Graph ingestion detected row-level errors from an explicitly " "configured remote NIM endpoint"
     )
+    body += f"{more}. " + "; ".join(details)
     if troubleshooting:
         body = body + " " + troubleshooting
     return body
@@ -294,6 +296,12 @@ def _hint_for_stage(diag: _StageDiagnostic, statuses: set[int | None]) -> str:
     bucket = _classify_status_codes(statuses)
     url_clause = f" at {diag.invoke_url}" if diag.invoke_url else ""
     name = diag.display_name
+
+    if diag.role == "nemotron_parse" and diag.invoke_url is None:
+        return (
+            f"{name} failed. Check the selected model revision, prepared offline model cache, "
+            "vLLM compatibility patch, and GPU memory; inspect the structured extraction error."
+        )
 
     if bucket == "auth":
         return (
@@ -1089,12 +1097,12 @@ class GraphIngestor(ingestor):
             ),
         )
         executor_input = self._inline_text_dataset(ray.data) if self._inline_texts else self._documents
-        if return_results:
+        if return_results and self._param_value(self._extract_params, "method") != "nemotron_parse":
             result = executor.ingest(executor_input)
         else:
             result = executor._ingest(
                 executor_input,
-                return_results=False,
+                return_results=return_results,
                 validate_batch=self._raise_for_stage_errors,
             )
         self._rd_dataset = result
@@ -1178,7 +1186,11 @@ class GraphIngestor(ingestor):
             allow_no_gpu=self._allow_no_gpu,
             ensure_batch_runtime=self._ensure_batch_runtime,
             return_results=return_results,
-            validate_batch=self._raise_for_stage_errors if not return_results else None,
+            validate_batch=(
+                self._raise_for_stage_errors
+                if not return_results or self._param_value(self._extract_params, "method") == "nemotron_parse"
+                else None
+            ),
         ).execute()
         self._rd_dataset = result if self._run_mode == "batch" else None
         return result
@@ -1549,6 +1561,14 @@ class GraphIngestor(ingestor):
                 column="nemotron_parse_v1_2",
                 display_name="Nemotron Parse NIM",
                 invoke_url=url,
+                role="nemotron_parse",
+            )
+        elif self._param_value(extract, "method") == "nemotron_parse":
+            diagnostics["nemotron_parse_v1_2"] = _StageDiagnostic(
+                column="nemotron_parse_v1_2",
+                display_name="Local Nemotron Parse",
+                invoke_url=None,
+                model_name=self._param_value(extract, "nemotron_parse_model"),
                 role="nemotron_parse",
             )
         if self._params_has_configured_field(self._embed_params, _REMOTE_EMBED_ENDPOINT_FIELDS):

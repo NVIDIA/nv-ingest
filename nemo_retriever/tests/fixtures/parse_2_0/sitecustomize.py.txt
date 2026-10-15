@@ -1,0 +1,48 @@
+"""Runtime patch for tied Nemotron Parse lm_head in vLLM.
+
+Current vLLM Nemotron Parse builds create a standalone ParallelLMHead and only
+load it when `lm_head.weight` is materialized. Compact Nemotron Parse exports
+tie the output head to `decoder.embed_tokens.weight` instead, so this patch
+restores that tie after vLLM loads decoder weights.
+"""
+
+from __future__ import annotations
+
+
+def _patch_nemotron_parse_tied_lm_head() -> None:
+    try:
+        import vllm.model_executor.models.nemotron_parse as np
+    except Exception:
+        return
+
+    cls = getattr(np, "NemotronParseForConditionalGeneration", None)
+    if cls is None:
+        return
+
+    original = getattr(cls, "load_weights", None)
+    if original is None or getattr(original, "_np_tied_lm_head_patch", False):
+        return
+
+    def load_weights_with_tied_lm_head(self, weights):
+        buffered_weights = list(weights)
+        saw_lm_head = any(name.startswith("lm_head") for name, _ in buffered_weights)
+        result = original(self, buffered_weights)
+
+        decoder_cfg = getattr(getattr(self, "config", None), "decoder", None)
+        tie_word_embeddings = bool(
+            getattr(getattr(self, "config", None), "tie_word_embeddings", False)
+            or getattr(decoder_cfg, "tie_word_embeddings", False)
+        )
+        if tie_word_embeddings and not saw_lm_head:
+            self.lm_head.weight = self.decoder.embed_tokens.weight
+            print(
+                "[np-vllm-tie-patch] tied lm_head.weight to decoder.embed_tokens.weight",
+                flush=True,
+            )
+        return result
+
+    load_weights_with_tied_lm_head._np_tied_lm_head_patch = True
+    cls.load_weights = load_weights_with_tied_lm_head
+
+
+_patch_nemotron_parse_tied_lm_head()

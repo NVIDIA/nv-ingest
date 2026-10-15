@@ -29,7 +29,6 @@ from nemo_retriever.ingestor.manifest import (
     resolve_branch_extraction_inputs,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -243,9 +242,9 @@ class ExtractionBranchExecutor:
         combined = normalized[0]
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
-        if self.return_results:
+        if self.return_results and self.validate_batch is None:
             return post_executor.ingest(combined)
-        return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
+        return post_executor._ingest(combined, return_results=self.return_results, validate_batch=self.validate_batch)
 
     def _execute_inprocess(self) -> Any:
         frames = []

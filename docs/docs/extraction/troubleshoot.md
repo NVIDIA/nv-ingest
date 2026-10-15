@@ -33,9 +33,11 @@ when troubleshooting. The `error` value can be a nested object or a string.
 
 ### Coverage limits of the raise error policy
 
-`error_policy="raise"` scans only remote NIM stages with an explicitly
-configured invoke URL: Page Elements, OCR, Table Structure, Nemotron Parse,
-and embedding. It does not automatically raise for:
+`error_policy="raise"` scans remote NIM stages with an explicitly configured
+invoke URL: Page Elements, OCR, Table Structure, Nemotron Parse, and embedding.
+It also scans local Parse when you select `method="nemotron_parse"`. This
+applies to ordinary and streaming graph ingestion. It does not automatically
+raise for:
 
 - Local-only pipelines (`pdfium` without remote URLs), even when rows contain
   `metadata.error` or column-level error payloads.
@@ -53,7 +55,7 @@ inspect row columns and service logs directly.
 | --- | --- | --- |
 | `ValueError` or Pydantic validation error before execution | An unsupported run mode, parameter value, protocol, or parameter combination | Compare the call with the current [Python API reference](nemo-retriever-api-reference.md). Remove unknown parameters and reproduce with the smallest valid pipeline. |
 | `ImportError`, `ModuleNotFoundError`, or a missing-dependency `RuntimeError` | The selected local extraction path requires a package or executable that is not installed | Install the documented package extra or system dependency. Confirm that the Python environment running the worker, not only the client shell, contains it. |
-| `GraphIngestionError` with no HTTP status | The named remote stage returned a row-level error, its error payload omitted a status, or the endpoint was unreachable | Check DNS, routing, TLS, the endpoint URL, and the NIM readiness endpoint from the worker or service pod. Inspect `exc.records` after removing secrets and document content. |
+| `GraphIngestionError` with no HTTP status | A local Parse stage failed, a remote stage omitted an HTTP status, or an endpoint was unreachable | Inspect `exc.records` for the stage and error type. For local Parse, check model dependencies, cache contents, and worker logs. For remote stages, check DNS, routing, TLS, the endpoint URL, and NIM readiness from the worker or service pod. |
 | HTTP `401` or `403` from a NIM | Missing, expired, or unauthorized credentials | Verify `NVIDIA_API_KEY`, `NGC_API_KEY`, or the stage-specific credential in the environment that makes the request. Do not attach API keys to a support case. |
 | HTTP `403` from the Retriever service | Authentication failure or a deployment policy that disallows the requested endpoint, stage, sink, or override | Read the response `detail`. Verify the service token and compare the requested pipeline with `/v1/ingest/pipeline-config`. |
 | HTTP `404` or `410` while opening a service ingest job | The Python SDK and Retriever service can be on incompatible API versions | A current client raises `RetrieverServiceCompatibilityError`. Align the Python package, service image, and Helm chart versions. |
@@ -313,6 +315,44 @@ Also refer to [NeMo Retriever Library Overview](overview.md) and [Pre-Requisites
 
 Currently, extraction with Nemotron parse doesn't support image files, only scanned PDFs.
 To work around this issue, convert image files to PDFs before you use `method="nemotron_parse"`.
+
+## Local Parse inference fails or returns only native PDF text { #local-parse-inference-evidence }
+
+Native PDF text in an ingest result does not prove that Nemotron Parse ran.
+In collect mode, initialization or inference errors can preserve native PDF
+text while leaving table, chart, and infographic outputs empty. With
+`error_policy="raise"`, explicitly selected local Parse errors raise
+`GraphIngestionError`, including during streaming ingestion.
+
+Complete the following checks before evaluating a local Parse run.
+
+1. Inspect `nemotron_parse_v1_2.inference_status` for every source page. Require
+   `succeeded` for the pages you intend to evaluate. `failed`, `skipped`, or
+   missing status fields do not establish successful inference.
+2. Inspect the adjacent `error` payload and worker logs for model initialization
+   or inference failures. A `succeeded` response can legitimately contain no
+   text on a blank page; text length is not the execution check.
+3. For offline deployment, pre-cache the exact revision selected by your
+   installed library, including configuration, processor, tokenizer, model
+   weights, and `vllm_tied_patch/sitecustomize.py` for Parse 2.0. Confirm that
+   the worker uses that cache before enabling
+   `HF_HUB_OFFLINE=1`.
+4. For opt-in local Parse 2.0, use a library version that pins
+   `b6742064f4a8cf22a10383ece5e7fbead355ac04`. The lightweight encoder
+   configuration avoids a recursive `nvidia/C-RADIOv2-H` configuration import
+   in the vLLM path. Direct Transformers inference still loads C-RADIO.
+   Caching an older Parse snapshot or only the weights does not prepare this
+   revision for offline startup.
+5. Run a representative PDF through the same worker environment and verify
+   successful inference evidence and generated structured output before a
+   larger evaluation. Evaluate output correctness separately from execution.
+
+When you use `execute_ingest_plan()`, compare the `parse_inference` counts in
+`IngestExecutionResult.to_summary_dict()` with the expected page count.
+For field meanings and error-policy behavior, refer to
+[Verify Nemotron Parse inference](nemo-retriever-api-reference.md#verify-nemotron-parse-inference).
+Parse 2.0 remains an explicit model selection; these steps do not change the
+local Parse v1.2 or self-hosted NIM defaults.
 
 ## Nemotron Parse model and endpoint mismatch { #nemotron-parse-model-endpoint-mismatch }
 
