@@ -427,7 +427,9 @@ def postprocess_text(
         try:
             text = _convert_html_tables_to_markdown(_latex_table_to_html(text))
         except ValueError as exc:
-            logger.warning("Keeping native LaTeX for a table that could not be converted to Markdown: %s", exc)
+            logger.warning(
+                "Keeping native LaTeX for a table that could not be converted to Markdown: %s", type(exc).__name__
+            )
 
     if blank_text_in_figures and cls == "Picture":
         text = ""
