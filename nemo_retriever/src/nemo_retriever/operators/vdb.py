@@ -378,4 +378,6 @@ class RetrieveVdbOperator(AbstractOperator):
 
         if not isinstance(data, list):
             return data
-        return hits_lists_to_rerank_dataframe(list(query_texts), data)
+        return hits_lists_to_rerank_dataframe(
+            list(query_texts), data, include_query_index=self._query_text_column is not None
+        )

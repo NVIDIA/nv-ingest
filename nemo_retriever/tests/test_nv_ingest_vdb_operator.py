@@ -464,6 +464,26 @@ def test_retrieve_operator_delegates_vectors_to_retrieval() -> None:
     ]
 
 
+@pytest.mark.parametrize("has_hits", [False, True])
+def test_retrieve_operator_rerank_preserves_direct_dataframe_schema(
+    monkeypatch: pytest.MonkeyPatch, has_hits: bool
+) -> None:
+    vdb = FakeVDB()
+    if not has_hits:
+        monkeypatch.setattr(vdb, "retrieval", lambda vectors, **kwargs: [[]])
+    operator = RetrieveVdbOperator(vdb=vdb, explode_for_rerank=True)
+
+    result = operator.run([[0.1, 0.2]], query_texts=["current"], top_k=3)
+
+    assert list(result.columns) == ["query", "text", "_hit"]
+    if has_hits:
+        assert result["query"].tolist() == ["current"]
+        assert result["text"].tolist() == ["retrieved chunk"]
+        assert result.iloc[0]["_hit"]["_distance"] == 0.12
+    else:
+        assert result.empty
+
+
 def test_retrieve_operator_reads_index_metadata_from_any_vdb() -> None:
     class MetadataVDB(FakeVDB):
         def get_index_metadata(self, key: str, **kwargs: Any) -> str | None:

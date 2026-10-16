@@ -90,12 +90,12 @@ def test_long_query_preserves_hybrid_alignment_and_original_groups(monkeypatch, 
     assert hits[0][0]["_relevance_score"] == pytest.approx(2 / 61)
 
 
-def test_rerank_uses_original_full_queries_and_keeps_duplicate_inputs_separate():
+@pytest.mark.parametrize("query", ["short", "a" * 200], ids=["unsplit", "split"])
+def test_rerank_uses_original_full_queries_and_keeps_duplicate_inputs_separate(query):
     from nemo_retriever.graph.retriever_utils import rerank_long_dataframe_to_hits
 
     vdb = _HybridVdb()
     op = RetrieveVdbOperator(vdb=vdb, explode_for_rerank=True, _query_text_column="text")
-    query = "a" * 200
     expanded = _SplitEmbed().run(pd.DataFrame({"text": [query, query], QUERY_INDEX_COLUMN: [0, 1]}))
     long = op.run(expanded, query_texts=[query, query], top_k=2)
     assert long["query"].tolist() == [query] * 4
@@ -105,6 +105,30 @@ def test_rerank_uses_original_full_queries_and_keeps_duplicate_inputs_separate()
     hits = rerank_long_dataframe_to_hits(long, query_texts=[query, query], top_k=1)
     assert hits[0][0]["text"] == "shared"
     assert hits[1][0]["text"] != "shared"
+
+
+@pytest.mark.parametrize("include_query_index", [False, True])
+@pytest.mark.parametrize("has_hits", [False, True])
+def test_rerank_dataframe_query_indices_are_opt_in(include_query_index, has_hits):
+    from nemo_retriever.graph.retriever_utils import hits_lists_to_rerank_dataframe
+
+    hit = {"text": "second query hit"}
+    hits_per_query = [[], [hit] if has_hits else []]
+    options = {"include_query_index": True} if include_query_index else {}
+    frame = hits_lists_to_rerank_dataframe(["same", "same"], hits_per_query, **options)
+
+    expected_columns = ["query", "text", "_hit"]
+    if include_query_index:
+        expected_columns.append(QUERY_INDEX_COLUMN)
+    assert list(frame.columns) == expected_columns
+    if has_hits:
+        assert frame["query"].tolist() == ["same"]
+        assert frame["text"].tolist() == [hit["text"]]
+        assert frame["_hit"].tolist() == [hit]
+        if include_query_index:
+            assert frame[QUERY_INDEX_COLUMN].tolist() == [1]
+    else:
+        assert frame.empty
 
 
 def test_chunk_fusion_uses_ranks_deduplicates_once_per_chunk_and_is_stable():
