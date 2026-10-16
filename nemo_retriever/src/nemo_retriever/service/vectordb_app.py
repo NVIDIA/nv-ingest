@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hmac
 import logging
 import os
 import threading
@@ -61,6 +60,7 @@ from nemo_retriever.models import resolve_embed_model
 from nemo_retriever.operators.vdb import IngestVdbOperator, RetrieveVdbOperator
 from nemo_retriever.query.evidence import build_evidence_result
 from nemo_retriever.service.agentic_query import run_agentic_answer, run_agentic_query
+from nemo_retriever.service.auth import tokens_match
 from nemo_retriever.service.config import AgenticConfig
 from nemo_retriever.service.query_schema import (
     AgenticAnswerResponse,
@@ -463,7 +463,7 @@ def create_vectordb_app(
         if request.url.path == "/v1/health" or not required_internal_token:
             return await call_next(request)
         supplied = request.headers.get("X-NRL-Internal-Token", "")
-        if not supplied or not hmac.compare_digest(supplied, required_internal_token):
+        if not supplied or not tokens_match(supplied, required_internal_token):
             return JSONResponse(
                 status_code=401,
                 content={"detail": "Missing or invalid internal credential."},

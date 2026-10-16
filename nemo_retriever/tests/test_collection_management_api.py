@@ -362,6 +362,40 @@ def test_scope_authorizer_secret_mapping_and_internal_vectordb_token(tmp_path) -
         assert client.get("/v1/collections", headers={"X-NRL-Internal-Token": "internal-secret"}).status_code == 200
 
 
+def test_non_ascii_credentials_are_rejected_with_401(tmp_path) -> None:
+    # Starlette decodes header bytes as latin-1, so a non-ASCII byte reaches the
+    # comparison as non-ASCII text.
+    secret = tmp_path / "scope-tokens.json"
+    secret.write_text('{"tokens":[{"token":"alpha-token","scopes":["alpha"]}]}', encoding="utf-8")
+    authorizer = ScopeAuthorizer(AuthConfig(enabled=True, scope_token_file=str(secret)))
+    assert authorizer.authorize("alpha-tok\xe9n", "alpha") == (None, 401)
+
+    vectordb = create_vectordb_app(
+        lancedb_uri=str(tmp_path / "db"),
+        embed_endpoint="http://embed",
+        internal_api_token="internal-secret",
+    )
+    with TestClient(vectordb) as client:
+        assert client.get("/v1/collections", headers={"X-NRL-Internal-Token": b"internal-secr\xe9t"}).status_code == 401
+
+    gateway = create_app(
+        ServiceConfig(
+            mode="gateway",
+            auth=AuthConfig(enabled=True, api_token="alpha-token", default_scope="alpha"),
+            vectordb=VectorDbConfig(internal_api_token="internal-secret"),
+        )
+    )
+    with TestClient(gateway) as client:
+        assert client.get("/v1/collections", headers={"Authorization": b"Bearer alpha-tok\xe9n"}).status_code == 401
+        assert (
+            client.get(
+                "/v1/internal/document-result/missing",
+                headers={"X-NRL-Internal-Token": b"internal-secr\xe9t"},
+            ).status_code
+            == 401
+        )
+
+
 def test_scope_authorizer_defaults_to_unprotected_and_fails_closed_when_enabled() -> None:
     assert ScopeAuthorizer(AuthConfig()).authorize("", "workspace-a") == ("workspace-a", None)
     assert ScopeAuthorizer(AuthConfig(enabled=True)).authorize("", "workspace-a") == (None, 401)
