@@ -12,10 +12,13 @@ The functions in this file were copied from the model repository:
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import List, Tuple
 
 from bs4 import BeautifulSoup
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -410,7 +413,8 @@ def postprocess_text(
     text_format : str
         ``"markdown"`` or ``"plain"``.
     table_format : str
-        ``"latex"``, ``"HTML"``, or ``"markdown"``.
+        ``"latex"``, ``"HTML"``, or ``"markdown"``. A table that cannot be
+        converted to Markdown is returned as native LaTeX.
     blank_text_in_figures : bool
         If ``True``, clear text for ``Picture`` elements.
     """
@@ -420,7 +424,12 @@ def postprocess_text(
     elif table_format == "HTML":
         text = _latex_table_to_html(text)
     elif table_format == "markdown":
-        text = _convert_html_tables_to_markdown(_latex_table_to_html(text))
+        try:
+            text = _convert_html_tables_to_markdown(_latex_table_to_html(text))
+        except ValueError as exc:
+            logger.warning(
+                "Keeping native LaTeX for a table that could not be converted to Markdown: %s", type(exc).__name__
+            )
 
     if blank_text_in_figures and cls == "Picture":
         text = ""
