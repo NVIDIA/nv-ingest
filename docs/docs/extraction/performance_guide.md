@@ -16,6 +16,8 @@ Use this guide to document practical recommendations for:
 
 In batch mode, NeMo Retriever Library sizes unspecified Ray actor pools from Ray CPU and GPU resources. The library uses the resources that Ray reports as available immediately before it submits the pipeline. This prevents default extraction, OCR, and embedding pools from reserving more resources than the cluster can schedule.
 
+`BatchTuningParams.actor_pool_mode` defaults to `"fixed"`, which preserves the existing heuristic worker counts. Set it to `"elastic"` on an extract or embed stage to reserve the heuristic minimum, choose a startup count up to the initial count, and preserve the maximum for later Ray scale-out. Explicit worker counts, remote endpoints, CPU-only runs, and caption stages do not use elastic pools.
+
 For filesystem inputs, the library reserves CPU capacity for each Ray Data `ReadBinary` source task before it sizes actor pools. This reservation lets the input stage start instead of being blocked by persistent extraction actors. Inputs that are already Ray datasets, such as inline text rows, do not require this reservation.
 
 When ingestion combines multiple extraction datasets, preflight also reserves 1 CPU for schema-normalization work. This keeps actor pools from occupying all CPU capacity before the datasets have compatible schemas.
