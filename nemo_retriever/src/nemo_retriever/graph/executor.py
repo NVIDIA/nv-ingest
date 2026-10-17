@@ -219,6 +219,18 @@ def _concurrency_target(concurrency: Any) -> int:
     return _concurrency_bounds(concurrency)[1]
 
 
+def _repartition_global_batch(dataset: Any, group_keys: list[str], concurrency: Any) -> Any:
+    """Repartition a global-batch stage without coalescing independent groups."""
+    if not group_keys:
+        return dataset.repartition(num_blocks=1)
+
+    # Hash partitioning keeps each group together. Retaining at least the
+    # current block count prevents a single-worker actor pool from collapsing
+    # unrelated groups into one potentially oversized Arrow block.
+    num_blocks = max(1, int(dataset.num_blocks()), _concurrency_target(concurrency))
+    return dataset.repartition(num_blocks=num_blocks, keys=group_keys, shuffle=True)
+
+
 def _concurrency_initial(concurrency: Any) -> int:
     """Return the startup floor for an automatically sized pool."""
     return _concurrency_bounds(concurrency)[2]
@@ -899,11 +911,7 @@ class RayDataExecutor(AbstractExecutor):
                 # concurrency > 1, hash-partition by those keys so rows sharing
                 # the keys stay co-located while blocks distribute across actors.
                 group_keys = list(getattr(node.operator_class, "GLOBAL_BATCH_GROUP_KEYS", None) or ())
-                n_blocks = max(1, int(overrides.get("concurrency") or 1)) if group_keys else 1
-                if n_blocks > 1:
-                    ds = ds.repartition(num_blocks=n_blocks, keys=group_keys, shuffle=True)
-                else:
-                    ds = ds.repartition(num_blocks=1)
+                ds = _repartition_global_batch(ds, group_keys, overrides.get("concurrency", 1))
             elif target_num_rows_per_block is not None and int(target_num_rows_per_block) > 0:
                 ds = ds.repartition(target_num_rows_per_block=int(target_num_rows_per_block))
 
