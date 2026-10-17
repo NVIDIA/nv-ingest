@@ -311,6 +311,14 @@ class _MultiTypeExtractBase(AbstractOperator):
         parse_mode = _parse_mode_enabled(extract_params)
 
         if parse_mode:
+            # PDF extraction renders pages to images required by Nemotron Parse.
+            # PDFSplitActor emits bytes/path/page_number/metadata/source_id and no
+            # page_image, and nemotron_parse_pages skips every row without one, so
+            # going straight to the parse actor sends it nothing to look at.
+            extract_kwargs = build_pdf_extraction_kwargs(extract_params)
+            extract_kwargs["extract_page_as_image"] = True
+            batch_df = PDFExtractionActor(**extract_kwargs).run(batch_df)
+
             parse_kwargs: dict[str, Any] = {
                 "extract_text": extract_params.extract_text,
                 "extract_tables": extract_params.extract_tables,
