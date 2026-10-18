@@ -1044,6 +1044,7 @@ class GraphIngestor(ingestor):
             vdb_upload_params=self._vdb_upload_params,
             webhook_params=self._webhook_params,
             stage_order=post_extract_order,
+            compact_embedding_transport=not return_results,
         )
         if (
             not return_results

@@ -14,8 +14,60 @@ import pandas as pd
 from nemo_retriever.common.io.image_store import inline_image_b64
 from nemo_retriever.operators.extract.ocr.ocr import _crop_b64_image_by_norm_bbox
 from nemo_retriever.common.params.models import IMAGE_MODALITIES
+from nemo_retriever.common.stage_errors import iter_stage_errors_from_value
 
 _CONTENT_COLUMNS = ("table", "chart", "infographic")
+_EXTRACTION_PAYLOAD_COLUMNS = (
+    "bytes",
+    "images",
+    "tables",
+    "charts",
+    "infographics",
+    "page_elements_v3",
+    "table_structure_v1",
+    "table_structure_ocr_v1",
+    "ocr",
+    "table_parse",
+    "chart_parse",
+    "infographic_parse",
+    "nemotron_parse_v1_2",
+) + _CONTENT_COLUMNS
+
+
+def _compact_embedding_rows(frame: pd.DataFrame) -> pd.DataFrame:
+    """Remove resolved extraction payloads, retaining their counts and errors."""
+    dropped = [
+        column
+        for column in _EXTRACTION_PAYLOAD_COLUMNS
+        if column in frame and not any(any(iter_stage_errors_from_value(value)) for value in frame[column])
+    ]
+    result = frame.drop(columns=dropped)
+
+    if any(kind in frame for kind in _CONTENT_COLUMNS):
+        metadata = []
+        for _, row in frame.iterrows():
+            row_metadata = dict(row["metadata"]) if isinstance(row.get("metadata"), dict) else {}
+            content_metadata = row_metadata.get("content_metadata")
+            content_metadata = dict(content_metadata) if isinstance(content_metadata, dict) else {}
+            for kind in _CONTENT_COLUMNS:
+                detections = row.get(kind)
+                if isinstance(detections, list):
+                    content_metadata.setdefault(f"ocr_{kind}_detections", len(detections))
+            row_metadata["content_metadata"] = content_metadata
+            metadata.append(row_metadata)
+        result["metadata"] = pd.Series(metadata, index=frame.index, dtype=object)
+
+    if "page_image" in frame and not any(any(iter_stage_errors_from_value(v)) for v in frame["page_image"]):
+        # Keep page URI provenance so VDB conversion can distinguish uploaded crops.
+        result["page_image"] = pd.Series(
+            [
+                {"stored_image_uri": v.get("stored_image_uri")} if isinstance(v, dict) else None
+                for v in frame["page_image"]
+            ],
+            index=frame.index,
+            dtype=object,
+        )
+    return result
 
 
 def _is_content_collection(value: Any) -> bool:
@@ -88,6 +140,7 @@ def explode_content_to_rows(
     modality: str = "text",
     text_elements_modality: Optional[str] = None,
     structured_elements_modality: Optional[str] = None,
+    compact: bool = False,
 ) -> Any:
     """Expand each page row into multiple rows for per-element embedding."""
     text_mod = text_elements_modality or modality
@@ -96,7 +149,8 @@ def explode_content_to_rows(
     if not isinstance(batch_df, pd.DataFrame):
         return batch_df
     if batch_df.empty:
-        return _normalize_bbox_column(batch_df)
+        result = _normalize_bbox_column(batch_df)
+        return _compact_embedding_rows(result) if compact else result
 
     any_images = text_mod in IMAGE_MODALITIES or struct_mod in IMAGE_MODALITIES
 
@@ -111,7 +165,8 @@ def explode_content_to_rows(
                 lambda page_image: page_image.get("stored_image_uri") if isinstance(page_image, dict) else None
             )
         batch_df["_embed_modality"] = text_mod
-        return _normalize_bbox_column(batch_df)
+        result = _normalize_bbox_column(batch_df)
+        return _compact_embedding_rows(result) if compact else result
 
     new_rows: List[Dict[str, Any]] = []
     for _, row in batch_df.iterrows():
@@ -182,7 +237,8 @@ def explode_content_to_rows(
             preserved["_bbox_xyxy_norm"] = None
             new_rows.append(preserved)
 
-    return _normalize_bbox_column(pd.DataFrame(new_rows).reset_index(drop=True))
+    result = _normalize_bbox_column(pd.DataFrame(new_rows).reset_index(drop=True))
+    return _compact_embedding_rows(result) if compact else result
 
 
 def collapse_content_to_page_rows(
@@ -191,6 +247,7 @@ def collapse_content_to_page_rows(
     text_column: str = "text",
     content_columns: Sequence[str] = _CONTENT_COLUMNS,
     modality: str = "text",
+    compact: bool = False,
 ) -> Any:
     """Collapse each page into a single row for page-level embedding."""
     if not isinstance(batch_df, pd.DataFrame) or batch_df.empty:
@@ -209,4 +266,5 @@ def collapse_content_to_page_rows(
         row_dict["_embed_modality"] = modality
         new_rows.append(row_dict)
 
-    return _normalize_bbox_column(pd.DataFrame(new_rows).reset_index(drop=True))
+    result = _normalize_bbox_column(pd.DataFrame(new_rows).reset_index(drop=True))
+    return _compact_embedding_rows(result) if compact else result

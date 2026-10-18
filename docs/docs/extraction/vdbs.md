@@ -163,6 +163,16 @@ VDB backend before returning zero counts. Invalid backend configuration,
 missing streaming support, or a stage after VDB upload raises an error.
 Valid blank input does not start Ray or write to the VDB.
 
+Batch summary mode also compacts built-in PDF and image records after preparing
+their embedding inputs. Configured captioning, deduplication, and image storage
+stages finish before extraction payloads are removed. Embedding text and images,
+retrieval metadata, and error diagnostics are preserved.
+
+This happens automatically when embedding is the last transform before upload
+and uses `text_column="text"` and `output_column="text_embeddings_1b_v2"`.
+Other stage orders, column names, or paths without the built-in content reshape
+keep full intermediate records. `return_results=True` also keeps full records.
+
 ### Direct LanceDB ingest and retrieval { #direct-lancedb-ingest-and-retrieval }
 
 You can also construct a `LanceDB` instance and call `run` and `retrieval` directly. This is the optional low-level path. Prefer `.vdb_upload()` for typical ingest.

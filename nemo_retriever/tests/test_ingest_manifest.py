@@ -630,6 +630,7 @@ def test_batch_branch_execution_uses_dataset_union(monkeypatch, tmp_path, return
     image.write_bytes(b"png")
     datasets = [_FakeDataset(["path", "pdf_value"]), _FakeDataset(["path", "image_value"])]
     executor_calls: list[dict[str, Any]] = []
+    post_calls: list[dict[str, Any]] = []
 
     class FakeCluster:
         def available_gpu_count(self) -> int:
@@ -660,12 +661,18 @@ def test_batch_branch_execution_uses_dataset_union(monkeypatch, tmp_path, return
     monkeypatch.setattr(GraphIngestor, "_ensure_batch_runtime", lambda self: (_FakeRay(), FakeCluster()))
     monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.RayDataExecutor", FakeExecutor)
     monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.build_graph", lambda **_kwargs: Graph())
-    monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.build_post_extract_graph", lambda **_kwargs: Graph())
+
+    def post_graph(**kwargs):
+        post_calls.append(kwargs)
+        return Graph()
+
+    monkeypatch.setattr("nemo_retriever.ingestor.branch_extraction.build_post_extract_graph", post_graph)
 
     ingestor = GraphIngestor(run_mode="batch").files([str(pdf), str(image)]).extract()
     if not return_results:
         ingestor.vdb_upload()
     result = ingestor.ingest(return_results=return_results)
+    assert post_calls[0]["compact_embedding_transport"] is (not return_results)
 
     assert [call["method"] for call in executor_calls] == [
         "build_dataset",

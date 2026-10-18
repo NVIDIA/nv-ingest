@@ -551,6 +551,7 @@ def _append_ordered_transform_stages(
     stage_order: tuple[str, ...],
     supports_dedup: bool,
     reshape_content_before_embed: bool,
+    compact_embedding_transport: bool = False,
 ) -> Graph:
     """Append post-extraction transform stages in the exact recorded plan order."""
 
@@ -569,6 +570,15 @@ def _append_ordered_transform_stages(
         if embed_params is not None:
             pending_stages.append("embed")
 
+    compact = (
+        compact_embedding_transport
+        and vdb_upload_params is not None
+        and embed_params is not None
+        and embed_params.text_column == "text"
+        and embed_params.output_column == "text_embeddings_1b_v2"
+        and pending_stages[-1] == "embed"
+    )
+
     for stage_name in pending_stages:
         if stage_name == "store" and store_params is not None:
             graph = graph >> StoreOperator(params=store_params)
@@ -586,6 +596,7 @@ def _append_ordered_transform_stages(
                             collapse_content_to_page_rows,
                             modality=embed_params.embed_modality,
                             content_columns=content_columns,
+                            compact=compact,
                         ),
                         name="CollapseContentToPageRows",
                         preserve_pandas_output=True,
@@ -599,6 +610,7 @@ def _append_ordered_transform_stages(
                             structured_elements_modality=embed_params.structured_elements_modality
                             or embed_params.embed_modality,
                             content_columns=content_columns,
+                            compact=compact,
                         ),
                         name="ExplodeContentToRows",
                         preserve_pandas_output=True,
@@ -638,6 +650,7 @@ def build_post_extract_graph(
     webhook_params: Any | None = None,
     stage_order: tuple[str, ...] = (),
     reshape_content_before_embed: bool = True,
+    compact_embedding_transport: bool = False,
 ) -> Graph:
     """Build only the common stages that run after extraction branch union."""
 
@@ -652,6 +665,7 @@ def build_post_extract_graph(
         stage_order=stage_order,
         supports_dedup=True,
         reshape_content_before_embed=reshape_content_before_embed,
+        compact_embedding_transport=compact_embedding_transport,
     )
 
 
@@ -675,6 +689,7 @@ def build_graph(
     video_text_dedup_params: Any | None = None,
     av_fuse_params: Any | None = None,
     stage_order: tuple[str, ...] = (),
+    compact_embedding_transport: bool = False,
 ) -> Graph:
     """Build a batch graph from explicit params or a shared execution plan."""
 
@@ -921,6 +936,7 @@ def build_graph(
         stage_order=stage_order,
         supports_dedup=True,
         reshape_content_before_embed=extraction_mode in {"pdf", "image", "auto"},
+        compact_embedding_transport=compact_embedding_transport,
     )
 
 

@@ -180,3 +180,100 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
         assert not [name for name in stored_table.tags.list() if name.startswith("nemo_sink_")]
     finally:
         ray.shutdown()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("granularity,modality", [("page", "text"), ("page", "text_image"), ("element", "text_image")])
+def test_compact_reshape_preserves_records_across_ray_blocks(tmp_path, monkeypatch, granularity, modality):
+    import base64
+    from functools import partial
+    import hashlib
+    from io import BytesIO
+    import json
+
+    from PIL import Image
+
+    from nemo_retriever.common.modality.content_transforms import collapse_content_to_page_rows, explode_content_to_rows
+    from nemo_retriever.common.schemas.embedding import embedding_text_input
+    from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy, prepare_embedding_inputs
+    from nemo_retriever.operators.graph_ops.custom_operator import UDFOperator
+
+    class CharacterTokenizer:
+        def encode(self, value, **kwargs):
+            return list(map(ord, value))
+
+        def decode(self, value, **kwargs):
+            return "".join(map(chr, value))
+
+    def embed_probe(frame, *, compact):
+        assert all(("image_b64" in value) == (not compact) for value in frame["page_image"])
+        frame = prepare_embedding_inputs(
+            frame, policy=EmbeddingInputPolicy(CharacterTokenizer(), max_tokens=12, prefix="")
+        ).frame
+        embeddings = []
+        for row in frame.to_dict("records"):
+            # Probe vectors depend on the actual model inputs after Ray transport.
+            payload = embedding_text_input(row) + row.get("_image_b64", "")
+            digest = hashlib.sha256(payload.encode()).digest()
+            embeddings.append({"embedding": [float(digest[0]), float(digest[1])]})
+        frame["text_embeddings_1b_v2"] = embeddings
+        return frame
+
+    image_buffer = BytesIO()
+    Image.new("RGB", (8, 8), "blue").save(image_buffer, format="PNG")
+    encoded = base64.b64encode(image_buffer.getvalue()).decode()
+    rows = [
+        {
+            "text": f"Page {page} text with overflow",
+            "path": "doc.pdf",
+            "page_number": page,
+            "metadata": {"content_metadata": {"id": f"page-{page}"}},
+            "page_image": {"image_b64": encoded, "stored_image_uri": "s3://bucket/page.png"},
+            "table": [{"text": f"Table {page} text", "bbox_xyxy_norm": [0.1, 0.1, 0.8, 0.8]}] if page % 2 else None,
+        }
+        for page in range(6)
+    ]
+    blocks = [pa.Table.from_pylist(rows[i : i + 2]) for i in range(0, 6, 2)]
+    reshape = collapse_content_to_page_rows if granularity == "page" else explode_content_to_rows
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    monkeypatch.setenv("RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO", "0")
+    if ray.is_initialized():
+        ray.shutdown()
+    ray.init(num_cpus=4, num_gpus=0, include_dashboard=False, log_to_driver=False)
+    try:
+        stored = []
+        summaries = []
+        for compact in (False, True):
+            uri = str(tmp_path / str(compact))
+            graph = (
+                Graph()
+                >> UDFOperator(partial(reshape, modality=modality, compact=compact), preserve_pandas_output=True)
+                >> UDFOperator(partial(embed_probe, compact=compact), preserve_pandas_output=True)
+                >> IngestVdbOperator(
+                    vdb_op="lancedb",
+                    vdb_kwargs={
+                        "uri": uri,
+                        "table_name": "chunks",
+                        "vector_dim": 2,
+                        "overwrite": True,
+                        "build_index": False,
+                        "stream_batch_bytes": 2048,
+                    },
+                )
+            )
+            source = ray.data.from_arrow(blocks, override_num_blocks=3)
+            result = RayDataExecutor(graph).ingest(source, return_results=False)
+            summaries.append(result.to_dict("records"))
+            records = lancedb.connect(uri).open_table("chunks").to_arrow().to_pylist()
+            for record in records:
+                # Detection counts move into metadata earlier, changing JSON key order.
+                record["metadata"] = json.loads(record["metadata"])
+            stored.append(sorted(records, key=lambda row: (row["id"], row["text"], row["vector"])))
+        assert summaries[0] == summaries[1]
+        assert stored[0] == stored[1]
+        if granularity == "page" and modality == "text_image":
+            assert len(stored[0]) == len(rows)
+        else:
+            assert len(stored[0]) > len(rows)
+    finally:
+        ray.shutdown()
