@@ -36,8 +36,10 @@ out_df, _info = create_text_embeddings_for_df(
 
 from __future__ import annotations
 
+import atexit
 import logging
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -278,6 +280,54 @@ def _multimodal_callable_runner(
 # ------------------------------------------------------------------------------
 
 _embed_rr_idx = 0
+_embed_http_client: Optional[Any] = None
+_embed_http_executor: Optional[ThreadPoolExecutor] = None
+_embed_http_executor_workers: Optional[int] = None
+_embed_http_resources_lock = threading.Lock()
+
+
+def _get_embed_http_client() -> Any:
+    """Return the process-local HTTP client reused by a Ray embed actor."""
+    global _embed_http_client
+    if _embed_http_client is None:
+        with _embed_http_resources_lock:
+            if _embed_http_client is None:
+                try:
+                    import httpx  # type: ignore
+                except Exception as e:  # pragma: no cover
+                    raise RuntimeError("Remote embedding requested but `httpx` is not installed.") from e
+                _embed_http_client = httpx.Client()
+    return _embed_http_client
+
+
+def _get_embed_http_executor(max_workers: Optional[int]) -> ThreadPoolExecutor:
+    """Return a process-local executor, replacing it only when concurrency changes."""
+    global _embed_http_executor, _embed_http_executor_workers
+    if _embed_http_executor is None or _embed_http_executor_workers != max_workers:
+        with _embed_http_resources_lock:
+            if _embed_http_executor is None or _embed_http_executor_workers != max_workers:
+                previous = _embed_http_executor
+                _embed_http_executor = ThreadPoolExecutor(max_workers=max_workers)
+                _embed_http_executor_workers = max_workers
+                if previous is not None:
+                    previous.shutdown(wait=True)
+    return _embed_http_executor
+
+
+def _close_embed_http_resources() -> None:
+    """Close process-local HTTP resources when the Ray actor exits."""
+    global _embed_http_client, _embed_http_executor, _embed_http_executor_workers
+    with _embed_http_resources_lock:
+        if _embed_http_executor is not None:
+            _embed_http_executor.shutdown(wait=True)
+            _embed_http_executor = None
+            _embed_http_executor_workers = None
+        if _embed_http_client is not None:
+            _embed_http_client.close()
+            _embed_http_client = None
+
+
+atexit.register(_close_embed_http_resources)
 
 
 def _pick_embed_endpoint(csv_url: str) -> str:
@@ -320,6 +370,7 @@ def _http_embed_openai_compat(
     timeout_s: float = 600.0,
     max_retries: int = _DEFAULT_HTTP_MAX_RETRIES,
     max_429_retries: int = _DEFAULT_HTTP_MAX_429_RETRIES,
+    client: Optional[Any] = None,
 ) -> List[Optional[List[float]]]:
     """
     Best-effort HTTP embeddings call using an OpenAI-compatible schema.
@@ -358,10 +409,13 @@ def _http_embed_openai_compat(
             normalized_modalities[0] if len(set(normalized_modalities)) == 1 else normalized_modalities
         )
 
-    with httpx.Client(timeout=float(timeout_s)) as client:
+    owns_client = client is None
+    if client is None:
+        client = httpx.Client()
+    try:
         for attempt in range(max(0, int(max_retries)) + 1):
             try:
-                resp = client.post(url, headers=headers, json=payload)
+                resp = client.post(url, headers=headers, json=payload, timeout=float(timeout_s))
             except httpx.TransportError:
                 if attempt >= max(0, int(max_retries)):
                     raise
@@ -399,6 +453,9 @@ def _http_embed_openai_compat(
                 raise RuntimeError(f"Embedding endpoint returned HTTP {status_code}{detail}") from exc
             data = resp.json()
             break
+    finally:
+        if owns_client:
+            client.close()
 
     # Parse embeddings.
     items = data.get("data") if isinstance(data, dict) else None
@@ -446,6 +503,7 @@ def _make_async_request(
     modalities: Optional[List[str]] = None,
     dimensions: Optional[int] = None,
     timeout_s: float = 600.0,
+    client: Optional[Any] = None,
 ) -> dict:
     """
     Send an HTTP OpenAI-compatible embedding request.
@@ -470,6 +528,7 @@ def _make_async_request(
             modalities=modalities,
             dimensions=dimensions,
             timeout_s=timeout_s,
+            client=client,
         )
         response["embedding"] = vecs
         response["info_msg"] = None
@@ -501,26 +560,28 @@ def _async_request_handler(
         modalities = [None] * len(prompts)  # type: ignore[assignment]
 
     pool_size = max_concurrent if max_concurrent and max_concurrent > 0 else None
-    with ThreadPoolExecutor(max_workers=pool_size) as executor:
-        futures = [
-            executor.submit(
-                _make_async_request,
-                prompts=prompt_batch,
-                api_key=api_key or None,
-                embedding_nim_endpoint=str(embedding_nim_endpoint),
-                embedding_model=str(embedding_model),
-                embedding_model_provider_prefix=embedding_model_provider_prefix,
-                encoding_format=str(encoding_format),
-                input_type=str(input_type),
-                truncate=str(truncate),
-                filter_errors=bool(filter_errors),
-                modalities=modality_batch,  # type: ignore[arg-type]
-                dimensions=dimensions,
-                timeout_s=timeout_s,
-            )
-            for prompt_batch, modality_batch in zip(prompts, modalities)
-        ]
-        results = [future.result() for future in futures]
+    executor = _get_embed_http_executor(pool_size)
+    client = _get_embed_http_client()
+    futures = [
+        executor.submit(
+            _make_async_request,
+            prompts=prompt_batch,
+            api_key=api_key or None,
+            embedding_nim_endpoint=str(embedding_nim_endpoint),
+            embedding_model=str(embedding_model),
+            embedding_model_provider_prefix=embedding_model_provider_prefix,
+            encoding_format=str(encoding_format),
+            input_type=str(input_type),
+            truncate=str(truncate),
+            filter_errors=bool(filter_errors),
+            modalities=modality_batch,  # type: ignore[arg-type]
+            dimensions=dimensions,
+            timeout_s=timeout_s,
+            client=client,
+        )
+        for prompt_batch, modality_batch in zip(prompts, modalities)
+    ]
+    results = [future.result() for future in futures]
 
     return results
 

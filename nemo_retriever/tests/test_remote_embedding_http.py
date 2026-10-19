@@ -14,6 +14,8 @@ import pandas as pd
 import pytest
 from nemo_retriever.models.inference.main_text_embed import (
     TextEmbeddingConfig,
+    _async_request_handler,
+    _close_embed_http_resources,
     _http_embed_openai_compat,
     _http_retry_delay_s,
     create_text_embeddings_for_df,
@@ -94,6 +96,37 @@ def test_remote_embedding_does_not_retry_bad_request_and_preserves_detail():
             _request()
 
     assert calls == 1
+
+
+def test_async_request_handler_reuses_http_client_and_executor():
+    requests = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(200, json={"data": [{"index": 0, "embedding": [0.5]}]})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    request_args = (
+        [["text"]],
+        None,
+        "http://embedding.test/v1",
+        "test/model",
+        None,
+        "float",
+        "passage",
+        "END",
+        False,
+    )
+    _close_embed_http_resources()
+    try:
+        with patch("httpx.Client", return_value=client) as client_factory:
+            assert _async_request_handler(*request_args, max_concurrent=2)[0]["embedding"] == [[0.5]]
+            assert _async_request_handler(*request_args, max_concurrent=2)[0]["embedding"] == [[0.5]]
+        assert client_factory.call_count == 1
+        assert requests == 2
+    finally:
+        _close_embed_http_resources()
 
 
 def test_retry_delay_honors_numeric_retry_after():
