@@ -55,6 +55,26 @@ def test_image_modalities_constant():
     assert isinstance(IMAGE_MODALITIES, frozenset)
 
 
+def test_build_embed_option_kwargs_propagates_inference_batch_size():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_inference_batch_size=8,
+    )
+
+    assert kwargs["embed_inference_batch_size"] == 8
+
+
+def test_build_embed_option_kwargs_propagates_reshape_workers():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_reshape_workers=4,
+    )
+
+    assert kwargs["batch_tuning"].embed_reshape_workers == 4
+
+
 def test_build_embed_option_kwargs_defers_remote_model_provider_prefix():
     kwargs = build_embed_option_kwargs(
         "https://litellm.example.com/v1/embeddings",

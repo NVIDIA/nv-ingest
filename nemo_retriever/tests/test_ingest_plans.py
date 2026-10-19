@@ -4,6 +4,7 @@ from tests import _have_ffmpeg_binary
 from nemo_retriever.graph.ingestor_runtime import batch_tuning_to_node_overrides
 from nemo_retriever.graph.ingestor_runtime import build_graph
 from nemo_retriever.graph.ingestor_runtime import build_inprocess_graph
+from nemo_retriever.graph.ingestor_runtime import build_post_extract_graph
 from nemo_retriever.graph.pipeline_graph import Graph
 from nemo_retriever.operators.extract.ocr.ocr import OCRActor
 from nemo_retriever.operators.extract.page_elements.page_elements import PageElementDetectionActor
@@ -257,7 +258,7 @@ def test_build_graph_keeps_archetype_operator_classes(
         "PDFExtractionActor",
         "PageElementDetectionActor",
         expected_actor_name,
-        "UDFOperator",
+        "ExplodeContentToRows",
         "_BatchEmbedActor",
     ]
     assert nodes[3].operator_class is PageElementDetectionActor
@@ -452,6 +453,22 @@ def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> N
     assert overrides["CaptionActor"]["num_gpus"] == 1.0
     assert overrides["_BatchEmbedActor"]["concurrency"] == 2
     assert overrides["_BatchEmbedActor"]["num_gpus"] == 0.5
+
+
+def test_batch_tuning_to_node_overrides_parallelizes_only_named_embed_reshape_nodes() -> None:
+    embed_params = EmbedParams(
+        embed_granularity="page",
+        batch_tuning=BatchTuningParams(embed_workers=12, embed_reshape_workers=4),
+    )
+
+    overrides = batch_tuning_to_node_overrides(None, embed_params)
+    graph = build_post_extract_graph(embed_params=embed_params, stage_order=("embed",))
+    names = [node.name for node in _linear_nodes(graph)]
+
+    assert overrides["CollapseContentToPageRows"]["concurrency"] == 4
+    assert overrides["ExplodeContentToRows"]["concurrency"] == 4
+    assert "CollapseContentToPageRows" in names
+    assert "UDFOperator" not in names
 
 
 def test_batch_preflight_reduces_default_pools_on_constrained_cluster() -> None:
@@ -668,6 +685,23 @@ def test_batch_tuning_to_node_overrides_honors_table_structure_tuning() -> None:
     assert overrides["TableStructureActor"]["target_num_rows_per_block"] == 12
     assert overrides["TableStructureActor"]["num_cpus"] == 0.4
     assert overrides["TableStructureActor"]["num_gpus"] == 0.25
+
+
+def test_batch_tuning_to_node_overrides_repartitions_pdf_pages_for_extraction() -> None:
+    extract_params = ExtractParams(
+        batch_tuning=BatchTuningParams(
+            pdf_extract_workers=32,
+            pdf_extract_batch_size=4,
+            pdf_extract_num_cpus=2.0,
+        ),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["PDFExtractionActor"]["concurrency"] == 32
+    assert overrides["PDFExtractionActor"]["batch_size"] == 4
+    assert overrides["PDFExtractionActor"]["target_num_rows_per_block"] == 4
+    assert overrides["PDFExtractionActor"]["num_cpus"] == 2.0
 
 
 def test_batch_tuning_to_node_overrides_adds_default_store_tuning() -> None:
