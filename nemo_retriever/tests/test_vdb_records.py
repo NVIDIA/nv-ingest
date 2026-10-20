@@ -300,7 +300,6 @@ def test_graph_record_conversion_normalizes_arrow_backed_bbox_array() -> None:
         pytest.param([0.5, 0.25], id="list"),
         pytest.param(np.array([0.5, 0.25], dtype=np.float32), id="numpy"),
         pytest.param((0.5, 0.25), id="tuple"),
-        pytest.param(pa.scalar([0.5, 0.25], pa.list_(pa.float32())), id="arrow-scalar"),
     ],
 )
 def test_graph_record_conversion_normalizes_embedding_vector_inputs(embedding: Any) -> None:

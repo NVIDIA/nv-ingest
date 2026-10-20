@@ -12,6 +12,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import Any, TypedDict
 
+import numpy as np
 from pydantic import ValidationError
 
 from nemo_retriever.common.schemas.collections import QueryHit
@@ -42,26 +43,15 @@ def normalize_content_type(value: Any) -> str | None:
 
 
 def embedding_vector(value: Any) -> list[float] | None:
-    """Convert a supported embedding value to a nonempty Python list (values are not rescaled).
+    """Return a nonempty embedding as a Python list (values are not rescaled), else ``None``.
 
     Args:
-        value: A list, tuple, NumPy array, PyArrow scalar, or pandas array containing an embedding.
-
-    Returns:
-        The embedding as a list, or ``None`` when the value is missing or empty.
+        value: A list, tuple, or NumPy array; pandas ``iterrows`` yields arrays for list columns.
     """
-    as_py = getattr(value, "as_py", None)
-    if callable(as_py):
-        value = as_py()
-    if not isinstance(value, list):
-        to_numpy = getattr(value, "to_numpy", None)
-        if callable(to_numpy):
-            value = to_numpy()
-        tolist = getattr(value, "tolist", None)
-        if callable(tolist):
-            value = tolist()
-        elif isinstance(value, tuple):
-            value = list(value)
+    if isinstance(value, np.ndarray):
+        value = value.tolist()
+    elif isinstance(value, tuple):
+        value = list(value)
     if not isinstance(value, list) or not value:
         return None
     return value
