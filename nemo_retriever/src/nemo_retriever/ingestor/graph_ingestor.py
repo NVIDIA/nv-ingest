@@ -107,7 +107,8 @@ from nemo_retriever.common.modality.txt.split import empty_text_chunks_df
 _ERROR_FIELD_KEYS = ERROR_FIELD_KEYS
 _REMOTE_EMBED_ENDPOINT_FIELDS = ("embedding_endpoint", "embed_invoke_url")
 _DEFAULT_PAGE_ELEMENTS_COLUMN = "page_elements_v3"
-_DEFAULT_EMBED_COLUMN = "text_embeddings_1b_v2"
+_DEFAULT_EMBED_COLUMN = "embedding"
+_DEFAULT_EMBED_ERROR_COLUMN = f"{_DEFAULT_EMBED_COLUMN}_error"
 _ERROR_MESSAGE_LIMIT = 256
 _SOURCE_IDENTIFIER_COLUMNS = ("document_id", "path", "source_path", "metadata", "source_id", "source_name")
 logger = logging.getLogger(__name__)
@@ -1357,6 +1358,17 @@ class GraphIngestor(ingestor):
     def _iter_stage_errors_from_value(cls, value: Any, *, path: str = "") -> Iterator[dict[str, Any]]:
         yield from iter_stage_errors_from_value(value, path=path)
 
+    @classmethod
+    def _iter_column_errors(
+        cls, column: str, value: Any, *, string_error_columns: Iterable[str] = (_DEFAULT_EMBED_ERROR_COLUMN,)
+    ) -> Iterator[dict[str, Any]]:
+        """Yield stage errors from one cell; ``string_error_columns`` hold a plain error string."""
+        if column in string_error_columns and isinstance(value, str):
+            if value.strip():
+                yield {"path": "error", "error": value}
+            return
+        yield from cls._iter_stage_errors_from_value(value)
+
     @staticmethod
     def _row_value(row: Any, key: str) -> Any:
         if isinstance(row, dict):
@@ -1418,11 +1430,18 @@ class GraphIngestor(ingestor):
         return identifier, _format_public_failure_message(record)
 
     @classmethod
-    def _stage_error_records(cls, batch: Any, *, columns: Iterable[str] | None = None) -> list[dict[str, Any]]:
+    def _stage_error_records(
+        cls,
+        batch: Any,
+        *,
+        columns: Iterable[str] | None = None,
+        string_error_columns: Iterable[str] = (_DEFAULT_EMBED_ERROR_COLUMN,),
+    ) -> list[dict[str, Any]]:
         iter_batches = getattr(batch, "iter_batches", None)
         if getattr(batch, "columns", None) is None and not callable(iter_batches):
             return []
         requested_columns = list(columns) if columns is not None else None
+        string_error_columns = frozenset(string_error_columns)
 
         batches = iter_batches(batch_format="pyarrow") if callable(iter_batches) else (batch,)
 
@@ -1460,7 +1479,9 @@ class GraphIngestor(ingestor):
                 row = {column: values[row_position] for column, values in column_values.items()}
                 source_identifier = cls._source_identifier_from_row(row, row_index)
                 for column in target_columns:
-                    for record in cls._iter_stage_errors_from_value(row[column]):
+                    for record in cls._iter_column_errors(
+                        column, row[column], string_error_columns=string_error_columns
+                    ):
                         records.append(
                             {
                                 "row_index": row_index,
@@ -1472,8 +1493,10 @@ class GraphIngestor(ingestor):
         return records
 
     @staticmethod
-    def _has_error(v: Any) -> bool:
-        return any(GraphIngestor._iter_stage_errors_from_value(v))
+    def _has_error(
+        v: Any, column: str = "", string_error_columns: Iterable[str] = (_DEFAULT_EMBED_ERROR_COLUMN,)
+    ) -> bool:
+        return any(GraphIngestor._iter_column_errors(column, v, string_error_columns=string_error_columns))
 
     @staticmethod
     def _param_value(params: Any, field: str) -> Any:
@@ -1496,6 +1519,10 @@ class GraphIngestor(ingestor):
     @classmethod
     def _params_has_configured_field(cls, params: Any, fields: tuple[str, ...]) -> bool:
         return any(cls._is_configured(cls._param_value(params, field)) for field in fields)
+
+    def _embed_error_column(self) -> str:
+        output_column = self._param_value(self._embed_params, "output_column") or _DEFAULT_EMBED_COLUMN
+        return f"{output_column}_error"
 
     def _remote_stage_error_columns(self) -> set[str]:
         """Backwards-compatible thin shim over :meth:`_remote_stage_diagnostics`.
@@ -1552,7 +1579,7 @@ class GraphIngestor(ingestor):
                 role="nemotron_parse",
             )
         if self._params_has_configured_field(self._embed_params, _REMOTE_EMBED_ENDPOINT_FIELDS):
-            column = self._param_value(self._embed_params, "output_column") or _DEFAULT_EMBED_COLUMN
+            column = self._embed_error_column()
             url = self._param_value(self._embed_params, "embed_invoke_url") or self._param_value(
                 self._embed_params, "embedding_endpoint"
             )
@@ -1571,7 +1598,9 @@ class GraphIngestor(ingestor):
         diagnostics = self._remote_stage_diagnostics()
         if not diagnostics:
             return
-        records = self._stage_error_records(result, columns=set(diagnostics.keys()))
+        records = self._stage_error_records(
+            result, columns=set(diagnostics.keys()), string_error_columns=(self._embed_error_column(),)
+        )
         if records:
             raise GraphIngestionError(records, stage_diagnostics=diagnostics)
 
@@ -1591,7 +1620,7 @@ class GraphIngestor(ingestor):
         # Without them, scan all columns so ``return_failures=True`` can expose
         # local collected failures instead of silently returning an empty list.
         columns = set(diagnostics.keys()) if diagnostics else None
-        return self._stage_error_records(result, columns=columns)
+        return self._stage_error_records(result, columns=columns, string_error_columns=(self._embed_error_column(),))
 
     def _collect_failure_tuples(self, result: Any) -> list[tuple[str, str]]:
         return [self._public_failure_tuple(record) for record in self._collect_failure_records(result)]
@@ -1606,7 +1635,7 @@ class GraphIngestor(ingestor):
         return result
 
     @staticmethod
-    def extract_error_rows(batch: Any) -> Any:
+    def extract_error_rows(batch: Any, string_error_columns: Iterable[str] = (_DEFAULT_EMBED_ERROR_COLUMN,)) -> Any:
         if batch is None:
             return batch
         columns = getattr(batch, "columns", None)
@@ -1615,9 +1644,16 @@ class GraphIngestor(ingestor):
         if len(columns) == 0:
             return batch.iloc[0:0]
 
-        mask = batch[columns[0]].apply(GraphIngestor._has_error).astype(bool)
+        string_error_columns = frozenset(string_error_columns)
+        mask = (
+            batch[columns[0]]
+            .apply(GraphIngestor._has_error, column=str(columns[0]), string_error_columns=string_error_columns)
+            .astype(bool)
+        )
         for c in columns[1:]:
-            mask = mask | batch[c].apply(GraphIngestor._has_error).astype(bool)
+            mask = mask | batch[c].apply(
+                GraphIngestor._has_error, column=str(c), string_error_columns=string_error_columns
+            ).astype(bool)
         return batch[mask]
 
     def get_error_rows(self, dataset: Any = None) -> Any:
@@ -1626,12 +1662,13 @@ class GraphIngestor(ingestor):
         target = dataset if dataset is not None else self._rd_dataset
         if target is None:
             raise RuntimeError("No Ray Dataset available to inspect for errors.")
+        string_error_columns = (self._embed_error_column(),)
         if isinstance(target, pd.DataFrame):
-            return self.extract_error_rows(target)
+            return self.extract_error_rows(target, string_error_columns)
         return target.map_batches(
             call_pandas_function_on_arrow,
             batch_format="pyarrow",
-            fn_kwargs={"fn": self.extract_error_rows},
+            fn_kwargs={"fn": self.extract_error_rows, "fn_kwargs": {"string_error_columns": string_error_columns}},
         )
 
     def get_dataset(self) -> Any:

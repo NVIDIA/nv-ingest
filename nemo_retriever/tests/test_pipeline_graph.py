@@ -31,6 +31,7 @@ from nemo_retriever.common.params import (
     EmbedParams,
     ExtractParams,
     TextChunkParams,
+    VdbUploadParams,
     VideoFrameTextDedupParams,
 )
 from nemo_retriever.common.input_files import INPUT_TYPE_EXTENSIONS
@@ -64,6 +65,30 @@ def test_post_extract_graph_can_skip_content_reshape() -> None:
     graph = build_post_extract_graph(embed_params=EmbedParams(), reshape_content_before_embed=False)
 
     assert "ExplodeContentToRows" not in _graph_node_names(graph)
+
+
+def test_post_extract_graph_wires_embed_output_column_to_vdb_upload(monkeypatch: pytest.MonkeyPatch) -> None:
+    import nemo_retriever.graph.ingestor_runtime as runtime
+
+    class _CaptureUploadOperator(AbstractOperator):
+        def preprocess(self, data: Any, **kwargs: Any) -> Any:
+            return data
+
+        def process(self, data: Any, **kwargs: Any) -> Any:
+            return data
+
+        def postprocess(self, data: Any, **kwargs: Any) -> Any:
+            return data
+
+    monkeypatch.setattr(runtime, "IngestVdbOperator", _CaptureUploadOperator)
+    graph = build_post_extract_graph(
+        embed_params=EmbedParams(output_column="vec"),
+        vdb_upload_params=VdbUploadParams(),
+        reshape_content_before_embed=False,
+    )
+
+    upload = next(node.operator for node in _graph_nodes(graph) if isinstance(node.operator, _CaptureUploadOperator))
+    assert upload.embedding_column == "vec"
 
 
 def test_text_build_graph_does_not_use_modal_content_reshape() -> None:

@@ -21,6 +21,7 @@ from nemo_retriever.graph import InprocessExecutor, StoreOperator, UDFOperator
 from nemo_retriever.common.modality.content_transforms import explode_content_to_rows
 from nemo_retriever.common.params import StoreParams
 from nemo_retriever.common.vdb.records import to_client_vdb_records
+from nemo_retriever.models.inference.main_text_embed import assign_embedding_columns
 
 
 def _make_tiny_png_b64(width: int = 4, height: int = 4, color=(255, 0, 0)) -> str:
@@ -219,7 +220,7 @@ class TestStoreOperatorInGraph:
         assert table_row["metadata"]["content_metadata"]["uploaded_image_uri"] == table_uri
         assert table_row["metadata"]["table_metadata"]["uploaded_image_uri"] == table_uri
 
-        result["metadata"] = result["metadata"].apply(lambda metadata: {**metadata, "embedding": [0.1, 0.2]})
+        result["embedding"] = [[0.1, 0.2] for _ in range(len(result.index))]
         records = to_client_vdb_records(result)[0]
         table_record = next(
             record for record in records if record["metadata"]["content_metadata"].get("type") == "table"
@@ -472,8 +473,12 @@ class TestStoreOperatorInGraph:
 
         def _fake_embed_group(group_df: pd.DataFrame, **kwargs):
             out = group_df.copy()
-            out["metadata"] = [{"embedding": [0.1, 0.2]} for _ in range(len(out.index))]
-            return out
+            return assign_embedding_columns(
+                out,
+                [[0.1, 0.2] for _ in range(len(out.index))],
+                [None for _ in range(len(out.index))],
+                output_column="embedding",
+            )
 
         monkeypatch.setattr(runtime, "_embed_group", _fake_embed_group)
 

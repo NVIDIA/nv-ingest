@@ -67,7 +67,9 @@ queries that table.
 
 By default, `.vdb_upload()` creates new or overwritten tables as hybrid tables, with a full-text search index on `text` next to the vector index. When it appends, it keeps the existing table's mode. To create a dense-only table, set `"hybrid": False` in `vdb_kwargs`.
 
-You can omit `.embed()` if a custom stage provides an embedding in `metadata["embedding"]` or `text_embeddings_1b_v2["embedding"]`. In that case, set `embedding_model_name` in `vdb_kwargs` so that `Retriever` can verify query compatibility. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+`.embed()` writes each vector to `EmbedParams.output_column` (default `embedding`) as a list of `float32` values. Its corresponding error column (default `embedding_error`) is null on success or when there is no embeddable content. It contains a one-line message only when embedding fails.
+
+By default, upload reads vectors from `embedding`; when `.embed()` uses a custom `EmbedParams.output_column`, upload reads from that column. If you omit `.embed()`, a custom stage must write its vectors to `embedding`. In that case, set `embedding_model_name` in `vdb_kwargs` so that `Retriever` can verify query compatibility. Dense upload fails closed if any searchable row in a nonempty batch is missing an embedding. This includes a mixed batch where other rows have embeddings: the library raises `VdbUploadError`, a `ValueError` subclass, without committing the embedded subset. An extraction that produces no content completes without uploading records. For automatic handling of overlength text before upload, refer to [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
 
 ## Keep the embedding model aligned { #lancedb-embedding-model-compatibility }
 
@@ -196,7 +198,7 @@ graph_rows = pd.DataFrame(
     [
         {
             "text": "hello from graph",
-            "text_embeddings_1b_v2": {"embedding": [1.0, 0.0]},
+            "embedding": [1.0, 0.0],
             "path": "graph.pdf",
             "page_number": 2,
             "metadata": {},

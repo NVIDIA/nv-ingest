@@ -178,6 +178,7 @@ class Retriever:
         retrieve = RetrieveVdbOperator(
             explode_for_rerank=self.rerank,
             _query_text_column=str(embed_params.text_column),
+            embedding_column=embed_params.output_column,
             **vdb_init,
         )
 

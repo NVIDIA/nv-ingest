@@ -27,6 +27,7 @@ import pickle
 from concurrent.futures import ProcessPoolExecutor
 
 import pandas as pd
+import pyarrow as pa
 import pytest
 
 from nemo_retriever.ingestor.graph_ingestor import (
@@ -103,6 +104,7 @@ def test_remote_stage_diagnostics_populated_from_embed_params() -> None:
     assert embed_diag.display_name == "Embedding NIM"
     assert embed_diag.invoke_url == "http://embed.svc/v1/embeddings"
     assert embed_diag.model_name == "nvidia/llama-nemotron-embed-1b-v2"
+    assert embed_diag.column == f"{EmbedParams().output_column}_error"
 
 
 def test_remote_stage_error_columns_preserves_legacy_shape() -> None:
@@ -454,3 +456,65 @@ def test_raise_for_stage_errors_noop_under_collect_policy() -> None:
     )
     # No exception even with row-level errors when policy is collect.
     ingestor._raise_for_stage_errors(result)
+
+
+def _remote_embed_ingestor(**kwargs) -> GraphIngestor:
+    return GraphIngestor(run_mode="inprocess", **kwargs).embed(
+        EmbedParams(embed_invoke_url="http://embed.svc/v1/embeddings", output_column="vec")
+    )
+
+
+def _embed_failure_frame() -> pd.DataFrame:
+    return pd.DataFrame(
+        {
+            "path": ["doc.pdf", "doc.pdf"],
+            "vec": pd.array([[0.1, 0.2], None], dtype=pd.ArrowDtype(pa.list_(pa.float32()))),
+            "vec_error": pd.array(
+                [None, "ConnectionError: embedding batch failed; inspect embed-stage logs for the cause"],
+                dtype=pd.ArrowDtype(pa.string()),
+            ),
+        }
+    )
+
+
+def test_raise_for_stage_errors_reports_embedding_error_column() -> None:
+    with pytest.raises(GraphIngestionError) as exc_info:
+        _remote_embed_ingestor()._raise_for_stage_errors(_embed_failure_frame())
+
+    err = exc_info.value
+    assert len(err.records) == 1
+    assert err.records[0]["row_index"] == 1
+    assert err.records[0]["column"] == "vec_error"
+    assert err.records[0]["source_identifier"] == "doc.pdf"
+    rendered = str(err)
+    assert "row 1, column vec_error [stage=Embedding NIM url=http://embed.svc/v1/embeddings], path error" in rendered
+    assert "ConnectionError: embedding batch failed" in rendered
+    assert "Troubleshooting: Embedding NIM at http://embed.svc/v1/embeddings reported a row-level error" in rendered
+
+
+def test_collect_policy_returns_embedding_error_column_failures() -> None:
+    ingestor = _remote_embed_ingestor(error_policy="collect")
+    frame = _embed_failure_frame()
+
+    ingestor._raise_for_stage_errors(frame)
+    failures = ingestor._collect_failure_tuples(frame)
+
+    assert failures == [
+        (
+            "doc.pdf",
+            "row 1, column vec_error, path error: "
+            "ConnectionError: embedding batch failed; inspect embed-stage logs for the cause",
+        )
+    ]
+    assert ingestor.get_error_rows(frame).index.tolist() == [1]
+
+
+def test_generation_error_strings_are_not_reported_as_stage_errors() -> None:
+    ingestor = _remote_embed_ingestor(error_policy="collect")
+    frame = _embed_failure_frame().assign(summary_error=[None, "TimeoutError: summary request timed out"])
+    frame["vec_error"] = None
+
+    assert ingestor._collect_failure_tuples(frame) == []
+    assert GraphIngestor._stage_error_records(frame) == []
+    assert ingestor.get_error_rows(frame).empty
+    assert GraphIngestor.extract_error_rows(frame).empty

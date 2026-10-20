@@ -8,7 +8,7 @@ Text embedding helper for NeMo Retriever pandas DataFrames.
 This module owns the batching and runner logic used by the graph pipeline. It
 operates on a pandas.DataFrame that typically contains:
   - `text`: the text to embed (or other common text columns)
-  - `metadata`: optional dict; if present, embeddings are written to `metadata["embedding"]`
+  - `metadata`: optional dict; embedding output is written to the `embedding` column
 It uses the shared HTTP embedding URL normalization helpers with pandas/httpx.
 
 Usage:
@@ -30,7 +30,7 @@ out_df, _info = create_text_embeddings_for_df(
     task_config={"embedder": local_embedder, "endpoint_url": None, "local_batch_size": 64},
 )
 
-# Embedding is written to out_df.loc[i, "metadata"]["embedding"] and _contains_embeddings is set.
+# Embeddings are written to out_df["embedding"].
 ```
 """
 
@@ -44,7 +44,9 @@ from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
+import numpy as np
 import pandas as pd
+import pyarrow as pa
 
 from nemo_retriever.common.api.util.string_processing import (
     ensure_openai_embeddings_http_url,
@@ -68,6 +70,74 @@ _DEFAULT_HTTP_MAX_429_RETRIES = 3
 _MAX_HTTP_RETRY_DELAY_S = 30.0
 _MAX_HTTP_ERROR_BODY_CHARS = 2_000
 
+EMBEDDING_DTYPE = pd.ArrowDtype(pa.list_(pa.float32()))
+EMBEDDING_ERROR_DTYPE = pd.ArrowDtype(pa.string())
+
+
+def embedding_error_message(stage: str, exc: BaseException) -> str:
+    """Format an exception as a one-line message for the embedding error column.
+
+    Args:
+        stage: Name of the stage where the exception occurred.
+        exc: Exception to describe.
+
+    Returns:
+        A single-line ``stage: ExceptionType: message`` string, omitting the message when it is empty.
+    """
+    message = " ".join(str(exc).split())
+    return f"{stage}: {type(exc).__name__}: {message}" if message else f"{stage}: {type(exc).__name__}"
+
+
+def assign_embedding_columns(
+    df: pd.DataFrame,
+    vectors: Sequence[Any],
+    errors: Sequence[Optional[str]],
+    *,
+    output_column: str,
+) -> pd.DataFrame:
+    """Return a copy of ``df`` with typed embedding and error columns.
+
+    Args:
+        df: Input dataframe to copy.
+        vectors: Per-row float sequences, or ``None`` or empty sequences for rows that were not embedded.
+        errors: Per-row error messages or ``None``; values are preserved.
+        output_column: Name of the vector column; its error column is named ``f"{output_column}_error"``.
+
+    Returns:
+        A new dataframe with ``output_column`` as an Arrow ``list<float32>`` column and
+        ``f"{output_column}_error"`` as an Arrow string column. Missing and empty vectors are null;
+        ``df`` is unchanged.
+
+    Raises:
+        ValueError: If ``vectors``, ``errors``, and ``df`` have different lengths.
+    """
+    if len(vectors) != len(errors) or len(vectors) != len(df):
+        raise ValueError("vectors, errors, and dataframe must have the same length")
+
+    mask = [vector is None or len(vector) == 0 for vector in vectors]
+    present = [vector for vector, is_missing in zip(vectors, mask) if not is_missing]
+    lengths = np.asarray(
+        [len(vector) if not is_missing else 0 for vector, is_missing in zip(vectors, mask)], dtype=np.int32
+    )
+    offsets = np.concatenate((np.zeros(1, dtype=np.int32), np.cumsum(lengths, dtype=np.int32)))
+    if present:
+        try:
+            values = np.asarray(present, dtype=np.float32).reshape(-1)
+        except ValueError:
+            values = np.concatenate([np.asarray(vector, dtype=np.float32).reshape(-1) for vector in present])
+    else:
+        values = np.empty(0, dtype=np.float32)
+
+    array = pa.ListArray.from_arrays(
+        pa.array(offsets, pa.int32()),
+        pa.array(values, pa.float32()),
+        mask=pa.array(mask, pa.bool_()),
+    )
+    vector_series = pd.Series(pd.arrays.ArrowExtensionArray(array), index=df.index)
+    error_series = pd.Series(list(errors), index=df.index, dtype=EMBEDDING_ERROR_DTYPE)
+    error_column = f"{output_column}_error"
+    return df.assign(**{output_column: vector_series, error_column: error_series})
+
 
 @dataclass(slots=True)
 class TextEmbeddingConfig:
@@ -88,10 +158,7 @@ class TextEmbeddingConfig:
 
     # Retriever-local dataframe settings
     text_column: str = "text"
-    write_embedding_to_metadata: bool = True
-    metadata_column: str = "metadata"
-    # Optional extra output column containing a payload dict (similar to embed_text_1b_v2)
-    output_payload_column: Optional[str] = None
+    output_column: str = "embedding"
     # Modality: "text" (default), "image", or "text_image"
     embed_modality: str = "text"
     # Parallel OpenAI-compatible embedding HTTP calls per Ray batch (NIM / vLLM).
@@ -150,13 +217,6 @@ def _text_input_for_embedding(
     return embedding_text_input(row, text_column=text_column, default_modality=default_modality)
 
 
-def _ensure_metadata_dict(row: pd.Series, *, metadata_column: str = "metadata") -> Dict[str, Any]:
-    md = row.get(metadata_column)
-    if isinstance(md, dict):
-        return md
-    return {}
-
-
 def _image_from_row(row: pd.Series) -> Optional[str]:
     """Extract ``_image_b64`` column value from a row."""
     v = row.get("_image_b64")
@@ -195,11 +255,9 @@ def _multimodal_callable_runner(
     graceful fallback (e.g. pdfium-extracted text without a rendered
     page image).  For ``image`` mode, rows without images get ``None``.
 
-    Returns the same ``{"embeddings": [...], "info_msgs": [...]}``
-    structure as ``_callable_runner``.
+    Returns ``{"embeddings": [...]}``.
     """
     flat_embeddings: List[Optional[Sequence[float]]] = []
-    flat_info_msgs: List[Optional[dict]] = []
 
     n = len(df_slice)
     bs = max(1, int(batch_size))
@@ -268,9 +326,7 @@ def _multimodal_callable_runner(
                 else:
                     flat_embeddings.append(None)
 
-        flat_info_msgs.extend([None] * size)
-
-    return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
+    return {"embeddings": flat_embeddings}
 
 
 # ------------------------------------------------------------------------------
@@ -472,7 +528,6 @@ def _make_async_request(
             timeout_s=timeout_s,
         )
         response["embedding"] = vecs
-        response["info_msg"] = None
     except Exception as err:
         err_str = str(err)
         if len(err_str) > 500:
@@ -556,12 +611,9 @@ def _async_runner(
         timeout_s=timeout_s,
     )
 
-    flat_results = {"embeddings": [], "info_msgs": []}
+    flat_results = {"embeddings": []}
     for batch_dict in results:
-        info_msg = batch_dict.get("info_msg")
-        for embedding in batch_dict.get("embedding") or []:
-            flat_results["embeddings"].append(embedding)
-            flat_results["info_msgs"].append(info_msg)
+        flat_results["embeddings"].extend(batch_dict.get("embedding") or [])
 
     return flat_results
 
@@ -573,7 +625,6 @@ def _callable_runner(
     batch_size: int,
 ) -> dict:
     flat_embeddings: List[Optional[Sequence[float]]] = []
-    flat_info_msgs: List[Optional[dict]] = []
 
     for prompt_batch in prompts:
         if not prompt_batch:
@@ -588,40 +639,8 @@ def _callable_runner(
                     f"(got={len(vecs_list)} expected={len(chunk)})"
                 )
             flat_embeddings.extend(vecs_list)
-            flat_info_msgs.extend([None] * len(vecs_list))
 
-    return {"embeddings": flat_embeddings, "info_msgs": flat_info_msgs}
-
-
-# ------------------------------------------------------------------------------
-# Row update helpers (adapted for retriever-local DataFrames)
-# ------------------------------------------------------------------------------
-
-
-def _add_embeddings_retriever_df(
-    row: pd.Series,
-    embeddings: Dict[Any, Any],
-    info_msgs: Dict[Any, Any],
-    *,
-    metadata_column: str,
-    write_embedding_to_metadata: bool,
-    output_payload_column: Optional[str],
-) -> pd.Series:
-    embedding = embeddings.get(row.name, None)
-    info_msg = info_msgs.get(row.name, None)
-
-    if write_embedding_to_metadata:
-        md = _ensure_metadata_dict(row, metadata_column=metadata_column)
-        md["embedding"] = embedding
-        if info_msg:
-            md["info_message_metadata"] = info_msg
-        row[metadata_column] = md
-
-    if output_payload_column:
-        row[output_payload_column] = {"embedding": embedding, "info_msg": info_msg}
-
-    row["_contains_embeddings"] = embedding is not None
-    return row
+    return {"embeddings": flat_embeddings}
 
 
 # ------------------------------------------------------------------------------
@@ -637,7 +656,7 @@ def create_text_embeddings_for_df(
     execution_trace_log: Optional[Dict[str, Any]] = None,
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
-    Create embeddings for a retriever-local DataFrame and write them into row metadata.
+    Create embeddings for a retriever-local DataFrame and write them to a typed vector column.
 
     Parameters
     ----------
@@ -700,7 +719,15 @@ def create_text_embeddings_for_df(
     request_timeout_s = float(timeout_raw)
 
     if df_transform_ledger.empty:
-        return df_transform_ledger, {"trace_info": execution_trace_log}
+        return (
+            assign_embedding_columns(
+                df_transform_ledger,
+                [],
+                [],
+                output_column=transform_config.output_column,
+            ),
+            {"trace_info": execution_trace_log},
+        )
 
     embed_modality = transform_config.embed_modality
     multimodal_embedder = task_config.get("multimodal_embedder")  # local VL model for image/text_image
@@ -735,6 +762,7 @@ def create_text_embeddings_for_df(
     df_content["_content"] = extracted_content
 
     valid_content_mask = df_content["_content"].notna()
+    vectors: List[Any] = [None] * len(df_content)
     if valid_content_mask.any():
         if embed_modality in IMAGE_MODALITIES and multimodal_embedder is not None:
             # Local multimodal path: use _multimodal_callable_runner
@@ -831,25 +859,22 @@ def create_text_embeddings_for_df(
                     "and no local embedder was provided in task_config['embedder']."
                 )
 
-        # Build a simple row index -> embedding map (API parity).
-        embeddings_dict = dict(zip(df_content.loc[valid_content_mask].index, content_embeddings.get("embeddings", [])))
-        info_msgs_dict = dict(zip(df_content.loc[valid_content_mask].index, content_embeddings.get("info_msgs", [])))
-    else:
-        embeddings_dict = {}
-        info_msgs_dict = {}
-
-    df_content = df_content.apply(
-        _add_embeddings_retriever_df,
-        embeddings=embeddings_dict,
-        info_msgs=info_msgs_dict,
-        metadata_column=str(transform_config.metadata_column),
-        write_embedding_to_metadata=bool(transform_config.write_embedding_to_metadata),
-        output_payload_column=transform_config.output_payload_column,
-        axis=1,
-    )
+        for position, vector in zip(
+            np.flatnonzero(valid_content_mask.to_numpy()),
+            content_embeddings.get("embeddings", []),
+        ):
+            vectors[position] = vector
 
     # Drop helper column to keep the output clean.
     if "_content" in df_content.columns:
         df_content = df_content.drop(columns=["_content"])
 
-    return df_content, {"trace_info": execution_trace_log}
+    return (
+        assign_embedding_columns(
+            df_content,
+            vectors,
+            [None] * len(df_content),
+            output_column=transform_config.output_column,
+        ),
+        {"trace_info": execution_trace_log},
+    )

@@ -827,7 +827,7 @@ def _run_pipeline_in_process(
         from nemo_retriever.common.vdb.records import to_client_vdb_records
         from nemo_retriever.service.services.pipeline_pool import DocumentWriteContext
 
-        records = to_client_vdb_records(result_df)
+        records = to_client_vdb_records(result_df, embedding_column=embedding_column or "embedding")
         _post_records_to_vectordb(
             records,
             vectordb_url,

@@ -171,8 +171,9 @@ def test_split_children_survive_adapter_write_and_retrieval(tmp_path, writer):
                 "text": text,
                 "path": "/inputs/source.pdf",
                 "page_number": 2,
+                "embedding": [1.0, float(index)],
+                "embedding_error": None,
                 "metadata": {
-                    "embedding": [1.0, float(index)],
                     **embedding_split_metadata(
                         content=text,
                         parent_id="parent",
