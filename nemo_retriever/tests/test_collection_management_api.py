@@ -38,8 +38,8 @@ from nemo_retriever.service.vectordb_app import VectorDBState, create_vectordb_a
 def _record(_chunk_id: str, _document_id: str, text: str, version: str = "v1") -> dict:
     return {
         "document_type": "text",
+        "embedding": [1.0, 0.0],
         "metadata": {
-            "embedding": [1.0, 0.0],
             "content": text,
             "content_metadata": {"page_number": 1, "type": "text"},
             "source_metadata": {

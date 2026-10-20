@@ -2048,8 +2048,8 @@ def test_root_ingest_default_builds_vector_and_fts_table(monkeypatch, tmp_path) 
         [
             {
                 "document_type": "text",
+                "embedding": [1.0, 0.0],
                 "metadata": {
-                    "embedding": [1.0, 0.0],
                     "content": "alpha hybrid manual",
                     "content_metadata": {"id": "alpha", "page_number": 1},
                     "source_metadata": {"source_id": str(doc)},
@@ -2057,8 +2057,8 @@ def test_root_ingest_default_builds_vector_and_fts_table(monkeypatch, tmp_path) 
             },
             {
                 "document_type": "text",
+                "embedding": [0.0, 1.0],
                 "metadata": {
-                    "embedding": [0.0, 1.0],
                     "content": "beta hybrid manual",
                     "content_metadata": {"id": "beta", "page_number": 2},
                     "source_metadata": {"source_id": str(doc)},

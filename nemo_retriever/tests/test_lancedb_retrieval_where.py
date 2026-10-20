@@ -188,8 +188,8 @@ def test_hybrid_ingestion_builds_searchable_fts_index_from_record_text() -> None
         [
             {
                 "document_type": "text",
+                "embedding": [1.0, 0.0],
                 "metadata": {
-                    "embedding": [1.0, 0.0],
                     "content": "quarterly alpha revenue outlook",
                     "content_metadata": {"id": "alpha", "page_number": 1},
                     "source_metadata": {"source_id": "alpha.pdf"},
@@ -197,8 +197,8 @@ def test_hybrid_ingestion_builds_searchable_fts_index_from_record_text() -> None
             },
             {
                 "document_type": "text",
+                "embedding": [0.0, 1.0],
                 "metadata": {
-                    "embedding": [0.0, 1.0],
                     "content": "beta safety compliance manual",
                     "content_metadata": {"id": "beta", "page_number": 2},
                     "source_metadata": {"source_id": "beta.pdf"},

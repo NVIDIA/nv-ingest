@@ -337,8 +337,8 @@ def test_fake_vdb_completes_collection_http_flow_without_backend_details() -> No
     app = _app(backend)
     record = {
         "document_type": "text",
+        "embedding": [1.0, 0.0],
         "metadata": {
-            "embedding": [1.0, 0.0],
             "content": "hello",
             "content_metadata": {"page_number": 1},
             "source_metadata": {"source_id": "report.pdf"},
@@ -449,8 +449,8 @@ def _embedding_records() -> list[list[dict[str, Any]]]:
         [
             {
                 "document_type": "text",
+                "embedding": [1.0, 0.0],
                 "metadata": {
-                    "embedding": [1.0, 0.0],
                     "content": "hello",
                     "content_metadata": {"page_number": 1},
                     "source_metadata": {"source_name": "doc.pdf"},
@@ -607,8 +607,8 @@ def test_legacy_write_and_query_keep_existing_vdb_path() -> None:
     app = _app(backend)
     record = {
         "document_type": "text",
+        "embedding": [1.0, 0.0],
         "metadata": {
-            "embedding": [1.0, 0.0],
             "content": "legacy",
             "content_metadata": {},
             "source_metadata": {},
@@ -646,8 +646,8 @@ def test_service_managed_lancedb_preserves_multimodal_fields(tmp_path) -> None:
     app = _app(backend)
     record = {
         "document_type": "text",
+        "embedding": [1.0, 0.0, 0.0, 0.0],
         "metadata": {
-            "embedding": [1.0, 0.0, 0.0, 0.0],
             "content": "table content",
             "content_metadata": {
                 "page_number": 7,

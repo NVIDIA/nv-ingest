@@ -469,7 +469,7 @@ def _create_lancedb_result(
 
     metadata = element.get("metadata", {})
     doc_type = element.get("document_type")
-    embedding = metadata.get("embedding")
+    embedding = element.get("embedding")
     if embedding is None:
         return None, "dropped_no_embedding"
 

@@ -24,8 +24,8 @@ from nemo_retriever.service.vectordb_app import VectorDBState, create_vectordb_a
 _DIM = 4
 _RECORD = {
     "document_type": "text",
+    "embedding": [1.0, 0.0, 0.0, 0.0],
     "metadata": {
-        "embedding": [1.0, 0.0, 0.0, 0.0],
         "content": "Revenue grew 12% year over year.",
         "content_metadata": {"page_number": 12, "type": "text"},
         "source_metadata": {
