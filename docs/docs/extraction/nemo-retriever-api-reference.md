@@ -151,13 +151,44 @@ Any other value raises a Pydantic `ValidationError` before pipeline setup. The
 error lists the supported values, so spelling and configuration errors do not
 silently select another extraction path.
 
-For local `nemotron_parse` extraction in NeMo Retriever Library 26.08, omit
-`nemotron_parse_model` to use the default model, or set it to
-`nvidia/NVIDIA-Nemotron-Parse-v1.2`. Other local model values, including
-`nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before pipeline
-execution. To use a remote Nemotron Parse endpoint, configure
+For local `nemotron_parse` extraction, omit `nemotron_parse_model` to use
+`nvidia/NVIDIA-Nemotron-Parse-v1.2` through vLLM. To opt into Nemotron Parse 3.5,
+set `nemotron_parse_model="nvidia/Nemotron-3.5-Parse"` without an invoke URL.
+This model runs through Transformers on a CUDA GPU with BF16 weights, not
+through vLLM. Install the local GPU and Parse dependencies with
+`pip install "nemo-retriever[local,nemotron-parse]"`.
+
+The following example explicitly selects the local Parse 3.5 checkpoint.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import ExtractParams
+
+result = (
+    create_ingestor(run_mode="inprocess")
+    .files(["report.pdf"])
+    .extract(
+        ExtractParams(
+            method="nemotron_parse",
+            nemotron_parse_model="nvidia/Nemotron-3.5-Parse",
+        )
+    )
+    .ingest()
+)
+```
+
+The Parse 3.5 adapter loads checkpoint custom code with
+`trust_remote_code=True` at the revision pinned in the model registry. Review
+the checkpoint code before use. It retains the existing task prompt, which
+disables text prediction inside pictures. The default extraction method
+remains `pdfium_hybrid`; the local Parse default remains v1.2.
+
+Other local Parse model values, including
+`nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before
+pipeline execution. To use a remote Nemotron Parse endpoint, configure
 `nemotron_parse_invoke_url` or `invoke_url` and select the model that matches
-the endpoint contract.
+the endpoint contract. Hosted endpoint selection and Helm NIM defaults are
+unchanged.
 
 ### Choose raise or collect behavior
 

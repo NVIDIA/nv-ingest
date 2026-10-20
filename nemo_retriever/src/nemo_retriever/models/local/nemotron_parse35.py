@@ -1,0 +1,258 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+"""Pinned Transformers implementation of local Nemotron 3.5 Parse inference."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Sequence
+
+import numpy as np
+import torch
+from PIL import Image
+
+from nemo_retriever.common.params.utils import NEMOTRON_PARSE35_MODEL
+from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
+from nemo_retriever.models.hf_model_registry import get_hf_revision
+from nemo_retriever.models.model import BaseModel, ModelRunMode
+
+ImageInput = Image.Image | str | Path | np.ndarray | torch.Tensor
+_DEFAULT_TASK_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
+
+
+class NemotronParse35(BaseModel):
+    """Parse page images with the checkpoint's native Transformers model and processor.
+
+    Weights and custom code are loaded lazily from an immutable registry revision.
+    Pages are generated sequentially to bound GPU memory independently of the
+    pipeline batch size. No vLLM plugin is installed or imported.
+    """
+
+    def __init__(
+        self,
+        device: str = "cuda",
+        hf_cache_dir: str | None = None,
+        task_prompt: str = _DEFAULT_TASK_PROMPT,
+        max_tokens: int = 9000,
+    ) -> None:
+        """Configure a lazy BF16 parser without loading weights.
+
+        Args:
+            device: PyTorch inference device, normally the worker's ``cuda`` device.
+            hf_cache_dir: Optional Hugging Face snapshot cache directory.
+            task_prompt: Native control tokens. Picture text is disabled unless enabled explicitly.
+            max_tokens: Positive maximum number of generated tokens per page.
+
+        Raises:
+            ValueError: If max_tokens is not positive or the device is invalid.
+            RuntimeError: If PyTorch cannot interpret the device.
+        """
+        super().__init__()
+        if max_tokens <= 0:
+            raise ValueError("max_tokens must be positive.")
+        self._device = torch.device(device)
+        self._hf_cache_dir = hf_cache_dir
+        self._task_prompt = task_prompt
+        self._max_tokens = max_tokens
+        self._model: Any = None
+        self._processor: Any = None
+        self._generation_config: Any = None
+
+    def _ensure_model(self) -> None:
+        if self._model is not None:
+            return
+        from huggingface_hub import snapshot_download
+        from transformers import AutoModel, AutoProcessor, GenerationConfig
+
+        cache_dir = configure_global_hf_cache_base(self._hf_cache_dir)
+        snapshot = snapshot_download(
+            NEMOTRON_PARSE35_MODEL,
+            revision=get_hf_revision(NEMOTRON_PARSE35_MODEL),
+            cache_dir=cache_dir,
+            allow_patterns=["*.json", "*.py", "*.safetensors", "*.jinja", "*.model", "*.txt"],
+        )
+        # Loading all assets from the resolved snapshot also keeps nested processor
+        # downloads on the same revision and in the configured cache.
+        processor = AutoProcessor.from_pretrained(snapshot, trust_remote_code=True)
+        generation_config = GenerationConfig.from_pretrained(snapshot)
+        generation_config.max_new_tokens = self._max_tokens
+        model = AutoModel.from_pretrained(
+            snapshot, trust_remote_code=True, dtype=torch.bfloat16, attn_implementation="sdpa"
+        )
+        self._model = model
+        try:
+            model.eval().to(self._device)
+        except (RuntimeError, ValueError):
+            self.unload()
+            raise
+        self._processor = processor
+        self._generation_config = generation_config
+
+    def preprocess(self, input_data: ImageInput) -> Image.Image:
+        """Convert a single page to an RGB image without resizing its content.
+
+        Args:
+            input_data: PIL image, image path, HWC/CHW array, or tensor. Arrays
+                and tensors can have a leading batch dimension of size one.
+                Floating-point pixels in [0, 1] are scaled to [0, 255].
+
+        Returns:
+            RGB PIL image for the checkpoint's native NaViT processor.
+
+        Raises:
+            TypeError: If the input type is unsupported.
+            ValueError: If the image shape or pixels are invalid.
+            OSError: If an image path cannot be opened or decoded.
+        """
+        if isinstance(input_data, Image.Image):
+            return input_data.convert("RGB")
+        if isinstance(input_data, (str, Path)):
+            with Image.open(Path(input_data).expanduser()) as image:
+                return image.convert("RGB")
+        if isinstance(input_data, torch.Tensor):
+            tensor = input_data.detach().cpu()
+            if tensor.dtype == torch.bfloat16:
+                tensor = tensor.float()
+            input_data = tensor.numpy()
+        if not isinstance(input_data, np.ndarray):
+            raise TypeError(f"Unsupported input type for Nemotron Parse: {type(input_data)!r}")
+        pixels = input_data
+        if pixels.ndim == 4 and pixels.shape[0] == 1:
+            pixels = pixels[0]
+        if pixels.ndim != 3 or not pixels.size:
+            raise ValueError(f"Expected a nonempty HWC/CHW image, got {pixels.shape}")
+        if pixels.shape[0] in (1, 3) and pixels.shape[-1] not in (1, 3):
+            pixels = pixels.transpose(1, 2, 0)
+        if pixels.shape[-1] not in (1, 3, 4) or not np.isfinite(pixels).all():
+            raise ValueError("Expected finite pixels with 1, 3, or 4 channels.")
+        if np.issubdtype(pixels.dtype, np.floating) and pixels.min() >= 0 and pixels.max() <= 1:
+            pixels = pixels * 255
+        pixels = np.clip(pixels, 0, 255).astype(np.uint8)
+        if pixels.shape[-1] == 1:
+            pixels = pixels[..., 0]
+        return Image.fromarray(pixels).convert("RGB")
+
+    def invoke(self, input_data: ImageInput, task_prompt: str | None = None) -> str:
+        """Generate structured Parse output for one page.
+
+        Args:
+            input_data: Page image in a format accepted by :meth:`preprocess`.
+            task_prompt: Optional native control tokens overriding the configured prompt.
+
+        Returns:
+            Decoded text with coordinate and class tags preserved.
+
+        Raises:
+            TypeError: If the image type is unsupported.
+            ValueError: If image data or processor inputs are invalid.
+            OSError: If image or checkpoint assets cannot be loaded.
+            RuntimeError: If model loading or inference fails, including GPU exhaustion.
+        """
+        return self.invoke_batch([input_data], task_prompt=task_prompt)[0]
+
+    def invoke_batch(self, inputs: Sequence[ImageInput], task_prompt: str | None = None) -> list[str]:
+        """Parse pages sequentially, keeping their original order.
+
+        Args:
+            inputs: Sequence of pages accepted by :meth:`preprocess`; an empty
+                sequence returns immediately without loading the checkpoint.
+            task_prompt: Optional native control tokens overriding the configured prompt.
+
+        Returns:
+            One tagged output string per input page, in input order.
+
+        Raises:
+            TypeError: If an image type is unsupported.
+            ValueError: If image data or processor inputs are invalid.
+            OSError: If image or checkpoint assets cannot be loaded.
+            RuntimeError: If model loading or generation fails. No partial batch is returned.
+        """
+        if not inputs:
+            return []
+        pages = [self.preprocess(image) for image in inputs]
+        self._ensure_model()
+        outputs: list[str] = []
+        for page in pages:
+            features = self._processor(
+                images=[page],
+                text=task_prompt if task_prompt is not None else self._task_prompt,
+                return_tensors="pt",
+                add_special_tokens=False,
+            ).to(self._device)
+            with torch.inference_mode():
+                sequences = self._model.generate(**features, generation_config=self._generation_config)
+            outputs.append(self._processor.batch_decode(sequences, skip_special_tokens=False)[0].strip())
+        return outputs
+
+    def __call__(self, input_data: ImageInput, task_prompt: str | None = None) -> str:
+        """Generate tagged text for a single page, delegating to :meth:`invoke`.
+
+        Args:
+            input_data: Page image accepted by :meth:`preprocess`.
+            task_prompt: Optional native control tokens overriding the configured prompt.
+
+        Returns:
+            Decoded text with coordinate and class tags preserved.
+
+        Raises:
+            TypeError: If the image type is unsupported.
+            ValueError: If image data or processor inputs are invalid.
+            OSError: If image or checkpoint assets cannot be loaded.
+            RuntimeError: If checkpoint loading or generation fails.
+        """
+        return self.invoke(input_data, task_prompt=task_prompt)
+
+    def unload(self) -> None:
+        """Release model tensors and cached CUDA allocations explicitly.
+
+        Subsequent inference reloads the pinned checkpoint. Repeated calls are safe.
+
+        Returns:
+            None.
+
+        Raises:
+            RuntimeError: If PyTorch cannot move model tensors off the device.
+        """
+        if self._model is not None:
+            self._model.to("cpu")
+            self._model = None
+        self._processor = None
+        self._generation_config = None
+        if self._device.type == "cuda" and torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+    @property
+    def model_name(self) -> str:
+        """Return the checkpoint's human-readable model name."""
+        return "Nemotron-3.5-Parse"
+
+    @property
+    def model_type(self) -> str:
+        """Return the document-parser model category."""
+        return "document-parse"
+
+    @property
+    def model_runmode(self) -> ModelRunMode:
+        """Return the local inference mode."""
+        return "local"
+
+    @property
+    def input(self) -> dict[str, Any]:
+        """Return the supported RGB image input schema."""
+        return {
+            "type": "image",
+            "format": "RGB",
+            "supported_inputs": ["PIL.Image", "path", "torch.Tensor", "np.ndarray"],
+        }
+
+    @property
+    def output(self) -> dict[str, str]:
+        """Return the tagged text output schema."""
+        return {"type": "text", "format": "string"}
+
+    @property
+    def input_batch_size(self) -> int:
+        """Return the number of pages generated concurrently (one)."""
+        return 1
