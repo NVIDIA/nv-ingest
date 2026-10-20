@@ -123,9 +123,16 @@ def build_lancedb_row(
     text_column: str = "text",
     include_text: bool = True,
     provenance_page: Optional[int] = None,
+    embedding: Any = None,
 ) -> Optional[Dict[str, Any]]:
-    """Build a single LanceDB-ready dict from a DataFrame row."""
-    embedding = extract_embedding_from_row(row, embedding_column=embedding_column)
+    """Build a single LanceDB-ready dict from a DataFrame row.
+
+    ``embedding``, when given, is used instead of reading ``embedding_column`` from ``row``.
+    """
+    if embedding is not None:
+        embedding = embedding_vector(embedding)
+    else:
+        embedding = extract_embedding_from_row(row, embedding_column=embedding_column)
     if embedding is None:
         return None
 
@@ -193,6 +200,9 @@ def build_lancedb_rows(
     # underscore-prefixed column names into positional _0, _1, etc.
     has_provenance = isinstance(df, pd.DataFrame) and "_page_number" in df.columns
     provenance_pages = df["_page_number"].tolist() if has_provenance else None
+    # Same for the embedding column: names like "my-vector" are not namedtuple fields.
+    has_embeddings = isinstance(df, pd.DataFrame) and embedding_column in df.columns
+    embeddings = df[embedding_column].tolist() if has_embeddings else None
 
     rows: List[Dict[str, Any]] = []
     for i, row in enumerate(df.itertuples(index=False)):
@@ -203,6 +213,7 @@ def build_lancedb_rows(
             text_column=text_column,
             include_text=include_text,
             provenance_page=pp,
+            embedding=embeddings[i] if embeddings is not None else None,
         )
         if row_out is not None:
             rows.append(row_out)

@@ -44,3 +44,22 @@ def test_build_lancedb_rows_from_arrow_df_skips_null_embeddings() -> None:
 
     assert len(row_out) == 1
     assert row_out[0]["vector"] == [0.5, 0.25]
+
+
+def test_build_lancedb_rows_reads_non_identifier_embedding_column() -> None:
+    frame = pd.DataFrame(
+        {
+            "path": ["/tmp/doc_d.pdf", "/tmp/doc_e.pdf"],
+            "page_number": [1, 2],
+            "text": ["first", "missing vector"],
+            "my-vector": pd.Series(
+                [[1.0, 0.0], None],
+                dtype=pd.ArrowDtype(pa.list_(pa.float32())),
+            ),
+        }
+    )
+
+    row_out = build_lancedb_rows(frame, embedding_column="my-vector")
+
+    assert len(row_out) == 1
+    assert row_out[0]["vector"] == [1.0, 0.0]
