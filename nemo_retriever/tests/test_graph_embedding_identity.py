@@ -143,6 +143,7 @@ def test_cli_default_is_resolved_by_selected_actor(tmp_path, monkeypatch, run_mo
     else:
         import pandas as pd
         from nemo_retriever.models.inference import runtime
+        from nemo_retriever.models.inference.main_text_embed import assign_embedding_columns
 
         assert embed_node.operator_class is _BatchEmbedCPUActor
         assert metadata["embedding_model_name"] == NEMOTRON_3_EMBED_MODEL
@@ -150,7 +151,12 @@ def test_cli_default_is_resolved_by_selected_actor(tmp_path, monkeypatch, run_mo
         # The CPU actor adds the hosted endpoint, then request construction must use N3.
         kwargs = build_embed_kwargs(params)
         kwargs["embedding_endpoint"] = _BatchEmbedCPUActor.DEFAULT_EMBED_INVOKE_URL
-        request = MagicMock(side_effect=lambda frame, **options: (frame, {}))
+        request = MagicMock(
+            side_effect=lambda frame, **options: (
+                assign_embedding_columns(frame, [[1.0]] * len(frame), [None] * len(frame), output_column="embedding"),
+                {},
+            )
+        )
         monkeypatch.setattr(runtime, "create_text_embeddings_for_df", request)
         runtime.embed_text_main_text_embed(pd.DataFrame([{"text": "document"}]), **kwargs)
         request.assert_called_once()

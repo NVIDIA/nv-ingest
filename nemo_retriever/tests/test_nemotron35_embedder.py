@@ -460,6 +460,7 @@ def test_image_without_remaining_text_budget_fails_before_embedding(monkeypatch)
 def test_runtime_runs_multimodal_admission_without_text_policy(monkeypatch):
     import pandas as pd
     from nemo_retriever.models.inference import runtime
+    from nemo_retriever.models.inference.main_text_embed import assign_embedding_columns
     from nemo_retriever.models.inference.embedding_input import (
         EmbeddingSplitChild,
         EmbeddingSplitPlan,
@@ -473,9 +474,9 @@ def test_runtime_runs_multimodal_admission_without_text_policy(monkeypatch):
             return EmbeddingSplitPlan(20, (EmbeddingSplitChild("abc", 0, 3), EmbeddingSplitChild("def", 3, 6)))
 
     def embed_group(frame, **kwargs):
-        result = frame.copy()
-        result["text_embeddings_1b_v2"] = [{"embedding": [1.0, 0.0], "error": None} for _ in range(len(frame))]
-        return result
+        return assign_embedding_columns(
+            frame, [[1.0, 0.0]] * len(frame), [None] * len(frame), output_column=kwargs["output_column"]
+        )
 
     monkeypatch.setattr(runtime, "_embed_group", embed_group)
     frame = pd.DataFrame([{"text": "abcdef", "_image_b64": "full_page", "metadata": {}}])
@@ -483,7 +484,7 @@ def test_runtime_runs_multimodal_admission_without_text_policy(monkeypatch):
     assert calls == [("abcdef", "full_page", False)]
     assert result.text.tolist() == ["abc", "def"]
     assert result._image_b64.tolist() == ["full_page", "full_page"]
-    assert result.text_embeddings_1b_v2_has_embedding.all()
+    assert result["embedding"].notna().all()
 
 
 @pytest.mark.parametrize("endpoint_key", ["embedding_endpoint", "embed_invoke_url"])

@@ -11,6 +11,7 @@ import pytest
 
 from nemo_retriever.graph.retriever import Retriever
 from nemo_retriever.models.inference.embedding_input import EmbeddingInputPolicy, prepare_embedding_inputs
+from nemo_retriever.models.inference.main_text_embed import assign_embedding_columns
 from nemo_retriever.operators.abstract_operator import AbstractOperator
 from nemo_retriever.operators.vdb import RetrieveVdbOperator
 from nemo_retriever.query.expansion import QUERY_INDEX_COLUMN, regroup_query_hits
@@ -32,9 +33,9 @@ class _SplitEmbed(AbstractOperator):
     def process(self, data, **kwargs):
         policy = EmbeddingInputPolicy(_CharacterTokenizer(), 128, "q:")
         out = prepare_embedding_inputs(data, policy=policy).frame
-        metadata = out["metadata"] if "metadata" in out else [None] * len(out)
-        out["metadata"] = [{**(md or {}), "embedding": [float(i)]} for i, md in enumerate(metadata)]
-        return out
+        return assign_embedding_columns(
+            out, [[float(i)] for i in range(len(out))], [None] * len(out), output_column="embedding"
+        )
 
     def postprocess(self, data, **kwargs):
         return data
