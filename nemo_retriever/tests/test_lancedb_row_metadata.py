@@ -18,7 +18,7 @@ def test_build_lancedb_row_persists_normalized_content_type() -> None:
         _content_type="table_caption",
     )
 
-    row_out = build_lancedb_row(row)
+    row_out = build_lancedb_row(row, embedding=row.embedding)
 
     assert row_out is not None
     assert row_out["vector"] == [0.5, 0.25]

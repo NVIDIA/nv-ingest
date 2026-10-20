@@ -620,7 +620,7 @@ def _append_ordered_transform_stages(
             vdb_op=vdb_upload_params.vdb_op,
             vdb_kwargs=vdb_kwargs,
             _embedding_params=embed_params if infer_identity else None,
-            embedding_column=getattr(embed_params, "output_column", "embedding") or "embedding",
+            embedding_column=embed_params.output_column if embed_params is not None else "embedding",
         )
 
     if webhook_params is not None and getattr(webhook_params, "endpoint_url", None):

@@ -120,13 +120,11 @@ def assign_embedding_columns(
         [len(vector) if not is_missing else 0 for vector, is_missing in zip(vectors, mask)], dtype=np.int32
     )
     offsets = np.concatenate((np.zeros(1, dtype=np.int32), np.cumsum(lengths, dtype=np.int32)))
-    if present:
-        try:
-            values = np.asarray(present, dtype=np.float32).reshape(-1)
-        except ValueError:
-            values = np.concatenate([np.asarray(vector, dtype=np.float32).reshape(-1) for vector in present])
-    else:
-        values = np.empty(0, dtype=np.float32)
+    values = (
+        np.concatenate([np.asarray(vector, dtype=np.float32).reshape(-1) for vector in present])
+        if present
+        else np.empty(0, dtype=np.float32)
+    )
 
     array = pa.ListArray.from_arrays(
         pa.array(offsets, pa.int32()),

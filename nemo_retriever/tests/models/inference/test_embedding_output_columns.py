@@ -241,3 +241,17 @@ def test_text_embed_gpu_actor_failure_returns_typed_error_columns(monkeypatch) -
 def test_assign_embedding_columns_rejects_mismatched_lengths() -> None:
     with pytest.raises(ValueError, match="same length"):
         assign_embedding_columns(pd.DataFrame({"text": ["one"]}), [], [], output_column="embedding")
+
+
+def test_assign_embedding_columns_keeps_each_vector_length() -> None:
+    frame = pd.DataFrame({"text": ["a", "b", "c"]})
+
+    result = assign_embedding_columns(
+        frame, [np.array([1.0, 2.0]), None, [3.0, 4.0, 5.0]], [None, "embed: failed", None], output_column="embedding"
+    )
+
+    _assert_embedding_types(result)
+    first, missing, last = result["embedding"].tolist()
+    assert list(first) == [1.0, 2.0]
+    assert pd.isna(missing)
+    assert list(last) == [3.0, 4.0, 5.0]

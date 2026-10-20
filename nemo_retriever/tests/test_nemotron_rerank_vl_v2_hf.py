@@ -422,7 +422,7 @@ class TestLanceDBStoredImageURI:
         row._content_type = "text"
         row._bbox_xyxy_norm = None
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == "file:///tmp/page_1.png"
         assert result["content_type"] == "text"
@@ -440,7 +440,7 @@ class TestLanceDBStoredImageURI:
         row._content_type = None
         row._bbox_xyxy_norm = None
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == ""
 
@@ -453,6 +453,6 @@ class TestLanceDBStoredImageURI:
         row.page_number = 1
         row.text = "hello"
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == ""

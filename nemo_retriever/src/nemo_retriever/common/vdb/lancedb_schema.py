@@ -13,15 +13,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from nemo_retriever.common.vdb.records import embedding_vector, normalize_content_type
 
 
-def extract_embedding_from_row(
-    row: Any,
-    *,
-    embedding_column: str = "embedding",
-) -> Optional[List[float]]:
-    """Extract an embedding vector from a row."""
-    return embedding_vector(getattr(row, embedding_column, None))
-
-
 def extract_source_path_and_page(row: Any, *, provenance_page: Optional[int] = None) -> Tuple[str, int]:
     """Best-effort extract of source path and page number from a row.
 
@@ -119,20 +110,13 @@ def update_metadata_with_content_type(metadata_obj: Dict[str, Any], *, content_t
 def build_lancedb_row(
     row: Any,
     *,
-    embedding_column: str = "embedding",
+    embedding: Any,
     text_column: str = "text",
     include_text: bool = True,
     provenance_page: Optional[int] = None,
-    embedding: Any = None,
 ) -> Optional[Dict[str, Any]]:
-    """Build a single LanceDB-ready dict from a DataFrame row.
-
-    ``embedding``, when given, is used instead of reading ``embedding_column`` from ``row``.
-    """
-    if embedding is not None:
-        embedding = embedding_vector(embedding)
-    else:
-        embedding = extract_embedding_from_row(row, embedding_column=embedding_column)
+    """Build a single LanceDB-ready dict from a DataFrame row and its embedding vector."""
+    embedding = embedding_vector(embedding)
     if embedding is None:
         return None
 
@@ -201,7 +185,7 @@ def build_lancedb_rows(
     has_provenance = isinstance(df, pd.DataFrame) and "_page_number" in df.columns
     provenance_pages = df["_page_number"].tolist() if has_provenance else None
     # Same for the embedding column: names like "my-vector" are not namedtuple fields.
-    embeddings = None
+    embeddings = [None] * len(df)
     if isinstance(df, pd.DataFrame) and embedding_column in df.columns:
         embedding_values = df[embedding_column]
         if isinstance(embedding_values, pd.DataFrame):
@@ -213,11 +197,10 @@ def build_lancedb_rows(
         pp = int(provenance_pages[i]) if provenance_pages is not None else None
         row_out = build_lancedb_row(
             row,
-            embedding_column=embedding_column,
+            embedding=embeddings[i],
             text_column=text_column,
             include_text=include_text,
             provenance_page=pp,
-            embedding=embeddings[i] if embeddings is not None else None,
         )
         if row_out is not None:
             rows.append(row_out)
