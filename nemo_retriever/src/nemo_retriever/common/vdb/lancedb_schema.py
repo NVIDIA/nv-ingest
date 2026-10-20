@@ -201,8 +201,12 @@ def build_lancedb_rows(
     has_provenance = isinstance(df, pd.DataFrame) and "_page_number" in df.columns
     provenance_pages = df["_page_number"].tolist() if has_provenance else None
     # Same for the embedding column: names like "my-vector" are not namedtuple fields.
-    has_embeddings = isinstance(df, pd.DataFrame) and embedding_column in df.columns
-    embeddings = df[embedding_column].tolist() if has_embeddings else None
+    embeddings = None
+    if isinstance(df, pd.DataFrame) and embedding_column in df.columns:
+        embedding_values = df[embedding_column]
+        if isinstance(embedding_values, pd.DataFrame):
+            embedding_values = embedding_values.iloc[:, 0]
+        embeddings = embedding_values.tolist()
 
     rows: List[Dict[str, Any]] = []
     for i, row in enumerate(df.itertuples(index=False)):

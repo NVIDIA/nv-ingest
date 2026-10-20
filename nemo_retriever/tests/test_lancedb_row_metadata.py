@@ -63,3 +63,12 @@ def test_build_lancedb_rows_reads_non_identifier_embedding_column() -> None:
 
     assert len(row_out) == 1
     assert row_out[0]["vector"] == [1.0, 0.0]
+
+
+def test_build_lancedb_rows_uses_first_duplicate_embedding_column() -> None:
+    frame = pd.DataFrame([["/tmp/doc_f.pdf", [1.0, 0.0], [0.0, 1.0]]], columns=["path", "embedding", "embedding"])
+
+    row_out = build_lancedb_rows(frame)
+
+    assert len(row_out) == 1
+    assert row_out[0]["vector"] == [1.0, 0.0]
