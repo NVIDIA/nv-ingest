@@ -84,6 +84,10 @@ def test_embedding_nim_uses_native_runtime_and_matching_client_model() -> None:
         "--silent",
         "http://localhost:8000/v1/health/ready",
     ]
+    # A service-level healthcheck replaces the entire inherited mapping.
+    inherited_healthcheck = compose["x-nim-service"]["healthcheck"]
+    for setting in ("interval", "timeout", "retries", "start_period"):
+        assert service["healthcheck"][setting] == inherited_healthcheck[setting]
     # The preset must select the served alias for both ingestion and queries.
     assert f"NIM_EMBED_MODEL={model}" in CORE_PRESET.read_text(encoding="utf-8").splitlines()
     config = compose["configs"]["retriever_service_config"]["content"]

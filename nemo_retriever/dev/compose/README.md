@@ -109,6 +109,8 @@ a separate runtime cache mounts at the fixed path `/opt/cache`.
 `NIM_EMBED_MODEL_PATH` configures both the model mount and engine artifact
 path. `NIM_EMBED_MODEL_VOLUME` and `NIM_EMBED_CACHE_VOLUME` select the
 persistent volumes for weights and the runtime cache.
+Compose checks `/v1/health/ready` every 15 seconds, with a 10-second timeout,
+a 120-second startup grace period, and 40 retries before marking the NIM unhealthy.
 Set `NIM_EMBED_IMAGE` and `NIM_EMBED_TAG` to select another image.
 For supported models and GPUs, refer to the
 [Embedding NIM 2.4 support matrix](https://docs.nvidia.com/nim/nemo-retriever/embedding/2.4/support-matrix.html).

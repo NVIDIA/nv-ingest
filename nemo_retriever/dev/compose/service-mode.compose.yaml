@@ -188,6 +188,10 @@ services:
       - "nim_embedding_model:${NIM_EMBED_MODEL_PATH:-/model}"
     healthcheck:
       test: [CMD, curl, --fail, --silent, http://localhost:8000/v1/health/ready]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
     deploy: {resources: {reservations: {devices: [{<<: *nim-gpu, device_ids: ["${NIM_EMBED_GPU_ID:-3}"]}]}}}
 
   nim-reranker:

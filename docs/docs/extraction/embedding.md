@@ -43,6 +43,10 @@ selects NVFP4 on supported GPUs and the BF16 checkpoint with FP16 execution
 on other supported GPUs. The matching `nims-core.env` preset uses
 `nvidia/nemotron-3.5-embed-1b` for ingestion and query embedding.
 This served alias does not select the checkpoint or precision.
+For client-side input validation and splitting, the library resolves the alias
+to the revision-pinned `nvidia/Nemotron-3.5-Embed-1B-BF16` tokenizer and input
+policy. HTTP embedding requests retain the served alias, including when the
+NIM selects NVFP4.
 The default modality remains `text`.
 For startup commands and cache configuration, refer to the
 [development Compose README](https://github.com/NVIDIA/NeMo-Retriever/blob/main/nemo_retriever/dev/compose/README.md#self-hosted-nim-profiles).
