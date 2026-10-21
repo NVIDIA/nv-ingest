@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Text-only Nemotron-3 Embed 1B on RTX PRO 6000 Blackwell (SM120).
+# Use a fresh cache/PVC; existing BF16 weights are not converted.
+nimOperator:
+  vlm_embed:
+    # Label compatible SM120 nodes accelerator=sm120, or use your cluster
+    # selector. Without a matching node, cache and service pods stay Pending.
+    nodeSelector:
+      accelerator: sm120
+    modelProfile:
+      gpus:
+        - ids: ["2BB5"]
+    cacheEnv:
+      - name: NIM_ENGINE_PRECISION
+        value: nvfp4
+    env:
+      - name: NIM_HTTP_API_PORT
+        value: "8000"
+      - name: NIM_TRITON_LOG_VERBOSE
+        value: "1"
+      - name: OMP_NUM_THREADS
+        value: "1"
+      - name: NIM_ENGINE_COUNT
+        value: "1"
+      - name: NIM_ENGINE_PRECISION
+        value: nvfp4

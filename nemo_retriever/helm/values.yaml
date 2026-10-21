@@ -1267,6 +1267,11 @@ nimOperator:
     # Per-NIM NIMCache GPU/profile filter. See `nimOperator.modelProfile`
     # above for the shape; non-empty REPLACES the chart-wide default.
     modelProfile: {}
+    # Extra environment for the NIMCache download job only. Use this to
+    # select model artifacts explicitly when caching without GPU access.
+    # For Nemotron-3 Embed 1B on SM120, set NIM_ENGINE_PRECISION=nvfp4.
+    # Service runtime settings remain in `env` below.
+    cacheEnv: []
     storage:
       pvc:
         create: true

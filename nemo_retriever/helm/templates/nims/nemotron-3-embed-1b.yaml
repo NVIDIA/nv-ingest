@@ -7,6 +7,10 @@ metadata:
   name: {{ $name }}
   {{- include "nemo-retriever.nimcache.keepPolicy" . | nindent 2 }}
 spec:
+  {{- with .Values.nimOperator.vlm_embed.cacheEnv }}
+  env:
+{{ toYaml . | indent 4 }}
+  {{- end }}
   source:
     ngc:
       modelPuller: "{{ .Values.nimOperator.vlm_embed.image.repository }}:{{ .Values.nimOperator.vlm_embed.image.tag }}"

@@ -1268,6 +1268,7 @@ gated on three conditions ALL holding:
 | `nimOperator.vlm_embed.nimServiceName` | `nemotron-3-embed-1b` | NIMService / in-cluster DNS name. |
 | `nimOperator.vlm_embed.image`          | `nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.2` | Default text embed NIM image. |
 | `nimOperator.vlm_embed.env` | `NIM_HTTP_API_PORT=8000`, `NIM_TRITON_LOG_VERBOSE=1`, `OMP_NUM_THREADS=1`, `NIM_ENGINE_COUNT=1` | Environment for the default text embed NIM. Overrides replace the complete list. `NIM_PERFORMANCE_MODE=1` is optional. |
+| `nimOperator.vlm_embed.cacheEnv` | `[]` | Environment for the embedding NIMCache download job (`spec.env`), separate from the NIMService `env` list. Empty omits the field. |
 | `nimOperator.rerankqa.enabled`         | `false` | VL reranker NIM (optional). Set `true` to opt in — refer to [Query-time reranking](#query-time-reranking). Default `false` so chart installs honor the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md) and do not silently provision an extra ≈ 3.1 GiB GPU NIM. The image points at the **VL** SKU (`llama-nemotron-rerank-vl-1b-v2`) per [prerequisites-support-matrix.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/prerequisites-support-matrix.md#default-helm-nims) — the text-only `llama-nemotron-rerank-1b-v2` silently degrades multimodal reranking and is not the documented POR. |
 | `nimOperator.rerankqa.image`           | `nvcr.io/nim/nvidia/llama-nemotron-rerank-vl-1b-v2:2.3.0` | Default optional VL reranker NIM image. |
 | `nimOperator.nemotron_parse.enabled`   | `false` | Structured-parse NIM (optional). Set `true` to deploy Parse. Enabling this NIM also sets the default PDF extract method to `nemotron_parse`. Default `false` so chart installs honor the "optional and disabled by default" contract in [deployment-options.md](https://github.com/NVIDIA/NeMo-Retriever/blob/main/docs/docs/extraction/deployment-options.md). Image tags follow the [image tag conventions](#image-tag-conventions). |
@@ -1396,6 +1397,36 @@ Tips:
 - Run `ngc registry model list-profiles nvcr.io/nim/nvidia/<image>:<tag>` to enumerate the available profiles for any chart-pinned NIM image and pick the smallest profile that matches your GPU.
 - Filter mismatches surface as `NIMCache` events such as `NoCompatibleProfile`; check with `kubectl describe nimcache <name>`.
 - Empty effective cache configurations preserve operator profile discovery, including the default `answer_llm` configuration.
+
+#### Nemotron 3 Embed on SM120 { #nemotron-3-embed-sm120 }
+
+For `nemotron-3-embed-1b:2.2.2` on RTX PRO 6000 Blackwell (SM120), use
+[the SM120 example](./examples/values-nemotron-3-embed-sm120.yaml) to set
+`NIM_ENGINE_PRECISION=nvfp4` for both the cache download and the service.
+This avoids caching BF16 weights that lack the scale tensors required by
+the NVFP4 runtime. The GPU profile filter alone does not select precision
+or constrain scheduling.
+
+The example selects nodes with the administrator-assigned label
+`accelerator=sm120`. Label only nodes whose allocatable GPUs are all
+compatible SM120 GPUs, or replace the selector with equivalent existing
+cluster labels. A node selector cannot choose between GPU types within a
+mixed-GPU node. Without a matching eligible node, the service pod stays Pending.
+
+`nimOperator.vlm_embed.cacheEnv` configures only the NIMCache download job;
+`nimOperator.vlm_embed.env` configures the NIMService. These lists are
+independent. The example preserves the default service environment entries
+because overriding `env` replaces the complete list.
+
+Use a fresh NIMCache and empty PVC; changing precision does not convert
+existing BF16 weights. Prepare a new namespace with the required NGC
+Secrets and storage settings, then append
+`-f nemo_retriever/helm/examples/values-nemotron-3-embed-sm120.yaml`
+to your Helm installation command.
+
+Confirm the download selects NVFP4, the NIMService becomes ready, and a text
+`/v1/embeddings` request succeeds. Cache readiness alone does not verify
+that the service can load the weights.
 
 #### Image tag conventions { #image-tag-conventions }
 

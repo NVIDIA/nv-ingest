@@ -285,6 +285,18 @@ For the Helm env list contract, refer to
 
 
 
+## Nemotron 3 Embed fails with a missing weight scale on SM120 { #nemotron-3-embed-sm120-weight-scale }
+
+On RTX PRO 6000 Blackwell (SM120), `nemotron-3-embed-1b:2.2.2` can fail
+with missing `layers.0.self_attn.q_proj.weight_scale` even when NIMCache
+reports Ready. A cache job without GPU visibility can download BF16
+weights while the service selects NVFP4, which requires quantization
+scale tensors absent from that checkpoint.
+
+Configure both the cache and service for NVFP4 and use a fresh cache.
+For the override file, installation instructions, and verification, refer to
+[Nemotron 3 Embed on SM120](https://github.com/NVIDIA/NeMo-Retriever/blob/main/nemo_retriever/helm/README.md#nemotron-3-embed-sm120).
+
 ## ModuleNotFoundError: No module named open_clip when using nemotron_parse { #modulenotfounderror-no-module-named-open-clip-when-using-nemotron-parse }
 
 When you run PDF extraction with `method="nemotron_parse"`, you might see an error similar to the following:
