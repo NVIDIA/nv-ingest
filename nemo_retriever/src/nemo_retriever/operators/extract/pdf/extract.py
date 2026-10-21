@@ -347,7 +347,14 @@ def pdf_extraction(
                 try:
                     # we can safely assume page[0] only because pre-splitting has already occurred.
                     page = doc.get_page(0)
-                    is_scanned_page = _is_scanned_page(page)
+                    # Reuse native text for scan detection and the output row.
+                    # Previously both paths built a PDFium text page.
+                    page_text = _extract_page_text(page) if extract_text else ""
+                    is_scanned_page = bool(
+                        extract_text
+                        and text_extraction_method == "pdfium_hybrid"
+                        and _is_scanned_page(page, page_text=page_text)
+                    )
 
                     ocr_extraction_needed_for_text = extract_text and (
                         (text_extraction_method == "pdfium_hybrid" and is_scanned_page)
@@ -363,7 +370,6 @@ def pdf_extraction(
 
                     # Text extraction
                     if extract_text and not ocr_extraction_needed_for_text:
-                        page_text = _extract_page_text(page)
                         # TODO: Tiddy up logic here for document depth option
                         if text_depth == "page":
                             text = page_text
