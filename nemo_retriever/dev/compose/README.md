@@ -102,9 +102,40 @@ docker compose \
 
 The `nim-caption` profile defaults to `nvcr.io/nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:2.0.4-variant`. Set `NIM_CAPTION_IMAGE` or `NIM_CAPTION_TAG` only when you need a different registry or image tag.
 
+The `nim-parse` profile defaults to `nvcr.io/nim/nvidia/nemotron-parse:latest`.
+Set `NIM_PARSE_IMAGE` and `NIM_PARSE_TAG` to select another registry path or tag.
+The Parse profile starts the NIM without selecting it for ingestion.
+Nemotron 3.5 Parse uses native `POST /v1/parse` with a multipart `document`
+image upload, rather than `/v1/chat/completions`. The container selects the
+model; the native request does not include a model field.
+
+To use this NIM for extraction, configure the following fields in the retriever
+service configuration. This URL is reachable from the retriever container on
+the Compose network. A client outside that network uses
+`http://localhost:8006/v1/parse` with the default host port.
+
+```yaml
+nim_endpoints:
+  nemotron_parse_invoke_url: http://nim-nemotron-parse:8000/v1/parse
+  nemotron_parse_model: nvidia/nemotron-3.5-parse
+```
+
+The model ID labels the configuration; it is not sent in the native multipart
+request. The library renders PDF pages and uploads each page as an image.
+The API returns extracted content in `content`. When it contains bounding-box
+and class tags, the library uses its existing tagged-content postprocessor to
+produce clean page text and the selected table, chart, and infographic elements.
+For untagged Markdown, the library preserves whole-page content in page `text`,
+including inline tables. This fallback requires text extraction to be enabled.
+
+The image has no `/bin/sh`. Compose uses
+`nemotron-parse-server --health-check` for readiness and persists its engine
+cache at `/opt/cache`. `NIM_PARSE_CACHE_PATH` changes both the volume mount and
+`NIM_ENGINE_PRECOMPILE_CACHE_DIR`.
+
 Reranker and Parse need only `--profile nim-reranker` or
 `--profile nim-parse`. They are lifecycle/API-only and intentionally are not
-injected into retriever service configuration, matching Helm.
+injected into retriever service configuration by Compose.
 
 Every NIM has a persistent model or cache volume, a configurable GPU assignment, and a
 configurable host port. Variables follow the service prefix, for example
