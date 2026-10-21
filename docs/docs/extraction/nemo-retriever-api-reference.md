@@ -152,13 +152,15 @@ error lists the supported values, so spelling and configuration errors do not
 silently select another extraction path.
 
 For local `nemotron_parse` extraction, omit `nemotron_parse_model` to use
-`nvidia/NVIDIA-Nemotron-Parse-v1.2` through vLLM. To opt into Nemotron Parse 3.5,
-set `nemotron_parse_model="nvidia/Nemotron-3.5-Parse"` without an invoke URL.
-This model runs through Transformers on a CUDA GPU with BF16 weights, not
-through vLLM. Install the local GPU and Parse dependencies with
+`nvidia/Nemotron-3.5-Parse` through Transformers on a CUDA GPU with BF16 weights,
+not through vLLM. You can also select this checkpoint explicitly with
+`nemotron_parse_model="nvidia/Nemotron-3.5-Parse"`. To retain the local v1.2
+vLLM path, set `nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-v1.2"`.
+Do not configure an invoke URL for either local path. Install the local GPU
+and Parse dependencies with
 `pip install "nemo-retriever[local,nemotron-parse]"`.
 
-The following example explicitly selects the local Parse 3.5 checkpoint.
+The following example uses the default local Parse 3.5 checkpoint.
 
 ```python
 from nemo_retriever import create_ingestor
@@ -170,7 +172,6 @@ result = (
     .extract(
         ExtractParams(
             method="nemotron_parse",
-            nemotron_parse_model="nvidia/Nemotron-3.5-Parse",
         )
     )
     .ingest()
@@ -181,7 +182,7 @@ The Parse 3.5 adapter loads checkpoint custom code with
 `trust_remote_code=True` at the revision pinned in the model registry. Review
 the checkpoint code before use. It retains the existing task prompt, which
 disables text prediction inside pictures. The default extraction method
-remains `pdfium_hybrid`; the local Parse default remains v1.2.
+remains `pdfium_hybrid`; select `method="nemotron_parse"` to use Parse.
 
 Other local Parse model values, including
 `nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before
