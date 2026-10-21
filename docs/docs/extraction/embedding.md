@@ -29,11 +29,33 @@ Before changing an existing index's model or precision, validate retrieval quali
 
 ## Remote and Helm defaults
 
-Remote embedding and Helm retain the text-only Nemotron 3 Embed 1B default, with logical model ID `nvidia/nemotron-3-embed-1b`. An explicitly selected Nemotron 3 model also retains its existing local resolution behavior.
+Hosted embedding and Helm retain the text-only Nemotron 3 Embed 1B default, with logical model ID `nvidia/nemotron-3-embed-1b`. An explicitly selected Nemotron 3 model also retains its existing local resolution behavior.
 
 When graph execution selects the CPU embedding actor without an explicit endpoint, it calls `https://integrate.api.nvidia.com/v1/embeddings`. This hosted fallback retains the Nemotron 3 default and records that model on the index. Set `NVIDIA_API_KEY` or `NGC_API_KEY` before ingest.
 
 Helm deploys `nvcr.io/nim/nvidia/nemotron-3-embed-1b:2.2.2`. The NIM selects a supported NVFP4 or BF16 engine automatically. For NIM product details, refer to the [NeMo Retriever Text Embedding NIM documentation](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html).
+
+## Development Compose defaults
+
+The development service Compose `nims-core` profile uses
+`nvcr.io/nim/nvidia/nemotron-embed:latest`. The native runtime automatically
+selects NVFP4 on supported GPUs and the BF16 checkpoint with FP16 execution
+on other supported GPUs. The matching `nims-core.env` preset uses
+`nvidia/nemotron-3.5-embed-1b` for ingestion and query embedding.
+This served alias does not select the checkpoint or precision.
+The default modality remains `text`.
+For startup commands and cache configuration, refer to the
+[development Compose README](https://github.com/NVIDIA/NeMo-Retriever/blob/main/nemo_retriever/dev/compose/README.md#self-hosted-nim-profiles).
+
+Before migrating an existing Nemotron 3 index, back up its data and rebuild
+and re-ingest the affected tables or collections. Matching vector dimensions
+do not make embeddings from different models compatible. Follow
+[Keep the embedding model aligned](vdbs.md#lancedb-embedding-model-compatibility)
+and evaluate retrieval quality on representative data.
+Changing GPU hardware can change the selected checkpoint or precision.
+Validate retrieval quality and rebuild and re-ingest affected collections
+when their embedding model or precision changes, even if the API alias stays
+the same.
 
 ## Example with Default Text-Based Embedding { #example-with-default-text-based-embedding }
 
@@ -180,7 +202,7 @@ ingestor = (
 results = ingestor.ingest()
 ```
 
-For a remote endpoint, explicitly select a multimodal model that the endpoint supports. The default Nemotron 3 embedding NIM is text-only.
+For a remote endpoint, explicitly select a multimodal model that the endpoint supports. The hosted and Helm Nemotron 3 defaults are text-only.
 
 ## Example with Embedding Entire PDF Pages as Images { #example-with-embedding-entire-pdf-pages-as-images }
 
