@@ -59,14 +59,20 @@ def test_multipart_upload_retries_with_identical_bytes_and_keeps_page_order(monk
 
 
 @pytest.mark.parametrize(
-    "payload", [{"text": "wrong contract"}, {"content": 17}, {"content": "partial", "finish_reason": "length"}]
+    "payload,recovery",
+    [
+        ({"text": "wrong contract"}, "Verify invoke_url targets.*native multipart /v1/parse"),
+        ({"content": 17}, "Verify invoke_url targets.*native multipart /v1/parse"),
+        ({"content": "partial", "finish_reason": "length"}, "Split this page into smaller image regions"),
+    ],
 )
-def test_invalid_or_truncated_native_responses_fail(monkeypatch, payload):
+def test_invalid_or_truncated_native_responses_fail(monkeypatch, payload, recovery):
     monkeypatch.setattr(nim.requests, "post", lambda *args, **kwargs: response(payload))
     client = nim.NIMClient()
     try:
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match=recovery) as exc_info:
             client.invoke_parse_pages(invoke_url="http://nim/v1/parse", image_b64_list=["aW1hZ2U="])
+        assert "page 1" in str(exc_info.value)
     finally:
         client.shutdown()
 
