@@ -432,6 +432,15 @@ Additional identity and geometry columns are `page_number`, `source_path`,
 `page_number` is zero-based. Bounding boxes refer to the coordinate space
 recorded in `bbox_coordinate_space`, not directly to source PDF coordinates.
 
+Cropping `Picture` elements in `normalized_page_content` coordinates requires
+the optional model-team `nemotron-parse` package. This applies to tagged native
+Parse 3.5 `/v1/parse` output as well as served 3.5 output. Follow the
+[pinned package installation and client plugin guidance](multimodal-extraction.md#served-nemotron-35-parse).
+If the package cannot be imported, the writer emits one `materialize_error`
+row for the affected page and continues exporting other pages. Native
+`/v1/parse` requests, native-schema output, and interleaved pages without those
+picture crops do not require this package.
+
 `passthrough_columns` copies explicitly selected input columns onto page
 output rows. Missing selected values become null. Names must not collide with
 the reserved or identity/geometry columns. Native output already keeps every

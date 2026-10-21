@@ -127,7 +127,13 @@ def _crop_picture_bytes(page_image: object, bbox: Sequence[float], *, coordinate
         return None
 
     if coordinate_space == "normalized_page_content":
-        from nemotron_parse.postprocessing import transform_bbox_to_original
+        try:
+            from nemotron_parse.postprocessing import transform_bbox_to_original
+        except ImportError as exc:
+            raise ValueError(
+                "Parse 3.5 interleaved picture crops require the optional nemotron-parse package. "
+                "Install the pinned model package with --no-deps as described in the Parse documentation."
+            ) from exc
     else:
         from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import transform_bbox_to_original
 

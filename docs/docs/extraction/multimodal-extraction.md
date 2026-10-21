@@ -75,6 +75,16 @@ library's local vLLM runtime. Apply it to the client environment only. The
 separate Parse server must use its validated runtime and load its own Parse
 plugin; do not give that server the client allowlist.
 
+Native NIM `/v1/parse` requests and native-schema Parquet output do not require
+this optional model-team package. However, interleaved export uses its geometry
+helper to crop Parse 3.5 `Picture` elements in `normalized_page_content`
+coordinates. Install the pinned package above and apply the client plugin
+allowlist when you need those crops. If the package cannot be imported, the
+writer records the affected page in `materialize_error` and continues exporting
+other pages. Native NIM pages without these picture crops do not need the
+package. Refer to [interleaved Parquet output](nemo-retriever-api-reference.md#interleaved-parquet-output)
+for the page-validation contract.
+
 Configure the server's OpenAI-compatible `/v1/chat/completions` endpoint and
 set `nemotron_parse_model` explicitly. The following example assumes that the
 server exposes `nvidia/Nemotron-3.5-Parse` as its served model name.

@@ -404,3 +404,35 @@ def test_interleaved_picture_coordinates_follow_model_frame(size, parse35):
             )
             assert result["binary_content"] == base64.b64decode(legacy)
             assert result["bbox_coordinate_space"] == "normalized_1664x2048_padded_canvas"
+
+
+def test_missing_optional_geometry_keeps_failed_picture_page_and_text_sibling(tmp_path, monkeypatch):
+    import base64
+    import io
+    import sys
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    with Image.new("RGB", (220, 170), "green") as image:
+        image.save(buffer, format="PNG")
+    picture = _page(
+        1, page_image={"image_b64": base64.b64encode(buffer.getvalue()).decode(), "orig_shape_hw": [170, 220]}
+    )
+    picture["nemotron_parse_v1_2"].update(
+        raw_output="<x_0.1><y_0.1>figure<x_0.9><y_0.9><class_Picture>", bbox_coordinate_space="normalized_page_content"
+    )
+    text = _page(2)
+    text["nemotron_parse_v1_2"]["bbox_coordinate_space"] = "normalized_page_content"
+    monkeypatch.setitem(sys.modules, "nemotron_parse.postprocessing", None)
+    target = tmp_path / "optional-geometry"
+    ParquetDatasetWriter(str(target), output_schema="interleaved").write_batches([pd.DataFrame([picture, text])])
+    rows = pq.read_table(target).to_pylist()[1:]
+    assert len(rows) == 2
+    assert rows[0]["page_number"] == 0
+    error = json.loads(rows[0]["materialize_error"])
+    assert error["stage"] == "interleaved_projection"
+    assert "optional nemotron-parse package" in error["message"]
+    assert rows[1]["page_number"] == 1
+    assert rows[1]["text_content"] == "hello"
+    assert rows[1]["materialize_error"] is None
+    assert (target / "_SUCCESS").exists()
