@@ -847,7 +847,7 @@ def build_graph(
                 detect_kwargs["inference_batch_size"] = int(extract_params.inference_batch_size)
 
             ocr_kwargs: dict[str, Any] = {}
-            if extract_params.method in ("pdfium_hybrid", "ocr") and extract_params.extract_text:
+            if extract_params.extract_text:
                 ocr_kwargs["extract_text"] = True
             if extract_params.extract_tables:
                 ocr_kwargs["extract_tables"] = True

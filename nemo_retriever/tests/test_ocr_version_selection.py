@@ -333,3 +333,266 @@ def test_table_structure_actor_receives_ocr_selectors(monkeypatch) -> None:
     table_kwargs = next(kwargs for name, kwargs in captured_kwargs if name == "TableStructureActor")
     assert table_kwargs.get("ocr_version") == "v2"
     assert table_kwargs.get("ocr_lang") == "english"
+
+
+# ---------------------------------------------------------------------------
+# Regression tests for Issue #2443 — default pipeline skips OCR extract_text
+# ---------------------------------------------------------------------------
+
+
+def test_default_pdfium_method_includes_ocr_when_extract_text_true() -> None:
+    """Default method='pdfium' must still include OCRActor when extract_text=True.
+
+    Regression test for https://github.com/NVIDIA/NeMo-Retriever/issues/2443.
+    Previously the OCR stage was only appended when method was 'pdfium_hybrid'
+    or 'ocr', causing the default pipeline to skip text extraction for scanned
+    images and PDFs.
+    """
+    graph = build_graph(
+        extract_params=ExtractParams(
+            method="pdfium",
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_infographics=False,
+        ),
+        embed_params=EmbedParams(
+            model_name="nvidia/llama-nemotron-embed-1b-v2",
+            embed_invoke_url="http://embed.example/v1",
+        ),
+    )
+
+    nodes = _linear_nodes(graph)
+    classes = [node.operator_class for node in nodes]
+    assert OCRActor in classes
+    ocr_node = next(node for node in nodes if node.operator_class is OCRActor)
+    assert ocr_node.operator_kwargs.get("extract_text") is True
+
+
+def test_default_pdfium_method_excludes_ocr_when_extract_text_false() -> None:
+    """method='pdfium' with extract_text=False must not include OCRActor."""
+    graph = build_graph(
+        extract_params=ExtractParams(
+            method="pdfium",
+            extract_text=False,
+            extract_tables=False,
+            extract_charts=False,
+            extract_infographics=False,
+        ),
+        embed_params=EmbedParams(
+            model_name="nvidia/llama-nemotron-embed-1b-v2",
+            embed_invoke_url="http://embed.example/v1",
+        ),
+    )
+
+    nodes = _linear_nodes(graph)
+    classes = [node.operator_class for node in nodes]
+    assert OCRActor not in classes
+
+
+def test_ocr_stage_needed_true_for_default_method_extract_text() -> None:
+    """_ocr_stage_needed must return True when extract_text=True regardless of method."""
+    from nemo_retriever.operators.graph_ops.multi_type_extract_operator import _ocr_stage_needed
+
+    params = ExtractParams(method="pdfium", extract_text=True)
+    assert _ocr_stage_needed(params) is True
+
+
+def test_ocr_stage_needed_false_when_extract_text_disabled() -> None:
+    """_ocr_stage_needed must return False when extract_text=False and no other OCR flags."""
+    from nemo_retriever.operators.graph_ops.multi_type_extract_operator import _ocr_stage_needed
+
+    params = ExtractParams(
+        method="pdfium",
+        extract_text=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_infographics=False,
+    )
+    assert _ocr_stage_needed(params) is False
+
+
+def test_detection_pipeline_includes_ocr_for_default_method(monkeypatch) -> None:
+    """In-process detection pipeline must include OCR when method='pdfium' and extract_text=True."""
+    from nemo_retriever.operators.graph_ops.multi_type_extract_operator import MultiTypeExtractCPUActor
+    from nemo_retriever.common.ray_resource_hueristics import Resources
+    import pandas as pd
+
+    calls = []
+
+    class _IdentityStage:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+
+        def run(self, data):
+            return data
+
+    def _fake_resolve(operator_class, resources, operator_kwargs=None):
+        calls.append(operator_class.__name__)
+        return _IdentityStage
+
+    monkeypatch.setattr(
+        "nemo_retriever.operators.graph_ops.multi_type_extract_operator.resolve_operator_class",
+        _fake_resolve,
+    )
+    monkeypatch.setattr(
+        "nemo_retriever.common.ray_resource_hueristics.gather_local_resources",
+        lambda: Resources(cpu_count=8, gpu_count=1),
+    )
+
+    op = MultiTypeExtractCPUActor(
+        extraction_mode="image",
+        extract_params=ExtractParams(
+            method="pdfium",
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_infographics=False,
+        ),
+    )
+
+    op._run_detection_pipeline(pd.DataFrame({"page_image": ["x"]}))
+    assert "OCRActor" in calls
+
+
+def test_pdf_extraction_sets_needs_ocr_for_scanned_default_method() -> None:
+    """PDF extraction must set needs_ocr_for_text=True for scanned pages under default method='pdfium'.
+
+    Regression test for https://github.com/NVIDIA/NeMo-Retriever/issues/2443
+    (Greptile review finding: PDF OCR eligibility remains disabled).
+    Previously ocr_extraction_needed_for_text was gated on
+    method in ('pdfium_hybrid', 'ocr'), so scanned PDF pages with
+    method='pdfium' never received OCR text extraction.
+    """
+    import io
+    from unittest.mock import patch
+
+    import pandas as pd
+
+    pdfium = pytest.importorskip("pypdfium2")
+    from nemo_retriever.operators.extract.pdf.extract import pdf_extraction
+
+    doc = pdfium.PdfDocument.new()
+    doc.new_page(612, 792)
+    buf = io.BytesIO()
+    doc.save(buf)
+    doc.close()
+
+    def _fake_is_scanned(_page):
+        return True
+
+    with patch(
+        "nemo_retriever.operators.extract.pdf.extract._is_scanned_page",
+        side_effect=_fake_is_scanned,
+    ):
+        result = pdf_extraction(
+            pd.DataFrame([{"bytes": buf.getvalue(), "path": "scanned.pdf", "page_number": 1}]),
+            extract_text=True,
+            text_extraction_method="pdfium",
+        )
+
+    row = result.iloc[0]
+    assert row["text"] == ""
+    assert row["metadata"]["needs_ocr_for_text"] is True
+
+
+def test_full_page_text_fallback_when_no_detections() -> None:
+    """When no element detections exist but needs_ocr_for_text is True, OCR must still produce text.
+
+    Regression test for https://github.com/NVIDIA/NeMo-Retriever/issues/2443
+    (Greptile review: 'fast-text OCR still produces empty text').
+
+    fast-text profile sets use_page_elements=False, so PageElementDetectionActor
+    is absent. Without a full-page fallback, _crop_all_from_page returns []
+    and scanned PDF text remains empty even though OCR is scheduled.
+    """
+    import base64
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    from nemo_retriever.common.modality.ocr.shared import (
+        _PreparedOCRRow,
+        _collect_local_crop_jobs,
+    )
+
+    img = Image.fromarray(np.zeros((8, 8, 3), dtype=np.uint8), "RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    page_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    class _FakeRow:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    prepared = _PreparedOCRRow(
+        row_index=0,
+        row=_FakeRow(metadata={"needs_ocr_for_text": True}),
+        page_image_b64=page_b64,
+        detections=[],
+        wanted_labels={"text", "title", "header_footer"},
+    )
+
+    from nemo_retriever.common.modality.ocr.shared import _OCRRowResult
+
+    row_results = [_OCRRowResult()]
+    jobs = _collect_local_crop_jobs([prepared], row_results)
+
+    all_jobs = jobs["word"] + jobs["paragraph"]
+    assert len(all_jobs) == 1
+    assert all_jobs[0].label_name == "full_page"
+    assert all_jobs[0].bbox == [0.0, 0.0, 1.0, 1.0]
+
+
+def test_full_page_text_fallback_when_only_structured_detections() -> None:
+    """When detections contain only structured elements (no text regions) but
+    needs_ocr_for_text is True, a full-page text OCR crop must still be added.
+
+    Regression test for https://github.com/NVIDIA/NeMo-Retriever/issues/2443
+    (Greptile review: 'structured crops suppress full-page text fallback').
+
+    Scenario: page-elements detection finds a table but no text regions.
+    The table crop goes to table_items, not text_blocks. Without a full-page
+    fallback, text_blocks stays empty despite needs_ocr_for_text=True.
+    """
+    import base64
+    import io
+
+    import numpy as np
+    from PIL import Image
+
+    from nemo_retriever.common.modality.ocr.shared import (
+        _PreparedOCRRow,
+        _collect_local_crop_jobs,
+        _OCRRowResult,
+    )
+
+    img = Image.fromarray(np.zeros((8, 8, 3), dtype=np.uint8), "RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    page_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+    class _FakeRow:
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    # wanted_labels includes both structured and text labels (as _prepare_ocr_rows
+    # would set when extract_text=True + needs_ocr_for_text=True + extract_tables=True).
+    prepared = _PreparedOCRRow(
+        row_index=0,
+        row=_FakeRow(metadata={"needs_ocr_for_text": True}),
+        page_image_b64=page_b64,
+        detections=[{"label_name": "table", "bbox_xyxy_norm": [0.1, 0.1, 0.9, 0.9]}],
+        wanted_labels={"table", "text", "title", "header_footer"},
+    )
+
+    row_results = [_OCRRowResult()]
+    jobs = _collect_local_crop_jobs([prepared], row_results)
+
+    all_jobs = jobs["word"] + jobs["paragraph"]
+    label_names = [j.label_name for j in all_jobs]
+    assert "table" in label_names, "table crop must be present"
+    assert "full_page" in label_names, "full-page text crop must be added when needs_ocr_for_text=True"

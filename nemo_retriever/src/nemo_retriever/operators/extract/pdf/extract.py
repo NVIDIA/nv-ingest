@@ -350,7 +350,7 @@ def pdf_extraction(
                     is_scanned_page = _is_scanned_page(page)
 
                     ocr_extraction_needed_for_text = extract_text and (
-                        (text_extraction_method == "pdfium_hybrid" and is_scanned_page)
+                        (text_extraction_method in ("pdfium", "pdfium_hybrid") and is_scanned_page)
                         or text_extraction_method == "ocr"
                     )
 
