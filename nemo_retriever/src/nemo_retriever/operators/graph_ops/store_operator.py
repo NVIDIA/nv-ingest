@@ -10,9 +10,10 @@ import base64
 import binascii
 import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import fsspec
 import numpy as np
@@ -59,9 +60,46 @@ def _decode_image_b64(value: Any) -> bytes | None:
         return None
 
 
-def _build_object_key(*, raw: bytes, extension: str) -> str:
+def _filename_token(value: Any, *, fallback: str) -> str:
+    if value is None or not pd.api.types.is_scalar(value) or pd.isna(value):
+        return fallback
+
+    token = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value)).strip("._-")
+    return token[:48] or fallback
+
+
+def _source_stem(source_path: Any) -> str:
+    if not isinstance(source_path, str) or not source_path.strip():
+        return "image"
+
+    parsed = urlparse(source_path.strip())
+    path = unquote(parsed.path if parsed.scheme else source_path.strip()).replace("\\", "/")
+    return _filename_token(Path(path).stem[:64], fallback="image")
+
+
+def _row_source_path(row: pd.Series) -> Any:
+    for column in ("path", "source", "source_id"):
+        value = row.get(column)
+        if isinstance(value, str) and value.strip():
+            return value
+    return None
+
+
+def _build_object_key(
+    *,
+    raw: bytes,
+    extension: str,
+    source_path: Any = None,
+    page_number: Any = None,
+    content_type: Any = None,
+    chunk_number: Any = None,
+) -> str:
     image_hash = hashlib.sha1(raw).hexdigest()
-    return f"{image_hash}.{extension}"
+    source = _source_stem(source_path)
+    page = _filename_token(page_number, fallback="unknown")
+    kind = _filename_token(content_type, fallback="image")
+    position = f"-c{_filename_token(chunk_number, fallback='1')}" if chunk_number is not None else ""
+    return f"{source}-p{page}-{kind}{position}-{image_hash}.{extension}"
 
 
 def _join_storage_uri(storage_uri: str, object_key: str) -> str:
@@ -81,13 +119,24 @@ def _write_image_b64(
     storage_uri: str,
     storage_options: dict[str, Any],
     fallback_format: str,
+    source_path: Any = None,
+    page_number: Any = None,
+    content_type: Any = None,
+    chunk_number: Any = None,
 ) -> str | None:
     raw = _decode_image_b64(value)
     if raw is None:
         return None
 
     extension = _sniff_image_format(raw) or fallback_format
-    object_key = _build_object_key(raw=raw, extension=extension)
+    object_key = _build_object_key(
+        raw=raw,
+        extension=extension,
+        source_path=source_path,
+        page_number=page_number,
+        content_type=content_type,
+        chunk_number=chunk_number,
+    )
     dest_uri = _join_storage_uri(storage_uri, object_key)
 
     try:
@@ -106,6 +155,10 @@ def _store_nested_image_payloads(
     storage_options: dict[str, Any],
     fallback_format: str,
     strip_base64: bool,
+    source_path: Any = None,
+    page_number: Any = None,
+    content_type: Any = None,
+    chunk_prefix: tuple[int, ...] = (),
 ) -> Any:
     """Persist nested ``image_b64`` values and replace them with URIs."""
     if isinstance(value, np.ndarray) and value.ndim == 1:
@@ -121,8 +174,12 @@ def _store_nested_image_payloads(
                 storage_options=storage_options,
                 fallback_format=fallback_format,
                 strip_base64=strip_base64,
+                source_path=source_path,
+                page_number=page_number,
+                content_type=content_type,
+                chunk_prefix=(*chunk_prefix, index + 1),
             )
-            for item in value
+            for index, item in enumerate(value)
         ]
 
     if not isinstance(value, dict):
@@ -138,6 +195,10 @@ def _store_nested_image_payloads(
                 storage_uri=storage_uri,
                 storage_options=storage_options,
                 fallback_format=fallback_format,
+                source_path=source_path,
+                page_number=page_number,
+                content_type=content_type,
+                chunk_number="_".join(map(str, chunk_prefix)) or 1,
             )
             if stored_uri:
                 out["stored_image_uri"] = stored_uri
@@ -153,6 +214,10 @@ def _store_nested_image_payloads(
             storage_options=storage_options,
             fallback_format=fallback_format,
             strip_base64=strip_base64,
+            source_path=source_path,
+            page_number=page_number,
+            content_type=content_type,
+            chunk_prefix=chunk_prefix,
         )
 
     return out
@@ -284,11 +349,19 @@ def _store_row_images(
         raw = _decode_image_b64(image_b64)
         inherited_page_uri = _is_inherited_page_uri(row, stored_uri, image_source=image_source, raw=raw)
         if raw is not None:
+            source_path = _row_source_path(row)
+            page_number = row.get("page_number")
+            content_type = row.get("_content_type")
+            if not isinstance(content_type, str) or not content_type.strip():
+                content_type = image_source
             stored_uri = _write_image_b64(
                 image_b64,
                 storage_uri=storage_uri,
                 storage_options=fsspec_options,
                 fallback_format=fallback_format,
+                source_path=source_path,
+                page_number=page_number,
+                content_type=content_type,
             )
             if stored_uri is not None:
                 out.at[idx, "_stored_image_uri"] = stored_uri
@@ -301,9 +374,8 @@ def _store_row_images(
                         updated_page_image["image_b64"] = None
                     out.at[idx, "page_image"] = updated_page_image
 
-                if strip_base64:
-                    if image_source in row_image_columns and image_source in out.columns:
-                        out.at[idx, image_source] = None
+                if strip_base64 and image_source in row_image_columns and image_source in out.columns:
+                    out.at[idx, image_source] = None
 
         if isinstance(stored_uri, str) and stored_uri.strip() and not inherited_page_uri and "metadata" in out.columns:
             out.at[idx, "metadata"] = _with_uploaded_image_uri(row.get("metadata"), stored_uri)
@@ -311,12 +383,25 @@ def _store_row_images(
         for column in image_columns:
             if column not in out.columns:
                 continue
+            nested_type = {
+                "page_image": "page",
+                "images": "image",
+                "tables": "table",
+                "table": "table",
+                "charts": "chart",
+                "chart": "chart",
+                "infographics": "infographic",
+                "infographic": "infographic",
+            }[column]
             out.at[idx, column] = _store_nested_image_payloads(
                 out.at[idx, column],
                 storage_uri=storage_uri,
                 storage_options=fsspec_options,
                 fallback_format=fallback_format,
                 strip_base64=strip_base64,
+                source_path=_row_source_path(row),
+                page_number=row.get("page_number"),
+                content_type=nested_type,
             )
 
     return out

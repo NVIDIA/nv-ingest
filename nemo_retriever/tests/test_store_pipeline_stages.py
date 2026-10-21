@@ -15,12 +15,11 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 import pytest
-from PIL import Image
-
-from nemo_retriever.graph import InprocessExecutor, StoreOperator, UDFOperator
 from nemo_retriever.common.modality.content_transforms import explode_content_to_rows
 from nemo_retriever.common.params import StoreParams
 from nemo_retriever.common.vdb.records import to_client_vdb_records
+from nemo_retriever.graph import InprocessExecutor, StoreOperator, UDFOperator
+from PIL import Image
 
 
 def _make_tiny_png_b64(width: int = 4, height: int = 4, color=(255, 0, 0)) -> str:
@@ -164,6 +163,34 @@ class TestStoreOperatorInGraph:
         assert nested["stored_image_uri"].startswith("file://")
         assert Path(urlparse(nested["stored_image_uri"]).path).exists()
         assert "_stored_image_uri" not in result.columns
+
+    def test_store_operator_names_nested_images_from_source_and_chunk(self, tmp_path: Path):
+        first_b64 = _make_tiny_png_b64(color=(0, 255, 0))
+        second_b64 = _make_tiny_png_b64(color=(0, 0, 255))
+        df = pd.DataFrame(
+            [
+                {
+                    "path": "/docs/quarterly report.pdf",
+                    "page_number": 2,
+                    "images": [
+                        {"image_b64": first_b64},
+                        {"image_b64": second_b64},
+                    ],
+                }
+            ]
+        )
+
+        result = StoreOperator(params=StoreParams(storage_uri=str(tmp_path))).process(df)
+
+        image_uris = [item["stored_image_uri"] for item in result.iloc[0]["images"]]
+        image_names = [Path(urlparse(uri).path).name for uri in image_uris]
+        assert image_names[0].startswith("quarterly_report-p2-image-c1-")
+        assert image_names[1].startswith("quarterly_report-p2-image-c2-")
+        assert image_names[0].endswith(".png")
+        assert image_names[1].endswith(".png")
+        assert image_names[0] != image_names[1]
+        assert Path(urlparse(image_uris[0]).path).read_bytes() == base64.b64decode(first_b64)
+        assert Path(urlparse(image_uris[1]).path).read_bytes() == base64.b64decode(second_b64)
 
     def test_store_operator_does_not_overwrite_page_uri_for_element_rows(self, tmp_path: Path):
         page_b64 = _make_tiny_png_b64(color=(255, 0, 0))
@@ -461,7 +488,28 @@ class TestStoreOperatorInGraph:
         assert result.iloc[0]["page_number"] == 0
         assert result.iloc[0]["_content_type"] == "text/page"
         assert calls
-        assert calls[0] == f"memory://stored/{hashlib.sha1(raw).hexdigest()}.png"
+        assert calls[0] == (
+            f"memory://stored/report_with_spaces-p0-text_page-{hashlib.sha1(raw).hexdigest()}.png"
+        )
+
+    def test_row_image_uris_are_independent_of_batch_order(self, tmp_path: Path):
+        first = _make_tiny_png_b64()
+        second = base64.b64encode(b"different image bytes").decode()
+        rows = pd.DataFrame(
+            {
+                "path": ["report.pdf", "report.pdf"],
+                "page_number": [1, 1],
+                "_content_type": ["image", "image"],
+                "_image_b64": [first, second],
+            }
+        )
+        params = StoreParams(storage_uri=str(tmp_path))
+
+        original = StoreOperator(params=params).process(rows)
+        reversed_rows = StoreOperator(params=params).process(rows.iloc[::-1].reset_index(drop=True))
+
+        assert original["_stored_image_uri"].tolist() == reversed_rows["_stored_image_uri"].tolist()[::-1]
+        assert len(list(tmp_path.iterdir())) == 2
 
     def test_embedding_preserves_image_b64_for_post_embed_store(self, monkeypatch):
         from nemo_retriever.models.inference import runtime
@@ -487,7 +535,9 @@ class TestStoreOperatorInGraph:
             StoreParams(public_base_url="https://cdn.example.com")
 
     def test_explode_does_not_reload_stored_uri_for_embedding(self, monkeypatch):
-        from nemo_retriever.common.modality.content_transforms import explode_content_to_rows
+        from nemo_retriever.common.modality.content_transforms import (
+            explode_content_to_rows,
+        )
 
         def _fail_load(uri):
             raise AssertionError(f"content transform attempted to reload stored image URI: {uri}")
@@ -506,7 +556,9 @@ class TestStoreOperatorInGraph:
         assert result.iloc[0]["_stored_image_uri"] == "file:///page.png"
 
     def test_collapse_does_not_reload_stored_uri_for_embedding(self, monkeypatch):
-        from nemo_retriever.common.modality.content_transforms import collapse_content_to_page_rows
+        from nemo_retriever.common.modality.content_transforms import (
+            collapse_content_to_page_rows,
+        )
 
         def _fail_load(uri):
             raise AssertionError(f"content transform attempted to reload stored image URI: {uri}")
