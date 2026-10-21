@@ -70,6 +70,8 @@ def test_served_model_uses_package_settings_and_preserves_successful_siblings(
     assert failed["raw_output"] == RAW
     assert failed["finish_reason"] == "length"
     assert failed["error"]["stage"] == "nemotron_parse_pages_fullpage"
+    assert good["bbox_coordinate_space"] == "normalized_page_content"
+    assert failed["bbox_coordinate_space"] == "normalized_page_content"
     assert good["error"] is None
     assert good["finish_reason"] == "stop"
     assert good["usage"] == {"completion_tokens": 9}

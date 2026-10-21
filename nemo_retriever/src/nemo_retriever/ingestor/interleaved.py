@@ -108,9 +108,8 @@ def _parse_raw_elements(raw_output: str) -> list[dict[str, Any]]:
     return elements
 
 
-def _crop_picture_bytes(page_image: object, bbox: Sequence[float]) -> bytes | None:
+def _crop_picture_bytes(page_image: object, bbox: Sequence[float], *, coordinate_space: str) -> bytes | None:
     from nemo_retriever.common.modality.ocr.shared import _crop_b64_image_by_norm_bbox
-    from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import transform_bbox_to_original
 
     if not isinstance(page_image, dict) or not isinstance(page_image.get("image_b64"), str):
         return None
@@ -126,6 +125,11 @@ def _crop_picture_bytes(page_image: object, bbox: Sequence[float]) -> bytes | No
         return None
     if height <= 0 or width <= 0:
         return None
+
+    if coordinate_space == "normalized_page_content":
+        from nemotron_parse.postprocessing import transform_bbox_to_original
+    else:
+        from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import transform_bbox_to_original
 
     left, top, right, bottom = transform_bbox_to_original(tuple(float(item) for item in bbox), width, height)
     normalized = [left / width, top / height, right / width, bottom / height]
@@ -183,6 +187,9 @@ def project_page(row: Mapping[str, Any], passthrough_columns: Sequence[str] = ()
         if isinstance(page, (int, float)) and not isinstance(page, bool) and math.isfinite(page) and int(page) == page
         else 0
     )
+    parser = row.get("nemotron_parse_v1_2")
+    parser = parser if isinstance(parser, Mapping) else {}
+    coordinate_space = parser.get("bbox_coordinate_space") or "normalized_1664x2048_padded_canvas"
     base = {
         "sample_id": sample_id,
         "position": 0,
@@ -196,11 +203,9 @@ def project_page(row: Mapping[str, Any], passthrough_columns: Sequence[str] = ()
         "source_path": source,
         "element_class": None,
         "bbox_xyxy_norm": None,
-        "bbox_coordinate_space": "normalized_1664x2048_padded_canvas",
+        "bbox_coordinate_space": coordinate_space,
         **{name: row.get(name) for name in passthrough_columns},
     }
-    parser = row.get("nemotron_parse_v1_2")
-    parser = parser if isinstance(parser, Mapping) else {}
     error = metadata.get("error") or parser.get("error") or row.get("error")
     if error:
         return [{**base, "materialize_error": _json(error)}]
@@ -222,7 +227,9 @@ def project_page(row: Mapping[str, Any], passthrough_columns: Sequence[str] = ()
             if bbox is None or not element["class"]:
                 raise ValueError("Invalid element box or class")
             picture = element["class"] == "Picture"
-            binary = _crop_picture_bytes(row.get("page_image"), bbox) if picture else None
+            binary = (
+                _crop_picture_bytes(row.get("page_image"), bbox, coordinate_space=coordinate_space) if picture else None
+            )
             if picture and binary is None:
                 raise ValueError("Picture crop could not be decoded or is too small")
             projected.append(

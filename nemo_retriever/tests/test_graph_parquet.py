@@ -359,3 +359,48 @@ def test_stream_closes_all_operators_when_one_cleanup_fails():
     with pytest.raises(RuntimeError, match="cleanup failed"):
         stream.close()
     assert closed == ["second", "first"]
+
+
+@pytest.mark.parametrize("size", [(2200, 1700), (1700, 2200)])
+@pytest.mark.parametrize("parse35", [False, True])
+def test_interleaved_picture_coordinates_follow_model_frame(size, parse35):
+    import base64
+    import io
+    from PIL import Image, ImageDraw
+
+    from nemo_retriever.ingestor.interleaved import project_page
+    from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import transform_bbox_to_original
+
+    if parse35:
+        pytest.importorskip("nemotron_parse.postprocessing")
+    image = Image.new("RGB", size, "red")
+    width, height = size
+    expected_box = (int(0.1 * width), int(0.1 * height), int(0.9 * width), int(0.9 * height))
+    ImageDraw.Draw(image).rectangle(expected_box, fill="green")
+    encoded = io.BytesIO()
+    image.save(encoded, format="PNG")
+    image.close()
+    page = _page(
+        1, page_image={"image_b64": base64.b64encode(encoded.getvalue()).decode(), "orig_shape_hw": [height, width]}
+    )
+    page["nemotron_parse_v1_2"]["raw_output"] = "<x_0.1><y_0.1>figure<x_0.9><y_0.9><class_Picture>"
+    if parse35:
+        page["nemotron_parse_v1_2"]["bbox_coordinate_space"] = "normalized_page_content"
+    (result,) = project_page(page)
+    assert result["materialize_error"] is None
+    with Image.open(io.BytesIO(result["binary_content"])) as crop:
+        if parse35:
+            assert crop.size == (expected_box[2] - expected_box[0], expected_box[3] - expected_box[1])
+            assert crop.getextrema() == ((0, 0), (128, 128), (0, 0))
+            assert result["bbox_coordinate_space"] == "normalized_page_content"
+        else:
+            from nemo_retriever.common.modality.ocr.shared import _crop_b64_image_by_norm_bbox
+
+            box = transform_bbox_to_original((0.1, 0.1, 0.9, 0.9), width, height)
+            legacy, _ = _crop_b64_image_by_norm_bbox(
+                page["page_image"]["image_b64"],
+                bbox_xyxy_norm=[box[0] / width, box[1] / height, box[2] / width, box[3] / height],
+                image_format="png",
+            )
+            assert result["binary_content"] == base64.b64decode(legacy)
+            assert result["bbox_coordinate_space"] == "normalized_1664x2048_padded_canvas"

@@ -390,6 +390,8 @@ def nemotron_parse_pages(
                     raise ValueError("Do not mix native /v1/parse and legacy Parse endpoint contracts.")
                 native_parse = all(native_endpoints)
                 if native_parse:
+                    for idx in batch_indices:
+                        all_meta[idx]["bbox_coordinate_space"] = "normalized_page_content"
                     client = nim_client or NIMClient(max_pool_workers=int(retry.remote_max_pool_workers))
                     try:
                         responses = client.invoke_parse_pages(
@@ -415,6 +417,8 @@ def nemotron_parse_pages(
                     contract = _resolve_nemotron_parse_contract(invoke_url, nemotron_parse_model)
                     uses_tool_call_routing = contract.uses_tool_call_routing
                     if contract.profile == _NemotronParseContractProfile.V3_5_DOCUMENT:
+                        for idx in batch_indices:
+                            all_meta[idx]["bbox_coordinate_space"] = "normalized_page_content"
                         from nemo_retriever.models.nim.nemotron_parse import (
                             invoke_document_parse_images,
                         )
