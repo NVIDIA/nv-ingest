@@ -334,6 +334,8 @@ class _MultiTypeExtractBase(AbstractOperator):
         return self._maybe_chunk(batch_df, "pdf")
 
     def _run_image_pipeline(self, batch_df: pd.DataFrame) -> pd.DataFrame:
+        if not self.extract_params.use_page_elements and _ocr_stage_needed(self.extract_params):
+            raise ValueError("Image OCR requires use_page_elements=True; images do not use the Nemotron Parse pipeline.")
         batch_df = ImageLoadActor().run(batch_df)
         batch_df = self._run_detection_pipeline(batch_df)
         return self._maybe_chunk(batch_df, "image")

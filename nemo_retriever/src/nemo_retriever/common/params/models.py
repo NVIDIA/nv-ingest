@@ -548,7 +548,7 @@ class ExtractParams(_ParamsModel):
         ),
     )
     # Run PageElementDetection (layout/yolox). Required by TableStructure and
-    # OCR. Safe to disable for text-only ingests.
+    # crop-based OCR. Safe to disable for PDFium text and page-image embedding.
     use_page_elements: bool = True
     use_table_structure: bool = False
     table_output_format: Optional[Literal["pseudo_markdown", "markdown"]] = None
@@ -623,6 +623,15 @@ class ExtractParams(_ParamsModel):
                 )
         if not self.use_page_elements:
             consumers = [("use_table_structure", self.use_table_structure and self.extract_tables)]
+            if self.method not in ("nemotron_parse", "audio"):
+                consumers.extend(
+                    [
+                        ("extract_text", self.extract_text and self.method in ("pdfium_hybrid", "ocr")),
+                        ("extract_tables", self.extract_tables),
+                        ("extract_charts", self.extract_charts),
+                        ("extract_infographics", self.extract_infographics),
+                    ]
+                )
             enabled = [name for name, on in consumers if on]
             if enabled:
                 raise ValueError(f"use_page_elements=False is incompatible with: {', '.join(enabled)}")

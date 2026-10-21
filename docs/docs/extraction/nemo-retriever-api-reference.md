@@ -159,6 +159,35 @@ execution. To use a remote Nemotron Parse endpoint, configure
 `nemotron_parse_invoke_url` or `invoke_url` and select the model that matches
 the endpoint contract.
 
+### Disable Page Elements when extraction does not require detections
+
+Set `use_page_elements=False` only when the enabled extraction stages do not
+require Page Elements detections. `ExtractParams` raises a Pydantic
+`ValidationError` during construction for these combinations:
+
+- `extract_text=True` with `method="ocr"` or `method="pdfium_hybrid"`.
+- `extract_tables=True`, `extract_charts=True`, or `extract_infographics=True`
+  with any method other than `nemotron_parse` or `audio`.
+- `use_table_structure=True` with `extract_tables=True`.
+
+Keep `use_page_elements=True` for these stages, or disable the stages that
+require detections. Validation prevents OCR from silently returning empty
+output because detections are unavailable.
+
+Native PDF text extraction with `method="pdfium"` and page-level image
+embedding remain compatible with `use_page_elements=False` when those
+stages are disabled. For PDF inputs, Nemotron Parse can extract text, tables,
+charts, and infographics without Page Elements when `use_table_structure=False`.
+The legacy `method="audio"` path also accepts `use_page_elements=False`
+with the default extraction flags for audio inputs because audio processing
+does not use Page Elements detections.
+
+Image inputs, including automatically routed images, use the detection/OCR
+pipeline regardless of `method`. Image ingestion raises `ValueError` before
+loading the image if `use_page_elements=False` and a detection-dependent OCR
+stage is enabled. The `nemotron_parse` and `audio` exemptions do not apply to
+image inputs.
+
 ### Choose raise or collect behavior
 
 For graph run modes, `error_policy="raise"` raises `GraphIngestionError` when

@@ -102,6 +102,7 @@ The following sections summarize user-visible changes included in 26.08.1 and fo
 
 ### Multimodal extraction { #multimodal-extraction }
 
+- `ExtractParams` rejects `use_page_elements=False` when enabled document extraction stages require Page Elements detections, preventing silent empty OCR output. The legacy `method="audio"` path remains compatible with the opt-out and default extraction flags. Refer to [Page Elements configuration validation](nemo-retriever-api-reference.md#disable-page-elements-when-extraction-does-not-require-detections).
 - Fixed an issue where SDK batch ingestion with `extraction_mode="auto"` initialized Page Elements for PDF and image inputs when `use_page_elements=False` or no enabled extraction stage required its output. Page-level image embedding continues to render one full-page image for each PDF page without loading a Page Elements model.
 - Fixed an issue that could cause local Hugging Face batch audio extraction to hang in interactive terminals when FFmpeg inherited the parent process's standard input.
 

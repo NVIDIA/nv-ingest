@@ -96,6 +96,60 @@ class TestExtractParams:
                 nemotron_parse_model=model,
             )
 
+    @pytest.mark.parametrize(
+        ("method", "feature"),
+        [
+            ("ocr", "extract_text"),
+            ("pdfium_hybrid", "extract_text"),
+            ("pdfium", "extract_tables"),
+            ("pdfium", "extract_charts"),
+            ("pdfium", "extract_infographics"),
+        ],
+    )
+    @pytest.mark.parametrize("remote", [False, True])
+    def test_page_elements_opt_out_rejects_dependent_ocr(self, method, feature, remote) -> None:
+        kwargs = dict(
+            method=method,
+            use_page_elements=False,
+            extract_text=False,
+            extract_images=False,
+            extract_tables=False,
+            extract_charts=False,
+            extract_infographics=False,
+            ocr_invoke_url="http://ocr.example/v1/infer" if remote else None,
+        )
+        kwargs[feature] = True
+
+        with pytest.raises(ValidationError, match=f"use_page_elements=False is incompatible with: {feature}"):
+            ExtractParams(**kwargs)
+
+    @pytest.mark.parametrize("method", ["pdfium", "ocr", "pdfium_hybrid", "nemotron_parse"])
+    def test_page_elements_opt_out_allows_extraction_without_detection_consumers(self, method) -> None:
+        params = ExtractParams(
+            method=method,
+            use_page_elements=False,
+            extract_text=method in ("pdfium", "nemotron_parse"),
+            extract_images=False,
+            extract_tables=method == "nemotron_parse",
+            extract_charts=method == "nemotron_parse",
+            extract_infographics=method == "nemotron_parse",
+        )
+
+        assert params.use_page_elements is False
+
+    def test_audio_page_elements_opt_out_preserves_document_defaults(self) -> None:
+        params = ExtractParams(method="audio", use_page_elements=False)
+
+        assert params.use_page_elements is False
+        assert params.extract_text is True
+        assert params.extract_images is True
+        assert params.extract_tables is True
+        assert params.extract_charts is True
+
+    def test_page_elements_opt_out_still_rejects_table_structure(self) -> None:
+        with pytest.raises(ValidationError, match="use_table_structure"):
+            ExtractParams(use_page_elements=False, use_table_structure=True, extract_tables=True)
+
     def test_graphic_elements_controls_are_removed(self) -> None:
         assert "use_graphic_elements" not in ExtractParams.model_fields
         assert "graphic_elements_invoke_url" not in ExtractParams.model_fields

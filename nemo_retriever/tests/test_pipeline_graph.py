@@ -995,7 +995,7 @@ class TestMultiTypeExtractOperator:
         [
             pytest.param(False, "pdfium", [], id="disabled"),
             pytest.param(True, "pdfium", [], id="enabled-without-consumer"),
-            pytest.param(False, "ocr", ["OCRActor"], id="disabled-with-independent-ocr"),
+            pytest.param(True, "ocr", ["PageElementDetectionActor", "OCRActor"], id="ocr-with-detections"),
         ],
     )
     def test_detection_pipeline_runs_only_needed_stages(
@@ -1036,6 +1036,49 @@ class TestMultiTypeExtractOperator:
 
         pd.testing.assert_frame_equal(result, batch_df)
         assert calls == expected_stages
+
+    @pytest.mark.parametrize("mode", ["image", "auto"])
+    @pytest.mark.parametrize("method", ["nemotron_parse", "audio"])
+    @pytest.mark.parametrize("feature", ["extract_tables", "extract_charts", "extract_infographics"])
+    def test_image_ocr_rejects_page_elements_opt_out(self, monkeypatch, mode, method, feature):
+        from unittest.mock import Mock
+        from nemo_retriever.operators.graph_ops import multi_type_extract_operator as module
+
+        flags = dict(extract_text=False, extract_tables=False, extract_charts=False, extract_infographics=False)
+        flags[feature] = True
+        params = ExtractParams(method=method, use_page_elements=False, **flags)
+        op = module.MultiTypeExtractCPUActor(extraction_mode=mode, extract_params=params)
+        load = Mock()
+        load.return_value.run.side_effect = lambda data: data
+        monkeypatch.setattr(module, "ImageLoadActor", load)
+        monkeypatch.setattr(op, "_run_detection_pipeline", lambda data: data)
+        with pytest.raises(ValueError, match="Image OCR requires use_page_elements=True"):
+            op.process(pd.DataFrame({"path": ["image.png"]}))
+        load.assert_not_called()
+
+    @pytest.mark.parametrize("mode", ["image", "auto"])
+    @pytest.mark.parametrize("use_page_elements,extract_tables", [(False, False), (True, True)])
+    def test_image_pipeline_preserves_valid_configurations(self, monkeypatch, mode, use_page_elements, extract_tables):
+        from unittest.mock import Mock
+        from nemo_retriever.operators.graph_ops import multi_type_extract_operator as module
+
+        op = module.MultiTypeExtractCPUActor(
+            extraction_mode=mode,
+            extract_params=ExtractParams(
+                method="nemotron_parse",
+                use_page_elements=use_page_elements,
+                extract_text=False,
+                extract_tables=extract_tables,
+                extract_charts=False,
+            ),
+        )
+        batch = pd.DataFrame({"path": ["image.png"]})
+        load = Mock()
+        load.return_value.run.side_effect = lambda data: data
+        monkeypatch.setattr(module, "ImageLoadActor", load)
+        monkeypatch.setattr(op, "_run_detection_pipeline", lambda data: data)
+        pd.testing.assert_frame_equal(op.process(batch), batch)
+        load.assert_called_once()
 
     def test_detection_pipeline_resolves_suboperators_through_archetype_resolution(self, monkeypatch):
         from nemo_retriever.operators.graph_ops.multi_type_extract_operator import MultiTypeExtractCPUActor
@@ -1085,7 +1128,8 @@ class TestMultiTypeExtractOperator:
         ]
         assert len({id(resources) for _name, resources in calls}) == 1
 
-    def test_parse_pipeline_resolves_nemotron_parse_through_archetype_resolution(self, monkeypatch):
+    @pytest.mark.parametrize("use_page_elements", [False, True])
+    def test_parse_pipeline_resolves_nemotron_parse_through_archetype_resolution(self, monkeypatch, use_page_elements):
         from nemo_retriever.operators.graph_ops.multi_type_extract_operator import MultiTypeExtractCPUActor
         from nemo_retriever.common.ray_resource_hueristics import Resources
 
@@ -1125,6 +1169,7 @@ class TestMultiTypeExtractOperator:
             extraction_mode="pdf",
             extract_params=ExtractParams(
                 method="nemotron_parse",
+                use_page_elements=use_page_elements,
                 nemotron_parse_invoke_url=endpoint,
                 nemotron_parse_model=model,
             ),
