@@ -32,8 +32,10 @@ For PDFs, NeMo Retriever Library typically uses **pdfium**-based extraction with
 
 For local GPU extraction, install `nemo-retriever[local,nemotron-parse]`.
 With `method="nemotron_parse"`, the local default is
-`nvidia/Nemotron-3.5-Parse` through Transformers with BF16 weights. Explicitly
-select `nvidia/NVIDIA-Nemotron-Parse-v1.2` to retain the vLLM path.
+`nvidia/Nemotron-3.5-Parse` through in-process vLLM with BF16 weights. Explicitly
+select `nvidia/NVIDIA-Nemotron-Parse-v1.2` to retain the legacy v1.2 vLLM path.
+For a Transformers fallback, direct adapter callers can select
+`NemotronParse35(backend="transformers")`.
 Refer to [Select a supported extraction method](nemo-retriever-api-reference.md#select-a-supported-extraction-method)
 for the configuration and checkpoint-code requirements.
 
