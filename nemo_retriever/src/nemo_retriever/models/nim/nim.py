@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import base64
 import logging
 import time
 from contextlib import nullcontext
@@ -139,6 +140,7 @@ def _post_with_retries(
     max_retries: int,
     max_429_retries: int,
     trace_context: Dict[str, str] | None = None,
+    files: Dict[str, Any] | None = None,
 ) -> Any:
     base_delay = 2.0
     attempt = 0
@@ -172,9 +174,8 @@ def _post_with_retries(
                     except Exception as exc:
                         logger.warning("OpenTelemetry trace propagation failed for NIM request: %s", exc)
                 try:
-                    response = requests.post(
-                        invoke_url, headers=request_headers, json=payload, timeout=float(timeout_s)
-                    )
+                    body = {"files": files} if files is not None else {"json": payload}
+                    response = requests.post(invoke_url, headers=request_headers, timeout=float(timeout_s), **body)
                 except (requests.Timeout, requests.RequestException) as exc:
                     _set_span_error(span, exc)
                     raise
@@ -279,6 +280,55 @@ class NIMClient:
     def __init__(self, *, max_pool_workers: int = 24) -> None:
         self._max_pool_workers = max(1, int(max_pool_workers))
         self._executor = ThreadPoolExecutor(max_workers=self._max_pool_workers)
+
+    def invoke_parse_pages(
+        self,
+        *,
+        invoke_url: str,
+        image_b64_list: Sequence[str],
+        api_key: Optional[str] = None,
+        timeout_s: float = 120.0,
+        max_retries: int = 5,
+        max_429_retries: int = 3,
+    ) -> List[Dict[str, Any]]:
+        """Call the native Parse multipart API, preserving input page order.
+
+        Each request uploads one image as ``document``. The response contains
+        page content, including the model's class and bounding-box tags.
+        Immutable image bytes are reused safely across HTTP retries.
+        """
+        endpoints = _parse_invoke_urls(invoke_url)
+        headers = {"Accept": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key.strip()}"
+        trace_context = _capture_trace_context()
+
+        def invoke(index: int, image: str) -> Dict[str, Any]:
+            mime = _mime_from_b64(image)
+            image_bytes = base64.b64decode(image, validate=True)
+            response = _post_with_retries(
+                invoke_url=endpoints[index % len(endpoints)],
+                payload={},
+                headers=headers,
+                files={"document": ("page.png" if mime == "image/png" else "page.jpg", image_bytes, mime)},
+                timeout_s=timeout_s,
+                max_retries=max_retries,
+                max_429_retries=max_429_retries,
+                trace_context=trace_context,
+            )
+            if not isinstance(response, dict) or not isinstance(response.get("content"), str):
+                raise ValueError("Native Parse response must contain a string 'content' field.")
+            if response.get("finish_reason") == "length":
+                raise ValueError("Native Parse output reached its token limit; refusing truncated page content.")
+            return response
+
+        futures = [self._executor.submit(invoke, index, image) for index, image in enumerate(image_b64_list)]
+        try:
+            return [future.result() for future in futures]
+        finally:
+            for future in futures:
+                future.cancel()
+            wait(futures)
 
     # -- image inference --------------------------------------------------
 

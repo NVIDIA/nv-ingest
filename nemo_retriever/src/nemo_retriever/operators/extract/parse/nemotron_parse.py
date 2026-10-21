@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """
-Nemotron Parse v1.2 pipeline stage.
+Nemotron Parse pipeline stage for native multipart and legacy contracts.
 
 Runs the Nemotron Parse model on full page images to extract structured
 document content (text, tables, charts, infographics) in a single pass,
@@ -304,7 +304,7 @@ def nemotron_parse_pages(
     nim_client: NIMClient | None = None,
     **kwargs: Any,
 ) -> Any:
-    """Run Nemotron Parse v1.2 on full page images.
+    """Run Nemotron Parse on full page images.
 
     Each page is parsed in a single model call.  The structured output is
     split by element class (Text, Table, Chart, Picture, …) and routed to
@@ -312,6 +312,9 @@ def nemotron_parse_pages(
     ``infographic``).  Non-structured elements (headings, body text, …) are
     concatenated into the ``text`` column, replacing the upstream pdfium
     extraction when ``extract_text`` is ``True``.
+
+    Native ``/v1/parse`` endpoints return tagged content in ``content``, which
+    uses the same element routing. Untagged Markdown is preserved as page text.
     """
     retry = remote_retry or RemoteRetryParams(
         remote_max_pool_workers=int(kwargs.get("remote_max_pool_workers", 16)),
@@ -367,10 +370,36 @@ def nemotron_parse_pages(
     raw_texts: List[str] = [""] * len(batch_indices)
     uses_tool_call_routing = False
     contract: _ResolvedNemotronParseContract | None = None
+    native_parse = False
     if batch_images:
         try:
             if use_remote:
-                if "/v1/chat/completions" in invoke_url:
+                endpoints = validate_nemotron_parse_endpoint_list(invoke_url)
+                native_endpoints = [urlsplit(url).path.rstrip("/") == "/v1/parse" for url in endpoints]
+                if any(native_endpoints) and not all(native_endpoints):
+                    raise ValueError("Do not mix native /v1/parse and legacy Parse endpoint contracts.")
+                native_parse = all(native_endpoints)
+                if native_parse:
+                    client = nim_client or NIMClient(max_pool_workers=int(retry.remote_max_pool_workers))
+                    try:
+                        responses = client.invoke_parse_pages(
+                            invoke_url=invoke_url,
+                            image_b64_list=batch_images,
+                            api_key=api_key,
+                            timeout_s=float(request_timeout_s),
+                            max_retries=int(retry.remote_max_retries),
+                            max_429_retries=int(retry.remote_max_429_retries),
+                        )
+                    finally:
+                        if nim_client is None:
+                            client.shutdown()
+                    raw_texts = [response["content"].strip() for response in responses]
+                    for idx, response in zip(batch_indices, responses):
+                        all_meta[idx]["native_parse"] = {
+                            "finish_reason": response.get("finish_reason"),
+                            "usage": response.get("usage"),
+                        }
+                elif "/v1/chat/completions" in invoke_url:
                     contract = _resolve_nemotron_parse_contract(invoke_url, nemotron_parse_model)
                     uses_tool_call_routing = contract.uses_tool_call_routing
                     extra_body: Dict[str, Any] = {"max_tokens": 8192}
@@ -455,6 +484,13 @@ def nemotron_parse_pages(
     for pos, raw_text in enumerate(raw_texts):
         idx = batch_indices[pos]
         try:
+            if native_parse and "<class_" not in raw_text:
+                # Preserve untagged Markdown; tagged native output uses the
+                # existing element/bounding-box router below.
+                if not extract_text:
+                    raise ValueError("Untagged native Parse content requires extract_text=True.")
+                all_text[idx] = raw_text
+                continue
             fp_tables, fp_charts, fp_infographics, fp_text = route_fn(
                 raw_text,
                 extract_tables=extract_tables,
