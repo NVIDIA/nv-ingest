@@ -562,7 +562,7 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
             if model_id == NEMOTRON_PARSE35_MODEL:
                 from nemo_retriever.models.local import NemotronParse35
 
-                self._model = NemotronParse35(task_prompt=self._task_prompt)
+                self._model = NemotronParse35(task_prompt=self._task_prompt, backend="vllm")
             else:
                 from nemo_retriever.models.local import NemotronParseV12
 

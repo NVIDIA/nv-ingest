@@ -152,8 +152,8 @@ error lists the supported values, so spelling and configuration errors do not
 silently select another extraction path.
 
 For local `nemotron_parse` extraction, omit `nemotron_parse_model` to use
-`nvidia/Nemotron-3.5-Parse` through Transformers on a CUDA GPU with BF16 weights,
-not through vLLM. You can also select this checkpoint explicitly with
+`nvidia/Nemotron-3.5-Parse` through in-process vLLM on a CUDA GPU with BF16
+weights. You can also select this checkpoint explicitly with
 `nemotron_parse_model="nvidia/Nemotron-3.5-Parse"`. To retain the local v1.2
 vLLM path, set `nemotron_parse_model="nvidia/NVIDIA-Nemotron-Parse-v1.2"`.
 Do not configure an invoke URL for either local path. Install the local GPU
@@ -178,20 +178,28 @@ result = (
 )
 ```
 
-The Parse 3.5 adapter loads checkpoint custom code with
-`trust_remote_code=True` at the revision pinned in the model registry. Review
-the checkpoint code before use. It retains the existing task prompt, which
-disables text prediction inside pictures. The default extraction method
-remains `pdfium_hybrid`; select `method="nemotron_parse"` to use Parse.
+The Parse 3.5 adapter downloads the checkpoint and its official vLLM plugin
+from the same revision pinned in the model registry. It registers the plugin
+in vLLM workers automatically; no separate plugin installation is required.
+The adapter executes checkpoint custom code with `trust_remote_code=True`.
+Review the checkpoint and plugin code before use. The adapter retains the
+existing task prompt, which disables text prediction inside pictures. The
+default extraction method remains `pdfium_hybrid`; select
+`method="nemotron_parse"` to use Parse.
 
 The `NemotronParse35` adapter loads lazily. Before downloading checkpoint
 assets, its first nonempty inference call validates the requested CUDA device.
-Unavailable CUDA or an invalid GPU index raises `RuntimeError`. Direct adapter
-callers can explicitly select `NemotronParse35(device="cpu")`; this does not
-enable automatic CPU inference in the CLI or graph pipeline. Batch parsing
-converts and generates one page at a time, preserving input order without
-retaining converted copies of the entire batch. If a page fails, the adapter
-does not return a partial batch.
+Unavailable CUDA raises `RuntimeError`. The vLLM backend accepts only `cuda`
+or `cuda:0` within the worker's visible GPU set; other devices raise
+`ValueError` during construction. Direct
+`NemotronParse35()` calls, the CLI, and the graph pipeline default to vLLM.
+Direct adapter callers can select `NemotronParse35(backend="transformers")`
+for Transformers GPU inference, or
+`NemotronParse35(backend="transformers", device="cpu")` for CPU inference.
+The adapter does not fall back to Transformers or CPU automatically.
+Batch parsing converts and generates one page at a time, preserving input
+order without retaining converted copies of the entire batch. If a page fails,
+the adapter does not return a partial batch.
 
 Other local Parse model values, including
 `nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before

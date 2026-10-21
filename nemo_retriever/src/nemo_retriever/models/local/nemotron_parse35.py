@@ -2,12 +2,12 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Pinned Transformers implementation of local Nemotron 3.5 Parse inference."""
+"""Pinned Transformers and vLLM implementations of local Parse 3.5 inference."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Literal, Sequence
 
 import numpy as np
 import torch
@@ -23,11 +23,12 @@ _DEFAULT_TASK_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><
 
 
 class NemotronParse35(BaseModel):
-    """Parse page images with the checkpoint's native Transformers model and processor.
+    """Parse page images with the checkpoint's native Transformers or vLLM backend.
 
     Weights and custom code are loaded lazily from an immutable registry revision.
     Pages are converted and generated sequentially to bound additional image
-    and GPU memory independently of batch size. No vLLM plugin is imported.
+    and GPU memory independently of batch size. The vLLM backend registers the
+    official plugin from the same pinned snapshot in each engine process.
     """
 
     def __init__(
@@ -36,24 +37,34 @@ class NemotronParse35(BaseModel):
         hf_cache_dir: str | None = None,
         task_prompt: str = _DEFAULT_TASK_PROMPT,
         max_tokens: int = 9000,
+        backend: Literal["transformers", "vllm"] = "vllm",
     ) -> None:
         """Configure a lazy BF16 parser without loading weights.
 
         Args:
             device: PyTorch inference device, normally the worker's ``cuda`` device.
-                Select ``cpu`` explicitly when CUDA is unavailable.
+                Select ``cpu`` with ``backend="transformers"`` when CUDA is unavailable.
             hf_cache_dir: Optional Hugging Face snapshot cache directory.
             task_prompt: Native control tokens. Picture text is disabled unless enabled explicitly.
             max_tokens: Positive maximum number of generated tokens per page.
+            backend: In-process vLLM (the default) or explicit native Transformers.
+                vLLM requires CUDA device zero
+                in the worker's visible GPU set; Transformers also supports CPU.
 
         Raises:
-            ValueError: If max_tokens is not positive or the device is invalid.
+            ValueError: If max_tokens is not positive, the backend is unsupported,
+                or the device is invalid for the selected backend.
             RuntimeError: If PyTorch cannot interpret the device.
         """
         super().__init__()
         if max_tokens <= 0:
             raise ValueError("max_tokens must be positive.")
+        if backend not in ("transformers", "vllm"):
+            raise ValueError(f"Unsupported Parse 3.5 backend: {backend}")
         self._device = torch.device(device)
+        if backend == "vllm" and (self._device.type != "cuda" or self._device.index not in (None, 0)):
+            raise ValueError('Parse 3.5 vLLM requires device="cuda" or "cuda:0" in the worker GPU set.')
+        self._backend = backend
         self._hf_cache_dir = hf_cache_dir
         self._task_prompt = task_prompt
         self._max_tokens = max_tokens
@@ -68,7 +79,7 @@ class NemotronParse35(BaseModel):
             if not torch.cuda.is_available():
                 raise RuntimeError(
                     f"Nemotron 3.5 Parse requested device {self._device}, but CUDA is unavailable. "
-                    'Use a CUDA-enabled host or explicitly select device="cpu".'
+                    'Use a CUDA-enabled host or explicitly select backend="transformers", device="cpu".'
                 )
             if self._device.index is not None and self._device.index >= torch.cuda.device_count():
                 raise RuntimeError(
@@ -76,7 +87,6 @@ class NemotronParse35(BaseModel):
                     'Select a visible CUDA device or explicitly select device="cpu".'
                 )
         from huggingface_hub import snapshot_download
-        from transformers import AutoModel, AutoProcessor, GenerationConfig
 
         cache_dir = configure_global_hf_cache_base(self._hf_cache_dir)
         snapshot = snapshot_download(
@@ -85,6 +95,11 @@ class NemotronParse35(BaseModel):
             cache_dir=cache_dir,
             allow_patterns=["*.json", "*.py", "*.safetensors", "*.jinja", "*.model", "*.txt"],
         )
+        if self._backend == "vllm":
+            self._load_vllm(snapshot)
+            return
+        from transformers import AutoModel, AutoProcessor, GenerationConfig
+
         # Loading all assets from the resolved snapshot also keeps nested processor
         # downloads on the same revision and in the configured cache.
         processor = AutoProcessor.from_pretrained(snapshot, trust_remote_code=True)
@@ -101,6 +116,53 @@ class NemotronParse35(BaseModel):
             raise
         self._processor = processor
         self._generation_config = generation_config
+
+    def _load_vllm(self, snapshot: str) -> None:
+        import os
+
+        from nemo_retriever.models.inference.nemotron_parse35_vllm import (
+            PARSE35_SNAPSHOT_ENV,
+            register_nemotron_parse35_vllm,
+        )
+        from nemo_retriever.models.inference.vllm import apply_vllm_startup_defaults
+
+        apply_vllm_startup_defaults()
+        # CUDA availability checks and other extraction stages may initialize
+        # CUDA on the actor before engine creation. Fork cannot reuse that state.
+        os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
+        previous_snapshot = os.environ.get(PARSE35_SNAPSHOT_ENV)
+        os.environ[PARSE35_SNAPSHOT_ENV] = snapshot
+        try:
+            register_nemotron_parse35_vllm()
+            from vllm import LLM, SamplingParams
+
+            self._generation_config = SamplingParams(
+                temperature=0,
+                top_k=1,
+                repetition_penalty=1.1,
+                max_tokens=self._max_tokens,
+                skip_special_tokens=False,
+            )
+            self._model = LLM(
+                model=snapshot,
+                trust_remote_code=True,
+                dtype="bfloat16",
+                distributed_executor_backend="uni",
+                max_model_len=16384,
+                max_num_seqs=1,
+                max_num_batched_tokens=16384,
+                limit_mm_per_prompt={"image": 1},
+                enable_prefix_caching=False,
+                attention_config={"flash_attn_version": 3},
+                gpu_memory_utilization=0.8,
+            )
+        finally:
+            # Engine workers inherit the snapshot during startup; later unrelated
+            # vLLM engines must not discover the Parse plugin through our env var.
+            if previous_snapshot is None:
+                os.environ.pop(PARSE35_SNAPSHOT_ENV, None)
+            else:
+                os.environ[PARSE35_SNAPSHOT_ENV] = previous_snapshot
 
     def preprocess(self, input_data: ImageInput) -> Image.Image:
         """Convert a single page to an RGB image without resizing its content.
@@ -189,6 +251,15 @@ class NemotronParse35(BaseModel):
         for image in inputs:
             page = self.preprocess(image)
             self._ensure_model()
+            if self._backend == "vllm":
+                prompt = task_prompt if task_prompt is not None else self._task_prompt
+                generated = self._model.generate(
+                    [{"prompt": "<pad>\n" + prompt, "multi_modal_data": {"image": page}}],
+                    self._generation_config,
+                    tokenization_kwargs={"add_special_tokens": False},
+                )
+                outputs.append(generated[0].outputs[0].text.strip())
+                continue
             features = self._processor(
                 images=[page],
                 text=task_prompt if task_prompt is not None else self._task_prompt,
@@ -220,7 +291,7 @@ class NemotronParse35(BaseModel):
         return self.invoke(input_data, task_prompt=task_prompt)
 
     def unload(self) -> None:
-        """Release model tensors and cached CUDA allocations explicitly.
+        """Shut down vLLM workers or release Transformers tensors explicitly.
 
         Subsequent inference reloads the pinned checkpoint. Repeated calls are safe.
 
@@ -228,10 +299,14 @@ class NemotronParse35(BaseModel):
             None.
 
         Raises:
-            RuntimeError: If PyTorch cannot move model tensors off the device.
+            RuntimeError: If engine shutdown or PyTorch device cleanup fails.
+                References are retained on shutdown failure so cleanup can be retried.
         """
         if self._model is not None:
-            self._model.to("cpu")
+            if self._backend == "vllm":
+                self._model.llm_engine.engine_core.shutdown(timeout=30.0)
+            else:
+                self._model.to("cpu")
             self._model = None
         self._processor = None
         self._generation_config = None

@@ -63,7 +63,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
 
 
 def test_lazy_loading_pins_native_assets_and_preserves_tags(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35(device="cpu", max_tokens=123)
+    parser = NemotronParse35(backend="transformers", device="cpu", max_tokens=123)
     runtime.snapshot_download.assert_not_called()
     assert parser.invoke(Image.new("RGB", (16, 16))) == TAGGED_OUTPUT
     runtime.snapshot_download.assert_called_once()
@@ -83,7 +83,7 @@ def test_lazy_loading_pins_native_assets_and_preserves_tags(runtime: SimpleNames
 
 
 def test_batch_order_prompt_override_and_empty_batch(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     assert parser.invoke_batch([]) == []
     runtime.snapshot_download.assert_not_called()
     runtime.processor.batch_decode.side_effect = [["first"], ["second"]]
@@ -98,7 +98,7 @@ def test_unavailable_cuda_fails_before_checkpoint_download(
     runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, device: str
 ) -> None:
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    parser = NemotronParse35(device=device)
+    parser = NemotronParse35(backend="transformers", device=device)
     assert parser.invoke_batch([]) == []
     with pytest.raises(RuntimeError, match='CUDA is unavailable.*device="cpu"'):
         parser.invoke(Image.new("RGB", (16, 16)))
@@ -112,7 +112,7 @@ def test_invalid_cuda_index_fails_before_checkpoint_download(
 ) -> None:
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
-    parser = NemotronParse35(device="cuda:1")
+    parser = NemotronParse35(backend="transformers", device="cuda:1")
     with pytest.raises(RuntimeError, match='unavailable CUDA device cuda:1.*device="cpu"'):
         parser.invoke(Image.new("RGB", (16, 16)))
     runtime.snapshot_download.assert_not_called()
@@ -121,14 +121,14 @@ def test_invalid_cuda_index_fails_before_checkpoint_download(
 
 def test_explicit_cpu_does_not_require_cuda(runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-    assert NemotronParse35(device="cpu").invoke(Image.new("RGB", (16, 16))) == TAGGED_OUTPUT
+    assert NemotronParse35(backend="transformers", device="cpu").invoke(Image.new("RGB", (16, 16))) == TAGGED_OUTPUT
     runtime.snapshot_download.assert_called_once()
 
 
 def test_later_pages_are_not_converted_until_previous_output_is_decoded(
     runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     events: list[tuple[str, int]] = []
     page_indices: dict[int, int] = {}
     pages = [Image.new("RGB", (16, 16)) for _ in range(3)]
@@ -155,7 +155,7 @@ def test_later_pages_are_not_converted_until_previous_output_is_decoded(
 
 
 def test_failed_page_does_not_convert_later_pages(runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     preprocess = MagicMock(wraps=parser.preprocess)
     monkeypatch.setattr(parser, "preprocess", preprocess)
     runtime.model.generate.side_effect = RuntimeError("generation failed")
@@ -165,7 +165,7 @@ def test_failed_page_does_not_convert_later_pages(runtime: SimpleNamespace, monk
 
 
 def test_unload_then_reload(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     page = Image.new("RGB", (16, 16))
     parser(page)
     parser.unload()
@@ -179,7 +179,7 @@ def test_unload_then_reload(runtime: SimpleNamespace) -> None:
 
 
 def test_cuda_unload_explicitly_clears_cache(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35()
+    parser = NemotronParse35(backend="transformers")
     parser._model = runtime.model
     with patch("torch.cuda.is_available", return_value=True), patch("torch.cuda.empty_cache") as empty_cache:
         parser.unload()
@@ -188,7 +188,7 @@ def test_cuda_unload_explicitly_clears_cache(runtime: SimpleNamespace) -> None:
 
 
 def test_model_transfer_failure_releases_tensors(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     runtime.model.eval.return_value.to.side_effect = RuntimeError("transfer failed")
     with pytest.raises(RuntimeError, match="transfer failed"):
         parser(Image.new("RGB", (16, 16)))
@@ -207,7 +207,7 @@ def test_model_transfer_failure_releases_tensors(runtime: SimpleNamespace) -> No
     ],
 )
 def test_supported_images_keep_geometry(image: object) -> None:
-    normalized = NemotronParse35(device="cpu").preprocess(image)
+    normalized = NemotronParse35(backend="transformers", device="cpu").preprocess(image)
     assert normalized.mode == "RGB"
     assert normalized.size == (16, 20)
 
@@ -215,13 +215,13 @@ def test_supported_images_keep_geometry(image: object) -> None:
 def test_image_path_is_closed_after_loading(tmp_path) -> None:
     path = tmp_path / "page.png"
     Image.new("RGB", (16, 20)).save(path)
-    normalized = NemotronParse35(device="cpu").preprocess(path)
+    normalized = NemotronParse35(backend="transformers", device="cpu").preprocess(path)
     assert normalized.size == (16, 20)
     assert normalized.getpixel((0, 0)) == (0, 0, 0)
 
 
 def test_integer_tensor_pixels_are_not_scaled_as_floats() -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     assert parser.preprocess(torch.ones((3, 20, 16), dtype=torch.uint8)).getpixel((0, 0)) == (1, 1, 1)
     assert parser.preprocess(torch.ones((3, 20, 16))).getpixel((0, 0)) == (255, 255, 255)
 
@@ -229,11 +229,11 @@ def test_integer_tensor_pixels_are_not_scaled_as_floats() -> None:
 @pytest.mark.parametrize("shape", [(2, 20, 16, 3), (16,), (0, 16, 3), (20, 16, 2)])
 def test_invalid_shapes_are_rejected(shape: tuple[int, ...]) -> None:
     with pytest.raises(ValueError):
-        NemotronParse35(device="cpu").preprocess(np.zeros(shape))
+        NemotronParse35(backend="transformers", device="cpu").preprocess(np.zeros(shape))
 
 
 def test_invalid_inputs_do_not_download_weights(runtime: SimpleNamespace) -> None:
-    parser = NemotronParse35(device="cpu")
+    parser = NemotronParse35(backend="transformers", device="cpu")
     with pytest.raises(TypeError):
         parser.invoke(object())
     with pytest.raises(ValueError, match="finite"):
@@ -254,7 +254,10 @@ def test_gpu_actor_defaults_to_parse35_and_preserves_explicit_v12(model_id: str 
         actor._ensure_model()
     expected_parser = legacy_parser if model_id == NEMOTRON_PARSE_V12_MODEL else new_parser
     other_parser = new_parser if model_id == NEMOTRON_PARSE_V12_MODEL else legacy_parser
-    expected_parser.assert_called_once_with(task_prompt=NEMOTRON_PARSE_DEFAULT_TASK_PROMPT)
+    expected_kwargs = {"task_prompt": NEMOTRON_PARSE_DEFAULT_TASK_PROMPT}
+    if model_id != NEMOTRON_PARSE_V12_MODEL:
+        expected_kwargs["backend"] = "vllm"
+    expected_parser.assert_called_once_with(**expected_kwargs)
     other_parser.assert_not_called()
     assert actor.get_constructor_kwargs()["nemotron_parse_model"] == model_id
 
@@ -299,7 +302,7 @@ def test_native_output_uses_existing_pipeline_routing(runtime: SimpleNamespace) 
     ]
     result = nemotron_parse_pages(
         frame,
-        model=NemotronParse35(device="cpu"),
+        model=NemotronParse35(backend="transformers", device="cpu"),
         extract_text=True,
         extract_infographics=True,
         extract_charts=True,
