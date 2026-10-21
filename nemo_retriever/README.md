@@ -97,6 +97,14 @@ uv pip install torch==2.11.0 torchvision==0.26.0 -i https://download.pytorch.org
 
 Skip this step if you are using remote NIM inference only.
 
+Local vLLM inference also requires a writable FlashInfer cache and HTTPS
+access to `edge.urm.nvidia.com` for missing GPU kernel artifacts. The default
+artifact cache is `~/.cache/flashinfer/cubins`. Before running offline, prefetch
+artifacts and exercise your intended model on matching GPU hardware. Refer to
+[Local GPU kernel cache](../docs/docs/extraction/prerequisites-support-matrix.md#local-gpu-kernel-cache)
+for the prefetch command and cache configuration. Model weights require
+separate caching.
+
 ## Run the pipeline
 
 The [test PDF](../data/multimodal_test.pdf) contains text, tables, charts, and images. Additional test data resides [here](../data/).
