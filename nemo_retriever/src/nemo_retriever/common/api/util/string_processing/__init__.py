@@ -12,6 +12,8 @@ DEPLOT_MAX_TOKENS = 128
 DEPLOT_TEMPERATURE = 1.0
 DEPLOT_TOP_P = 1.0
 
+_V1_PATH_SEGMENT = re.compile(r"(?<!/)/v1(?=[/?#]|$)")
+
 
 def remove_url_endpoints(url) -> str:
     """Some configurations provide the full endpoint in the URL.
@@ -26,8 +28,11 @@ def remove_url_endpoints(url) -> str:
     Returns:
         str: URL with just the hostname:port portion remaining
     """
-    if "/v1" in url:
-        url = url.split("/v1")[0]
+    # Match "/v1" only as a whole path segment, never inside the authority
+    # (e.g. "http://v1-nim:8000"), where it would truncate the hostname.
+    match = _V1_PATH_SEGMENT.search(url)
+    if match:
+        url = url[: match.start()]
 
     return url
 
