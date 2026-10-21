@@ -290,3 +290,52 @@ def test_model_close_during_a_batch_keeps_that_batch_engine() -> None:
 
     assert model.invoke_batch_with_finish_reasons(["image"]) == [("page", "stop")]
     engine.generate.assert_called_once()
+
+
+def test_async_engine_rejects_submission_after_close_without_creating_a_coroutine(
+    fake_async_engine,
+):
+    import warnings
+
+    engine, fake = fake_async_engine
+    engine.close()
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(RuntimeError, match="engine was closed"):
+            engine.generate(["fast"], None)
+    assert not caught
+    assert not fake.request_ids
+
+
+def test_async_engine_shutdown_waits_for_cancelled_request_cleanup():
+    import asyncio
+    import concurrent.futures
+    import threading
+
+    entered = threading.Event()
+    cleaned = threading.Event()
+
+    class SlowCleanup(_FakeAsyncLLM):
+        async def generate(self, prompt, sampling_params, request_id):
+            entered.set()
+            try:
+                await asyncio.sleep(60)
+                yield None
+            finally:
+                await asyncio.sleep(0.02)
+                cleaned.set()
+
+        def shutdown(self):
+            assert cleaned.is_set(), "engine shut down before request cleanup"
+            super().shutdown()
+
+    fake = SlowCleanup()
+    engine = _make_async_engine(fake)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(engine.generate, ["hang"], None)
+        assert entered.wait(5)
+        engine.close()
+        with pytest.raises(concurrent.futures.CancelledError):
+            future.result(timeout=5)
+    assert cleaned.is_set()
+    assert fake.shutdown_calls == 1

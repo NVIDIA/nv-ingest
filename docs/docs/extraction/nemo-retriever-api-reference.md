@@ -274,6 +274,202 @@ actions, and escalation criteria, refer to
     container versions from that deployment and include them in the support
     case.
 
+## Write graph results to Parquet { #graph-parquet-output }
+
+Call `.save_to_disk(output_directory)` before `.ingest()` to write graph rows
+to a local Parquet dataset. The default `output_schema="native"` preserves
+native graph columns. Select `output_schema="interleaved"` for ordered
+multimodal rows projected from tagged Parse pages. This method configures the writer and returns
+the ingestor. Extraction and writing start when you call `.ingest()`. It works
+with `run_mode="inprocess"` and `run_mode="batch"`.
+
+The following example uses a [served Nemotron 3.5 Parse
+endpoint](multimodal-extraction.md#served-nemotron-35-parse) and returns counts
+without retaining all extracted rows in the driver.
+
+```python
+from nemo_retriever import create_ingestor
+
+summary = (
+    create_ingestor(run_mode="batch", error_policy="collect")
+    .files(["report.pdf"])
+    .extract(
+        method="nemotron_parse",
+        nemotron_parse_invoke_url="http://localhost:8000/v1/chat/completions",
+        nemotron_parse_model="nvidia/Nemotron-3.5-Parse",
+        extract_text=True,
+        extract_tables=True,
+    )
+    .save_to_disk("./parse-rows", rows_per_file=1024)
+    .ingest(return_results=False)
+)
+
+print(summary.to_dict(orient="records"))
+```
+
+The destination must not already exist. Choose a new destination for each run;
+the writer does not append to or replace an existing dataset.
+
+The writer accepts the following settings.
+
+| Argument | Default | Behavior |
+| --- | --- | --- |
+| `output_directory` | Required | Local directory to publish after the stream completes. |
+| `compression` | `"snappy"` | PyArrow-supported Parquet compression codec, or `None` for no compression. |
+| `rows_per_file` | `1024` | Positive maximum number of output rows in each Parquet part. This is not the model inference batch size. |
+| `output_schema` | `"native"` | Preserve native graph rows, or use `"interleaved"` to project tagged Parse page results. |
+| `passthrough_columns` | `()` | Input columns to copy onto interleaved page elements and error rows. Only valid with `output_schema="interleaved"`. |
+
+With `return_results=False`, the returned DataFrame contains one summary row.
+`input_rows` counts graph rows consumed by the writer. `written_rows` counts
+rows in the published dataset. These counts match for native output;
+interleaved output can contain several elements and document metadata rows per
+input. Neither field counts successful pages or model requests.
+`parquet_files` counts the written parts, including the readable empty part
+created when the stream contains no rows.
+
+The default `return_results=True` also returns the native extracted DataFrame
+and retains those records in memory, regardless of the selected disk schema. Use that mode with `return_failures=True`
+when you need a returned failure list. `return_failures=True` cannot be
+combined with the Parquet summary mode; inspect the saved error fields instead.
+
+The default native dataset preserves graph columns, including binary content
+and nested extraction errors. A failed page remains a failed row; saving it does
+not make its extraction successful. Empty dictionaries become null because
+Parquet cannot represent an empty struct. Nullable fields introduced by later
+batches are aligned across parts before publication. Incompatible values can
+still cause a schema error.
+
+The existing extraction error policy still applies. With the default
+`error_policy="raise"`, configured remote-stage errors raise
+`GraphIngestionError` after all rows have been saved and the dataset has been
+published. In summary mode, the exception retains the first failing batch's
+diagnostics; the dataset retains all failed rows. Use `error_policy="collect"`
+to receive the summary and review the saved errors yourself. The existence of
+a published dataset does not imply that `.ingest()` returned successfully.
+
+The writer consumes the stream into a temporary sibling directory, writes
+`_common_metadata` and a `_SUCCESS` record, then publishes the destination by
+renaming the directory. If consumption or writing fails, it removes that
+attempt's temporary directory. `_SUCCESS` records completed dataset writing,
+not error-free page extraction.
+
+You can verify the published dataset without loading all rows into memory.
+
+```python
+import pyarrow.dataset as ds
+
+saved = ds.dataset("./parse-rows", format="parquet")
+print(saved.count_rows())
+print(saved.schema)
+
+for batch in saved.to_batches(columns=["nemotron_parse_v1_2"], batch_size=128):
+    for row in batch.to_pylist():
+        metadata = row.get("nemotron_parse_v1_2") or {}
+        if metadata.get("error"):
+            print(metadata["error"])
+```
+
+Batch mode consumes Ray Data output in batches. In-process mode reuses its
+operators across bounded document batches and closes them after the stream.
+A single PDF can still produce many page rows in one document batch.
+In-process streaming rejects operators that require the complete corpus as one
+global batch because splitting that input would change their behavior.
+
+`ServiceIngestor.save_to_disk()` is a separate service-mode API. It writes
+per-document JSON or compressed JSON, not this Parquet dataset.
+
+### Export tagged Parse pages as interleaved rows { #interleaved-parquet-output }
+
+Set `output_schema="interleaved"` when a downstream reader needs ordered text,
+table, and image elements. This export uses PyArrow and the library's Parse
+postprocessor; it does not require an installed NeMo Curator package.
+
+The following configuration keeps each page's native Parse diagnostics as an
+additional column in the saved elements and error rows.
+
+```python
+summary = (
+    create_ingestor(run_mode="batch", error_policy="collect")
+    .files(["report.pdf"])
+    .extract(
+        method="nemotron_parse",
+        nemotron_parse_invoke_url="http://localhost:8000/v1/chat/completions",
+        nemotron_parse_model="nvidia/Nemotron-3.5-Parse",
+        extract_text=True,
+        extract_tables=True,
+    )
+    .save_to_disk(
+        "./parse-interleaved",
+        output_schema="interleaved",
+        passthrough_columns=("nemotron_parse_v1_2",),
+    )
+    .ingest(return_results=False)
+)
+```
+
+The projection requires tagged Parse output in `nemotron_parse_v1_2`, a
+one-based input `page_number`, and a source path or source identity. It does
+not convert arbitrary graph rows or untagged Markdown into a validated page.
+Missing page information becomes an error row when a source identity exists;
+missing source identity or duplicate document/page identities abort publication.
+
+The eight reserved columns have the following meanings.
+
+| Column | Meaning |
+| --- | --- |
+| `sample_id` | Document grouping key: the input `source_id`, or a hash of the source path when it is absent. |
+| `position` | Element order within the document. The document metadata row has position `-1`; page elements and error rows start at `0`. |
+| `modality` | `text`, `table`, `image`, or `metadata`. `Picture` elements become images; `Table` elements become tables; other classes become text. |
+| `content_type` | `image/png` for picture crops, `text/markdown` for text and tables, or `application/json` for metadata and error rows. |
+| `text_content` | Element text or document metadata. Table bodies retain their native markup, including merged-cell spans. |
+| `binary_content` | Decoded PNG picture-crop bytes when the element is an image. |
+| `source_ref` | JSON containing the source path. |
+| `materialize_error` | JSON error details for a failed page, otherwise null. |
+
+Additional identity and geometry columns are `page_number`, `source_path`,
+`element_class`, `bbox_xyxy_norm`, and `bbox_coordinate_space`. The exported
+`page_number` is zero-based. Bounding boxes refer to the coordinate space
+recorded in `bbox_coordinate_space`, not directly to source PDF coordinates.
+
+`passthrough_columns` copies explicitly selected input columns onto page
+output rows. Missing selected values become null. Names must not collide with
+the reserved or identity/geometry columns. Native output already keeps every
+column, so it rejects `passthrough_columns` rather than silently ignoring it.
+
+Each page must pass whole-page validation before its elements are published.
+The complete response must parse into balanced tagged elements, and every
+box must contain finite, ordered coordinates between `0` and `1`. Every
+`Picture` must produce a decodable crop at least 10 pixels in each dimension.
+An upstream error, incomplete response, invalid box, or invalid picture crop
+produces one error row for that page. The writer does not publish the valid
+prefix of a rejected page.
+
+An empty Parse response is also a failed page. It is not classified as a
+correctly blank page because this export does not establish whether the source
+is blank. Passing structural validation does not establish extraction accuracy.
+Projection-only failures are recorded in `materialize_error`; they do not
+independently trigger `GraphIngestionError`. Inspect that column even when the
+ingest call succeeds.
+
+A temporary SQLite spool groups documents and orders their observed pages on
+disk before writing the Parquet parts. Reserve space for that spool, the
+Parquet output, and temporary part rewrites. This avoids concatenating the
+complete corpus in memory, but it does not eliminate temporary disk use or
+the memory needed to process an individual page.
+
+Each document also receives one metadata row with `observed_pages`,
+`failed_pages`, and an `extraction_status` of `success`, `partial`, or `failed`.
+These fields describe only the pages received by the writer. They do not prove
+that every page of the original PDF was ingested. Reconcile source-page counts
+and identities separately when you require complete-document accounting.
+
+Read interleaved Parquet with an Arrow dataset reader and filter
+`materialize_error` to inspect page failures. `return_results=True` still
+returns native graph rows, so read the published dataset to inspect its
+interleaved projection.
+
+
 ## PDF pre-splitting for parallel ingest { #pdf-pre-splitting-for-parallel-ingest }
 
 Large PDFs are split into page batches before Ray processing so extraction can run in parallel. This happens on the default ingest path; you do not need extra configuration for typical workloads.
@@ -421,14 +617,17 @@ service = create_ingestor(run_mode="service", base_url="http://localhost:7670")
 
 `create_ingestor(run_mode="inprocess")` and `create_ingestor(run_mode="batch")` return `GraphIngestor`. Import the class from `nemo_retriever.ingestor.graph_ingestor` when you need the type explicitly. Import `GraphIngestionError` from `nemo_retriever`.
 
-`GraphIngestor` methods include `extract_html()`, `extract_audio()`, `extract_video()`, `get_error_rows()`, and `get_dataset()`. `get_error_rows()` filters rows that contain stage error payloads from a pandas DataFrame or Ray Dataset. If you omit `dataset`, it uses the dataset retained from the last `ingest()` call. `get_dataset()` returns that retained dataset.
+`GraphIngestor` methods include `extract_html()`, `extract_audio()`, `extract_video()`, `save_to_disk()`, `get_error_rows()`, and `get_dataset()`. `get_error_rows()` filters rows that contain stage error payloads from a pandas DataFrame or Ray Dataset. If you omit `dataset`, it uses the dataset retained from the last `ingest()` call. `get_dataset()` returns that retained dataset.
 
-In batch mode, `.ingest(return_results=False)` returns a one-row summary
-instead of retaining full result records. You can also pass
-`IngestExecuteParams(return_results=False)` through `params`. This requires a
-final streaming VDB upload stage and the default raise error policy. Refer to
-[Return a batch ingest summary](vdbs.md#batch-ingest-summary) for the counts,
-requirements, and an example. `get_dataset()` then returns the summary.
+With `.save_to_disk()`, `.ingest(return_results=False)` returns a Parquet
+writing summary in either graph run mode. Refer to [Write graph results to
+Parquet](#graph-parquet-output) for its counts and error handling.
+
+Without `.save_to_disk()`, this flag requires batch mode, a final streaming VDB
+upload stage, and the default raise error policy. Refer to [Return a batch
+ingest summary](vdbs.md#batch-ingest-summary) for that path's counts and
+requirements. You can also pass `IngestExecuteParams(return_results=False)`
+through `params`. In batch mode, `get_dataset()` then returns the summary.
 
 ::: nemo_retriever.ingestor.graph_ingestor.GraphIngestor
     options:
@@ -448,7 +647,7 @@ requirements, and an example. `get_dataset()` then returns the summary.
 
 `create_ingestor(run_mode="service")` returns `ServiceIngestor`. Import the class from `nemo_retriever.service.service_ingestor`. `ingest()` returns `ServiceIngestResult`.
 
-Service-only methods include `split()`, `pdf_split_config()`, `save_to_disk()`, `ingest_stream()`, `aingest_stream()`, and `cancel()`. `cancel()` is part of the public class. It currently raises `NotImplementedError` because the service does not expose a cancel endpoint.
+Service-only methods include `split()`, `pdf_split_config()`, `ingest_stream()`, `aingest_stream()`, and `cancel()`. Its `save_to_disk()` method writes service results as JSON and has a different signature from the graph Parquet writer. `cancel()` is part of the public class. It currently raises `NotImplementedError` because the service does not expose a cancel endpoint.
 
 #### Choose a service result schema { #service-result-schema }
 

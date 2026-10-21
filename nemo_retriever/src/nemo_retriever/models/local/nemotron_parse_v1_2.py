@@ -107,9 +107,14 @@ class _AsyncEngine:
         from vllm.engine.arg_utils import AsyncEngineArgs
         from vllm.v1.engine.async_llm import AsyncLLM
 
+        self._lifecycle_lock = threading.Lock()
+        self._closed = False
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(
-            target=_run_event_loop, args=(self._loop,), name="nemotron-parse-engine", daemon=True
+            target=_run_event_loop,
+            args=(self._loop,),
+            name="nemotron-parse-engine",
+            daemon=True,
         )
         self._thread.start()
 
@@ -126,6 +131,9 @@ class _AsyncEngine:
 
     def close(self) -> None:
         """Cancel in-flight requests, shut down the engine, and stop its thread; later calls do nothing."""
+        with self._lifecycle_lock:
+            self._closed = True
+        # Do not hold this lock while joining the loop: close may also run on that loop.
         self._finalizer()
 
     def generate(self, prompts: Sequence[Any], sampling_params: Any) -> List[Any]:
@@ -146,13 +154,24 @@ class _AsyncEngine:
             tasks = [asyncio.ensure_future(final_output(prompt)) for prompt in prompts]
             try:
                 return list(await asyncio.gather(*tasks))
-            except Exception:
+            except BaseException:
+                # Cancellation also waits for every sibling generator to release its request.
                 for task in tasks:
                     task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
                 raise
 
-        return asyncio.run_coroutine_threadsafe(generate_all(), self._loop).result()
+        # Submit while holding the same lock as close(), but do not hold it while
+        # waiting: shutdown must be able to cancel a running batch.
+        with self._lifecycle_lock:
+            if self._closed:
+                raise RuntimeError("Nemotron Parse async engine was closed")
+            future = asyncio.run_coroutine_threadsafe(generate_all(), self._loop)
+        try:
+            return future.result()
+        except BaseException:
+            future.cancel()
+            raise
 
 
 # ---------------------------------------------------------------------------

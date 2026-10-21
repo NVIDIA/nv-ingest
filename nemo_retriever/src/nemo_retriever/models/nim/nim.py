@@ -270,6 +270,15 @@ def _mime_from_b64(b64: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+class IncompleteParseOutputError(ValueError):
+    """A native Parse response ended at its token limit; retain its page evidence."""
+
+    def __init__(self, message: str, *, response: Dict[str, Any], page_index: int) -> None:
+        super().__init__(message)
+        self.response = response
+        self.page_index = page_index
+
+
 class NIMClient:
     """Persistent NIM HTTP client that reuses a single :class:`ThreadPoolExecutor`.
 
@@ -349,7 +358,13 @@ class NIMClient:
                 invoke_url=endpoints[index % len(endpoints)],
                 payload={},
                 headers=headers,
-                files={"document": ("page.png" if mime == "image/png" else "page.jpg", image_bytes, mime)},
+                files={
+                    "document": (
+                        "page.png" if mime == "image/png" else "page.jpg",
+                        image_bytes,
+                        mime,
+                    )
+                },
                 timeout_s=timeout_s,
                 max_retries=max_retries,
                 max_429_retries=max_429_retries,
@@ -362,10 +377,12 @@ class NIMClient:
                     "endpoint, rather than a chat-completions or legacy endpoint, before retrying."
                 )
             if response.get("finish_reason") == "length":
-                raise ValueError(
+                raise IncompleteParseOutputError(
                     f"Native Parse output for page {index + 1} reached its token limit; refusing truncated content. "
                     "Split this page into smaller image regions and retry those regions. Retrying the unchanged "
-                    "page will not resolve the output limit; this method does not expose a token-budget override."
+                    "page will not resolve the output limit; this method does not expose a token-budget override.",
+                    response=response,
+                    page_index=index,
                 )
             return response
 
@@ -512,23 +529,29 @@ class NIMClient:
         extra_body: Optional[Dict[str, Any]] = None,
         max_retries: int = 10,
         max_429_retries: int = 5,
-    ) -> List[str]:
+        return_metadata: bool = False,
+    ) -> List[Any]:
         """Concurrent chat completions using the persistent thread pool."""
-        from nemo_retriever.models.nim.chat_completions import extract_chat_completion_text
+        from nemo_retriever.models.nim.chat_completions import (
+            extract_chat_completion_text,
+        )
 
         if not messages_list:
             return []
 
         token = (api_key or "").strip()
-        headers: Dict[str, str] = {"Accept": "application/json", "Content-Type": "application/json"}
+        headers: Dict[str, str] = {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
         invoke_urls = _parse_invoke_urls(invoke_url)
-        results: List[Optional[str]] = [None] * len(messages_list)
+        results: List[Optional[Any]] = [None] * len(messages_list)
         trace_context = _capture_trace_context()
 
-        def _invoke_one(idx: int, messages: List[Dict[str, Any]], endpoint_url: str) -> Tuple[int, str]:
+        def _invoke_one(idx: int, messages: List[Dict[str, Any]], endpoint_url: str) -> Tuple[int, Any]:
             payload: Dict[str, Any] = {
                 "messages": messages,
                 "temperature": temperature,
@@ -546,7 +569,15 @@ class NIMClient:
                 max_429_retries=int(max_429_retries),
                 trace_context=trace_context,
             )
-            return idx, extract_chat_completion_text(response_json)
+            text = extract_chat_completion_text(response_json)
+            if return_metadata:
+                choice = response_json.get("choices", [{}])[0]
+                return idx, {
+                    "text": text,
+                    "finish_reason": choice.get("finish_reason"),
+                    "usage": response_json.get("usage"),
+                }
+            return idx, text
 
         futures = {
             self._executor.submit(_invoke_one, i, msgs, invoke_urls[i % len(invoke_urls)]): i
@@ -572,7 +603,8 @@ class NIMClient:
         extra_body: Optional[Dict[str, Any]] = None,
         max_retries: int = 10,
         max_429_retries: int = 5,
-    ) -> List[str]:
+        return_metadata: bool = False,
+    ) -> List[Any]:
         """Chat completions wrapper: one request per base64 image."""
         if not image_b64_list:
             return []
@@ -607,6 +639,7 @@ class NIMClient:
             extra_body=merged_extra,
             max_retries=max_retries,
             max_429_retries=max_429_retries,
+            return_metadata=return_metadata,
         )
 
     # -- lifecycle --------------------------------------------------------

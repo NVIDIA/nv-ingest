@@ -504,6 +504,52 @@ class InprocessExecutor(AbstractExecutor):
 
         return df
 
+    def iter_batches(self, data: Any, *, batch_size: int = 1) -> Iterator[pd.DataFrame]:
+        """Execute bounded input batches with one set of operators for this stream.
+
+        A batch contains input documents, not extracted pages. Global operators
+        cannot use this path because splitting their corpus would change results.
+        An iterator of pandas frames can also feed an already prepared graph.
+        """
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+            raise ValueError("batch_size must be a positive integer")
+        resolved = resolve_graph(self.graph, _rrh.gather_local_resources())
+        nodes = self._linearize(resolved)
+        if any(getattr(node.operator_class, "REQUIRES_GLOBAL_BATCH", False) for node in nodes):
+            raise ValueError("In-process streaming cannot split a graph with a global-batch operator")
+        operators = []
+        try:
+            for node in nodes:
+                operators.append(node.operator_class(**node.operator_kwargs))
+            if isinstance(data, pd.DataFrame):
+                batches = (data.iloc[start : start + batch_size].copy() for start in range(0, len(data), batch_size))
+            elif isinstance(data, (str, list)):
+                paths = expand_input_file_patterns(data)
+                batches = (
+                    self._load_files(paths[start : start + batch_size]) for start in range(0, len(paths), batch_size)
+                )
+            else:
+                batches = iter(data)
+            try:
+                for frame in batches:
+                    if not isinstance(frame, pd.DataFrame):
+                        raise TypeError("In-process streams must yield pandas DataFrames")
+                    for op in operators:
+                        frame = op.run(frame)
+                    yield frame
+            finally:
+                close = getattr(batches, "close", None)
+                if callable(close):
+                    close()
+        finally:
+            from contextlib import ExitStack
+
+            with ExitStack() as cleanup:
+                for op in operators:
+                    close = getattr(op, "close", None)
+                    if callable(close):
+                        cleanup.callback(close)
+
     @staticmethod
     def _load_files(paths: List[str]) -> "pd.DataFrame":
         """Read files as raw bytes into a DataFrame with ``bytes`` and ``path`` columns."""

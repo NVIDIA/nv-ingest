@@ -1227,3 +1227,43 @@ class TestBatchEmbedActor:
         actor = self._make()
         result = actor(pd.DataFrame({"text": ["hello"]}))
         pd.testing.assert_frame_equal(result, expected)
+
+
+def test_parse_actor_cannot_reload_before_previous_engine_releases_memory():
+    import concurrent.futures
+    import threading
+
+    from nemo_retriever.operators.extract.parse.nemotron_parse import (
+        NemotronParseGPUActor,
+    )
+
+    closing = threading.Event()
+    release = threading.Event()
+    new_load = threading.Event()
+    actor = NemotronParseGPUActor(async_engine=True)
+    old_model = MagicMock()
+
+    def close_old():
+        closing.set()
+        assert release.wait(5)
+
+    old_model.close.side_effect = close_old
+    actor._model = old_model
+
+    def load_new(**kwargs):
+        assert release.is_set(), "new model allocated before old engine close finished"
+        new_load.set()
+        return MagicMock()
+
+    with patch("nemo_retriever.models.local.NemotronParseV12", side_effect=load_new):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            closer = pool.submit(actor.close)
+            assert closing.wait(5)
+            loader = pool.submit(actor._ensure_model)
+            try:
+                assert not new_load.wait(0.05)
+            finally:
+                release.set()
+            closer.result(timeout=5)
+            assert loader.result(timeout=5) is actor._model
+    actor.close()

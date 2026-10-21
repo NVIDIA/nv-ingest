@@ -13,7 +13,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
-from nemo_retriever.graph.executor import call_pandas_function_on_arrow, preflight_executors
+from nemo_retriever.graph.executor import (
+    call_pandas_function_on_arrow,
+    preflight_executors,
+)
 from nemo_retriever.common.url_fetch import restore_url_source_value
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
@@ -128,6 +131,7 @@ class ExtractionBranchExecutor:
     ensure_batch_runtime: Callable[[], tuple[Any, Any]]
     return_results: bool = True
     validate_batch: Callable[[Any], None] | None = None
+    result_writer: Any | None = None
 
     def execute(self) -> Any:
         logger.info(
@@ -193,7 +197,10 @@ class ExtractionBranchExecutor:
                 branch_executors.append(executor)
                 branch_inputs.append((executor, input_data))
 
-        logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
+        logger.info(
+            "Retriever ingest post-extraction stages: %s",
+            format_post_stage_summary(self.post_extract_order),
+        )
         post_graph = build_post_extract_graph(
             dedup_params=self.dedup_params,
             embed_params=self.embed_params,
@@ -243,11 +250,16 @@ class ExtractionBranchExecutor:
         combined = normalized[0]
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
+        if self.result_writer is not None:
+            dataset = post_executor.build_dataset(combined)
+            return self.result_writer(dataset.iter_batches(batch_format=None, batch_size=self.batch_size))
         if self.return_results:
             return post_executor.ingest(combined)
         return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
 
     def _execute_inprocess(self) -> Any:
+        if self.result_writer is not None:
+            return self._write_inprocess()
         frames = []
         for branch in self.branches:
             effective_extraction = self._resolve_branch(branch)
@@ -260,11 +272,17 @@ class ExtractionBranchExecutor:
             graph = self._build_extraction_only_graph(effective_extraction)
             executor = InprocessExecutor(graph, show_progress=self.show_progress)
             frames.append(
-                restore_source_urls(executor.ingest(self._inprocess_branch_input(branch)), source_map=self.source_map)
+                restore_source_urls(
+                    executor.ingest(self._inprocess_branch_input(branch)),
+                    source_map=self.source_map,
+                )
             )
 
         combined = concat_dataframes(frames)
-        logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
+        logger.info(
+            "Retriever ingest post-extraction stages: %s",
+            format_post_stage_summary(self.post_extract_order),
+        )
         post_graph = build_post_extract_graph(
             dedup_params=self.dedup_params,
             embed_params=self.embed_params,
@@ -276,6 +294,43 @@ class ExtractionBranchExecutor:
             reshape_content_before_embed=self._should_reshape_content_before_embed(),
         )
         return InprocessExecutor(post_graph, show_progress=self.show_progress).ingest(combined)
+
+    def _write_inprocess(self) -> Any:
+        """Stream extraction branches into one reusable post-extraction graph."""
+
+        def extraction_batches():
+            for branch in self.branches:
+                graph = self._build_extraction_only_graph(self._resolve_branch(branch))
+                executor = InprocessExecutor(graph, show_progress=self.show_progress)
+                paths, rows = self._partition_branch_inputs(branch)
+
+                def inputs():
+                    import pandas as pd
+
+                    for path in paths:
+                        yield executor._load_files([path])
+                    for row in rows:
+                        yield pd.DataFrame([row])
+
+                stream = executor.iter_batches(inputs())
+                try:
+                    for frame in stream:
+                        yield restore_source_urls(frame, source_map=self.source_map)
+                finally:
+                    stream.close()
+
+        post_graph = build_post_extract_graph(
+            dedup_params=self.dedup_params,
+            embed_params=self.embed_params,
+            caption_params=self.caption_params,
+            store_params=self.store_params,
+            vdb_upload_params=self.vdb_upload_params,
+            webhook_params=self.webhook_params,
+            stage_order=self.post_extract_order,
+            reshape_content_before_embed=self._should_reshape_content_before_embed(),
+        )
+        executor = InprocessExecutor(post_graph, show_progress=self.show_progress)
+        return self.result_writer(executor.iter_batches(extraction_batches()))
 
     def _should_reshape_content_before_embed(self) -> bool:
         return any(branch.family in {"pdf", "image"} for branch in self.branches)
