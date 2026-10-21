@@ -484,9 +484,9 @@ def nemotron_parse_pages(
     for pos, raw_text in enumerate(raw_texts):
         idx = batch_indices[pos]
         try:
-            if native_parse and "<class_" not in raw_text:
-                # Preserve untagged Markdown; tagged native output uses the
-                # existing element/bounding-box router below.
+            if native_parse and not extract_classes_bboxes(raw_text)[0]:
+                # Only complete bounding-box/class sequences select the tagged
+                # router. Literal or incomplete tags remain page Markdown.
                 if not extract_text:
                     raise ValueError("Untagged native Parse content requires extract_text=True.")
                 all_text[idx] = raw_text

@@ -89,8 +89,15 @@ def test_native_client_does_not_retry_bad_requests(monkeypatch):
     assert post.call_count == 1
 
 
-def test_native_markdown_is_preserved_as_page_text_and_usage_is_recorded():
-    markdown = "# Budget\n\n| Item | Cost |\n| --- | --- |\n| Equipment | 42000 |"
+@pytest.mark.parametrize(
+    "markdown",
+    [
+        "# Budget\n\n| Item | Cost |\n| --- | --- |\n| Equipment | 42000 |",
+        "# Parse syntax\n\nUse `<class_Text>` to label text; `<class_` begins a class tag.",
+        "# Incomplete example\n\n<x_0.1><y_0.2>Budget 42000<class_Text>",
+    ],
+)
+def test_native_markdown_is_preserved_as_page_text_and_usage_is_recorded(markdown):
     client = Mock()
     client.invoke_parse_pages.return_value = [
         {"content": markdown, "finish_reason": "stop", "usage": {"output_tokens": 42}}
