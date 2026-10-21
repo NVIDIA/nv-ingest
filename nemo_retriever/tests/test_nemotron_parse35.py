@@ -20,6 +20,7 @@ from nemo_retriever.common.params.utils import (
     NEMOTRON_PARSE_V12_MODEL,
 )
 from nemo_retriever.models.hf_model_registry import get_hf_revision
+from nemo_retriever.models.local import nemotron_parse35 as parse35_module
 from nemo_retriever.models.local.nemotron_parse35 import NemotronParse35
 from nemo_retriever.operators.extract.parse.nemotron_parse import (
     NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,
@@ -47,9 +48,9 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
     monkeypatch.setattr("transformers.AutoModel.from_pretrained", model_loader)
     monkeypatch.setattr("transformers.AutoProcessor.from_pretrained", processor_loader)
     monkeypatch.setattr("transformers.GenerationConfig.from_pretrained", generation_loader)
-    monkeypatch.setattr(
-        "nemo_retriever.models.local.nemotron_parse35.configure_global_hf_cache_base", lambda _: "/cache"
-    )
+    # Other tests reload the lazy local-model package. Keep the actual module
+    # object rather than resolving its package attribute again in the fixture.
+    monkeypatch.setattr(parse35_module, "configure_global_hf_cache_base", lambda _: "/cache")
     return SimpleNamespace(
         model=model,
         processor=processor,

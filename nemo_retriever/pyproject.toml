@@ -25,8 +25,6 @@ override-dependencies = [
   "idna>=3.15",
   "pydantic-settings>=2.14.2",
   "vllm==0.26.0",
-  # Quack kernels used by vLLM 0.26 still require the CUTLASS 4.5 API (ThrMma).
-  "nvidia-cutlass-dsl==4.5.2",
   "transformers>=5.17.0",
   "ray>=2.56.1",
   "nltk>=3.10.3",
@@ -166,8 +164,8 @@ local = [
   # Use a uv-managed Python (`uv python install 3.12`) so headers are available;
   # system Python installs typically omit them and will fail with InductorError.
   "vllm==0.26.0; sys_platform == 'linux'",
-  # Keep pip installs on the same Quack-compatible CUTLASS API as uv installs.
-  "nvidia-cutlass-dsl==4.5.2; sys_platform == 'linux'",
+  # Older Quack releases use APIs removed in vLLM 0.26's required CUTLASS 4.6.
+  "quack-kernels==0.6.1; sys_platform == 'linux'",
   # vLLM 0.26 requires FlashInfer 0.6.14. No matching cubin wheel is published;
   # use FlashInfer's artifact cache rather than the incompatible 0.6.13 wheel.
   "flashinfer-python==0.6.14; sys_platform == 'linux'",
