@@ -184,6 +184,15 @@ the checkpoint code before use. It retains the existing task prompt, which
 disables text prediction inside pictures. The default extraction method
 remains `pdfium_hybrid`; select `method="nemotron_parse"` to use Parse.
 
+The `NemotronParse35` adapter loads lazily. Before downloading checkpoint
+assets, its first nonempty inference call validates the requested CUDA device.
+Unavailable CUDA or an invalid GPU index raises `RuntimeError`. Direct adapter
+callers can explicitly select `NemotronParse35(device="cpu")`; this does not
+enable automatic CPU inference in the CLI or graph pipeline. Batch parsing
+converts and generates one page at a time, preserving input order without
+retaining converted copies of the entire batch. If a page fails, the adapter
+does not return a partial batch.
+
 Other local Parse model values, including
 `nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before
 pipeline execution. To use a remote Nemotron Parse endpoint, configure

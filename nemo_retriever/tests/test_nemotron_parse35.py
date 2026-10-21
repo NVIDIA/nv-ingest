@@ -93,6 +93,77 @@ def test_batch_order_prompt_override_and_empty_batch(runtime: SimpleNamespace) -
     runtime.snapshot_download.assert_called_once()
 
 
+@pytest.mark.parametrize("device", ["cuda", "cuda:0", "cuda:4"])
+def test_unavailable_cuda_fails_before_checkpoint_download(
+    runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, device: str
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    parser = NemotronParse35(device=device)
+    assert parser.invoke_batch([]) == []
+    with pytest.raises(RuntimeError, match='CUDA is unavailable.*device="cpu"'):
+        parser.invoke(Image.new("RGB", (16, 16)))
+    runtime.snapshot_download.assert_not_called()
+    runtime.model_loader.assert_not_called()
+    runtime.processor_loader.assert_not_called()
+
+
+def test_invalid_cuda_index_fails_before_checkpoint_download(
+    runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "device_count", lambda: 1)
+    parser = NemotronParse35(device="cuda:1")
+    with pytest.raises(RuntimeError, match='unavailable CUDA device cuda:1.*device="cpu"'):
+        parser.invoke(Image.new("RGB", (16, 16)))
+    runtime.snapshot_download.assert_not_called()
+    runtime.model_loader.assert_not_called()
+
+
+def test_explicit_cpu_does_not_require_cuda(runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    assert NemotronParse35(device="cpu").invoke(Image.new("RGB", (16, 16))) == TAGGED_OUTPUT
+    runtime.snapshot_download.assert_called_once()
+
+
+def test_later_pages_are_not_converted_until_previous_output_is_decoded(
+    runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    parser = NemotronParse35(device="cpu")
+    events: list[tuple[str, int]] = []
+    page_indices: dict[int, int] = {}
+    pages = [Image.new("RGB", (16, 16)) for _ in range(3)]
+    page_indices.update((id(page), index) for index, page in enumerate(pages))
+    original_preprocess = parser.preprocess
+
+    def preprocess(page: Image.Image) -> Image.Image:
+        events.append(("convert", page_indices[id(page)]))
+        return original_preprocess(page)
+
+    def generate(**kwargs: object) -> torch.Tensor:
+        events.append(("generate", runtime.model.generate.call_count - 1))
+        return torch.tensor([[1, 2]])
+
+    def decode(*args: object, **kwargs: object) -> list[str]:
+        events.append(("decode", runtime.processor.batch_decode.call_count - 1))
+        return [TAGGED_OUTPUT]
+
+    monkeypatch.setattr(parser, "preprocess", preprocess)
+    runtime.model.generate.side_effect = generate
+    runtime.processor.batch_decode.side_effect = decode
+    assert parser.invoke_batch(pages) == [TAGGED_OUTPUT] * len(pages)
+    assert events == [(stage, index) for index in range(len(pages)) for stage in ("convert", "generate", "decode")]
+
+
+def test_failed_page_does_not_convert_later_pages(runtime: SimpleNamespace, monkeypatch: pytest.MonkeyPatch) -> None:
+    parser = NemotronParse35(device="cpu")
+    preprocess = MagicMock(wraps=parser.preprocess)
+    monkeypatch.setattr(parser, "preprocess", preprocess)
+    runtime.model.generate.side_effect = RuntimeError("generation failed")
+    with pytest.raises(RuntimeError, match="generation failed"):
+        parser.invoke_batch([Image.new("RGB", (16, 16)) for _ in range(3)])
+    assert preprocess.call_count == 1
+
+
 def test_unload_then_reload(runtime: SimpleNamespace) -> None:
     parser = NemotronParse35(device="cpu")
     page = Image.new("RGB", (16, 16))

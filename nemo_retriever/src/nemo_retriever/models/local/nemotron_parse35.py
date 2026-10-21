@@ -26,8 +26,8 @@ class NemotronParse35(BaseModel):
     """Parse page images with the checkpoint's native Transformers model and processor.
 
     Weights and custom code are loaded lazily from an immutable registry revision.
-    Pages are generated sequentially to bound GPU memory independently of the
-    pipeline batch size. No vLLM plugin is installed or imported.
+    Pages are converted and generated sequentially to bound additional image
+    and GPU memory independently of batch size. No vLLM plugin is imported.
     """
 
     def __init__(
@@ -41,6 +41,7 @@ class NemotronParse35(BaseModel):
 
         Args:
             device: PyTorch inference device, normally the worker's ``cuda`` device.
+                Select ``cpu`` explicitly when CUDA is unavailable.
             hf_cache_dir: Optional Hugging Face snapshot cache directory.
             task_prompt: Native control tokens. Picture text is disabled unless enabled explicitly.
             max_tokens: Positive maximum number of generated tokens per page.
@@ -63,6 +64,17 @@ class NemotronParse35(BaseModel):
     def _ensure_model(self) -> None:
         if self._model is not None:
             return
+        if self._device.type == "cuda":
+            if not torch.cuda.is_available():
+                raise RuntimeError(
+                    f"Nemotron 3.5 Parse requested device {self._device}, but CUDA is unavailable. "
+                    'Use a CUDA-enabled host or explicitly select device="cpu".'
+                )
+            if self._device.index is not None and self._device.index >= torch.cuda.device_count():
+                raise RuntimeError(
+                    f"Nemotron 3.5 Parse requested unavailable CUDA device {self._device}. "
+                    'Select a visible CUDA device or explicitly select device="cpu".'
+                )
         from huggingface_hub import snapshot_download
         from transformers import AutoModel, AutoProcessor, GenerationConfig
 
@@ -148,12 +160,13 @@ class NemotronParse35(BaseModel):
             TypeError: If the image type is unsupported.
             ValueError: If image data or processor inputs are invalid.
             OSError: If image or checkpoint assets cannot be loaded.
-            RuntimeError: If model loading or inference fails, including GPU exhaustion.
+            RuntimeError: If the requested CUDA device is unavailable, or model
+                loading or inference fails, including GPU exhaustion.
         """
         return self.invoke_batch([input_data], task_prompt=task_prompt)[0]
 
     def invoke_batch(self, inputs: Sequence[ImageInput], task_prompt: str | None = None) -> list[str]:
-        """Parse pages sequentially, keeping their original order.
+        """Convert and parse one page at a time, keeping the original order.
 
         Args:
             inputs: Sequence of pages accepted by :meth:`preprocess`; an empty
@@ -167,14 +180,15 @@ class NemotronParse35(BaseModel):
             TypeError: If an image type is unsupported.
             ValueError: If image data or processor inputs are invalid.
             OSError: If image or checkpoint assets cannot be loaded.
-            RuntimeError: If model loading or generation fails. No partial batch is returned.
+            RuntimeError: If the requested CUDA device is unavailable, or model
+                loading or generation fails. No partial batch is returned.
         """
         if not inputs:
             return []
-        pages = [self.preprocess(image) for image in inputs]
-        self._ensure_model()
         outputs: list[str] = []
-        for page in pages:
+        for image in inputs:
+            page = self.preprocess(image)
+            self._ensure_model()
             features = self._processor(
                 images=[page],
                 text=task_prompt if task_prompt is not None else self._task_prompt,
@@ -200,7 +214,8 @@ class NemotronParse35(BaseModel):
             TypeError: If the image type is unsupported.
             ValueError: If image data or processor inputs are invalid.
             OSError: If image or checkpoint assets cannot be loaded.
-            RuntimeError: If checkpoint loading or generation fails.
+            RuntimeError: If the requested CUDA device is unavailable, or
+                checkpoint loading or generation fails.
         """
         return self.invoke(input_data, task_prompt=task_prompt)
 
