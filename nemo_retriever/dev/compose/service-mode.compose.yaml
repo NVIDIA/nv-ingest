@@ -195,10 +195,20 @@ services:
   nim-nemotron-parse:
     <<: *nim-service
     profiles: [nim-parse]
-    image: ${NIM_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse-v1.2}:${NIM_PARSE_TAG:-1.7.0-variant}
+    image: ${NIM_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NIM_PARSE_TAG:-latest}
     ports: ["${NIM_PARSE_HOST_PORT:-8006}:8000"]
-    environment: {<<: *nim-environment, NIM_HTTP_API_PORT: "8000", NIM_OTEL_SERVICE_NAME: nemotron-parse-v1.2, NIM_TRITON_LOG_VERBOSE: "1"}
-    volumes: ["nim_parse_cache:${NIM_PARSE_CACHE_PATH:-/opt/nim/.cache}"]
+    environment:
+      <<: *nim-environment
+      NIM_HTTP_API_PORT: "8000"
+      NIM_OTEL_SERVICE_NAME: nemotron-parse
+      NIM_ENGINE_PRECOMPILE_CACHE_DIR: ${NIM_PARSE_CACHE_PATH:-/opt/cache}
+    healthcheck:
+      test: [CMD, nemotron-parse-server, --health-check]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
+    volumes: ["nim_parse_cache:${NIM_PARSE_CACHE_PATH:-/opt/cache}"]
     deploy: {resources: {reservations: {devices: [{<<: *nim-gpu, device_ids: ["${NIM_PARSE_GPU_ID:-5}"]}]}}}
 
   nim-caption:

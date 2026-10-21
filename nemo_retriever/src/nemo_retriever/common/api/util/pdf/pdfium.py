@@ -622,10 +622,15 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
     return extracted_images
 
 
-def is_scanned_page(page) -> bool:
-    tp = page.get_textpage()
-    text = tp.get_text_bounded() or ""
+def is_scanned_page(page, page_text: Optional[str] = None) -> bool:
+    if page_text is None:
+        tp = page.get_textpage()
+        text = tp.get_text_bounded() or ""
+    else:
+        text = page_text
     num_chars = len(text.strip())
-    num_images = sum(1 for obj in page.get_objects() if obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE)
+    if num_chars > 0:
+        return False
 
-    return num_chars == 0 and num_images > 0
+    num_images = sum(1 for obj in page.get_objects() if obj.type == pdfium_c.FPDF_PAGEOBJ_IMAGE)
+    return num_images > 0
