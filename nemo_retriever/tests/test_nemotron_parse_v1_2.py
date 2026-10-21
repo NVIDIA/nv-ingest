@@ -290,4 +290,3 @@ def test_model_close_during_a_batch_keeps_that_batch_engine() -> None:
 
     assert model.invoke_batch_with_finish_reasons(["image"]) == [("page", "stop")]
     engine.generate.assert_called_once()
-

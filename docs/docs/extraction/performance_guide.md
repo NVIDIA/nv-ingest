@@ -183,16 +183,24 @@ A smaller OCR inference batch size creates more, smaller HTTP requests. In Ray b
 
 ## Overlap local Nemotron Parse batches
 
-By default, each local Nemotron Parse actor runs one batch at a time, so the GPU can idle while the slowest pages of each batch finish. To overlap batches, set `BatchTuningParams.nemotron_parse_batches_in_flight` through `.extract(batch_tuning=...)`.
+In batch mode, each local Nemotron Parse actor runs one batch at a time by default. The GPU can idle while the slowest pages of each batch finish. To overlap batches, set `BatchTuningParams.nemotron_parse_batches_in_flight` through `.extract(batch_tuning=...)`.
 
 When the value is greater than `1`, each actor loads the model on the vLLM async engine and runs that many batches through it at once. The model, prompt, and sampling settings do not change. The default value, `1`, keeps the offline vLLM engine.
 
 The following example runs 4 Parse batches at once in each actor:
 
 ```python
-.extract(
-    method="nemotron_parse",
-    batch_tuning=BatchTuningParams(nemotron_parse_batches_in_flight=4),
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import BatchTuningParams
+
+result = (
+    create_ingestor(run_mode="batch")
+    .files(["report.pdf"])
+    .extract(
+        method="nemotron_parse",
+        batch_tuning=BatchTuningParams(nemotron_parse_batches_in_flight=4),
+    )
+    .ingest()
 )
 ```
 
@@ -203,6 +211,8 @@ Consider the following tradeoffs before you raise the value:
 - The setting applies only to local Nemotron Parse. The library rejects it for a remote Parse endpoint, which overlaps requests through `remote_retry.remote_max_pool_workers` instead.
 
 Benchmark with representative documents, and monitor host memory, failed pages, and output quality.
+
+If you use `NemotronParseV12` directly, call `close()` when you no longer need its engine. Closing the async engine cancels running batches; the offline engine is released after its active batch finishes. A closed model raises `RuntimeError` on later inference calls. Closing a `NemotronParseGPUActor` releases its local model; a later actor call loads a new model.
 
 ## Shared preflight for custom Ray Data graphs
 
