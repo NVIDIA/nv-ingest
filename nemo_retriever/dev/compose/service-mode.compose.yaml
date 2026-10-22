@@ -111,11 +111,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-page-elements-v3
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-page-elements-v3
       NIM_ENGINE_MODEL_PATH: ${NIM_PAGE_ELEMENTS_CACHE_PATH:-/model}/page-elements
@@ -133,11 +130,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-table-structure-v1
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-table-structure-v1
       NIM_ENGINE_MODEL_PATH: ${NIM_TABLE_STRUCTURE_CACHE_PATH:-/model}/table-structure
@@ -155,11 +149,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-ocr-v2
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-ocr-v2
       NIM_ENGINE_MODEL_PATH: ${NIM_OCR_CACHE_PATH:-/model}/ocr
@@ -172,15 +163,28 @@ services:
   nim-embedding:
     <<: *nim-service
     profiles: [nims-core]
-    image: ${NIM_EMBED_IMAGE:-nvcr.io/nim/nvidia/nemotron-3-embed-1b}:${NIM_EMBED_TAG:-2.2.2}
+    image: ${NIM_EMBED_IMAGE:-nvcr.io/nim/nvidia/nemotron-embed}:${NIM_EMBED_TAG:-latest}
     ports: ["${NIM_EMBED_HOST_PORT:-8004}:8000"]
     environment:
       <<: *nim-environment
-      NIM_HTTP_API_PORT: "8000"
-      NIM_OTEL_SERVICE_NAME: nemotron-3-embed-1b
-      NIM_TRITON_LOG_VERBOSE: "1"
+      NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
+      NIM_OTEL_SERVICE_NAME: nemotron-embed
+      NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
+      # Let NIM select NVFP4 or FP16 for the GPU; keep the client model ID stable.
+      NIM_SERVER_SERVED_MODEL_NAME: ${NIM_EMBED_MODEL:-nvidia/nemotron-3.5-embed-1b}
+      NIM_ENGINE_MODEL_PATH: ${NIM_EMBED_MODEL_PATH:-/model}/embed
+      NIM_PERFORMANCE_MODE: "1"
+      NIM_ENGINE_COUNT: "1"
       OMP_NUM_THREADS: "1"
-    volumes: ["nim_embedding_cache:${NIM_EMBED_CACHE_PATH:-/opt/nim/.cache}"]
+    volumes:
+      - "nim_embedding_cache:/opt/cache"
+      - "nim_embedding_model:${NIM_EMBED_MODEL_PATH:-/model}"
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://localhost:8000/v1/health/ready]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
     deploy: {resources: {reservations: {devices: [{<<: *nim-gpu, device_ids: ["${NIM_EMBED_GPU_ID:-3}"]}]}}}
 
   nim-reranker:
@@ -195,10 +199,20 @@ services:
   nim-nemotron-parse:
     <<: *nim-service
     profiles: [nim-parse]
-    image: ${NIM_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse-v1.2}:${NIM_PARSE_TAG:-1.7.0-variant}
+    image: ${NIM_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemotron-parse}:${NIM_PARSE_TAG:-latest}
     ports: ["${NIM_PARSE_HOST_PORT:-8006}:8000"]
-    environment: {<<: *nim-environment, NIM_HTTP_API_PORT: "8000", NIM_OTEL_SERVICE_NAME: nemotron-parse-v1.2, NIM_TRITON_LOG_VERBOSE: "1"}
-    volumes: ["nim_parse_cache:${NIM_PARSE_CACHE_PATH:-/opt/nim/.cache}"]
+    environment:
+      <<: *nim-environment
+      NIM_HTTP_API_PORT: "8000"
+      NIM_OTEL_SERVICE_NAME: nemotron-parse
+      NIM_ENGINE_PRECOMPILE_CACHE_DIR: ${NIM_PARSE_CACHE_PATH:-/opt/cache}
+    healthcheck:
+      test: [CMD, nemotron-parse-server, --health-check]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 120s
+    volumes: ["nim_parse_cache:${NIM_PARSE_CACHE_PATH:-/opt/cache}"]
     deploy: {resources: {reservations: {devices: [{<<: *nim-gpu, device_ids: ["${NIM_PARSE_GPU_ID:-5}"]}]}}}
 
   nim-caption:
@@ -369,6 +383,7 @@ volumes:
   nim_table_structure_cache: {name: "${NIM_TABLE_STRUCTURE_CACHE_VOLUME:-nemo-retriever-nim-table-structure-cache}"}
   nim_ocr_cache: {name: "${NIM_OCR_CACHE_VOLUME:-nemo-retriever-nim-ocr-cache}"}
   nim_embedding_cache: {name: "${NIM_EMBED_CACHE_VOLUME:-nemo-retriever-nim-embedding-cache}"}
+  nim_embedding_model: {name: "${NIM_EMBED_MODEL_VOLUME:-nemo-retriever-nim-embedding-model}"}
   nim_reranker_cache: {name: "${NIM_RERANK_CACHE_VOLUME:-nemo-retriever-nim-reranker-cache}"}
   nim_parse_cache: {name: "${NIM_PARSE_CACHE_VOLUME:-nemo-retriever-nim-parse-cache}"}
   nim_caption_cache: {name: "${NIM_CAPTION_CACHE_VOLUME:-nemo-retriever-nim-caption-cache}"}

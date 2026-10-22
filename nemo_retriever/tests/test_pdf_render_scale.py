@@ -106,6 +106,16 @@ class TestIsScannedPageImport:
 
         assert _extract._is_scanned_page is is_scanned_page
 
+    def test_supplied_text_avoids_second_textpage_extraction(self):
+        """The extractor can reuse native text collected for the output row."""
+        from nemo_retriever.common.api.util.pdf.pdfium import is_scanned_page
+
+        page = MagicMock()
+        page.get_objects.return_value = []
+
+        assert is_scanned_page(page, page_text="native text") is False
+        page.get_textpage.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # Helpers for _crop_all_from_page tests

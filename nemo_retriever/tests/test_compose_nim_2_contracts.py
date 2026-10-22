@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-"""Compose contracts for the Object Detection and OCR 2.0 NIMs."""
+"""Compose contracts for the native extraction and embedding NIMs."""
 
 from __future__ import annotations
 
@@ -56,6 +56,45 @@ def test_extraction_nims_use_distinct_native_models_and_supported_model_paths() 
 
     assert services["nim-ocr"]["environment"]["NIM_ENGINE_MODEL_VARIANT"] == "multilingual"
     assert "/model-store" not in COMPOSE.read_text(encoding="utf-8")
+
+
+def test_embedding_nim_uses_native_runtime_and_matching_client_model() -> None:
+    compose = _compose()
+    service = compose["services"]["nim-embedding"]
+    env = service["environment"]
+    model = "nvidia/nemotron-3.5-embed-1b"
+    assert service["image"] == ("${NIM_EMBED_IMAGE:-nvcr.io/nim/nvidia/nemotron-embed}:${NIM_EMBED_TAG:-latest}")
+    # Pinning either setting would disable NIM's automatic GPU-specific selection.
+    assert "NIM_ENGINE_MODEL_NAME" not in env
+    assert "NIM_ENGINE_PRECISION" not in env
+    assert env["NIM_SERVER_SERVED_MODEL_NAME"] == f"${{NIM_EMBED_MODEL:-{model}}}"
+    assert env["NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER"] == "ngc"
+    assert env["NIM_SERVER_BIND_ADDR"] == "0.0.0.0:8000"
+    assert "NIM_HTTP_API_PORT" not in env
+    assert not any(name.startswith("NIM_TRITON_") for name in env)
+    assert env["NIM_ENGINE_MODEL_PATH"] == "${NIM_EMBED_MODEL_PATH:-/model}/embed"
+    assert service["volumes"] == [
+        "nim_embedding_cache:/opt/cache",
+        "nim_embedding_model:${NIM_EMBED_MODEL_PATH:-/model}",
+    ]
+    assert service["healthcheck"]["test"] == [
+        "CMD",
+        "curl",
+        "--fail",
+        "--silent",
+        "http://localhost:8000/v1/health/ready",
+    ]
+    # A service-level healthcheck replaces the entire inherited mapping.
+    inherited_healthcheck = compose["x-nim-service"]["healthcheck"]
+    for setting in ("interval", "timeout", "retries", "start_period"):
+        assert service["healthcheck"][setting] == inherited_healthcheck[setting]
+    # The preset must select the served alias for both ingestion and queries.
+    assert f"NIM_EMBED_MODEL={model}" in CORE_PRESET.read_text(encoding="utf-8").splitlines()
+    config = compose["configs"]["retriever_service_config"]["content"]
+    assert 'embed_model_name: "${NIM_EMBED_MODEL:-nvidia/nemotron-3-embed-1b}"' in config
+    assert 'embed_model: "${NIM_EMBED_MODEL:-nvidia/nemotron-3-embed-1b}"' in config
+    command = compose["services"]["vectordb"]["command"]
+    assert command[command.index("--embed-model") + 1] == "${NIM_EMBED_MODEL:-nvidia/nemotron-3-embed-1b}"
 
 
 def test_caption_nim_uses_the_helm_aligned_omni_image_tag() -> None:

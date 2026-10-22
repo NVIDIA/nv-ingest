@@ -262,7 +262,12 @@ nimOperator:
         value: "3"
 ```
 
-**Development Compose:** The default `nim-embedding` image is also `nemotron-3-embed-1b:2.2.2`. Add `NIM_PIPELINE_MAX_BATCH_SIZE` to its existing environment mapping in `nemo_retriever/dev/compose/service-mode.compose.yaml`:
+**Development Compose:** The `nim-embedding` service uses `nemotron-embed:latest`
+with automatic GPU-dependent checkpoint and precision selection. Its served
+alias is `nvidia/nemotron-3.5-embed-1b`. To override its batch limit,
+add `NIM_PIPELINE_MAX_BATCH_SIZE` to the existing environment mapping in
+`nemo_retriever/dev/compose/service-mode.compose.yaml`, using a supported value
+for your model and GPU:
 
 ```yaml
 NIM_PIPELINE_MAX_BATCH_SIZE: "3"

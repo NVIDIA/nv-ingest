@@ -65,6 +65,10 @@ Routing is selected when Compose renders the configuration: self-hosted mode
 requires both the `nims-core` preset and profile, and it does not fail over to
 hosted endpoints if a local NIM becomes unavailable.
 
+The page-elements, table-structure, OCR, and embedding NIM services set
+`NIM_PERFORMANCE_MODE=1` to select throughput defaults and
+`NIM_ENGINE_COUNT=1` in the Compose file.
+
 Start the four core extraction/retrieval NIM services with their checked-in internal
 endpoint wiring:
 
@@ -86,6 +90,35 @@ docker compose \
   -f nemo_retriever/dev/compose/service-mode.compose.yaml up --build -d
 ```
 
+The core embedding service uses `nvcr.io/nim/nvidia/nemotron-embed:latest`
+and lets the native runtime select the Nemotron 3.5 checkpoint and precision
+for the GPU. Supported GPUs use NVFP4; other supported GPUs use the BF16
+checkpoint with FP16 execution.
+The `nims-core.env` preset uses the served alias `nvidia/nemotron-3.5-embed-1b`
+for both ingestion and query embedding. `NIM_EMBED_MODEL` configures that
+API alias, not the checkpoint or precision. Clear any previous shell override
+to use the preset alias. Hosted inference retains its Nemotron 3 default.
+
+This is a model migration from Nemotron 3 Embed 1B. Before upgrading a
+persistent deployment, back up its data and rebuild and re-ingest the affected
+tables or collections. Matching vector dimensions do not make embeddings
+from different models compatible. Evaluate retrieval quality on your data.
+Also validate retrieval quality when changing GPU hardware or precision;
+the stable API alias does not establish embedding compatibility. Rebuild and
+re-ingest affected collections when changing their embedding model or precision.
+
+The embedding NIM downloads artifacts through NGC using `NGC_API_KEY`.
+Its model volume mounts at `/model`, with artifacts under `/model/embed`;
+a separate runtime cache mounts at the fixed path `/opt/cache`.
+`NIM_EMBED_MODEL_PATH` configures both the model mount and engine artifact
+path. `NIM_EMBED_MODEL_VOLUME` and `NIM_EMBED_CACHE_VOLUME` select the
+persistent volumes for weights and the runtime cache.
+Compose checks `/v1/health/ready` every 15 seconds, with a 10-second timeout,
+a 120-second startup grace period, and 40 retries before marking the NIM unhealthy.
+Set `NIM_EMBED_IMAGE` and `NIM_EMBED_TAG` to select another image.
+For supported models and GPUs, refer to the
+[Embedding NIM 2.4 support matrix](https://docs.nvidia.com/nim/nemo-retriever/embedding/2.4/support-matrix.html).
+
 To start all nine NIM services, layer the four wiring presets and select every NIM
 profile:
 
@@ -102,14 +135,47 @@ docker compose \
 
 The `nim-caption` profile defaults to `nvcr.io/nim/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:2.0.4-variant`. Set `NIM_CAPTION_IMAGE` or `NIM_CAPTION_TAG` only when you need a different registry or image tag.
 
+The `nim-parse` profile defaults to `nvcr.io/nim/nvidia/nemotron-parse:latest`.
+Set `NIM_PARSE_IMAGE` and `NIM_PARSE_TAG` to select another registry path or tag.
+The Parse profile starts the NIM without selecting it for ingestion.
+Nemotron 3.5 Parse uses native `POST /v1/parse` with a multipart `document`
+image upload, rather than `/v1/chat/completions`. The container selects the
+model; the native request does not include a model field.
+
+To use this NIM for extraction, configure the following fields in the retriever
+service configuration. This URL is reachable from the retriever container on
+the Compose network. A client outside that network uses
+`http://localhost:8006/v1/parse` with the default host port.
+
+```yaml
+nim_endpoints:
+  nemotron_parse_invoke_url: http://nim-nemotron-parse:8000/v1/parse
+  nemotron_parse_model: nvidia/nemotron-3.5-parse
+```
+
+The model ID labels the configuration; it is not sent in the native multipart
+request. The library renders PDF pages and uploads each page as an image.
+The API returns extracted content in `content`. When it contains bounding-box
+and class tags, the library uses its existing tagged-content postprocessor to
+produce clean page text and the selected table, chart, and infographic elements.
+For untagged Markdown, the library preserves whole-page content in page `text`,
+including inline tables. This fallback requires text extraction to be enabled.
+
+The image has no `/bin/sh`. Compose uses
+`nemotron-parse-server --health-check` for readiness and persists its engine
+cache at `/opt/cache`. `NIM_PARSE_CACHE_PATH` changes both the volume mount and
+`NIM_ENGINE_PRECOMPILE_CACHE_DIR`.
+
 Reranker and Parse need only `--profile nim-reranker` or
 `--profile nim-parse`. They are lifecycle/API-only and intentionally are not
-injected into retriever service configuration, matching Helm.
+injected into retriever service configuration by Compose.
 
 Every NIM has a persistent model or cache volume, a configurable GPU assignment, and a
 configurable host port. Variables follow the service prefix, for example
 `NIM_OCR_GPU_ID`, `NIM_OCR_HOST_PORT`, `NIM_OCR_CACHE_VOLUME`,
-`NIM_OCR_CACHE_PATH`, `NIM_OCR_IMAGE`, and `NIM_OCR_TAG`. The defaults form a
+`NIM_OCR_CACHE_PATH`, `NIM_OCR_IMAGE`, and `NIM_OCR_TAG`. Cache-path overrides
+depend on the service; the embedding runtime cache stays at `/opt/cache`.
+The defaults form a
 collision-free assignment for the combined-profile example: core NIMs use GPUs
 0, 1, 2, and 3 (page-elements, table-structure, OCR, and embedding), reranker uses 4,
 parse uses 5, caption uses 6, answer uses 7, and audio uses 9. Change the
