@@ -16,6 +16,7 @@ from nemo_retriever.operators.extract.audio.asr_actor import ASRActor
 from nemo_retriever.operators.extract.audio.chunk_actor import MediaChunkActor
 from nemo_retriever.operators.dedup import dedup_images
 from nemo_retriever.graph import Graph, StoreOperator, UDFOperator, WebhookNotifyOperator
+from nemo_retriever.graph.executor import MAX_TASKS_IN_FLIGHT_PER_ACTOR
 from nemo_retriever.common.modality.content_transforms import (
     _CONTENT_COLUMNS,
     collapse_content_to_page_rows,
@@ -364,6 +365,9 @@ def batch_tuning_to_node_overrides(
             getattr(extract_tuning, "nemotron_parse_workers", None) if extract_tuning is not None else None,
             plan.nemotron_parse_initial_actors if plan else None,
         )
+        np_in_flight = getattr(extract_tuning, "nemotron_parse_batches_in_flight", 1)
+        if np_in_flight > 1:
+            overrides.setdefault(NemotronParseActor.__name__, {})[MAX_TASKS_IN_FLIGHT_PER_ACTOR] = np_in_flight
         if effective_allow_no_gpu:
             _force_cpu_only(NemotronParseActor.__name__)
         else:
@@ -836,6 +840,8 @@ def build_graph(
             if extract_params.nemotron_parse_model:
                 parse_kwargs["nemotron_parse_model"] = extract_params.nemotron_parse_model
             parse_kwargs.update(_nim_remote_http_kwargs(extract_params))
+            if getattr(tuning, "nemotron_parse_batches_in_flight", 1) > 1:
+                parse_kwargs["async_engine"] = True
             graph = graph >> NemotronParseActor(**parse_kwargs)
         else:
             detect_kwargs: dict[str, Any] = {}

@@ -6,6 +6,7 @@ NeMo Retriever Library classifies and extracts text, tables, charts, infographic
 
 - [Supported file types and formats](#supported-file-types-and-formats)
 - [Text and layout extraction](#text-and-layout-extraction)
+- [Serve Nemotron 3.5 Parse with vLLM](#served-nemotron-35-parse)
 - [PDF image extraction](#pdf-image-extraction)
 - [Tables](#tables)
 - [Charts and infographics](#charts-and-infographics)
@@ -28,13 +29,105 @@ NeMo Retriever Library accepts multiple document and media types. A current list
 For PDFs, NeMo Retriever Library typically uses **pdfium**-based extraction with configurable depth and paths. Scanned or mixed pages may use hybrid, OCR-oriented, or Nemotron Parse methods. For `method` options such as `pdfium`, `pdfium_hybrid`, `ocr`, and `nemotron_parse`, refer to the [Python API reference](nemo-retriever-api-reference.md).
 
 !!! note
-    `method="nemotron_parse"` requires the Nemotron Parse NIM client dependencies. Install them with the `nemotron-parse` extra, for example `pip install "nemo-retriever[nemotron-parse]"`, before running PDF extraction through Nemotron Parse. This path does not produce chart modality rows; for chart detection, refer to [Charts and infographics](#charts-and-infographics).
+    `method="nemotron_parse"` requires the Nemotron Parse NIM client dependencies. Install them with the `nemotron-parse` extra, for example `pip install "nemo-retriever[nemotron-parse]"`, before running PDF extraction through Nemotron Parse. Available element classes depend on the model; refer to [Charts and infographics](#charts-and-infographics).
 
 **Related**
 
 - [NeMo Retriever Library Overview](overview.md)
 - [OCR and scanned documents](#ocr-and-scanned-documents)
 - [Chunking](concepts.md#chunking)
+
+## Serve Nemotron 3.5 Parse with vLLM { #served-nemotron-35-parse }
+
+You can run Nemotron 3.5 Parse in a separate vLLM server and send page images
+from an in-process or batch graph. NeMo Retriever Library keeps its existing
+local inference dependencies. The server uses the model package's own runtime.
+
+Install the optional model-team client package at the pinned revision in your
+NeMo Retriever Library environment. `--no-deps` keeps the package's serving
+runtime pins from replacing the library's dependencies.
+
+```bash
+pip install "nemo-retriever[nemotron-parse]"
+pip install --no-deps \
+  "git+https://huggingface.co/nvidia/Nemotron-3.5-Parse@e7ea79242a87ea0ad3919b672bfedb429a683206"
+```
+
+The optional `nemotron-parse` package is separate from the
+`nemo-retriever[nemotron-parse]` extra. The extra installs the library's Parse
+client dependencies; the package provides the model team's `DocumentParser`.
+Refer to the [pinned model package and serving
+instructions](https://huggingface.co/nvidia/Nemotron-3.5-Parse/tree/e7ea79242a87ea0ad3919b672bfedb429a683206)
+when preparing the separate server environment.
+
+The optional package also installs a vLLM plugin. Its version check requires
+vLLM `0.26.0`, Transformers `5.14.1`, and Hugging Face Hub `1.24.0`, which differ
+from the library's local runtime. Before starting NeMo Retriever Library
+processes or their Ray workers, allow only the library's embedding plugin in
+that environment.
+
+```bash
+export VLLM_PLUGINS=nrl_nemotron35_embedding
+```
+
+This setting prevents the model package's serving plugin from loading in the
+library's local vLLM runtime. Apply it to the client environment only. The
+separate Parse server must use its validated runtime and load its own Parse
+plugin; do not give that server the client allowlist.
+
+Native NIM `/v1/parse` requests and native-schema Parquet output do not require
+this optional model-team package. However, interleaved export uses its geometry
+helper to crop Parse 3.5 `Picture` elements in `normalized_page_content`
+coordinates. Install the pinned package above and apply the client plugin
+allowlist when you need those crops. If the package cannot be imported, the
+writer records the affected page in `materialize_error` and continues exporting
+other pages. Native NIM pages without these picture crops do not need the
+package. Refer to [interleaved Parquet output](nemo-retriever-api-reference.md#interleaved-parquet-output)
+for the page-validation contract.
+
+Configure the server's OpenAI-compatible `/v1/chat/completions` endpoint and
+set `nemotron_parse_model` explicitly. The following example assumes that the
+server exposes `nvidia/Nemotron-3.5-Parse` as its served model name.
+
+```python
+from nemo_retriever import create_ingestor
+
+result, failures = (
+    create_ingestor(run_mode="batch")
+    .files(["report.pdf"])
+    .extract(
+        method="nemotron_parse",
+        nemotron_parse_invoke_url="http://localhost:8000/v1/chat/completions",
+        nemotron_parse_model="nvidia/Nemotron-3.5-Parse",
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
+    )
+    .ingest(return_failures=True)
+)
+```
+
+`Nemotron-3.5-Parse` is also accepted as the model name when it matches the
+server configuration. These names select the model-team `DocumentParser`
+single-pass path. That path uses the package's full-page prompt and sampling
+settings; the library's legacy `task_prompt` does not override them. Other
+model names do not select this adapter.
+
+Remote requests use the existing NIM transport and retry configuration.
+`remote_retry.remote_max_pool_workers` limits concurrent page requests per
+actor. `BatchTuningParams.nemotron_parse_batches_in_flight` controls local
+inference only and cannot be used with a remote endpoint. No local Parse model
+is loaded for this remote route.
+
+Inspect `failures` and the `nemotron_parse_v1_2` metadata in each page row.
+A failed served 3.5 request retains its page identity and diagnostic fields;
+successful sibling pages remain available. Missing optional client dependencies
+produce an installation error instead of selecting another model.
+
+The native Nemotron Parse NIM uses a different `/v1/parse` contract. Refer to
+[Parse endpoint contracts](prerequisites-support-matrix.md#nemotron-parse-hosted-vs-self-hosted)
+before changing an existing NIM endpoint.
 
 ## PDF image extraction { #pdf-image-extraction }
 
@@ -101,16 +194,20 @@ NeMo Retriever Library detects tables as structured page elements, processes the
 
 Charts and infographic regions are classified with other page layout elements (tables, text blocks, titles) and processed through layout detection and OCR. `extract_charts` and `extract_infographics` are enabled by default. Outputs use the same metadata schema as other extracted objects.
 
-!!! important "Chart modality requires the default layout path"
-    [Nemotron Parse v1.2](https://huggingface.co/nvidia/NVIDIA-Nemotron-Parse-v1.2) semantic classes do not include `Chart` or `Infographic`. The model labels regions as `Text`, `Table`, `Picture`, `Caption`, `List-item`, `Section-header`, and similar types instead.
+!!! note "Parse element classes depend on the model"
+    [Nemotron Parse v1.2](https://huggingface.co/nvidia/NVIDIA-Nemotron-Parse-v1.2)
+    does not predict a `Chart` class. Its figures can be labeled `Picture`,
+    which the tagged-content router places in the `infographic` channel when
+    `extract_infographics=True`.
 
-    When you set `method="nemotron_parse"`:
+    Nemotron 3.5 Parse can predict `Chart` elements. The router places these in
+    the `chart` channel when `extract_charts=True`. `Table` elements go to
+    `table`; `Picture` and `Infographic` elements go to `infographic`. These
+    channels contain the model's extracted text and normalized boxes.
 
-    - The pipeline does not produce `chart` or `infographic` modality rows, even when `extract_charts=True` or `extract_infographics=True`.
-    - Chart- and infographic-filtered retrieval (for example, queries scoped to figure or chart content) returns no hits.
-    - Chart-heavy and infographic-heavy pages are typically emitted as `Picture` or other non-chart modalities.
-
-    For chart and infographic detection and modality-specific retrieval, use the default **pdfium** layout path (page-elements detection and OCR), not `method="nemotron_parse"`.
+    Enabling an extraction flag does not make a model predict additional
+    classes. For a separate layout-detection and OCR workflow, use the default
+    PDFium path.
 
 Chart-labeled PDF regions are **not** routed through the Omni caption stage; they remain on the layout-and-OCR path. For scope and validation guidance, refer to [Image captioning](#image-captioning).
 
@@ -209,6 +306,44 @@ To disable all image deduplication through the Python API, call `.dedup(DedupPar
 ## Metadata and content schema { #metadata-and-content-schema }
 
 Extracted objects follow the schema and field descriptions in the [Metadata reference](content-metadata.md). Use that page for tables, types, and per-field notes.
+
+With `method="nemotron_parse"`, each page row includes a
+`nemotron_parse_v1_2` metadata dictionary. This column name remains the same
+for local v1.2, remote chat, native NIM, and served 3.5 extraction.
+
+The following fields support page-level diagnostics.
+
+| Field | Meaning |
+| --- | --- |
+| `raw_output` | Model response before element routing. `None` means no response was available; `""` means an empty response. Whitespace normalization depends on the endpoint contract. |
+| `finish_reason` | Completion reason when the backend provides it. Local v1.2 uses `unknown` when its completion reason is missing. |
+| `usage` | Backend token usage when available. Local v1.2 does not populate usage. |
+| `error` | Failure details, including `stage`, `type`, and `message`. Some failures also include a traceback. |
+| `native_parse` | Native `/v1/parse` completion metadata, retained alongside the common fields for compatibility. |
+| `stages` and `inference` | Raw stage responses and effective model-package settings for successful served 3.5 calls. |
+
+Local v1.2 and chat responses with an available finish reason other than
+`stop` or `eos` receive an `IncompleteModelOutputError` at
+`nemotron_parse_pages_finish_reason`. The legacy router can retain a returned
+prefix in content fields. Consumers that require complete pages must inspect
+`error`, rather than treating nonempty text as success.
+
+The served 3.5 adapter rejects empty or incomplete full-page responses before
+element routing and records the error on the affected page. The native
+`/v1/parse` client rejects `finish_reason="length"` and retains its existing
+batch failure behavior. For that rejection, the failing page retains its raw
+response and completion metadata. Both `get_error_rows()` and
+`return_failures=True` report pages with populated error fields when you retain
+result rows. To preserve native rows and diagnostic metadata on disk, use
+[graph Parquet output](nemo-retriever-api-reference.md#graph-parquet-output).
+Its summary mode avoids retaining the full result DataFrame; inspect the saved
+error fields when reviewing failures. The optional
+[interleaved output schema](nemo-retriever-api-reference.md#interleaved-parquet-output)
+projects complete tagged pages into ordered text, table, and picture-crop rows.
+It retains rejected pages as `materialize_error` rows and uses temporary disk
+storage to order documents without collecting the full corpus in memory.
+
+In a custom Ray graph, a node's `node_overrides` entry can set `target_num_rows_per_block` to a positive integer and `strict_rows_per_block=True` to request blocks of exactly that many rows, except the final block. Pair it with the same `batch_size` so the node receives full batches instead of a small remainder after each bundle. `strict_rows_per_block` defaults to `False`; strict blocks buffer up to one block of rows, which can delay the first call.
 
 ## Extraction limitations and quality { #extraction-limitations-and-quality }
 

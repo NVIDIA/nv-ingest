@@ -181,6 +181,39 @@ In service mode, use `.extract(inference_batch_size=...)` to set the request bat
 
 A smaller OCR inference batch size creates more, smaller HTTP requests. In Ray batch mode, it also reduces the number of page rows available to each actor call. A larger value creates fewer, larger requests. Benchmark both latency and throughput with representative documents, and monitor NIM GPU memory, HTTP `429` responses, errors, and output counts. Overlapping HTTP requests does not establish concurrent GPU execution; the NIM controls backend queueing and execution.
 
+## Overlap local Nemotron Parse batches
+
+In batch mode, each local Nemotron Parse actor runs one batch at a time by default. The GPU can idle while the slowest pages of each batch finish. To overlap batches, set `BatchTuningParams.nemotron_parse_batches_in_flight` through `.extract(batch_tuning=...)`.
+
+When the value is greater than `1`, each actor loads the model on the vLLM async engine and runs that many batches through it at once. The model, prompt, and sampling settings do not change. The default value, `1`, keeps the offline vLLM engine.
+
+The following example runs 4 Parse batches at once in each actor:
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import BatchTuningParams
+
+result = (
+    create_ingestor(run_mode="batch")
+    .files(["report.pdf"])
+    .extract(
+        method="nemotron_parse",
+        batch_tuning=BatchTuningParams(nemotron_parse_batches_in_flight=4),
+    )
+    .ingest()
+)
+```
+
+Consider the following tradeoffs before you raise the value:
+
+- Each actor holds more pages in host memory, and each batch takes longer to finish. Whole-job throughput can improve while per-batch latency increases.
+- Output text can differ from runs with one batch in flight because vLLM groups requests differently. Repeated runs with one batch in flight can also differ for the same reason.
+- The setting applies only to local Nemotron Parse. The library rejects it for a remote Parse endpoint, which overlaps requests through `remote_retry.remote_max_pool_workers` instead.
+
+Benchmark with representative documents, and monitor host memory, failed pages, and output quality.
+
+If you use `NemotronParseV12` directly, call `close()` when you no longer need its engine. Closing the async engine cancels running batches; the offline engine is released after its active batch finishes. A closed model raises `RuntimeError` on later inference calls. Closing a `NemotronParseGPUActor` releases its local model; a later actor call loads a new model.
+
 ## Shared preflight for custom Ray Data graphs
 
 `GraphIngestor` reserves source capacity automatically. For custom graphs, declare source capacity before calling `preflight_executors(...)`. Set `source_cpu_reservation=1` on each `RayDataExecutor` that will receive a filesystem path or glob. `source_cpu_reservation` must be a finite, non-negative CPU value. An executor that only receives an existing Ray dataset can omit the reservation.

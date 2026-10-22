@@ -4,6 +4,10 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import uuid
+import weakref
 from pathlib import Path
 from typing import Any, List, Optional, Sequence, Union
 
@@ -51,6 +55,125 @@ def _patch_vllm_nemotron_parse_processor() -> None:
     _VLLM_PROCESSOR_PATCHED = True
 
 
+def _run_event_loop(loop: asyncio.AbstractEventLoop) -> None:
+    try:
+        loop.run_forever()
+    finally:
+        loop.close()
+
+
+def _stop_event_loop(loop: asyncio.AbstractEventLoop, thread: threading.Thread) -> None:
+    loop.call_soon_threadsafe(loop.stop)
+    thread.join()
+
+
+_BATCH_TASK_NAME = "nemotron-parse-batch"
+
+
+async def _cancel_requests_and_shut_down(engine: Any) -> None:
+    # vLLM's own shutdown stops the engine core before cancelling its output handler, which then logs
+    # EngineDeadError; cancelling in-flight batches and the handler first lets the engine stop quietly.
+    tasks = [task for task in asyncio.all_tasks() if task.get_name() == _BATCH_TASK_NAME]
+    if (handler := getattr(engine, "output_handler", None)) is not None:
+        tasks.append(handler)
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    engine.shutdown()
+
+
+def _shut_down(engine: Any, loop: asyncio.AbstractEventLoop, thread: threading.Thread) -> None:
+    if not thread.is_alive():
+        return
+    if threading.current_thread() is thread:
+        loop.create_task(_cancel_requests_and_shut_down(engine)).add_done_callback(lambda _task: loop.stop())
+        return
+    try:
+        asyncio.run_coroutine_threadsafe(_cancel_requests_and_shut_down(engine), loop).result()
+    finally:
+        _stop_event_loop(loop, thread)
+
+
+class _AsyncEngine:
+    """One vLLM ``AsyncLLM`` on a private event-loop thread, shared by concurrent callers.
+
+    Every caller's pages become requests to the same scheduler, so one batch's
+    slowest pages no longer hold the GPU while the next batch waits. The engine
+    and its thread stop once: on :meth:`close`, when this object is collected,
+    or at interpreter exit.
+    """
+
+    def __init__(self, engine_kwargs: dict[str, Any]) -> None:
+        from vllm.engine.arg_utils import AsyncEngineArgs
+        from vllm.v1.engine.async_llm import AsyncLLM
+
+        self._lifecycle_lock = threading.Lock()
+        self._closed = False
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(
+            target=_run_event_loop,
+            args=(self._loop,),
+            name="nemotron-parse-engine",
+            daemon=True,
+        )
+        self._thread.start()
+
+        async def create() -> Any:
+            return AsyncLLM.from_engine_args(AsyncEngineArgs(**engine_kwargs))
+
+        try:
+            self._engine = asyncio.run_coroutine_threadsafe(create(), self._loop).result()
+        except BaseException:
+            _stop_event_loop(self._loop, self._thread)
+            raise
+        # Created after the engine so that, at interpreter exit, it runs before vLLM's own finalizers.
+        self._finalizer = weakref.finalize(self, _shut_down, self._engine, self._loop, self._thread)
+
+    def close(self) -> None:
+        """Cancel in-flight requests, shut down the engine, and stop its thread; later calls do nothing."""
+        with self._lifecycle_lock:
+            self._closed = True
+        # Do not hold this lock while joining the loop: close may also run on that loop.
+        self._finalizer()
+
+    def generate(self, prompts: Sequence[Any], sampling_params: Any) -> List[Any]:
+        """Return each prompt's final output in input order, like ``LLM.generate``.
+
+        The first failure cancels the batch's other requests, which vLLM aborts,
+        and then propagates unchanged.
+        """
+
+        async def final_output(prompt: Any) -> Any:
+            output = None
+            async for output in self._engine.generate(prompt, sampling_params, uuid.uuid4().hex):
+                pass
+            return output
+
+        async def generate_all() -> List[Any]:
+            asyncio.current_task().set_name(_BATCH_TASK_NAME)
+            tasks = [asyncio.ensure_future(final_output(prompt)) for prompt in prompts]
+            try:
+                return list(await asyncio.gather(*tasks))
+            except BaseException:
+                # Cancellation also waits for every sibling generator to release its request.
+                for task in tasks:
+                    task.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+
+        # Submit while holding the same lock as close(), but do not hold it while
+        # waiting: shutdown must be able to cancel a running batch.
+        with self._lifecycle_lock:
+            if self._closed:
+                raise RuntimeError("Nemotron Parse async engine was closed")
+            future = asyncio.run_coroutine_threadsafe(generate_all(), self._loop)
+        try:
+            return future.result()
+        except BaseException:
+            future.cancel()
+            raise
+
+
 # ---------------------------------------------------------------------------
 # Model wrapper
 # ---------------------------------------------------------------------------
@@ -65,6 +188,10 @@ class NemotronParseV12(BaseModel):
     vLLM handles KV-cache management, continuous batching, and GPU scheduling
     internally, avoiding the transformers cache-API incompatibility that affects
     the HuggingFace ``trust_remote_code`` model code with transformers >= 4.52.
+
+    With ``async_engine=True`` it uses vLLM's ``AsyncLLM`` instead, with the same
+    model and sampling settings, so several threads can submit batches to one
+    engine at once. Use it only when the caller runs batches concurrently.
     """
 
     _DEFAULT_TASK_PROMPT: str = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
@@ -78,6 +205,7 @@ class NemotronParseV12(BaseModel):
         gpu_memory_utilization: float = 0.8,
         max_num_seqs: int = 64,
         max_tokens: int = 9000,
+        async_engine: bool = False,
     ) -> None:
         super().__init__()
 
@@ -106,7 +234,7 @@ class NemotronParseV12(BaseModel):
         configure_global_hf_cache_base(hf_cache_dir)
         revision = get_hf_revision(model_path)
 
-        self._llm = LLM(
+        engine_kwargs: dict[str, Any] = dict(
             model=model_path,
             revision=revision,
             trust_remote_code=True,
@@ -115,14 +243,23 @@ class NemotronParseV12(BaseModel):
             limit_mm_per_prompt={"image": 1},
             gpu_memory_utilization=gpu_memory_utilization,
         )
-
-        self._sampling_params = SamplingParams(
+        sampling_kwargs: dict[str, Any] = dict(
             temperature=0,
             top_k=1,
             repetition_penalty=1.1,
             max_tokens=self._max_tokens,
             skip_special_tokens=False,
         )
+        if async_engine:
+            from vllm.sampling_params import RequestOutputKind
+
+            # The offline LLM applies these engine defaults itself; AsyncEngineArgs does not.
+            self._llm = _AsyncEngine({**engine_kwargs, "seed": 0, "disable_log_stats": True})
+            sampling_kwargs["output_kind"] = RequestOutputKind.FINAL_ONLY
+        else:
+            self._llm = LLM(**engine_kwargs)
+
+        self._sampling_params = SamplingParams(**sampling_kwargs)
 
     # ------------------------------------------------------------------
     # Input normalisation
@@ -195,6 +332,42 @@ class NemotronParseV12(BaseModel):
         making this significantly faster than sequential single-image calls
         for large batches.
         """
+        return [text.strip() for text, _ in self.invoke_batch_with_finish_reasons(inputs, task_prompt=task_prompt)]
+
+    def invoke_batch_with_finish_reasons(
+        self,
+        inputs: Sequence[ImageInput],
+        task_prompt: Optional[str] = None,
+    ) -> List[tuple[str, str]]:
+        """Run a batch and return each unstripped completion with its vLLM finish reason.
+
+        A finish reason other than ``"stop"``, such as ``"length"``, means the
+        generation ended before the model completed the page.
+        Errors from image preprocessing or vLLM generation propagate unchanged.
+
+        Args:
+            inputs: Sequence of PIL images, image paths (strings or ``Path``
+                objects), tensors, or NumPy arrays, normalized to RGB images.
+                Tensors and arrays must be CHW or HWC, optionally with a leading
+                batch dimension of size 1.
+            task_prompt: Decoder prompt for every image. ``None`` or an empty
+                string uses the prompt configured on this model.
+
+        Returns:
+            A list of ``(text, finish_reason)`` tuples in input order. Text keeps
+            its original whitespace. A missing or empty finish reason becomes
+            ``"unknown"``.
+
+        Raises:
+            TypeError: An input type is unsupported.
+            ValueError: A tensor or array has an unsupported shape.
+            OSError: An image file cannot be opened or decoded.
+            IndexError: vLLM returns a request without a completion.
+            RuntimeError: The model was closed.
+        """
+        llm = self._llm
+        if llm is None:
+            raise RuntimeError("This Nemotron Parse model was closed; create a new NemotronParseV12 to run it again.")
         prompt = task_prompt or self._task_prompt
         prompts = [
             {
@@ -206,8 +379,8 @@ class NemotronParseV12(BaseModel):
             }
             for img in inputs
         ]
-        outputs = self._llm.generate(prompts, self._sampling_params)
-        return [out.outputs[0].text.strip() for out in outputs]
+        outputs = llm.generate(prompts, self._sampling_params)
+        return [(out.outputs[0].text, str(out.outputs[0].finish_reason or "unknown")) for out in outputs]
 
     def __call__(
         self,
@@ -215,6 +388,18 @@ class NemotronParseV12(BaseModel):
         task_prompt: Optional[str] = None,
     ) -> str:
         return self.invoke(input_data, task_prompt=task_prompt)
+
+    def close(self) -> None:
+        """Release the vLLM engine and the GPU memory it holds; later calls do nothing.
+
+        The async engine stops at once, cancelling batches it is still running.
+        vLLM's offline engine has no shutdown API, so this drops the model's
+        reference and vLLM's own finalizer stops its engine process once a running
+        batch finishes. Safe to call from any thread; the model cannot run afterwards.
+        """
+        engine, self._llm = getattr(self, "_llm", None), None
+        if isinstance(engine, _AsyncEngine):
+            engine.close()
 
     # ------------------------------------------------------------------
     # BaseModel abstract interface

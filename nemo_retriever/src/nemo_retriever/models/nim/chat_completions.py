@@ -48,7 +48,8 @@ def invoke_chat_completions(
     max_pool_workers: int = 16,
     max_retries: int = 10,
     max_429_retries: int = 5,
-) -> List[str]:
+    return_metadata: bool = False,
+) -> List[Any]:
     """Invoke an OpenAI-compatible chat completions endpoint concurrently.
 
     .. note::
@@ -83,6 +84,7 @@ def invoke_chat_completions(
             extra_body=extra_body,
             max_retries=max_retries,
             max_429_retries=max_429_retries,
+            return_metadata=return_metadata,
         )
     finally:
         client.shutdown()
@@ -167,7 +169,8 @@ def invoke_chat_completions_images(
     max_pool_workers: int = 16,
     max_retries: int = 10,
     max_429_retries: int = 5,
-) -> List[str]:
+    return_metadata: bool = False,
+) -> List[Any]:
     """Convenience wrapper: one chat completion request per base64 image.
 
     Builds an OpenAI-format ``image_url`` message for each image and
@@ -189,6 +192,7 @@ def invoke_chat_completions_images(
             extra_body=extra_body,
             max_retries=max_retries,
             max_429_retries=max_429_retries,
+            return_metadata=return_metadata,
         )
     finally:
         client.shutdown()

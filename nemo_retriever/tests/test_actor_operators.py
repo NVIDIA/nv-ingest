@@ -413,6 +413,67 @@ class TestNemotronParseActor:
         mock_fn.assert_called_once()
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_concurrent_first_calls_load_one_async_engine(self):
+        import threading
+        import time
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        def slow_load(**kwargs):
+            time.sleep(0.05)
+            return MagicMock()
+
+        actor = NemotronParseGPUActor(async_engine=True)
+        with patch("nemo_retriever.models.local.NemotronParseV12", side_effect=slow_load) as model_class:
+            threads = [threading.Thread(target=actor._ensure_model) for _ in range(4)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join()
+
+        model_class.assert_called_once_with(task_prompt=actor._task_prompt, async_engine=True)
+
+    def test_only_the_async_engine_supports_concurrent_calls(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        assert NemotronParseGPUActor.supports_concurrent_calls({"async_engine": True}) is True
+        assert NemotronParseGPUActor.supports_concurrent_calls({}) is False
+
+    def test_close_releases_the_model_once_and_runs_when_ray_deletes_the_actor(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        model = MagicMock()
+        actor = NemotronParseGPUActor(async_engine=True)
+        actor._model = model
+        actor.close()
+        actor.close()
+        assert model.close.call_count == 1
+        assert actor._model is None
+
+        actor._model = model
+        del actor
+        assert model.close.call_count == 2
+
+    def test_process_keeps_the_model_it_loaded_when_close_runs_before_parsing(self, monkeypatch):
+        from nemo_retriever.operators.extract.parse import nemotron_parse
+        from nemo_retriever.operators.extract.parse.nemotron_parse import NemotronParseGPUActor
+
+        model = MagicMock()
+        actor = NemotronParseGPUActor(async_engine=True)
+        actor._model = model
+        load = NemotronParseGPUActor._ensure_model
+
+        def load_then_close(self):
+            loaded = load(self)
+            self.close()
+            return loaded
+
+        monkeypatch.setattr(NemotronParseGPUActor, "_ensure_model", load_then_close)
+        with patch.object(nemotron_parse, "nemotron_parse_pages") as parse_pages:
+            actor.process(pd.DataFrame({"page_image": ["x"]}))
+
+        assert parse_pages.call_args.kwargs["model"] is model
+
     def test_remote_chat_completions_uses_v1_2_protocol(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import (
             NEMOTRON_PARSE_DEFAULT_TASK_PROMPT,
@@ -420,13 +481,15 @@ class TestNemotronParseActor:
             nemotron_parse_pages,
         )
 
+        raw_output = "<x_0><y_0>Hello world<x_1><y_1><class_Text>"
+
         class _FakeNIMClient:
             def __init__(self):
                 self.kwargs = None
 
             def invoke_chat_completions_images(self, **kwargs):
                 self.kwargs = kwargs
-                return ["<x_0><y_0>Hello world<x_1><y_1><class_Text>"]
+                return [raw_output]
 
         client = _FakeNIMClient()
         df = pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]})
@@ -443,6 +506,238 @@ class TestNemotronParseActor:
         assert client.kwargs["task_prompt"] == NEMOTRON_PARSE_DEFAULT_TASK_PROMPT
         assert client.kwargs["extra_body"] == {"max_tokens": 8192}
         assert client.kwargs["repetition_penalty"] == 1.1
+        assert result.at[0, "nemotron_parse_v1_2"]["raw_output"] == raw_output
+
+    def test_raw_output_retains_textless_picture_before_channel_filtering(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        raw_output = "<x_0.1><y_0.2><x_0.4><y_0.5><class_Picture>"
+
+        class _FakeNIMClient:
+            def invoke_chat_completions_images(self, **kwargs):
+                return [raw_output]
+
+        result = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+            invoke_url="http://nemotron-parse:8000/v1/chat/completions",
+            extract_infographics=True,
+            nim_client=_FakeNIMClient(),
+        )
+
+        assert result.at[0, "infographic"] == []
+        metadata = result.at[0, "nemotron_parse_v1_2"]
+        assert metadata["timing"]["seconds"] >= 0
+        assert metadata["raw_output"] == raw_output
+        assert metadata["error"] is None
+
+    def test_raw_output_distinguishes_empty_response_from_missing_response(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        class _EmptyNIMClient:
+            def invoke_chat_completions_images(self, **kwargs):
+                return [""]
+
+        empty = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+            invoke_url="http://nemotron-parse:8000/v1/chat/completions",
+            nim_client=_EmptyNIMClient(),
+        )
+        missing = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [None]}),
+            invoke_url="http://nemotron-parse:8000/v1/chat/completions",
+            nim_client=_EmptyNIMClient(),
+        )
+
+        assert empty.at[0, "nemotron_parse_v1_2"]["raw_output"] == ""
+        assert missing.at[0, "nemotron_parse_v1_2"]["raw_output"] is None
+
+    def test_local_raw_output_retains_response_whitespace(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        raw_output = "\n<x_0><y_0>Hello<x_1><y_1><class_Text>\t"
+
+        class _FakeModel:
+            def invoke_batch(self, images, *, task_prompt):
+                assert len(images) == 1
+                return [raw_output]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+            )
+
+        assert result.at[0, "nemotron_parse_v1_2"]["raw_output"] == raw_output
+
+    def test_local_length_finish_reason_marks_output_incomplete(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        raw_output = "<x_0><y_0>Hello<x_1><y_1><class_Text>"
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                assert len(images) == 1
+                return [(raw_output, "length")]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+                extract_text=True,
+            )
+
+        assert result.at[0, "text"] == "Hello"
+        metadata = result.at[0, "nemotron_parse_v1_2"]
+        assert metadata["raw_output"] == raw_output
+        assert metadata["error"]["stage"] == "nemotron_parse_pages_finish_reason"
+        assert metadata["error"]["type"] == "IncompleteModelOutputError"
+        assert "length" in metadata["error"]["message"]
+
+    @pytest.mark.parametrize(
+        ("finish_reason", "expected_error_type"), [("stop", None), (None, "IncompleteModelOutputError")]
+    )
+    def test_local_finish_reason_only_accepts_stop(self, finish_reason, expected_error_type):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", finish_reason)]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+            )
+
+        error = result.at[0, "nemotron_parse_v1_2"]["error"]
+        assert (error or {}).get("type") == expected_error_type
+        if expected_error_type is not None:
+            assert "'unknown'" in error["message"]
+
+    def test_local_completion_count_mismatch_fails_batch(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", "stop")]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._decode_page_image",
+            return_value=object(),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}, {"image_b64": "aW1hZ2U="}]}),
+                model=_FakeModel(),
+            )
+
+        for metadata in result["nemotron_parse_v1_2"]:
+            assert metadata["raw_output"] is None
+            assert metadata["error"]["stage"] == "nemotron_parse_pages"
+            assert "different number of completions" in metadata["error"]["message"]
+
+    @pytest.mark.parametrize("mode", ["RGB", "RGBA", "P", "L", "LA", "I;16"])
+    def test_page_decode_yields_the_same_rgb_pixels_as_numpy(self, mode):
+        import base64
+        import io
+
+        import numpy as np
+        from PIL import Image
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import _decode_page_image
+
+        pixels = np.random.default_rng(0).integers(0, 256, size=(37, 53, 4), dtype=np.uint8)
+        source = Image.fromarray(pixels, "RGBA").convert(mode)
+        buffer = io.BytesIO()
+        source.save(buffer, format="PNG")
+        encoded = base64.b64encode(buffer.getvalue()).decode()
+
+        decoded = _decode_page_image(encoded)
+        with Image.open(io.BytesIO(buffer.getvalue())) as reference:
+            expected = np.asarray(reference.convert("RGB"), dtype=np.uint8)
+
+        assert decoded.mode == "RGB"
+        assert decoded.size == (53, 37)
+        assert np.array_equal(np.asarray(decoded), expected)
+
+    def test_page_decode_drops_exif_orientation_like_the_numpy_path(self):
+        import base64
+        import io
+
+        import numpy as np
+        from PIL import Image, ImageOps
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import _decode_page_image
+
+        exif = Image.Exif()
+        exif[0x0112] = 6  # rotate 90 degrees on display
+        buffer = io.BytesIO()
+        Image.fromarray(np.zeros((37, 53, 3), dtype=np.uint8)).save(buffer, format="PNG", exif=exif)
+
+        decoded = _decode_page_image(base64.b64encode(buffer.getvalue()).decode())
+
+        assert decoded.info == {}
+        assert ImageOps.exif_transpose(decoded).size == (53, 37)
+
+    def test_undecodable_page_is_recorded_and_other_pages_still_parse(self):
+        import base64
+        import io
+
+        from PIL import Image
+
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        buffer = io.BytesIO()
+        Image.new("RGB", (8, 8), "white").save(buffer, format="PNG")
+        valid = base64.b64encode(buffer.getvalue()).decode()
+        truncated = base64.b64encode(buffer.getvalue()[:41]).decode()
+        seen = []
+
+        class _FakeModel:
+            def invoke_batch_with_finish_reasons(self, images, *, task_prompt):
+                seen.extend(images)
+                return [("<x_0><y_0>Hello<x_1><y_1><class_Text>", "stop")] * len(images)
+
+        result = nemotron_parse_pages(
+            pd.DataFrame({"page_image": [{"image_b64": truncated}, {"image_b64": valid}]}),
+            model=_FakeModel(),
+        )
+
+        assert [image.mode for image in seen] == ["RGB"]
+        assert result.at[0, "nemotron_parse_v1_2"]["error"]["stage"] == "nemotron_parse_pages_decode"
+        assert result.at[1, "nemotron_parse_v1_2"]["error"] is None
+        assert result.at[1, "nemotron_parse_v1_2"]["raw_output"] == "<x_0><y_0>Hello<x_1><y_1><class_Text>"
+
+    def test_route_error_retains_raw_output(self):
+        from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
+
+        raw_output = "<x_0><y_0>Hello<x_1><y_1><class_Text>"
+
+        class _FakeNIMClient:
+            def invoke_chat_completions_images(self, **kwargs):
+                return [raw_output]
+
+        with patch(
+            "nemo_retriever.operators.extract.parse.nemotron_parse._route_parsed_elements",
+            side_effect=RuntimeError("route failed"),
+        ):
+            result = nemotron_parse_pages(
+                pd.DataFrame({"page_image": [{"image_b64": "aW1hZ2U="}]}),
+                invoke_url="http://nemotron-parse:8000/v1/chat/completions",
+                nim_client=_FakeNIMClient(),
+            )
+
+        metadata = result.at[0, "nemotron_parse_v1_2"]
+        assert metadata["raw_output"] == raw_output
+        assert metadata["error"]["stage"] == "nemotron_parse_pages_route"
 
     def test_malformed_table_keeps_native_latex_without_dropping_page(self):
         from nemo_retriever.operators.extract.parse.nemotron_parse import nemotron_parse_pages
@@ -563,6 +858,8 @@ class TestNemotronParseActor:
         assert len(result.at[0, "table"]) == 1
         assert len(result.at[0, "chart"]) == 1
         assert len(result.at[0, "infographic"]) == 1
+        raw_elements = json.loads(result.at[0, "nemotron_parse_v1_2"]["raw_output"])["result"][0]
+        assert [element["type"] for element in raw_elements] == ["Text", "Table", "Chart", "Picture"]
 
     @pytest.mark.parametrize(
         ("endpoint", "model", "expected_model", "expected_profile"),
@@ -930,3 +1227,43 @@ class TestBatchEmbedActor:
         actor = self._make()
         result = actor(pd.DataFrame({"text": ["hello"]}))
         pd.testing.assert_frame_equal(result, expected)
+
+
+def test_parse_actor_cannot_reload_before_previous_engine_releases_memory():
+    import concurrent.futures
+    import threading
+
+    from nemo_retriever.operators.extract.parse.nemotron_parse import (
+        NemotronParseGPUActor,
+    )
+
+    closing = threading.Event()
+    release = threading.Event()
+    new_load = threading.Event()
+    actor = NemotronParseGPUActor(async_engine=True)
+    old_model = MagicMock()
+
+    def close_old():
+        closing.set()
+        assert release.wait(5)
+
+    old_model.close.side_effect = close_old
+    actor._model = old_model
+
+    def load_new(**kwargs):
+        assert release.is_set(), "new model allocated before old engine close finished"
+        new_load.set()
+        return MagicMock()
+
+    with patch("nemo_retriever.models.local.NemotronParseV12", side_effect=load_new):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+            closer = pool.submit(actor.close)
+            assert closing.wait(5)
+            loader = pool.submit(actor._ensure_model)
+            try:
+                assert not new_load.wait(0.05)
+            finally:
+                release.set()
+            closer.result(timeout=5)
+            assert loader.result(timeout=5) is actor._model
+    actor.close()

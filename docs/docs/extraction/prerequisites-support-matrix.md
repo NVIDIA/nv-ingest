@@ -170,13 +170,15 @@ When you call [NVIDIA-hosted NIMs](deployment-options.md#when-to-use-nvidia-host
 
 <a id="nemotron-parse-hosted-vs-self-hosted"></a>
 
-!!! note "Nemotron Parse: hosted Build and self-hosted NIM contracts"
+!!! note "Nemotron Parse endpoint contracts"
 
-    NVIDIA Build and self-hosted Nemotron Parse use distinct request contracts:
+    Hosted Build, self-hosted NIMs, and vLLM serving use distinct request contracts:
 
     - **Hosted Build** (`https://integrate.api.nvidia.com/v1/chat/completions`) resolves to model ID `nvidia/nemotron-parse` and uses an image-only tool-call contract.
     - **Self-hosted Parse v1.2** uses `nvidia/nemotron-parse-v1.2` and the tagged text-prompt contract. The Helm chart defaults to `nvcr.io/nim/nvidia/nemotron-parse-v1.2:1.7.0-variant`.
-    - **Self-hosted Nemotron 3.5 Parse** uses native `POST /v1/parse` with a multipart `document` image upload. The development Compose `nim-parse` profile defaults to `nvcr.io/nim/nvidia/nemotron-parse:latest`. This image does not expose `/v1/chat/completions`. Set `nemotron_parse_invoke_url` to the native endpoint, for example `http://localhost:8006/v1/parse` for a host client using the default Compose port. The container selects the model; `nemotron_parse_model="nvidia/nemotron-3.5-parse"` is not sent in the native request.
+    - **Self-hosted Nemotron 3.5 Parse NIM** uses native `POST /v1/parse` with a multipart `document` image upload. The development Compose `nim-parse` profile defaults to `nvcr.io/nim/nvidia/nemotron-parse:latest`. This image does not expose `/v1/chat/completions`. Set `nemotron_parse_invoke_url` to the native endpoint, for example `http://localhost:8006/v1/parse` for a host client using the default Compose port. The container selects the model; `nemotron_parse_model="nvidia/nemotron-3.5-parse"` is not sent in the native request.
+
+    - **Nemotron 3.5 Parse served by vLLM** uses `/v1/chat/completions` and an explicit `nemotron_parse_model="nvidia/Nemotron-3.5-Parse"` or `"Nemotron-3.5-Parse"`. The model name must match the server's served model name. This route requires the optional model-team `nemotron-parse` package and uses its `DocumentParser` prompt and sampling settings. It does not change the library's local v1.2 runtime. Refer to [Serve Nemotron 3.5 Parse with vLLM](multimodal-extraction.md#served-nemotron-35-parse) for installation and a complete example.
 
     The native API returns extracted content in `content`. Bounding-box and class tags are routed through the existing tagged-content postprocessor to produce clean page text and the selected table, chart, and infographic elements. Untagged Markdown is preserved as whole-page text, including inline tables; this fallback requires text extraction to be enabled. The Parse hardware rows below describe the existing Helm image, not a hardware qualification of the native Compose image.
 

@@ -30,11 +30,29 @@ import logging
 import os
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Self, Sequence, Tuple, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Self,
+    Sequence,
+    Tuple,
+    Union,
+)
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
-from nemo_retriever.graph.executor import arrow_table_to_pandas, call_pandas_function_on_arrow
-from nemo_retriever.ingestor.branch_extraction import ExtractionBranchExecutor, merge_node_overrides
+from nemo_retriever.graph.executor import (
+    arrow_table_to_pandas,
+    call_pandas_function_on_arrow,
+)
+from nemo_retriever.ingestor.branch_extraction import (
+    ExtractionBranchExecutor,
+    merge_node_overrides,
+)
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
@@ -51,7 +69,10 @@ from nemo_retriever.ingestor.manifest import (
     plan_extraction_branches,
     resolve_branch_extraction_inputs,
 )
-from nemo_retriever.ingestor.plans import dedup_params_enabled, resolve_effective_dedup_params
+from nemo_retriever.ingestor.plans import (
+    dedup_params_enabled,
+    resolve_effective_dedup_params,
+)
 from nemo_retriever.ingestor import ingestor
 from nemo_retriever.common.inline_text import (
     inline_text_source_id,
@@ -109,7 +130,14 @@ _REMOTE_EMBED_ENDPOINT_FIELDS = ("embedding_endpoint", "embed_invoke_url")
 _DEFAULT_PAGE_ELEMENTS_COLUMN = "page_elements_v3"
 _DEFAULT_EMBED_COLUMN = "text_embeddings_1b_v2"
 _ERROR_MESSAGE_LIMIT = 256
-_SOURCE_IDENTIFIER_COLUMNS = ("document_id", "path", "source_path", "metadata", "source_id", "source_name")
+_SOURCE_IDENTIFIER_COLUMNS = (
+    "document_id",
+    "path",
+    "source_path",
+    "metadata",
+    "source_id",
+    "source_name",
+)
 logger = logging.getLogger(__name__)
 _HTTP_STATUS_FIELDS: tuple[str, ...] = ("status_code", "http_status", "status", "code")
 _EXPLICIT_MODE_INPUT_TYPES: dict[str, frozenset[str]] = {
@@ -553,6 +581,7 @@ class GraphIngestor(ingestor):
         self._dedup_params: Any = None
         self._store_params: Any = None
         self._vdb_upload_params: Any = None
+        self._parquet_writer: Any = None
         self._webhook_params: Any = None
         # Ordered list of stage names; "extract" is tracked but excluded from
         # the post-extraction stage_order passed to graph builders.
@@ -872,6 +901,63 @@ class GraphIngestor(ingestor):
     # Execution
     # ------------------------------------------------------------------
 
+    def save_to_disk(
+        self,
+        output_directory: str,
+        *,
+        compression: str | None = "snappy",
+        rows_per_file: int = 1024,
+        output_schema: str = "native",
+        passthrough_columns: tuple[str, ...] = (),
+    ) -> "GraphIngestor":
+        """Write graph rows as Parquet during ingest in batch or inprocess mode.
+
+        Use ``ingest(return_results=False)`` to return counts without retaining
+        extracted records. The destination must not exist. Failed extraction rows
+        are preserved; this does not turn failed pages into successful pages.
+        ``output_schema="interleaved"`` projects tagged Parse page results into
+        ordered multimodal document rows with ``materialize_error`` for failed
+        pages. ``passthrough_columns`` retains selected input columns on elements.
+        Returned records remain native rows regardless of the disk schema.
+        """
+        from nemo_retriever.ingestor.parquet import ParquetDatasetWriter
+
+        self._parquet_writer = ParquetDatasetWriter(
+            output_directory,
+            compression=compression,
+            rows_per_file=rows_per_file,
+            output_schema=output_schema,
+            passthrough_columns=passthrough_columns,
+        )
+        return self
+
+    def _write_parquet(self, batches: Any, *, return_results: bool) -> Any:
+        """Keep failure policy in summary mode, after preserving all error rows."""
+        stage_error = None
+
+        def checked_batches():
+            nonlocal stage_error
+            iterator = iter(batches)
+            try:
+                for batch in iterator:
+                    if not return_results and stage_error is None:
+                        frame = batch.to_pandas() if hasattr(batch, "to_pandas") else batch
+                        try:
+                            self._raise_for_stage_errors(frame)
+                        except GraphIngestionError as exc:
+                            # Retain a bounded diagnostic; the dataset retains every failed row.
+                            stage_error = exc
+                    yield batch
+            finally:
+                close = getattr(iterator, "close", None)
+                if callable(close):
+                    close()
+
+        result = self._parquet_writer.write_batches(checked_batches(), return_results=return_results)
+        if stage_error is not None:
+            raise stage_error
+        return result
+
     def ingest(self, params: Any = None, **kwargs: Any) -> Any:
         """Fetch configured URLs and execute the configured ingestion graph.
 
@@ -895,11 +981,14 @@ class GraphIngestor(ingestor):
             still be returned. The default raise path remains scoped to
             explicitly configured remote stages and URL fetch failures.
         return_results
-            When ``False``, batch ingestion returns a one-row summary with
-            ``input_rows`` and ``submitted_records`` instead of retaining the
-            extracted records. Requires a terminal streaming VDB upload,
-            ``error_policy='raise'``, and ``return_failures=False``. Submitted
-            records are counted before any backend filtering.
+            When ``False``, return a one-row summary instead of retaining extracted
+            records. With ``save_to_disk()``, both graph modes support this option;
+            the summary contains ``input_rows``, ``written_rows`` and ``parquet_files``.
+            Failed rows remain on disk, and configured remote-stage errors still
+            raise after publication unless ``error_policy='collect'``. Without a
+            disk writer, summary mode requires a terminal batch VDB upload,
+            ``error_policy='raise'``, and ``return_failures=False``; its
+            ``submitted_records`` count precedes backend filtering.
 
         Returns
         -------
@@ -923,11 +1012,15 @@ class GraphIngestor(ingestor):
         """
         return_failures = self._resolve_execute_flag(params, kwargs, "return_failures", default=False)
         return_results = self._resolve_execute_flag(params, kwargs, "return_results", default=True)
-        if not return_results:
+        if not return_results and self._parquet_writer is None:
             if self._run_mode != "batch" or self._vdb_upload_params is None:
                 raise ValueError("return_results=False requires run_mode='batch' with a VDB upload")
             if return_failures or self._error_policy == "collect":
                 raise ValueError("return_results=False requires error_policy='raise' and return_failures=False")
+        if self._parquet_writer is not None and not return_results and return_failures:
+            raise ValueError(
+                "Disk summary mode retains failures in Parquet; use return_results=True for a failure list"
+            )
         self._validate_input_sources(self._inline_texts)
         self._prepare_url_inputs()
         try:
@@ -945,6 +1038,8 @@ class GraphIngestor(ingestor):
             and is_blank_inline_corpus(self._inline_texts)
         ):
             result = empty_text_chunks_df()
+            if self._parquet_writer is not None:
+                result = self._write_parquet([result], return_results=return_results)
             if self._run_mode == "batch":
                 self._rd_dataset = result
             else:
@@ -1016,6 +1111,7 @@ class GraphIngestor(ingestor):
             effective_extraction,
             dedup_params=dedup_params,
             post_extract_order=post_extract_order,
+            return_results=return_results,
         )
 
     def _execute_single_graph_batch(
@@ -1047,6 +1143,7 @@ class GraphIngestor(ingestor):
         )
         if (
             not return_results
+            and self._parquet_writer is None
             and not self._documents
             and not self._url_documents()
             and not self._all_buffers()
@@ -1089,7 +1186,13 @@ class GraphIngestor(ingestor):
             ),
         )
         executor_input = self._inline_text_dataset(ray.data) if self._inline_texts else self._documents
-        if return_results:
+        if self._parquet_writer is not None:
+            dataset = executor.build_dataset(executor_input)
+            result = self._write_parquet(
+                dataset.iter_batches(batch_format=None, batch_size=self._parquet_writer.rows_per_file),
+                return_results=return_results,
+            )
+        elif return_results:
             result = executor.ingest(executor_input)
         else:
             result = executor._ingest(
@@ -1106,6 +1209,7 @@ class GraphIngestor(ingestor):
         *,
         dedup_params: DedupParams | None,
         post_extract_order: tuple[str, ...],
+        return_results: bool = True,
     ) -> Any:
         graph = build_graph(
             extraction_mode=effective_extraction.extraction_mode,
@@ -1129,13 +1233,16 @@ class GraphIngestor(ingestor):
         executor = InprocessExecutor(graph, show_progress=self._show_progress)
         self._rd_dataset = None
         if self._inline_texts:
-            return executor.ingest(self._inline_text_dataframe())
-        if self._all_buffers():
+            inputs = self._inline_text_dataframe()
+        elif self._all_buffers():
             import pandas as pd
 
-            df = pd.DataFrame([{"bytes": buf.getvalue(), "path": name} for name, buf in self._all_buffers()])
-            return executor.ingest(df)
-        return executor.ingest(self._documents)
+            inputs = pd.DataFrame([{"bytes": buf.getvalue(), "path": name} for name, buf in self._all_buffers()])
+        else:
+            inputs = self._documents
+        if self._parquet_writer is not None:
+            return self._write_parquet(executor.iter_batches(inputs), return_results=return_results)
+        return executor.ingest(inputs)
 
     def _execute_extraction_branches(
         self,
@@ -1179,6 +1286,11 @@ class GraphIngestor(ingestor):
             ensure_batch_runtime=self._ensure_batch_runtime,
             return_results=return_results,
             validate_batch=self._raise_for_stage_errors if not return_results else None,
+            result_writer=(
+                (lambda batches: self._write_parquet(batches, return_results=return_results))
+                if self._parquet_writer is not None
+                else None
+            ),
         ).execute()
         self._rd_dataset = result if self._run_mode == "batch" else None
         return result

@@ -514,6 +514,15 @@ class BatchTuningParams(_ParamsModel):
     nemotron_parse_workers: Optional[int] = None
     gpu_nemotron_parse: Optional[float] = None
     nemotron_parse_batch_size: Optional[int] = None
+    nemotron_parse_batches_in_flight: int = Field(
+        default=1,
+        ge=1,
+        description=(
+            "Batches each local Nemotron Parse actor runs at once through one shared vLLM async engine. Values "
+            "above 1 keep the GPU busy while a batch's slowest pages finish, at the cost of host memory and "
+            "per-batch latency. 1 keeps the offline engine and runs one batch at a time."
+        ),
+    )
     store_workers: Optional[int] = None
     inference_batch_size: int = 8
 
@@ -620,6 +629,11 @@ class ExtractParams(_ParamsModel):
                     f"Local Nemotron Parse supports only `{NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL}` in this release; "
                     f"received `{self.nemotron_parse_model}`. Configure `nemotron_parse_invoke_url` or `invoke_url` "
                     "to use a compatible remote model."
+                )
+            if parse_endpoints and self.batch_tuning.nemotron_parse_batches_in_flight > 1:
+                raise ValueError(
+                    "`batch_tuning.nemotron_parse_batches_in_flight` above 1 requires local Nemotron Parse; "
+                    "remote endpoints already overlap requests through `remote_retry.remote_max_pool_workers`."
                 )
         if not self.use_page_elements:
             consumers = [("use_table_structure", self.use_table_structure and self.extract_tables)]

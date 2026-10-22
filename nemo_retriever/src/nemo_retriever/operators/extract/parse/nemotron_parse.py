@@ -21,10 +21,10 @@ import base64
 import io
 import json
 import re
+import threading
 import time
 import traceback
 
-import numpy as np
 import pandas as pd
 
 from nemo_retriever.common.modality.parse.nemotron_parse_postprocessing import (
@@ -69,9 +69,10 @@ _PARSE_CLASS_TO_CHANNEL: Dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def _error_payload(*, stage: str, exc: BaseException) -> Dict[str, Any]:
+def _error_payload(*, stage: str, exc: BaseException, raw_output: Optional[str] = None) -> Dict[str, Any]:
     return {
         "timing": None,
+        "raw_output": raw_output,
         "error": {
             "stage": str(stage),
             "type": exc.__class__.__name__,
@@ -156,6 +157,7 @@ class _NemotronParseContractProfile(str, Enum):
     HOSTED_TOOL_CALL = "hosted_tool_call"
     LEGACY_TOOL_CALL = "legacy_tool_call"
     V1_2_TAGGED = "v1_2_tagged"
+    V3_5_DOCUMENT = "v3_5_document"
 
 
 @dataclass(frozen=True)
@@ -197,7 +199,9 @@ def _resolve_nemotron_parse_contract(
         NEMOTRON_PARSE_HOSTED_MODEL if all(build_endpoints) else NEMOTRON_PARSE_REMOTE_DEFAULT_MODEL
     )
     normalized_model = resolved_model.lower()
-    if normalized_model == NEMOTRON_PARSE_HOSTED_MODEL:
+    if normalized_model in {"nvidia/nemotron-3.5-parse", "nemotron-3.5-parse"}:
+        profile = _NemotronParseContractProfile.V3_5_DOCUMENT
+    elif normalized_model == NEMOTRON_PARSE_HOSTED_MODEL:
         profile = _NemotronParseContractProfile.HOSTED_TOOL_CALL
     elif _is_legacy_nemotron_parse_model(normalized_model):
         profile = _NemotronParseContractProfile.LEGACY_TOOL_CALL
@@ -275,11 +279,15 @@ def _route_tool_call_elements(
     return table_items, chart_items, infographic_items, page_text
 
 
-def _decode_page_image(page_image_b64: str) -> np.ndarray:
-    """Decode a base64 page image to an HWC uint8 numpy array."""
+def _decode_page_image(page_image_b64: str) -> "Image.Image":
+    """Decode a base64 page image to a loaded RGB PIL image."""
     raw = base64.b64decode(page_image_b64)
     with Image.open(io.BytesIO(raw)) as im:
-        return np.asarray(im.convert("RGB"), dtype=np.uint8).copy()
+        image = im.convert("RGB")
+    # The previous NumPy handoff dropped file metadata such as EXIF orientation; later
+    # normalization (vLLM's exif_transpose) must see the same image as before.
+    image.info.clear()
+    return image
 
 
 # ---------------------------------------------------------------------------
@@ -336,13 +344,22 @@ def nemotron_parse_pages(
     all_chart: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_infographic: List[List[Dict[str, Any]]] = [[] for _ in range(n_rows)]
     all_text: List[Optional[str]] = [None] * n_rows
-    all_meta: List[Dict[str, Any]] = [{"timing": None, "error": None} for _ in range(n_rows)]
+    all_meta: List[Dict[str, Any]] = [
+        {
+            "timing": None,
+            "raw_output": None,
+            "finish_reason": None,
+            "usage": None,
+            "error": None,
+        }
+        for _ in range(n_rows)
+    ]
 
     t0_total = time.perf_counter()
 
     # -- Phase 1: collect page images that need inference ----------------
     batch_indices: List[int] = []  # index into batch_df
-    batch_images: List[Any] = []  # numpy arrays (local) or b64 strings (remote)
+    batch_images: List[Any] = []  # RGB PIL images (local) or b64 strings (remote)
 
     for idx, row in enumerate(batch_df.itertuples(index=False)):
         page_image = getattr(row, "page_image", None) or {}
@@ -356,18 +373,11 @@ def nemotron_parse_pages(
                 batch_images.append(_decode_page_image(page_image_b64))
             batch_indices.append(idx)
         except Exception as e:
-            all_meta[idx] = {
-                "timing": None,
-                "error": {
-                    "stage": "nemotron_parse_pages_decode",
-                    "type": e.__class__.__name__,
-                    "message": str(e),
-                    "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-                },
-            }
+            all_meta[idx] = _error_payload(stage="nemotron_parse_pages_decode", exc=e)
 
     # -- Phase 2: run model inference in a single batch ------------------
     raw_texts: List[str] = [""] * len(batch_indices)
+    local_finish_reasons: List[Optional[str]] = [None] * len(batch_indices)
     uses_tool_call_routing = False
     contract: _ResolvedNemotronParseContract | None = None
     native_parse = False
@@ -380,6 +390,8 @@ def nemotron_parse_pages(
                     raise ValueError("Do not mix native /v1/parse and legacy Parse endpoint contracts.")
                 native_parse = all(native_endpoints)
                 if native_parse:
+                    for idx in batch_indices:
+                        all_meta[idx]["bbox_coordinate_space"] = "normalized_page_content"
                     client = nim_client or NIMClient(max_pool_workers=int(retry.remote_max_pool_workers))
                     try:
                         responses = client.invoke_parse_pages(
@@ -395,6 +407,8 @@ def nemotron_parse_pages(
                             client.shutdown()
                     raw_texts = [response["content"].strip() for response in responses]
                     for idx, response in zip(batch_indices, responses):
+                        all_meta[idx]["finish_reason"] = response.get("finish_reason")
+                        all_meta[idx]["usage"] = response.get("usage")
                         all_meta[idx]["native_parse"] = {
                             "finish_reason": response.get("finish_reason"),
                             "usage": response.get("usage"),
@@ -402,30 +416,66 @@ def nemotron_parse_pages(
                 elif "/v1/chat/completions" in invoke_url:
                     contract = _resolve_nemotron_parse_contract(invoke_url, nemotron_parse_model)
                     uses_tool_call_routing = contract.uses_tool_call_routing
-                    extra_body: Dict[str, Any] = {"max_tokens": 8192}
-                    if contract.profile == _NemotronParseContractProfile.LEGACY_TOOL_CALL:
-                        extra_body["tools"] = [{"type": "function", "function": {"name": "markdown_bbox"}}]
-                    _chat_kw = dict(
-                        invoke_url=invoke_url,
-                        image_b64_list=batch_images,
-                        model=contract.model,
-                        api_key=api_key,
-                        timeout_s=float(request_timeout_s),
-                        task_prompt=None if uses_tool_call_routing else task_prompt,
-                        repetition_penalty=(
-                            None if contract.profile == _NemotronParseContractProfile.HOSTED_TOOL_CALL else 1.1
-                        ),
-                        extra_body=extra_body,
-                        max_retries=int(retry.remote_max_retries),
-                        max_429_retries=int(retry.remote_max_429_retries),
-                    )
-                    if nim_client is not None:
-                        raw_texts = nim_client.invoke_chat_completions_images(**_chat_kw)
-                    else:
-                        raw_texts = invoke_chat_completions_images(
-                            **_chat_kw,
-                            max_pool_workers=int(retry.remote_max_pool_workers),
+                    if contract.profile == _NemotronParseContractProfile.V3_5_DOCUMENT:
+                        for idx in batch_indices:
+                            all_meta[idx]["bbox_coordinate_space"] = "normalized_page_content"
+                        from nemo_retriever.models.nim.nemotron_parse import (
+                            invoke_document_parse_images,
                         )
+
+                        documents = invoke_document_parse_images(
+                            invoke_url=invoke_url,
+                            image_b64_list=batch_images,
+                            model=contract.model,
+                            api_key=api_key,
+                            timeout_s=float(request_timeout_s),
+                            max_pool_workers=int(retry.remote_max_pool_workers),
+                            max_retries=int(retry.remote_max_retries),
+                            max_429_retries=int(retry.remote_max_429_retries),
+                            nim_client=nim_client,
+                        )
+                        raw_texts = [item["routing_output"] for item in documents]
+                        for idx, document in zip(batch_indices, documents):
+                            all_meta[idx].update({k: v for k, v in document.items() if k != "routing_output"})
+                    else:
+                        extra_body: Dict[str, Any] = {"max_tokens": 8192}
+                        if contract.profile == _NemotronParseContractProfile.LEGACY_TOOL_CALL:
+                            extra_body["tools"] = [
+                                {
+                                    "type": "function",
+                                    "function": {"name": "markdown_bbox"},
+                                }
+                            ]
+                        _chat_kw = dict(
+                            invoke_url=invoke_url,
+                            image_b64_list=batch_images,
+                            model=contract.model,
+                            api_key=api_key,
+                            timeout_s=float(request_timeout_s),
+                            task_prompt=None if uses_tool_call_routing else task_prompt,
+                            repetition_penalty=(
+                                None if contract.profile == _NemotronParseContractProfile.HOSTED_TOOL_CALL else 1.1
+                            ),
+                            extra_body=extra_body,
+                            max_retries=int(retry.remote_max_retries),
+                            max_429_retries=int(retry.remote_max_429_retries),
+                            return_metadata=True,
+                        )
+                        if nim_client is not None:
+                            chat_results = nim_client.invoke_chat_completions_images(**_chat_kw)
+                        else:
+                            chat_results = invoke_chat_completions_images(
+                                **_chat_kw,
+                                max_pool_workers=int(retry.remote_max_pool_workers),
+                            )
+                        raw_texts = []
+                        for idx, response in zip(batch_indices, chat_results):
+                            if isinstance(response, dict):
+                                raw_texts.append(response["text"])
+                                all_meta[idx]["finish_reason"] = response.get("finish_reason")
+                                all_meta[idx]["usage"] = response.get("usage")
+                            else:
+                                raw_texts.append(str(response))
                 else:
                     _img_kw = dict(
                         invoke_url=invoke_url,
@@ -446,11 +496,21 @@ def nemotron_parse_pages(
                     raw_texts = [_extract_parse_text(item) for item in response_items]
             else:
                 # Local vLLM model (v1.2): uses task_prompt, returns tagged text.
-                invoke_batch = getattr(model, "invoke_batch", None)
-                if invoke_batch is not None:
-                    raw_texts = [str(t or "").strip() for t in invoke_batch(batch_images, task_prompt=task_prompt)]
+                invoke_with_finish_reasons = getattr(model, "invoke_batch_with_finish_reasons", None)
+                if callable(invoke_with_finish_reasons):
+                    local_results = list(invoke_with_finish_reasons(batch_images, task_prompt=task_prompt))
+                    if len(local_results) != len(batch_images):
+                        raise RuntimeError(
+                            "Local Nemotron Parse returned a different number of completions than page images"
+                        )
+                    raw_texts = [str(text or "") for text, _ in local_results]
+                    local_finish_reasons = [str(finish_reason or "unknown") for _, finish_reason in local_results]
                 else:
-                    raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "").strip() for img in batch_images]
+                    invoke_batch = getattr(model, "invoke_batch", None)
+                    if invoke_batch is not None:
+                        raw_texts = [str(t or "") for t in invoke_batch(batch_images, task_prompt=task_prompt)]
+                    else:
+                        raw_texts = [str(model.invoke(img, task_prompt=task_prompt) or "") for img in batch_images]
         except BaseException as e:
             if (
                 contract is not None
@@ -469,20 +529,27 @@ def nemotron_parse_pages(
                 hint.__cause__ = e
                 e = hint
             print(f"Warning: Nemotron Parse batch failed: {type(e).__name__}: {e}")
-            err = {
-                "stage": "nemotron_parse_pages",
-                "type": e.__class__.__name__,
-                "message": str(e),
-                "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-            }
+            payload = _error_payload(stage="nemotron_parse_pages", exc=e)
             for i in batch_indices:
-                all_meta[i] = {"timing": None, "error": err}
+                all_meta[i].update(payload)
+            response = getattr(e, "response", None)
+            failed_pos = getattr(e, "page_index", None)
+            if isinstance(response, dict) and isinstance(failed_pos, int) and 0 <= failed_pos < len(batch_indices):
+                all_meta[batch_indices[failed_pos]].update(
+                    raw_output=response.get("content"),
+                    finish_reason=response.get("finish_reason"),
+                    usage=response.get("usage"),
+                )
             raw_texts = []
 
     # -- Phase 3: route parsed elements into content channels ------------
     route_fn = _route_tool_call_elements if uses_tool_call_routing else _route_parsed_elements
     for pos, raw_text in enumerate(raw_texts):
         idx = batch_indices[pos]
+        if all_meta[idx]["raw_output"] is None:
+            all_meta[idx]["raw_output"] = raw_text
+        if all_meta[idx]["error"] is not None:
+            continue
         try:
             if native_parse and not extract_classes_bboxes(raw_text)[0]:
                 # Only complete bounding-box/class sequences select the tagged
@@ -502,16 +569,22 @@ def nemotron_parse_pages(
             all_infographic[idx] = fp_infographics
             if fp_text is not None:
                 all_text[idx] = fp_text
+            finish_reason = local_finish_reasons[pos] or all_meta[idx].get("finish_reason")
+            all_meta[idx]["finish_reason"] = finish_reason
+            if not native_parse and finish_reason is not None and finish_reason.lower() not in {"stop", "eos"}:
+                all_meta[idx]["error"] = {
+                    "stage": "nemotron_parse_pages_finish_reason",
+                    "type": "IncompleteModelOutputError",
+                    "message": (f"Nemotron Parse ended with finish_reason={finish_reason!r}"),
+                }
         except BaseException as e:
-            all_meta[idx] = {
-                "timing": None,
-                "error": {
-                    "stage": "nemotron_parse_pages_route",
-                    "type": e.__class__.__name__,
-                    "message": str(e),
-                    "traceback": "".join(traceback.format_exception(type(e), e, e.__traceback__)),
-                },
-            }
+            all_meta[idx].update(
+                _error_payload(
+                    stage="nemotron_parse_pages_route",
+                    exc=e,
+                    raw_output=all_meta[idx]["raw_output"],
+                )
+            )
 
     elapsed = time.perf_counter() - t0_total
     for meta in all_meta:
@@ -540,7 +613,14 @@ def nemotron_parse_pages(
 
 
 class NemotronParseGPUActor(AbstractOperator, GPUOperator):
-    """Ray-friendly callable that initialises Nemotron Parse v1.2 once per actor."""
+    """Ray-friendly callable that initialises Nemotron Parse v1.2 once per actor.
+
+    ``async_engine=True`` loads the model on vLLM's async engine so the actor can
+    run several batches at once; the executor decides how many.
+    """
+
+    # Concurrent actor tasks must not each start an engine on the same GPU.
+    _model_lock = threading.Lock()
 
     def __init__(
         self,
@@ -558,9 +638,11 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
         remote_max_pool_workers: int = 16,
         remote_max_retries: int = 10,
         remote_max_429_retries: int = 5,
+        async_engine: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        self._async_engine = bool(async_engine)
         self._invoke_url = str(nemotron_parse_invoke_url or "").strip() or str(invoke_url or "").strip()
         self._nemotron_parse_model = nemotron_parse_model
         validate_nemotron_parse_endpoint_list(self._invoke_url)
@@ -585,18 +667,50 @@ class NemotronParseGPUActor(AbstractOperator, GPUOperator):
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data
 
-    def _ensure_model(self) -> None:
-        """Load the local vLLM model on first use (i.e. on the worker, not the driver)."""
-        if self._model is None and not self._invoke_url:
-            from nemo_retriever.models.local import NemotronParseV12
+    def _ensure_model(self) -> Any:
+        """Load the local vLLM model on first use (i.e. on the worker, not the driver) and return it."""
+        model = self._model
+        if model is not None or self._invoke_url:
+            return model
+        with self._model_lock:
+            if self._model is None:
+                from nemo_retriever.models.local import NemotronParseV12
 
-            self._model = NemotronParseV12(task_prompt=self._task_prompt)
+                self._model = NemotronParseV12(task_prompt=self._task_prompt, async_engine=self._async_engine)
+            return self._model
+
+    @classmethod
+    def supports_concurrent_calls(cls, operator_kwargs: dict[str, Any]) -> bool:
+        """Report whether the executor may run several batches on one actor at once.
+
+        Args:
+            operator_kwargs: Constructor keyword arguments for this actor.
+
+        Returns:
+            True only with ``async_engine=True``; the offline vLLM engine is not thread-safe.
+        """
+        return bool(operator_kwargs.get("async_engine"))
+
+    def close(self) -> None:
+        """Release the local model and the GPU memory its engine holds.
+
+        Safe to call more than once and from any thread. Batches already running
+        on the async engine are cancelled; a later batch loads the model again.
+        """
+        with self._model_lock:
+            model, self._model = getattr(self, "_model", None), None
+            if model is not None:
+                # A replacement must not allocate GPU memory before shutdown completes.
+                model.close()
+
+    # Ray Data deletes the actor's operator when the actor exits gracefully.
+    __del__ = close
 
     def process(self, data: Any, **kwargs: Any) -> Any:
-        self._ensure_model()
+        model = self._ensure_model()
         return nemotron_parse_pages(
             data,
-            model=self._model,
+            model=model,
             invoke_url=self._invoke_url,
             nemotron_parse_model=self._nemotron_parse_model,
             api_key=self._api_key,
