@@ -86,6 +86,35 @@ docker compose \
   -f nemo_retriever/dev/compose/service-mode.compose.yaml up --build -d
 ```
 
+The core embedding service uses `nvcr.io/nim/nvidia/nemotron-embed:latest`
+and lets the native runtime select the Nemotron 3.5 checkpoint and precision
+for the GPU. Supported GPUs use NVFP4; other supported GPUs use the BF16
+checkpoint with FP16 execution.
+The `nims-core.env` preset uses the served alias `nvidia/nemotron-3.5-embed-1b`
+for both ingestion and query embedding. `NIM_EMBED_MODEL` configures that
+API alias, not the checkpoint or precision. Clear any previous shell override
+to use the preset alias. Hosted inference retains its Nemotron 3 default.
+
+This is a model migration from Nemotron 3 Embed 1B. Before upgrading a
+persistent deployment, back up its data and rebuild and re-ingest the affected
+tables or collections. Matching vector dimensions do not make embeddings
+from different models compatible. Evaluate retrieval quality on your data.
+Also validate retrieval quality when changing GPU hardware or precision;
+the stable API alias does not establish embedding compatibility. Rebuild and
+re-ingest affected collections when changing their embedding model or precision.
+
+The embedding NIM downloads artifacts through NGC using `NGC_API_KEY`.
+Its model volume mounts at `/model`, with artifacts under `/model/embed`;
+a separate runtime cache mounts at the fixed path `/opt/cache`.
+`NIM_EMBED_MODEL_PATH` configures both the model mount and engine artifact
+path. `NIM_EMBED_MODEL_VOLUME` and `NIM_EMBED_CACHE_VOLUME` select the
+persistent volumes for weights and the runtime cache.
+Compose checks `/v1/health/ready` every 15 seconds, with a 10-second timeout,
+a 120-second startup grace period, and 40 retries before marking the NIM unhealthy.
+Set `NIM_EMBED_IMAGE` and `NIM_EMBED_TAG` to select another image.
+For supported models and GPUs, refer to the
+[Embedding NIM 2.4 support matrix](https://docs.nvidia.com/nim/nemo-retriever/embedding/2.4/support-matrix.html).
+
 To start all nine NIM services, layer the four wiring presets and select every NIM
 profile:
 
@@ -140,7 +169,9 @@ injected into retriever service configuration by Compose.
 Every NIM has a persistent model or cache volume, a configurable GPU assignment, and a
 configurable host port. Variables follow the service prefix, for example
 `NIM_OCR_GPU_ID`, `NIM_OCR_HOST_PORT`, `NIM_OCR_CACHE_VOLUME`,
-`NIM_OCR_CACHE_PATH`, `NIM_OCR_IMAGE`, and `NIM_OCR_TAG`. The defaults form a
+`NIM_OCR_CACHE_PATH`, `NIM_OCR_IMAGE`, and `NIM_OCR_TAG`. Cache-path overrides
+depend on the service; the embedding runtime cache stays at `/opt/cache`.
+The defaults form a
 collision-free assignment for the combined-profile example: core NIMs use GPUs
 0, 1, 2, and 3 (page-elements, table-structure, OCR, and embedding), reranker uses 4,
 parse uses 5, caption uses 6, answer uses 7, and audio uses 9. Change the
