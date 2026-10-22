@@ -67,6 +67,8 @@ hosted endpoints if a local NIM becomes unavailable.
 
 The page-elements, table-structure, OCR, and embedding NIM services set
 `NIM_SERVER_MODE=throughput` and `NIM_PERFORMANCE_MODE=1` in the Compose file.
+They use `NIM_ENGINE_COUNT=1`, `NIM_SERVER_MAX_WAIT_MS=10` (10 ms), and
+`NIM_PIPELINE_MAX_BATCH_SIZE=16`.
 
 Start the four core extraction/retrieval NIM services with their checked-in internal
 endpoint wiring:

@@ -113,9 +113,9 @@ services:
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
       NIM_PERFORMANCE_MODE: "1"
       NIM_SERVER_MODE: throughput
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_SERVER_MAX_WAIT_MS: "10"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
+      NIM_PIPELINE_MAX_BATCH_SIZE: "16"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-page-elements-v3
       NIM_ENGINE_MODEL_PATH: ${NIM_PAGE_ELEMENTS_CACHE_PATH:-/model}/page-elements
@@ -135,9 +135,9 @@ services:
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
       NIM_PERFORMANCE_MODE: "1"
       NIM_SERVER_MODE: throughput
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_SERVER_MAX_WAIT_MS: "10"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
+      NIM_PIPELINE_MAX_BATCH_SIZE: "16"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-table-structure-v1
       NIM_ENGINE_MODEL_PATH: ${NIM_TABLE_STRUCTURE_CACHE_PATH:-/model}/table-structure
@@ -157,9 +157,9 @@ services:
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
       NIM_PERFORMANCE_MODE: "1"
       NIM_SERVER_MODE: throughput
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_SERVER_MAX_WAIT_MS: "10"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
+      NIM_PIPELINE_MAX_BATCH_SIZE: "16"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-ocr-v2
       NIM_ENGINE_MODEL_PATH: ${NIM_OCR_CACHE_PATH:-/model}/ocr
@@ -184,9 +184,9 @@ services:
       NIM_ENGINE_MODEL_PATH: ${NIM_EMBED_MODEL_PATH:-/model}/embed
       NIM_PERFORMANCE_MODE: "1"
       NIM_SERVER_MODE: throughput
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_SERVER_MAX_WAIT_MS: "10"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
+      NIM_PIPELINE_MAX_BATCH_SIZE: "16"
       OMP_NUM_THREADS: "1"
     volumes:
       - "nim_embedding_cache:/opt/cache"
