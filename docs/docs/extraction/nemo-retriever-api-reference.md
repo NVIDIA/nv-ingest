@@ -147,6 +147,18 @@ The `audio` value remains available for the legacy params-driven audio path. For
 new audio pipelines, use [`GraphIngestor.extract_audio()`](#graph-ingestor)
 instead.
 
+The meaning of an omitted method depends on the API layer. In the Python
+parameter model, `ExtractParams()` defaults to `method="pdfium"`; passing
+`method=None` is not an automatic mode and does not select OCR. In the CLI and
+service ingest APIs, leaving `--method` unset passes `None` as an option-level
+sentinel. The default `profile="auto"` resolves that sentinel to
+`method="pdfium_hybrid"`, while `profile="fast-text"` resolves it to
+`method="pdfium"`. The automatic profile can therefore process image-only or
+scanned PDF pages through the configured OCR path, but OCR still requires the
+OCR stage to be available and enabled. Use `method="ocr"` or
+`method="pdfium_hybrid"` explicitly when selecting an OCR-capable PDF path in
+the Python API.
+
 Any other value raises a Pydantic `ValidationError` before pipeline setup. The
 error lists the supported values, so spelling and configuration errors do not
 silently select another extraction path.
