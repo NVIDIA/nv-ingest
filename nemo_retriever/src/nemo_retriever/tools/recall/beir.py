@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import logging
 import math
@@ -143,6 +143,12 @@ class BeirDataset:
     query_ids: list[str]
     queries: list[str]
     qrels: dict[str, dict[str, int]]
+    query_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+BEIR_METADATA_FIELDS: tuple[str, ...] = (
+    "modality", "content_type", "query_types", "query_format", "language", "source_type",
+)
 
 
 @dataclass(frozen=True)
@@ -366,6 +372,7 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
     query_ids: list[str] = []
     queries: list[str] = []
     qrels: dict[str, dict[str, int]] = {}
+    query_metadata: dict[str, dict[str, Any]] = {}
 
     with dataset_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -399,6 +406,10 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
             query_ids.append(query_id)
             queries.append(query_text)
             qrels[query_id] = {corpus_id: 1}
+            # Retain the supplied annotation, not the retrieval-ID fallback.
+            query_metadata[query_id] = {
+                key: row[key] for key in BEIR_METADATA_FIELDS if row.get(key)
+            }
 
     if not query_ids:
         raise ValueError(f"No queries loaded from {dataset_path}")
@@ -408,6 +419,7 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
         query_ids=query_ids,
         queries=queries,
         qrels=qrels,
+        query_metadata=query_metadata,
     )
 
 
@@ -669,6 +681,13 @@ def load_beir_dataset(
         query_ids=filtered_query_ids,
         queries=filtered_queries,
         qrels={qid: qrels[qid] for qid in filtered_query_ids},
+        query_metadata={
+            str(_row_get(row, "query_id", idx)): {
+                key: _row_get(row, key) for key in BEIR_METADATA_FIELDS if _row_get(row, key) is not None
+            }
+            for idx, row in enumerate(queries_rows)
+            if str(_row_get(row, "query_id", idx)) in qrels
+        },
     )
 
 
@@ -860,6 +879,16 @@ def compute_beir_metrics(
             top_binary = [1 if rel > 0 else 0 for rel in top_relevances]
             hits = sum(top_binary)
 
+            precision_at_k = hits / float(k)
+            cumulative_hits = 0
+            precision_sum = 0.0
+            for rank, relevant in enumerate(top_binary, start=1):
+                cumulative_hits += relevant
+                if relevant:
+                    precision_sum += cumulative_hits / float(rank)
+            # TREC map_cut divides by all relevant targets, even when R > k.
+            average_precision_at_k = precision_sum / relevant_count if relevant_count else 0.0
+
             recall_at_k = (hits / float(relevant_count)) if relevant_count else 0.0
 
             ideal_relevances = sorted(relevant_scores, reverse=True)
@@ -868,8 +897,53 @@ def compute_beir_metrics(
 
             aggregates[f"recall@{k}"].append(recall_at_k)
             aggregates[f"ndcg@{k}"].append(ndcg_at_k)
+            aggregates[f"map@{k}"].append(average_precision_at_k)
+            aggregates[f"precision@{k}"].append(precision_at_k)
 
     return {metric_name: sum(values) / float(len(values)) for metric_name, values in sorted(aggregates.items())}
+
+
+def compute_beir_breakdowns(
+    qrels: dict[str, dict[str, int]],
+    run: dict[str, dict[str, float]],
+    query_metadata: dict[str, dict[str, Any]],
+    *,
+    ks: Sequence[int] = DEFAULT_BEIR_KS,
+    fields: Sequence[str] = BEIR_METADATA_FIELDS,
+) -> dict[str, Any]:
+    """Score metadata groups independently, including coverage and overlapping labels.
+
+    Scalar strings and sequences of strings are supported. Missing/empty labels
+    do not create a group. A query belongs once to each of its distinct labels;
+    therefore multi-label groups must not be summed to recover the overall score.
+    """
+    result: dict[str, Any] = {"schema_version": 1, "query_count": len(qrels), "fields": {}}
+    for name in dict.fromkeys(fields):
+        groups: dict[str, set[str]] = defaultdict(set)
+        covered: set[str] = set()
+        for query_id in qrels:
+            value = query_metadata.get(query_id, {}).get(name)
+            values = [value] if isinstance(value, str) else value if isinstance(value, (list, tuple)) else []
+            labels = {item.strip() for item in values if isinstance(item, str) and item.strip()}
+            for label in labels:
+                groups[label].add(query_id)
+                covered.add(query_id)
+        result["fields"][name] = {
+            "covered_query_count": len(covered),
+            "missing_query_count": len(qrels) - len(covered),
+            "groups": {
+                label: {
+                    "query_count": len(query_ids),
+                    "metrics": compute_beir_metrics(
+                        {qid: qrels[qid] for qid in query_ids},
+                        {qid: run[qid] for qid in query_ids if qid in run},
+                        ks=ks,
+                    ),
+                }
+                for label, query_ids in sorted(groups.items())
+            },
+        }
+    return result
 
 
 def evaluate_lancedb_beir(
