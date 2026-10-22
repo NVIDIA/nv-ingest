@@ -65,6 +65,10 @@ Routing is selected when Compose renders the configuration: self-hosted mode
 requires both the `nims-core` preset and profile, and it does not fail over to
 hosted endpoints if a local NIM becomes unavailable.
 
+The page-elements, table-structure, OCR, and embedding NIM services set
+`NIM_PERFORMANCE_MODE=1` to select throughput defaults and
+`NIM_ENGINE_COUNT=1` in the Compose file.
+
 Start the four core extraction/retrieval NIM services with their checked-in internal
 endpoint wiring:
 

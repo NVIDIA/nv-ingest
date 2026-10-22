@@ -111,11 +111,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-page-elements-v3
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-page-elements-v3
       NIM_ENGINE_MODEL_PATH: ${NIM_PAGE_ELEMENTS_CACHE_PATH:-/model}/page-elements
@@ -133,11 +130,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-table-structure-v1
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-table-structure-v1
       NIM_ENGINE_MODEL_PATH: ${NIM_TABLE_STRUCTURE_CACHE_PATH:-/model}/table-structure
@@ -155,11 +149,8 @@ services:
       <<: *nim-environment
       NIM_OTEL_SERVICE_NAME: nemotron-ocr-v2
       NIM_SERVER_BIND_ADDR: 0.0.0.0:8000
-      NIM_PERFORMANCE_MODE: "0"
-      NIM_SERVER_MODE: latency
-      NIM_SERVER_MAX_WAIT_MS: "0"
+      NIM_PERFORMANCE_MODE: "1"
       NIM_ENGINE_COUNT: "1"
-      NIM_PIPELINE_MAX_BATCH_SIZE: "1"
       NIM_ENGINE_MODEL_DOWNLOAD_PROVIDER: ngc
       NIM_ENGINE_MODEL_NAME: nvidia/nemotron-ocr-v2
       NIM_ENGINE_MODEL_PATH: ${NIM_OCR_CACHE_PATH:-/model}/ocr
@@ -182,6 +173,8 @@ services:
       # Let NIM select NVFP4 or FP16 for the GPU; keep the client model ID stable.
       NIM_SERVER_SERVED_MODEL_NAME: ${NIM_EMBED_MODEL:-nvidia/nemotron-3.5-embed-1b}
       NIM_ENGINE_MODEL_PATH: ${NIM_EMBED_MODEL_PATH:-/model}/embed
+      NIM_PERFORMANCE_MODE: "1"
+      NIM_ENGINE_COUNT: "1"
       OMP_NUM_THREADS: "1"
     volumes:
       - "nim_embedding_cache:/opt/cache"
