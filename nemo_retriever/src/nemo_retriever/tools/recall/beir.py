@@ -914,11 +914,63 @@ def compute_beir_breakdowns(
     ks: Sequence[int] = DEFAULT_BEIR_KS,
     fields: Sequence[str] = BEIR_METADATA_FIELDS,
 ) -> dict[str, Any]:
-    """Score metadata groups independently, including coverage and overlapping labels.
+    """Compute BEIR metrics for metadata groups and report label coverage.
 
-    Scalar strings and sequences of strings are supported. Missing/empty labels
-    do not create a group. A query belongs once to each of its distinct labels;
-    therefore multi-label groups must not be summed to recover the overall score.
+    Args:
+        qrels: Relevance judgments, keyed by query ID and then document ID.
+            These query IDs define the population for coverage and grouping.
+            Each group retains its queries' complete relevance judgments.
+        run: Retrieval scores, keyed by query ID and then document ID. Each
+            group retains its queries' complete rankings. Missing query results
+            contribute zero, as in :func:`compute_beir_metrics`. Queries absent
+            from ``qrels`` are ignored.
+        query_metadata: Metadata dictionaries keyed by the original query IDs.
+            Requested values can be strings or lists or tuples of strings.
+            Labels are stripped of whitespace and deduplicated per query.
+            Empty and non-string labels are ignored. Queries without a usable
+            label remain uncovered.
+        ks: Rank cutoffs passed to :func:`compute_beir_metrics` for every
+            nonempty group. The scorer converts values with ``int()``, drops
+            nonpositive values, removes duplicates, and sorts the result.
+            Defaults to ``(1, 3, 5, 10)``. Short rankings receive no synthetic
+            hits, and precision retains the cutoff as its denominator.
+        fields: Metadata fields to group independently. Defaults to
+            :data:`BEIR_METADATA_FIELDS`. Duplicate fields are evaluated once.
+            An empty sequence disables grouping and scoring.
+
+    Returns:
+        A dictionary with the following nested structure:
+
+        * ``schema_version``: The integer ``1``.
+        * ``query_count``: The number of queries in ``qrels``.
+        * ``fields``: A mapping from each requested field to a dictionary with
+          ``covered_query_count``, ``missing_query_count``, and ``groups``.
+          Coverage counts queries with at least one supported, nonempty label.
+          Missing coverage includes every other query in ``qrels``.
+        * Each ``groups`` mapping is keyed by label and contains dictionaries
+          with ``query_count`` and ``metrics``. Metrics are the flat
+          ``recall@k``, ``ndcg@k``, ``map@k``, and ``precision@k`` values from
+          :func:`compute_beir_metrics`, averaged over that group's queries.
+
+        A query occurs once per distinct label but can occur in multiple groups.
+        Group counts and scores therefore cannot be summed to recover overall
+        results. A field without labels has an empty ``groups`` mapping. Empty
+        ``qrels`` returns zero coverage and empty groups for each field.
+
+    Raises:
+        ValueError: Propagated from :func:`compute_beir_metrics` when a group is
+            scored and no positive cutoff remains, or a cutoff or relevance
+            grade cannot be converted to an integer.
+        TypeError: Propagated from :func:`compute_beir_metrics` when a cutoff or
+            relevance grade does not support integer conversion, or ranking
+            values cannot be sorted.
+        OverflowError: Propagated from :func:`compute_beir_metrics` when integer
+            conversion of a cutoff or relevance grade overflows.
+
+    Note:
+        Cutoffs and scoring inputs are only validated when a group is scored.
+        If no requested field has a group, the scorer is not called and these
+        errors are not raised.
     """
     result: dict[str, Any] = {"schema_version": 1, "query_count": len(qrels), "fields": {}}
     for name in dict.fromkeys(fields):
