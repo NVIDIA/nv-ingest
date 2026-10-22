@@ -395,8 +395,11 @@ def test_missing_queries_zero_relevance_and_ties_are_deterministic() -> None:
 def test_breakdowns_filter_query_population_and_report_overlap_and_coverage() -> None:
     qrels = {"q1": {"a": 1}, "q2": {"b": 1}, "q3": {"c": 1}}
     run = {"q1": {"a": 1.0}, "q3": {"c": 1.0}}
-    metadata = {"q1": {"content_type": ["Text", "Table", "Text"], "language": "en"},
-                "q2": {"content_type": ["Table"]}, "extra": {"content_type": ["Table"]}}
+    metadata = {
+        "q1": {"content_type": ["Text", "Table", "Text"], "language": "en"},
+        "q2": {"content_type": ["Table"]},
+        "extra": {"content_type": ["Table"]},
+    }
     result = compute_beir_breakdowns(qrels, run, metadata, ks=(1, 10), fields=("content_type", "language"))
     field = result["fields"]["content_type"]
     assert result["query_count"] == 3
@@ -405,11 +408,14 @@ def test_breakdowns_filter_query_population_and_report_overlap_and_coverage() ->
     assert field["groups"]["Text"]["query_count"] == 1
     assert field["groups"]["Table"]["query_count"] == 2
     assert field["groups"]["Table"]["metrics"] == compute_beir_metrics(
-        {key: qrels[key] for key in ("q1", "q2")}, {"q1": run["q1"]}, ks=(1, 10),
+        {key: qrels[key] for key in ("q1", "q2")},
+        {"q1": run["q1"]},
+        ks=(1, 10),
     )
     assert result["fields"]["language"]["groups"]["en"]["metrics"]["map@1"] == 1
-    assert compute_beir_breakdowns(qrels, run, {}, fields=("modality",))["fields"]["modality"][
-        "missing_query_count"] == 3
+    assert (
+        compute_beir_breakdowns(qrels, run, {}, fields=("modality",))["fields"]["modality"]["missing_query_count"] == 3
+    )
 
 
 def test_csv_metadata_does_not_infer_missing_modality(tmp_path: Path) -> None:
@@ -422,15 +428,18 @@ def test_csv_metadata_does_not_infer_missing_modality(tmp_path: Path) -> None:
 
 def test_vidore_metadata_follows_language_and_qrel_filtering(monkeypatch) -> None:
     rows = {
-        "queries": [{"query_id": 1, "query": "English", "language": "en", "content_type": ["Text"]},
-                    {"query_id": 2, "query": "French", "language": "fr", "query_format": "keyword"},
-                    {"query_id": 3, "query": "Unlabeled", "language": "en"}],
-        "qrels": [{"query_id": 1, "corpus_id": "c", "score": 2},
-                  {"query_id": 2, "corpus_id": "c", "score": 1}],
+        "queries": [
+            {"query_id": 1, "query": "English", "language": "en", "content_type": ["Text"]},
+            {"query_id": 2, "query": "French", "language": "fr", "query_format": "keyword"},
+            {"query_id": 3, "query": "Unlabeled", "language": "en"},
+        ],
+        "qrels": [{"query_id": 1, "corpus_id": "c", "score": 2}, {"query_id": 2, "corpus_id": "c", "score": 1}],
         "corpus": [{"corpus_id": "c", "doc_id": "doc", "page_number_in_doc": 0}],
     }
+
     def load(_repo, config, **_kwargs):
         return rows[config]
+
     monkeypatch.setitem(sys.modules, "datasets", type("Datasets", (), {"load_dataset": load}))
     dataset = load_beir_dataset("vidore_hf", dataset_name="test", query_language="en", doc_id_field="pdf_page")
     assert dataset.query_ids == ["1"]

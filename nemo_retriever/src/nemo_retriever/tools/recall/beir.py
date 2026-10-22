@@ -147,7 +147,12 @@ class BeirDataset:
 
 
 BEIR_METADATA_FIELDS: tuple[str, ...] = (
-    "modality", "content_type", "query_types", "query_format", "language", "source_type",
+    "modality",
+    "content_type",
+    "query_types",
+    "query_format",
+    "language",
+    "source_type",
 )
 
 
@@ -407,9 +412,7 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
             queries.append(query_text)
             qrels[query_id] = {corpus_id: 1}
             # Retain the supplied annotation, not the retrieval-ID fallback.
-            query_metadata[query_id] = {
-                key: row[key] for key in BEIR_METADATA_FIELDS if row.get(key)
-            }
+            query_metadata[query_id] = {key: row[key] for key in BEIR_METADATA_FIELDS if row.get(key)}
 
     if not query_ids:
         raise ValueError(f"No queries loaded from {dataset_path}")
