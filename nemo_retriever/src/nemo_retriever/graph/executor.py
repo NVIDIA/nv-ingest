@@ -99,6 +99,45 @@ def _is_row_unsafe_arrow_column(field: Any) -> bool:
     return _contains_null_arrow_child(field.type)
 
 
+def _arrow_to_pylist(values: Any) -> list[Any]:
+    """Return ``values.to_pylist()``, converting float-list leaves through NumPy.
+
+    pyarrow builds one Python scalar per list element, which dominates the
+    cost of converting embedding columns to Python rows.
+    """
+    import pyarrow as pa
+
+    if isinstance(values, pa.ChunkedArray):
+        return [item for chunk in values.chunks for item in _arrow_to_pylist(chunk)]
+
+    data_type = values.type
+    if pa.types.is_struct(data_type) and data_type.num_fields:
+        children = [
+            [None] * len(values) if pa.types.is_null(child.type) else _arrow_to_pylist(child)
+            for child in values.flatten()
+        ]
+        rows = [dict(zip(data_type.names, items)) for items in zip(*children)]
+    elif (pa.types.is_list(data_type) or pa.types.is_large_list(data_type)) and data_type.value_type in (
+        pa.float32(),
+        pa.float64(),
+    ):
+        offsets = values.offsets.to_numpy()
+        flat = values.values.slice(offsets[0], offsets[-1] - offsets[0])
+        if flat.null_count:
+            return values.to_pylist()
+        flat_values = flat.to_numpy().tolist()
+        offsets = (offsets - offsets[0]).tolist()
+        rows = [flat_values[start:end] for start, end in zip(offsets, offsets[1:])]
+    else:
+        return values.to_pylist()
+
+    if values.null_count:
+        for index, valid in enumerate(values.is_valid().to_pylist()):
+            if not valid:
+                rows[index] = None
+    return rows
+
+
 def _materialize_row_unsafe_columns(table: Any, frame: pd.DataFrame) -> pd.DataFrame:
     """Rewrite Arrow columns pandas cannot index as plain object columns."""
     import pyarrow as pa
@@ -109,7 +148,7 @@ def _materialize_row_unsafe_columns(table: Any, frame: pd.DataFrame) -> pd.DataF
     for index, field in enumerate(table.schema):
         if not _is_row_unsafe_arrow_column(field):
             continue
-        frame[field.name] = pd.Series(table.column(index).to_pylist(), index=frame.index, dtype=object)
+        frame[field.name] = pd.Series(_arrow_to_pylist(table.column(index)), index=frame.index, dtype=object)
     return frame
 
 
@@ -145,6 +184,38 @@ def arrow_table_to_pandas(table: Any) -> pd.DataFrame:
 
     frame = BlockAccessor.for_block(table).to_pandas()
     return _normalize_object_tensor_columns(_materialize_row_unsafe_columns(table, frame))
+
+
+def frame_to_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    """Convert a DataFrame to row dicts, converting nested Arrow columns once per batch.
+
+    Equivalent to ``frame.to_dict(orient="records")``. Columns with a nested
+    ``pd.ArrowDtype`` (lists, structs) are converted to Python objects with
+    ``_arrow_to_pylist`` first, so float-list values go through NumPy instead of
+    one Python float per element. Other columns and column labels are left as is.
+    Duplicate labels follow the same last-value-wins behavior as ``frame.to_dict``.
+
+    Args:
+        frame: Batch to convert. It is not modified.
+
+    Returns:
+        One dict per row, keyed by column label, with the same values and types
+        that ``frame.to_dict(orient="records")`` would return.
+    """
+    import pyarrow as pa
+
+    positions = [
+        index
+        for index, dtype in enumerate(frame.dtypes)
+        if isinstance(dtype, pd.ArrowDtype) and pa.types.is_nested(dtype.pyarrow_dtype)
+    ]
+    if not positions:
+        return frame.to_dict(orient="records")
+    frame = frame.copy(deep=False)
+    for index in positions:
+        values = _arrow_to_pylist(pa.array(frame.iloc[:, index]))
+        frame.isetitem(index, pd.Series(values, index=frame.index, dtype=object))
+    return frame.to_dict(orient="records")
 
 
 @nvtx.annotate("nrl.batch::ray.materialize", color="blue")
