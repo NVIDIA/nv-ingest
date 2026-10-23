@@ -242,6 +242,90 @@ ingestor = (
 results = ingestor.ingest()
 ```
 
+## Compare local Hugging Face embedding inputs { #local-hf-input-audit }
+
+!!! note "Unreleased diagnostic"
+
+    Input auditing and typed query backend selection are under development.
+    They are not available in current NVIDIA `main` or a released package.
+
+To investigate differences between repeated embedding runs, enable
+`EmbedInputAuditParams` through `embed_input_audit`. The audit is disabled by
+default and supports only the local Hugging Face (`hf`) Nemotron 3.5 adapter.
+Enabling it for another model, backend, or a remote endpoint raises a
+configuration error before model loading.
+
+Pass the typed audit configuration through `EmbedParams`,
+`IngestEmbedOptions`, or `QueryEmbedOptions`. The following ingestion example
+uses the existing `EmbedParams` API. Replace the input path and output directory
+with paths available to your workers.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import EmbedInputAuditParams, EmbedParams
+
+results = (
+    create_ingestor(run_mode="batch")
+    .files("/path/to/your/document.pdf")
+    .extract()
+    .embed(
+        EmbedParams(
+            local_ingest_embed_backend="hf",
+            embed_input_audit=EmbedInputAuditParams(
+                enabled=True,
+                output_dir="/absolute/private/embed-audit",
+            ),
+        )
+    )
+    .ingest()
+)
+```
+
+For typed query plans, import `QueryEmbedOptions` from
+`nemo_retriever.query.options` and set `local_query_embed_backend="hf"` when
+you enable the audit. This option accepts `"hf"` or `"vllm"`. Its default,
+`None`, preserves existing backend selection. You can select a query backend
+without enabling the audit. Enabling the audit does not select a backend.
+
+`output_dir` is required when the audit is enabled and must be an absolute
+directory owned by the worker's user, with no group or other permissions.
+The writer creates new directories with mode `0700` and files with mode `0600`.
+Each embedding actor writes a separate YAML shard that contains multiple YAML
+documents. Keep these files private: input hashes are linkable, and someone who
+guesses a short input can compute its hash. The audit does not export source
+text, images, token values, model tensors, or embedding vectors.
+
+The shards contain SHA256 fingerprints of selected text, compressed images,
+decoded RGB pixels, rendered prompts, processor tensors, ordered microbatch
+membership, and output vectors before storage. Processor records distinguish
+valid tokens and image pixels from padded batch tensors. Identical images can
+have different padded tensors when their microbatch peers have different sizes.
+Compare valid content and batch context separately. The shard header records
+`nrl-safe-yaml-v1`, the PyYAML version, and the exact canonicalization settings.
+Hash metadata uses sorted, alias-free UTF-8 YAML with explicit document markers
+and LF line endings. Compare fingerprints only under compatible hash contracts.
+
+The following limits apply independently to each actor.
+
+| Field | Default | Limit |
+| --- | --- | --- |
+| `max_records` | `4096` | Admitted input rows. |
+| `max_hashed_bytes` | `68719476736` (64 GiB) | Total bytes hashed. |
+| `max_output_bytes` | `16777216` (16 MiB) | Emitted YAML bytes. |
+| `chunk_bytes` | `8388608` (8 MiB) | Maximum hash buffer size; cannot exceed 8 MiB. |
+
+After setup, a budget limit or capture failure stops only that actor's audit.
+The shard records `complete: false` and a reason or error type. Embedding
+continues. A missing completion receipt also means capture is incomplete.
+Inspect every shard's coverage and completion status before comparing runs;
+partial evidence does not establish equal inputs across the full dataset.
+
+Hashing and device synchronization add overhead. Collect fingerprints in a
+separate diagnostic run, and exclude its timings from performance qualification.
+The audit does not change model inputs, batching, precision, or determinism
+settings. Equal fingerprints establish equality only for the captured bytes;
+they do not establish deterministic model execution or retrieval quality.
+
 ## Related Topics { #related-topics }
 
 - [Pre-Requisites & Support Matrix](prerequisites-support-matrix.md)
