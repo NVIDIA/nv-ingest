@@ -20,6 +20,7 @@ from typing import Any, Literal
 
 import numpy as np
 import pyarrow as pa
+import pyarrow.compute as pc
 
 from nemo_retriever.common.vdb._lancedb_stream_state import (
     VdbOperationConflict,
@@ -265,6 +266,159 @@ def _checked_batches(
         estimated_bytes += row_estimate
     if pending:
         yield from emit(pending)
+
+
+@dataclass(frozen=True, slots=True)
+class _PreparedColumns:
+    """One projected batch: fixed-width vectors plus the string columns, row aligned."""
+
+    vector: pa.Array
+    text: pa.Array
+    metadata: pa.Array
+    source: pa.Array
+    id: pa.Array
+
+    def record_batch(self, schema: pa.Schema) -> pa.RecordBatch:
+        return pa.RecordBatch.from_arrays(
+            [self.vector, self.text, self.metadata, self.source, self.id],
+            schema=schema,
+        )
+
+
+def _bounded_record_batches(
+    prepared: Iterable[_PreparedColumns],
+    *,
+    schema: pa.Schema,
+    max_batch_bytes: int,
+    stats: _StreamStats,
+    include_digest: bool,
+) -> Iterator[pa.RecordBatch]:
+    """Emit owned Arrow batches under ``max_batch_bytes``, bisecting oversized input."""
+
+    def emit(batch: pa.RecordBatch) -> Iterator[pa.RecordBatch]:
+        retained_bytes = int(batch.get_total_buffer_size())
+        if retained_bytes > max_batch_bytes:
+            if batch.num_rows == 1:
+                raise OversizedVdbRowError(
+                    "One canonical VDB row requires "
+                    f"{retained_bytes} Arrow buffer bytes, exceeding max_batch_bytes={max_batch_bytes}."
+                )
+            midpoint = batch.num_rows // 2
+            # ``take`` compacts; a slice keeps the whole parent buffers.
+            yield from emit(batch.take(pa.array(np.arange(0, midpoint), type=pa.int64())))
+            yield from emit(batch.take(pa.array(np.arange(midpoint, batch.num_rows), type=pa.int64())))
+            return
+        _record_stream_batch(stats, batch, include_digest=include_digest)
+        yield batch
+
+    for columns in prepared:
+        if len(columns.vector) == 0:
+            continue
+        yield from emit(columns.record_batch(schema))
+
+
+def _estimated_prepared_row_bytes(fields: dict[str, Any], *, vector_dim: int) -> int:
+    """Conservative Arrow byte estimate for one projected row (vector plus four strings)."""
+
+    return (
+        64
+        + 32
+        + int(vector_dim) * 4
+        + sum(32 + len(str(fields[name]).encode("utf-8")) for name in ("text", "metadata", "source", "id"))
+    )
+
+
+def _row_chunks(positions: np.ndarray, estimates: list[int], *, max_batch_bytes: int) -> Iterator[np.ndarray]:
+    """Split row positions into consecutive chunks whose estimated bytes stay under the limit."""
+
+    start = 0
+    chunk_bytes = 0
+    for index, estimate in enumerate(estimates):
+        if index > start and chunk_bytes + estimate > max_batch_bytes:
+            yield positions[start:index]
+            start = index
+            chunk_bytes = 0
+        chunk_bytes += estimate
+    if start < len(estimates):
+        yield positions[start:]
+
+
+def _vector_lengths(vectors: pa.Array) -> np.ndarray:
+    return pc.fill_null(pc.list_value_length(vectors), 0).to_numpy(zero_copy_only=False)
+
+
+def _python_float_vectors(vectors: pa.Array) -> pa.Array:
+    """Coerce non-numeric list elements with Python ``float()``, exactly as :func:`_inspect_vector` does.
+
+    Only reached for string-typed embedding columns, which the embed stage never
+    produces; ordinary float columns skip this.
+    """
+
+    return pa.array(
+        [
+            None if vector is None else [None if item is None else float(item) for item in vector]
+            for vector in vectors.to_pylist()
+        ],
+        type=pa.list_(pa.float64()),
+    )
+
+
+def _apply_bad_vector_policy(
+    vectors: pa.Array,
+    *,
+    vector_dim: int,
+    on_bad_vectors: str,
+    fill_value: float,
+) -> tuple[np.ndarray, pa.Array]:
+    """Columnar twin of :func:`_apply_deferred_bad_vector_policy`.
+
+    ``vectors`` holds non-null ``list`` values. Returns the kept row
+    positions and their vectors as ``fixed_size_list<float32, vector_dim>``,
+    with wrong-width and NaN vectors dropped, filled, nulled, or rejected the
+    same way the row path does. As on the row path, the width check runs
+    first; only correctly sized vectors are then coerced with ``float()``, so a
+    non-numeric value in one of them raises ``ValueError``.
+    """
+
+    fixed_type = pa.list_(pa.float32(), int(vector_dim))
+    row_count = len(vectors)
+    wrong_dim = _vector_lengths(vectors) != vector_dim
+    sized = np.flatnonzero(~wrong_dim)
+    sized_vectors = vectors.take(pa.array(sized, type=pa.int64()))
+    child_type = sized_vectors.type.value_type
+    if not (pa.types.is_floating(child_type) or pa.types.is_integer(child_type)):
+        sized_vectors = _python_float_vectors(sized_vectors)
+    has_nan = np.zeros(row_count, dtype=bool)
+    if sized.size:
+        nan_flags = pc.fill_null(pc.is_nan(pc.list_flatten(sized_vectors)), False).to_numpy(zero_copy_only=False)
+        has_nan[sized] = nan_flags.reshape(sized.size, vector_dim).any(axis=1)
+    bad = wrong_dim | has_nan
+    if not bad.any():
+        return np.arange(row_count), sized_vectors.cast(fixed_type)
+
+    if on_bad_vectors == "error":
+        first_bad = int(np.flatnonzero(bad)[0])
+        detail = f"expected dimension {vector_dim}" if wrong_dim[first_bad] else "contains NaN"
+        raise ValueError(
+            f"Invalid LanceDB vector: {detail}. Set on_bad_vectors to 'drop', 'fill', or 'null' to handle it."
+        )
+    good = np.flatnonzero(~bad)
+    good_vectors = sized_vectors.take(pa.array(np.searchsorted(sized, good), type=pa.int64())).cast(fixed_type)
+    if on_bad_vectors == "drop":
+        return good, good_vectors
+
+    bad_count = int(bad.sum())
+    if on_bad_vectors == "fill":
+        # LanceDB 0.34 replaces the complete vector when its width is wrong or
+        # any element is NaN.
+        replacement = pa.array([[float(fill_value)] * vector_dim] * bad_count, type=fixed_type)
+    else:
+        replacement = pa.nulls(bad_count, type=fixed_type)
+    merged = pa.concat_arrays([good_vectors, replacement])
+    order = np.empty(row_count, dtype=np.int64)
+    order[good] = np.arange(good.size)
+    order[np.flatnonzero(bad)] = good.size + np.arange(bad_count)
+    return np.arange(row_count), merged.take(pa.array(order, type=pa.int64()))
 
 
 def _infer_vector_dim_with_spooled_prefix(

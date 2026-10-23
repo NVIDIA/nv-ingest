@@ -9,10 +9,13 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 
 import numpy as np
+import pyarrow as pa
+import pyarrow.compute as pc
 from pydantic import ValidationError
 
 from nemo_retriever.common.schemas.collections import QueryHit
@@ -290,12 +293,20 @@ def _client_record_from_graph_row(
     require_embedding: bool = True,
     embedding_column: str = "embedding",
 ) -> dict[str, Any] | None:
-    metadata = _dict_or_empty(row.get("metadata"))
-
     embedding = _embedding_from_graph_row(row, embedding_column=embedding_column)
-    text = _text_from_graph_row(row)
     if require_embedding and embedding is None:
         return None
+    record = _client_record_without_vector(row, require_embedding=require_embedding)
+    if record is not None and embedding is not None:
+        record["metadata"]["embedding"] = embedding
+    return record
+
+
+def _client_record_without_vector(row: dict[str, Any], *, require_embedding: bool = True) -> dict[str, Any] | None:
+    """Build the canonical record for a row whose vector, if any, is handled by the caller."""
+    metadata = _dict_or_empty(row.get("metadata"))
+
+    text = _text_from_graph_row(row)
     image_only = require_embedding and text is None and _is_image_backed_row(row)
     if text is None and not image_only:
         return None
@@ -345,8 +356,7 @@ def _client_record_from_graph_row(
         source_metadata.setdefault("source_name", source_name)
 
     record_metadata = dict(metadata)
-    if embedding is not None:
-        record_metadata["embedding"] = embedding
+    record_metadata.pop("embedding", None)
     record_metadata["content"] = "" if text is None else text
     record_metadata["content_metadata"] = content_metadata
     record_metadata["source_metadata"] = source_metadata
@@ -425,59 +435,224 @@ def _raise_for_empty_vdb_conversion(
     )
 
 
+class ConversionTally:
+    """Count graph rows that produced no record and raise the stream's fail-closed errors."""
+
+    def __init__(self, *, embedding_column: str) -> None:
+        self._embedding_column = embedding_column
+        self.row_count = 0
+        self.converted_count = 0
+        self._upstream_error_count = 0
+        self._upstream_error_fields: Counter[str] = Counter()
+        self._rejection_reasons: Counter[str] = Counter()
+        self._missing_embeddings = 0
+
+    def reject(self, row: dict[str, Any], *, has_embedding: bool) -> None:
+        """Count one graph row that produced no record, by reason (stage error, missing embedding, no content)."""
+        missing_embedding = not has_embedding and _row_has_uploadable_content_without_embedding(row, None)
+        if missing_embedding:
+            self._missing_embeddings += 1
+
+        upstream_errors = _row_stage_errors(row, embedding_column=self._embedding_column)
+        if upstream_errors:
+            self._upstream_error_count += len(upstream_errors)
+            self._upstream_error_fields.update(_stage_error_field(error.get("path")) for error in upstream_errors)
+        else:
+            reason = "missing embedding" if missing_embedding else "missing searchable text or image backing"
+            self._rejection_reasons[reason] += 1
+
+    def snapshot(self) -> dict[str, Any]:
+        """JSON-safe counts, so a worker can hand its tally to the driver."""
+        return {
+            "row_count": self.row_count,
+            "converted_count": self.converted_count,
+            "upstream_error_count": self._upstream_error_count,
+            "upstream_error_fields": dict(self._upstream_error_fields),
+            "rejection_reasons": dict(self._rejection_reasons),
+            "missing_embeddings": self._missing_embeddings,
+        }
+
+    def absorb(self, snapshot: dict[str, Any]) -> None:
+        """Add another tally's :meth:`snapshot` to this one."""
+        self.row_count += int(snapshot["row_count"])
+        self.converted_count += int(snapshot["converted_count"])
+        self._upstream_error_count += int(snapshot["upstream_error_count"])
+        self._upstream_error_fields.update(snapshot["upstream_error_fields"])
+        self._rejection_reasons.update(snapshot["rejection_reasons"])
+        self._missing_embeddings += int(snapshot["missing_embeddings"])
+
+    def finish(self) -> None:
+        """Apply the fail-closed rules to the counts so far.
+
+        Raises:
+            VdbUploadError: searchable rows are missing embeddings while other rows converted, or rows
+                arrived and none of them converted.
+        """
+        if self.converted_count and self._missing_embeddings:
+            raise VdbUploadError(
+                "vdb_upload is refusing a partial write because searchable rows are missing embeddings: "
+                f"input rows={self.row_count}, uploadable rows={self.converted_count}, "
+                f"missing embedding={self._missing_embeddings}."
+            )
+        if self.row_count and not self.converted_count:
+            _raise_for_empty_vdb_conversion(
+                row_count=self.row_count,
+                upstream_error_count=self._upstream_error_count,
+                upstream_error_fields=self._upstream_error_fields,
+                rejection_reasons=self._rejection_reasons,
+            )
+
+
 def _iter_client_vdb_records(
     rows: Iterable[dict[str, Any]],
     *,
     embedding_column: str = "embedding",
+    tally: ConversionTally | None = None,
 ) -> Iterator[dict[str, Any]]:
     """Lazily convert graph rows into individual canonical NRL records.
 
     Rows without searchable content are skipped. Missing embeddings fail the
-    stream on exhaustion, matching :func:`to_client_vdb_records`.
+    stream on exhaustion, matching :func:`to_client_vdb_records`. A caller that
+    passes ``tally`` applies the fail-closed rules itself, over every partition.
     """
 
-    row_count = 0
-    converted_count = 0
-    upstream_error_count = 0
-    upstream_error_fields: Counter[str] = Counter()
-    rejection_reasons: Counter[str] = Counter()
-    missing_embeddings = 0
-
+    owns_tally = tally is None
+    tally = tally or ConversionTally(embedding_column=embedding_column)
     for row in rows:
         if not isinstance(row, dict):
             continue
-        row_count += 1
+        tally.row_count += 1
         record = _client_record_from_graph_row(row, embedding_column=embedding_column)
         if record is not None:
-            converted_count += 1
+            tally.converted_count += 1
             yield record
             continue
-
         embedding = _embedding_from_graph_row(row, embedding_column=embedding_column)
-        missing_embedding = _row_has_uploadable_content_without_embedding(row, embedding)
-        if missing_embedding:
-            missing_embeddings += 1
+        tally.reject(row, has_embedding=embedding is not None)
+    if owns_tally:
+        tally.finish()
 
-        upstream_errors = _row_stage_errors(row, embedding_column=embedding_column)
-        if upstream_errors:
-            upstream_error_count += len(upstream_errors)
-            upstream_error_fields.update(_stage_error_field(error.get("path")) for error in upstream_errors)
-        else:
-            reason = "missing embedding" if missing_embedding else "missing searchable text or image backing"
-            rejection_reasons[reason] += 1
 
-    if converted_count and missing_embeddings:
-        raise VdbUploadError(
-            "vdb_upload is refusing a partial write because searchable rows are missing embeddings: "
-            f"input rows={row_count}, uploadable rows={converted_count}, missing embedding={missing_embeddings}."
+@dataclass(frozen=True, slots=True)
+class CanonicalRecordBatch:
+    """Canonical NRL records whose dense vectors stay in one Arrow column.
+
+    ``records[i]`` has no ``metadata["embedding"]``; its vector is ``vectors[i]``,
+    a non-null, non-empty ``list<float>`` value. Backends that set
+    ``supports_stream_ingest_batches`` receive these instead of record dictionaries,
+    so a vector is never expanded into Python floats on the way to storage.
+    """
+
+    records: list[dict[str, Any]]
+    vectors: pa.Array
+
+
+def _deferred_float_text(item: Any) -> str | None:
+    """Spell one embedding element so Arrow's string-to-float cast reproduces ``float(item)``."""
+
+    if item is None or isinstance(item, str):
+        return item
+    try:
+        return repr(float(item))
+    except (TypeError, ValueError):
+        return str(item)
+
+
+def embedding_arrow_column(values: Any, *, length: int) -> pa.Array:
+    """Return an embedding column as a ``list`` Arrow array with one slot per row.
+
+    Arrow-backed pandas columns are taken as they are, without touching rows.
+    Anything else is normalized per row with :func:`embedding_vector`, so empty
+    and non-list values become null slots, matching the record path.
+
+    Args:
+        values: One embedding column: a pandas ``Series`` (Arrow-backed or
+            object dtype), an Arrow array, or any iterable of per-row vectors.
+        length: Row count of the batch, used when no row carries a vector.
+
+    Returns:
+        A ``list<float>`` array, or ``list<string>`` when an object column
+        contains string elements; the LanceDB policy casts those to floats after
+        its width check, in the order the record path applies ``float()``.
+        Null slots mark rows without an embedding.
+    """
+    backing = getattr(values, "array", values)
+    if callable(getattr(backing, "__arrow_array__", None)):
+        column = pa.array(backing)
+        if isinstance(column, pa.ChunkedArray):
+            column = column.combine_chunks()
+        if (
+            pa.types.is_list(column.type)
+            or pa.types.is_large_list(column.type)
+            or pa.types.is_fixed_size_list(column.type)
+        ):
+            return column
+        values = column.to_pylist()
+    vectors = [embedding_vector(value) for value in values]
+    if any(isinstance(item, str) for vector in vectors if vector for item in vector):
+        return pa.array(
+            [None if vector is None else [_deferred_float_text(item) for item in vector] for vector in vectors],
+            type=pa.list_(pa.string()),
         )
-    if row_count and not converted_count:
-        _raise_for_empty_vdb_conversion(
-            row_count=row_count,
-            upstream_error_count=upstream_error_count,
-            upstream_error_fields=upstream_error_fields,
-            rejection_reasons=rejection_reasons,
-        )
+    return pa.array(vectors, type=pa.list_(pa.float64()))
+
+
+def iter_canonical_record_batches(
+    batches: Iterable[tuple[list[dict[str, Any]], pa.Array]],
+    *,
+    embedding_column: str = "embedding",
+    tally: ConversionTally | None = None,
+) -> Iterator[CanonicalRecordBatch]:
+    """Lazily convert graph row batches into :class:`CanonicalRecordBatch` values.
+
+    Each input item pairs graph rows (without their embedding column) with the
+    aligned embedding column from :func:`embedding_arrow_column`. Row selection and
+    the fail-closed errors match :func:`_iter_client_vdb_records` exactly.
+
+    Args:
+        batches: Pairs of ``(rows, vectors)``; ``vectors[i]`` is row ``i``'s
+            embedding or null.
+        embedding_column: Name of the embedding column, used to find upstream
+            ``{embedding_column}_error`` messages for the error summary.
+        tally: Counts into this tally and leaves ``finish()`` to the caller, for
+            inputs that are only one partition of a larger upload.
+
+    Yields:
+        One :class:`CanonicalRecordBatch` per input item that still has
+        uploadable rows; rows without text or image backing are dropped and
+        counted.
+
+    Raises:
+        ValueError: If ``rows`` and ``vectors`` differ in length.
+        VdbUploadError: On exhaustion, if searchable rows lacked embeddings
+            while others had them (no partial write), or if no row converted.
+    """
+
+    finish = tally is None
+    if tally is None:
+        tally = ConversionTally(embedding_column=embedding_column)
+    for rows, vectors in batches:
+        if len(rows) != len(vectors):
+            raise ValueError(f"Embedding column has {len(vectors)} rows but the batch has {len(rows)}")
+        present = pc.greater(pc.fill_null(pc.list_value_length(vectors), 0), 0).to_numpy(zero_copy_only=False)
+        records: list[dict[str, Any]] = []
+        indices: list[int] = []
+        for index, row in enumerate(rows):
+            if not isinstance(row, dict):
+                continue
+            tally.row_count += 1
+            has_embedding = bool(present[index])
+            record = _client_record_without_vector(row) if has_embedding else None
+            if record is None:
+                tally.reject(row, has_embedding=has_embedding)
+                continue
+            tally.converted_count += 1
+            records.append(record)
+            indices.append(index)
+        if records:
+            yield CanonicalRecordBatch(records, vectors.take(pa.array(indices, type=pa.int64())))
+    if finish:
+        tally.finish()
 
 
 def to_client_vdb_records(rows: Any, *, embedding_column: str = "embedding") -> list[list[dict[str, Any]]]:

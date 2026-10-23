@@ -33,6 +33,14 @@ iterable of canonical record dictionaries and returns after consuming it to
 exhaustion. The default flag is `False`, so existing subclasses retain the
 `VDB.run(records)` path. Overriding the method alone does not enable streaming.
 
+`VDB.stream_ingest_batches(batches)` is the columnar variant. Each item is a
+`CanonicalRecordBatch`: the same canonical records without
+`metadata["embedding"]`, plus one aligned Arrow `list<float>` column holding
+their vectors. A backend opts in with `supports_stream_ingest_batches = True`;
+`IngestVdbOperator` then prefers it over `stream_ingest(records)`, so dense
+vectors never become Python lists between the embed stage and storage. Row
+selection and the fail-closed errors are identical on both paths.
+
 ---
 
 ## `IngestVdbOperator` (ingestion)
@@ -130,6 +138,11 @@ and finalization checks. Its identity covers the rows produced after configured
 bad-vector filtering and the table-result settings. Dropped input records are
 not part of the identity. LanceDB retains each success marker indefinitely so a
 reconstructed backend can recognize a completed operation.
+
+`LanceDB.stream_ingest_batches` shares that lifecycle. It projects the string
+columns per record and handles the vector column with Arrow operations: width
+check, `on_bad_vectors` policy, and the `fixed_size_list<float32>` cast. It
+stores the same rows as `stream_ingest`; sparse tables keep the record stream.
 
 Ray remains responsible only for producing and retaining ordered input batches.
 LanceDB sets `supports_stream_ingest = True` for scheme-less local paths and
