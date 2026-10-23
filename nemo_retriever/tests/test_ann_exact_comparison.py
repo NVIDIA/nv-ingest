@@ -407,3 +407,106 @@ def test_normal_retriever_forwards_explicit_runtime_ef(fake_query, monkeypatch):
     monkeypatch.setattr(LanceDB, "retrieval", retrieval)
     assert retriever.query("query", candidate_k=5, vdb_kwargs={"ef": 4096})
     assert len(seen) == 1 and seen[0]["ef"] == 4096 and seen[0]["top_k"] == 5
+
+
+@pytest.mark.parametrize("archetype", [False, True])
+@pytest.mark.parametrize("owned", [False, True])
+def test_diagnostic_cleanup_releases_only_owned_models_and_preserves_normal_graph(fake_query, archetype, owned):
+    from unittest.mock import Mock
+
+    retriever, calls = fake_query
+    retriever.cleanup_query_compare_exact()
+    retriever.query("ordinary")
+    ordinary_graph = retriever._cached_graph
+    retriever.query_compare_exact("diagnostic")
+    helper, _, _ = retriever.__dict__["_exact_search_session"]
+    model = Mock()
+    operator = helper._cached_graph.roots[0].operator
+    if archetype:
+        operator._resolved_delegate = SimpleNamespace(_model=model, _owns_model=owned)
+        operator = operator._resolved_delegate
+    else:
+        operator._model = model
+        operator._owns_model = owned
+
+    retriever.cleanup_query_compare_exact()
+    retriever.cleanup_query_compare_exact()
+
+    assert model.unload.call_count == int(owned)
+    assert helper._cached_graph is None and helper._cache_key is None
+    assert helper._dense_search_capture is None
+    assert retriever._cached_graph is ordinary_graph
+    assert operator._model is (None if owned else model)
+    retriever.query_compare_exact("rebuilt")
+    assert helper._cached_graph is not None
+    assert calls == dict(embeddings=3, pair=2, ordinary=1)
+
+
+def test_diagnostic_cleanup_preserves_failed_unload_for_retry(fake_query):
+    from unittest.mock import Mock
+
+    retriever, _ = fake_query
+    retriever.query_compare_exact("diagnostic")
+    helper, _, _ = retriever.__dict__["_exact_search_session"]
+    graph = helper._cached_graph
+    operator = graph.roots[0].operator
+    model = Mock()
+    model.unload.side_effect = RuntimeError("backend is still shutting down")
+    operator._model, operator._owns_model = model, True
+
+    with pytest.raises(RuntimeError, match="still shutting down"):
+        retriever.cleanup_query_compare_exact()
+    assert helper._cached_graph is graph and operator._model is model
+
+    model.unload.side_effect = None
+    retriever.cleanup_query_compare_exact()
+    assert helper._cached_graph is None and operator._model is None
+    assert model.unload.call_count == 2
+
+
+def test_diagnostic_configuration_change_releases_previous_owned_model(fake_query):
+    from unittest.mock import Mock
+
+    retriever, _ = fake_query
+    retriever.query_compare_exact("first")
+    helper, _, _ = retriever.__dict__["_exact_search_session"]
+    old_graph = helper._cached_graph
+    operator = old_graph.roots[0].operator
+    model = Mock()
+    operator._model, operator._owns_model = model, True
+
+    retriever.query_compare_exact("second", embed_kwargs={"inference_batch_size": 8})
+
+    model.unload.assert_called_once_with()
+    assert operator._model is None
+    assert helper._cached_graph is not old_graph
+
+
+@pytest.mark.parametrize("warmed", [False, True])
+def test_local_embedding_actor_tracks_created_and_shared_model_ownership(monkeypatch, warmed):
+    from unittest.mock import Mock
+
+    from nemo_retriever.common.params import EmbedParams
+    from nemo_retriever.models.local_embedder_spec import LocalEmbedderSpec
+    from nemo_retriever.operators.embed.gpu_operator import _BatchEmbedActor
+
+    model = Mock()
+    spec = SimpleNamespace(
+        checkpoint=object(),
+        model_name="embedder",
+        revision="revision",
+        max_length=8192,
+        query_max_length=8192,
+        prefix_if_missing=True,
+        create=Mock(return_value=model),
+    )
+    monkeypatch.setattr(LocalEmbedderSpec, "from_config", lambda kwargs: spec)
+    monkeypatch.setattr(
+        "nemo_retriever.models.warmup_registry.get_warmed_model", lambda *args, **kwargs: model if warmed else None
+    )
+
+    actor = _BatchEmbedActor(params=EmbedParams())
+
+    assert actor._model is model
+    assert actor._owns_model is (not warmed)
+    assert spec.create.call_count == int(not warmed)

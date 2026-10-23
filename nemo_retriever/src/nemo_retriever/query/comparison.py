@@ -62,6 +62,22 @@ def _vector_hashes(vectors: list[list[float]], dimension: int) -> tuple[str, ...
 
 @dataclass(frozen=True)
 class DenseSearchRowFingerprint:
+    """Hash evidence for one expanded query row without retaining its vector.
+
+    Attributes
+    ----------
+    expanded_row_index : int
+        Position of this row in the ordered input to both search paths.
+    original_query_index : int
+        Position of the original query before embedding admission split it.
+    query_text_sha256 : str
+        SHA-256 of this row's query text.
+    vector_dimension : int
+        Number of finite components in the query vector.
+    vector_sha256 : str
+        SHA-256 of ordered vector components encoded as little-endian float64.
+    """
+
     expanded_row_index: int
     original_query_index: int
     query_text_sha256: str
@@ -71,6 +87,79 @@ class DenseSearchRowFingerprint:
 
 @dataclass(frozen=True)
 class DenseSearchComparisonEvidence:
+    """Describe the shared inputs and immutable index used by a paired search.
+
+    A complete capture covers at most 256 expanded rows with vector dimensions
+    from 1 through 65,536. It records hashes instead of query text or vectors.
+    Diagnostic timings cannot qualify performance or promote a baseline.
+
+    Attributes
+    ----------
+    schema_version : int
+        Version of this evidence format.
+    complete : bool
+        Whether both search paths and final hit shaping completed.
+    timing_qualification : bool
+        Always false; diagnostic execution is ineligible for timing comparisons.
+    query_text_sha256 : str
+        SHA-256 of the original query text.
+    table_uri : str
+        Filesystem location of the compared LanceDB table.
+    table_name : str
+        Name of the compared table.
+    table_version : int
+        Immutable table version used by both paths.
+    table_rows : int
+        Number of rows in that table version.
+    vector_column : str
+        Name of the searched vector column.
+    vector_dimension : int
+        Number of components in each query vector.
+    metric : str
+        Verified index distance metric.
+    index_name : str
+        Name of the vector index used by indexed search.
+    index_type : str
+        Observed index family.
+    indexed_rows : int
+        Number of rows covered by the vector index.
+    unindexed_rows : int
+        Number of rows outside the vector index.
+    embedding_model_name : str
+        Verified embedding model identity.
+    embedding_model_revision : str or None
+        Verified model revision when available.
+    candidate_k : int
+        Candidate limit applied to each expanded query row and search path.
+    indexed_nprobes : int
+        Requested probe count for indexed search.
+    indexed_refine_factor : int
+        Requested refinement factor for indexed search.
+    predicate_sha256 : str or None
+        SHA-256 of the shared row predicate, if configured.
+    top_k : int
+        Final hit limit after shaping each ranking.
+    page_dedup : bool
+        Whether final rankings deduplicate document pages.
+    content_types : tuple of str or None
+        Normalized final content-type allowlist, if configured.
+    vector_encoding : str
+        Encoding used for vector fingerprints.
+    expanded_row_count : int
+        Number of rows after query embedding admission.
+    rows : tuple of DenseSearchRowFingerprint
+        Ordered fingerprints mapping expanded rows to original queries.
+    indexed_input_sha256 : str
+        Fingerprint of indexed search inputs.
+    exact_input_sha256 : str
+        Fingerprint of exhaustive search inputs.
+    shared_input_sha256 : str
+        Fingerprint covering the common query, table, and search configuration.
+    indexed_ef : int or None
+        Explicit HNSW search budget. None requests the native default and does
+        not identify its effective value.
+    """
+
     schema_version: int
     complete: bool
     timing_qualification: bool
@@ -107,6 +196,19 @@ class DenseSearchComparisonEvidence:
 
 @dataclass(frozen=True)
 class DenseSearchComparisonResult:
+    """Return two shaped rankings and evidence of their identical search input.
+
+    Attributes
+    ----------
+    indexed_hits : list of RetrievalHit
+        Ranking produced by the configured vector index.
+    exact_hits : list of RetrievalHit
+        Ranking produced by exhaustive search on the same table version.
+    evidence : DenseSearchComparisonEvidence
+        Input and index fingerprints; diagnostic timings cannot qualify
+        performance, and an omitted indexed_ef does not resolve the native budget.
+    """
+
     indexed_hits: list[RetrievalHit]
     exact_hits: list[RetrievalHit]
     evidence: DenseSearchComparisonEvidence

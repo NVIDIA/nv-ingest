@@ -216,6 +216,8 @@ class Retriever:
         )
         if self._cached_graph is not None and self._cache_key == key:
             return self._cached_graph
+        if self._dense_search_capture is not None:
+            self._release_cached_comparison_graph()
         g = self._build_default_graph(embed_extra=embed_extra)
         self._cached_graph = g
         self._cache_key = key
@@ -446,6 +448,51 @@ class Retriever:
         vdb = LanceDB(uri=uri, table_name=table_name, overwrite=False, sparse=True)
         return normalize_retrieval_results(vdb.sparse_retrieval(query_texts, **retrieval_kwargs))
 
+    def _release_cached_comparison_graph(self) -> None:
+        """Release owned embedding models before dropping the diagnostic graph."""
+        if self._cached_graph is not None:
+            for root in self._cached_graph.roots:
+                operator = root.operator
+                delegate = getattr(operator, "_resolved_delegate", None)
+                if delegate is not None:
+                    operator = delegate
+                model = getattr(operator, "_model", None)
+                if model is not None and getattr(operator, "_owns_model", False):
+                    # Backend unload shuts down workers and clears CUDA caches.
+                    # Keep references on failure so callers can retry cleanup.
+                    model.unload()
+                    operator._model = None
+                    operator._owns_model = False
+        self._cached_graph = None
+        self._cache_key = None
+        self._lancedb_capabilities_cache.clear()
+
+    def cleanup_query_compare_exact(self) -> None:
+        """Release the graph and owned model cached by exact-search diagnostics.
+
+        Ordinary query graphs and shared warmed models remain available. This
+        method waits for an active comparison, supports repeated calls, and
+        allows a later comparison to rebuild its diagnostic graph and model.
+
+        Returns
+        -------
+        None
+            The diagnostic cache no longer retains an owned embedding model.
+
+        Raises
+        ------
+        RuntimeError
+            If backend model unloading fails. References remain available so
+            you can retry this method after resolving the backend failure.
+        """
+        session = self.__dict__.get("_exact_search_session")
+        if session is None:
+            return
+        diagnostic, _capture, lock = session
+        with lock:
+            diagnostic._release_cached_comparison_graph()
+            diagnostic._dense_search_capture = None
+
     def query_compare_exact(
         self,
         query: str,
@@ -463,7 +510,9 @@ class Retriever:
         reranking or collections. Both legs use the same immutable table version,
         query vectors, expansion regrouping and final hit shaping. Returned
         evidence contains hashes, never vectors. Diagnostic timings must not be
-        used for performance qualification or baseline promotion.
+        used for performance qualification or baseline promotion. Call
+        ``cleanup_query_compare_exact()`` when finished to release the cached
+        diagnostic model.
         """
         from nemo_retriever.common.vdb.lancedb import _is_filesystem_lancedb_uri
         from nemo_retriever.query.comparison import DenseSearchComparisonResult, _DenseSearchCapture

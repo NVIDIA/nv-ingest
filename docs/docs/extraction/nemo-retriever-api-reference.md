@@ -499,9 +499,9 @@ workflows also reject it rather than ignoring it. The CLI does not expose an
 
 !!! note "Unreleased diagnostic"
 
-    `Retriever.query_compare_exact()` and explicit `ef` tuning are under
-    development. These APIs are not available in current NVIDIA `main` or a
-    released package.
+    `Retriever.query_compare_exact()`, its cleanup method, and explicit `ef`
+    tuning are under development. These APIs are not available in current
+    NVIDIA `main` or a released package.
 
 Use `Retriever.query_compare_exact()` to compare approximate nearest neighbor
 (ANN) search with exhaustive dense search. The method embeds your query once
@@ -527,15 +527,17 @@ from nemo_retriever.graph.retriever import Retriever
 retriever = Retriever(
     vdb_kwargs={"uri": "./lancedb", "table_name": "nemo-retriever"},
 )
-comparison = retriever.query_compare_exact(
-    "What methods improve document retrieval?",
-    top_k=10,
-    candidate_k=50,
-)
-
-indexed_hits = comparison.indexed_hits
-exact_hits = comparison.exact_hits
-shared_input_evidence = comparison.evidence
+try:
+    comparison = retriever.query_compare_exact(
+        "What methods improve document retrieval?",
+        top_k=10,
+        candidate_k=50,
+    )
+    indexed_hits = comparison.indexed_hits
+    exact_hits = comparison.exact_hits
+    shared_input_evidence = comparison.evidence
+finally:
+    retriever.cleanup_query_compare_exact()
 ```
 
 `DenseSearchComparisonResult` contains `indexed_hits`, `exact_hits`, and typed
@@ -558,6 +560,19 @@ Both searches receive those rows in the same order and apply the existing
 fusion policy independently. Each call accepts up to 256 expanded query rows
 and vector dimensions from 1 through 65,536. Refer to
 [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+
+### Release diagnostic resources { #indexed-exact-cleanup }
+
+Call `Retriever.cleanup_query_compare_exact()` after your diagnostic session
+as shown in the example above. It releases the cached diagnostic graph and
+unloads embedding models owned by that graph. Normal query graphs and shared
+warmed models remain available.
+
+The method returns `None`, supports repeated calls, and waits for an active
+comparison on the same `Retriever`. A later comparison rebuilds the diagnostic
+graph and reloads any released models. If backend unloading raises an error,
+the error propagates and the method retains references for retry. Resolve the
+backend failure, and call cleanup again on the same `Retriever`.
 
 ### Verify the shared inputs { #indexed-exact-shared-inputs }
 
