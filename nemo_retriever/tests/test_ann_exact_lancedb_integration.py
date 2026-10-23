@@ -5,6 +5,7 @@
 """Small synthetic filesystem integration of the real LanceDB Arrow/Rust API."""
 
 import numpy as np
+import pytest
 
 from nemo_retriever.common.vdb.lancedb import LanceDB
 from nemo_retriever.common.vdb.lancedb_comparison import compare_dense_search
@@ -18,7 +19,8 @@ def _files(root):
     }
 
 
-def test_real_lancedb_pair_matches_normal_indexed_search_without_index_mutation(tmp_path):
+@pytest.mark.parametrize("ef", [None, 4096])
+def test_real_lancedb_pair_matches_normal_indexed_search_without_index_mutation(tmp_path, ef):
     vectors = np.random.default_rng(20261022).normal(size=(512, 8)).astype(np.float32).tolist()
     records = [
         [
@@ -51,6 +53,8 @@ def test_real_lancedb_pair_matches_normal_indexed_search_without_index_mutation(
     before = _files(tmp_path)
     query = [list(vectors[17])]
     options = dict(top_k=17, where="text IS NOT NULL", result_fields=["id", "text", "metadata", "source"])
+    if ef is not None:
+        options["ef"] = ef
     normal = backend.retrieval(query, **options)
     indexed, exact, evidence = compare_dense_search(
         backend,
@@ -60,6 +64,7 @@ def test_real_lancedb_pair_matches_normal_indexed_search_without_index_mutation(
         **options,
     )
     assert indexed == normal
+    assert evidence["indexed_ef"] == ef
     assert len(indexed) == len(exact) == 1
     assert len(indexed[0]) == len(exact[0]) == 17
     assert exact[0][0]["text"] == "synthetic row 17"

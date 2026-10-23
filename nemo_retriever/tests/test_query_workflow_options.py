@@ -234,3 +234,42 @@ def test_service_query_validates_candidate_pool_before_calling_service(monkeypat
 
     with pytest.raises(ValueError, match=r"candidate_k \(2\) must be greater than or equal to top_k \(3\)"):
         query_service.query_documents(request)
+
+
+@pytest.mark.parametrize("ef", [None, 1, 4096])
+def test_optional_ef_is_resolved_and_forwarded_to_normal_query(monkeypatch, ef):
+    calls = []
+
+    class FakeRetriever:
+        def __init__(self, **kwargs):
+            assert "ef" not in kwargs["vdb_kwargs"]
+
+        def query(self, text, **kwargs):
+            calls.append((text, kwargs))
+            return []
+
+    monkeypatch.setattr(query_workflow, "Retriever", FakeRetriever)
+    request = QueryRequest(query="query", retrieval=QueryRetrievalOptions(candidate_k=50, ef=ef))
+    plan = query_workflow.resolve_query_plan(request)
+    assert plan.ef == ef
+    expected = {"candidate_k": 50, "page_dedup": False, "content_types": None}
+    if ef is not None:
+        expected["vdb_kwargs"] = {"ef": ef}
+    assert plan.query_kwargs() == expected
+    assert query_workflow.query_documents(request) == []
+    assert calls == [("query", expected)]
+
+
+@pytest.mark.parametrize("ef", [True, False, 0, -1, 1.5, "4096", float("nan")])
+def test_query_ef_requires_a_strict_positive_integer(ef):
+    with pytest.raises(ValueError, match="ef must be a positive integer"):
+        QueryRetrievalOptions(ef=ef)
+
+
+def test_explicit_ef_rejects_unsupported_typed_query_paths():
+    with pytest.raises(ValueError, match="dense or hybrid"):
+        QueryRetrievalOptions(retrieval_mode="sparse", ef=4096)
+    with pytest.raises(ValueError, match="service query"):
+        ServiceQueryRequest(query="query", retrieval=QueryRetrievalOptions(ef=4096))
+    with pytest.raises(ValueError, match="agentic query"):
+        query_workflow.build_agentic_config(QueryRequest(query="query", retrieval=QueryRetrievalOptions(ef=4096)))

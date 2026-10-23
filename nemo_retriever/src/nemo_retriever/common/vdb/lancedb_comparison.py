@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from nemo_retriever.common.vdb.query_options import validate_hnsw_ef
+
 from nemo_retriever.query.comparison import _digest, _vector_hashes, _yaml_digest
 
 
@@ -44,6 +46,7 @@ def compare_dense_search(
     top_k = int(kwargs.get("top_k", 10))
     refine = int(kwargs.get("refine_factor", 50))
     nprobes = int(kwargs.get("n_probe", kwargs.get("nprobes", 64)))
+    ef = validate_hnsw_ef(kwargs.get("ef"))
     if min(top_k, refine, nprobes) <= 0:
         raise ValueError("Exact-search comparison requires positive candidate/probe/refinement bounds.")
     where = kwargs.get("where")
@@ -100,6 +103,7 @@ def compare_dense_search(
         candidate_k=top_k,
         indexed_nprobes=nprobes,
         indexed_refine_factor=refine,
+        indexed_ef=ef,
         predicate_sha256=_digest(where) if where is not None else None,
     )
 
@@ -116,6 +120,8 @@ def compare_dense_search(
                 query = query.bypass_vector_index()
             else:
                 query = query.refine_factor(refine).nprobes(nprobes)
+                if ef is not None:
+                    query = query.ef(ef)
             if fields is not None:
                 query = query.select(fields)
             results.append(query.to_list())

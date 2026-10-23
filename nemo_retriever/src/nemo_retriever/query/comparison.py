@@ -101,6 +101,8 @@ class DenseSearchComparisonEvidence:
     indexed_input_sha256: str
     exact_input_sha256: str
     shared_input_sha256: str
+    # Explicit indexed builder budget; None requests the native default, not a resolved value.
+    indexed_ef: int | None = None
 
 
 @dataclass(frozen=True)

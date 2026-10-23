@@ -51,6 +51,10 @@ class _Builder:
         self.options["nprobes"] = value
         return self
 
+    def ef(self, value):
+        self.options["ef"] = value
+        return self
+
     def select(self, value):
         self.options["fields"] = value
         return self
@@ -222,6 +226,7 @@ def _fake_pair(backend, vectors, **kwargs):
         candidate_k=kwargs["top_k"],
         indexed_nprobes=64,
         indexed_refine_factor=50,
+        indexed_ef=kwargs.get("ef"),
         predicate_sha256=None,
         vector_hashes=hashes,
         indexed_vector_fingerprint=_yaml_digest(list(hashes)),
@@ -359,3 +364,46 @@ def test_same_query_text_is_not_cached_between_pairs(fake_query):
     assert first.evidence.shared_input_sha256 == second.evidence.shared_input_sha256
     assert helper._cached_graph is graph
     assert capture.query_text == "" and capture.exact_hits is None and capture.evidence is None
+
+
+@pytest.mark.parametrize("ef", [None, 1, 4096])
+def test_pair_applies_ef_only_to_indexed_leg_and_records_explicit_budget(backend, ef):
+    value, table, _ = backend
+    _, _, evidence = _compare(value, ef=ef)
+    assert evidence["indexed_ef"] == ef
+    indexed_options, exact_options = table.calls[0][1], table.calls[1][1]
+    if ef is None:
+        assert "ef" not in indexed_options
+    else:
+        assert indexed_options["ef"] == ef
+    assert "ef" not in exact_options and exact_options["bypass"]
+
+
+@pytest.mark.parametrize("ef", [True, False, 0, -1, 1.0, "4096", float("nan")])
+def test_pair_rejects_invalid_ef_before_table_access(backend, ef):
+    value, table, opened = backend
+    with pytest.raises(ValueError, match="ef must be a positive integer"):
+        _compare(value, ef=ef)
+    assert opened == [] and table.calls == []
+
+
+def test_public_pair_preserves_expansion_and_ef_through_runtime_filter(fake_query):
+    retriever, calls = fake_query
+    result = retriever.query_compare_exact("query", candidate_k=5, vdb_kwargs={"ef": 4096})
+    assert calls == dict(embeddings=1, pair=1, ordinary=0)
+    assert result.evidence.indexed_ef == 4096
+    assert result.evidence.expanded_row_count == 2
+    assert result.evidence.indexed_input_sha256 == result.evidence.exact_input_sha256
+
+
+def test_normal_retriever_forwards_explicit_runtime_ef(fake_query, monkeypatch):
+    retriever, _ = fake_query
+    seen = []
+
+    def retrieval(self, vectors, **kwargs):
+        seen.append(kwargs)
+        return [[_hit(1)] for _ in vectors]
+
+    monkeypatch.setattr(LanceDB, "retrieval", retrieval)
+    assert retriever.query("query", candidate_k=5, vdb_kwargs={"ef": 4096})
+    assert len(seen) == 1 and seen[0]["ef"] == 4096 and seen[0]["top_k"] == 5
