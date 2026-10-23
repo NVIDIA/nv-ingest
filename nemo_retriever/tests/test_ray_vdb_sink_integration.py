@@ -77,9 +77,19 @@ def _source_table(block_id: int) -> pa.Table:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("return_results", [True, False, None])
+@pytest.mark.parametrize(
+    "entry_point,options,downstream",
+    [
+        ("executor", {}, False),
+        ("executor", {"return_results": None}, False),
+        ("executor", {"return_results": False}, False),
+        ("executor", {"return_results": True}, True),
+        ("executor", {}, True),
+        ("fluent", {}, False),
+    ],
+)
 def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
-    tmp_path, monkeypatch, return_results
+    tmp_path, monkeypatch, entry_point, options, downstream
 ) -> None:
     """Streaming ingest avoids the global sink barrier and executes in order once."""
 
@@ -144,7 +154,7 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
                 "stream_batch_bytes": 512,
             },
         )
-        if return_results:
+        if downstream:
             graph = graph >> RequireFinalizedWrite()
         executor = RayDataExecutor(graph)
 
@@ -162,18 +172,18 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
 
         monkeypatch.setattr(ray.data.Dataset, "repartition", reject_global_repartition)
 
-        if return_results is None:
+        if entry_point == "fluent":
             ingestor = GraphIngestor(run_mode="batch").texts(["source"]).vdb_upload()
             monkeypatch.setattr("nemo_retriever.ingestor.graph_ingestor.build_graph", lambda **_kwargs: graph)
             monkeypatch.setattr(ingestor, "_inline_text_dataset", lambda _data: dataset)
-            result = ingestor.ingest()
+            result = ingestor.ingest(**options)
             assert ingestor.get_dataset() is result
         else:
-            result = executor.ingest(dataset, return_results=return_results)
+            result = executor.ingest(dataset, **options)
 
         assert Counter(ray.get(completed.completed_blocks.remote())) == Counter({0: 1, 1: 1, 2: 1})
 
-        if return_results:
+        if downstream or options.get("return_results") is True:
             assert result["page_number"].tolist() == list(range(6))
             assert result["text"].tolist() == [f"chunk-{row_id}" for row_id in range(6)]
             assert result["result_only"].tolist() == [f"not-stored-{row_id}" for row_id in range(6)]

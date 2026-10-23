@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
-from nemo_retriever.graph.executor import call_pandas_function_on_arrow, preflight_executors
+from nemo_retriever.graph.executor import (
+    call_pandas_function_on_arrow,
+    preflight_executors,
+    resolve_batch_return_results,
+)
 from nemo_retriever.common.url_fetch import restore_url_source_value
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
@@ -22,7 +26,6 @@ from nemo_retriever.graph.ingestor_runtime import (
     default_concurrency_node_names,
     _image_embedding_requires_page_image,
 )
-from nemo_retriever.ingestor.execute_flags import resolve_batch_return_results
 from nemo_retriever.ingestor.manifest import (
     ExtractionBranchPlan,
     ResolvedExtractionInputs,
@@ -246,7 +249,7 @@ class ExtractionBranchExecutor:
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
         if return_results:
-            return post_executor.ingest(combined)
+            return post_executor.ingest(combined, return_results=True)
         return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
 
     def _execute_inprocess(self) -> Any:

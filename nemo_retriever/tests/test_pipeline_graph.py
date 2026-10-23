@@ -1782,7 +1782,10 @@ class TestRayDataExecutor:
         executor = RayDataExecutor(g, node_overrides=overrides)
         assert executor._node_overrides == overrides
 
-    def test_ingest_rejects_invalid_data_type(self):
+    def test_ingest_rejects_invalid_data_type(self, monkeypatch):
+        import ray
+
+        monkeypatch.setattr("nemo_retriever.graph.executor.ensure_local_ray_runtime", lambda _address: ray)
         g = Graph()
         g.add_chain(AddOperator(1))
         executor = RayDataExecutor(g)

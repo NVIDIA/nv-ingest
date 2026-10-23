@@ -33,9 +33,13 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Self, Sequence, Tuple, Union
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
-from nemo_retriever.graph.executor import arrow_table_to_pandas, call_pandas_function_on_arrow
+from nemo_retriever.graph.executor import (
+    arrow_table_to_pandas,
+    call_pandas_function_on_arrow,
+    resolve_batch_return_results,
+)
 from nemo_retriever.ingestor.branch_extraction import ExtractionBranchExecutor, merge_node_overrides
-from nemo_retriever.ingestor.execute_flags import resolve_batch_return_results, resolve_return_results_option
+from nemo_retriever.ingestor.execute_flags import resolve_return_results_option
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
@@ -1101,7 +1105,7 @@ class GraphIngestor(ingestor):
         )
         executor_input = self._inline_text_dataset(ray.data) if self._inline_texts else self._documents
         if return_results:
-            result = executor.ingest(executor_input)
+            result = executor.ingest(executor_input, return_results=True)
         else:
             result = executor._ingest(
                 executor_input,

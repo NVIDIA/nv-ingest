@@ -165,9 +165,10 @@ configuration supports it. For supported LanceDB locations, refer to
 [streaming ingest](#vdb-backends-implementations). Batch summary mode keeps the
 existing [raise error policy coverage](nemo-retriever-api-reference.md#what-the-raise-error-policy-covers).
 
-The lower-level `RayDataExecutor.ingest()` returns full records by default.
-Pass `return_results=False` explicitly when using that executor for a
-supported terminal VDB write.
+Direct `RayDataExecutor.ingest()` also selects summary mode by default when
+its graph has one streaming-capable VDB upload as the final stage. Other
+executor graphs return full records. Pass `return_results=True` to retain
+the records, or `False` to require a supported terminal VDB write.
 
 When the only input is blank inline text, summary mode validates the pipeline
 and VDB backend before returning zero counts. Invalid backend configuration

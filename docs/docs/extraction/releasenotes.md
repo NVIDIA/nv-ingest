@@ -8,7 +8,7 @@ This documentation contains the release notes for [NeMo Retriever Library](overv
 
 - Batch Python ingestion now returns a summary by default when the pipeline ends in a streaming-capable VDB upload, uses `error_policy="raise"`, and has `return_failures=False`. The summary contains `input_rows` and `submitted_records`. Pass `return_results=True` if your application reads extracted rows or expects `get_dataset()` to contain those rows. Other graph configurations keep returning full records by default.
 - Service Python `.ingest()` and `.ingest_async()` now skip result downloads by default. Completion metadata and failures remain available, and `ServiceIngestResult.dataframe` is `None`. Pass `return_results=True` to fetch rows into `.dataframe`. `.save_to_disk(...)` still fetches the payloads needed to write files.
-- `IngestExecuteParams.return_results` now defaults to `None`, which selects the pipeline-specific behavior above. Explicit `True` and `False` retain their existing semantics. Direct `RayDataExecutor.ingest()` keeps its `True` default. Refer to [Choose whether to return result rows](nemo-retriever-api-reference.md#return-ingest-results).
+- `IngestExecuteParams.return_results` and direct `RayDataExecutor.ingest(..., return_results=...)` now default to `None`. Direct executor calls return a summary when the graph has one streaming-capable VDB upload as its final stage, and full records otherwise. Pass `True` when your application needs full records. Explicit `True` and `False` retain their existing semantics. Refer to [Choose whether to return result rows](nemo-retriever-api-reference.md#return-ingest-results).
 
 ## 26.08.2 Helm Chart Patch { #release-26082 }
 

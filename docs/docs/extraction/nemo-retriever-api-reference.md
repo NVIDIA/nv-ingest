@@ -440,15 +440,17 @@ service mode, this also fetches completed result payloads into
 `ServiceIngestResult.dataframe`. Requesting embeddings or a result schema
 does not enable result fetching by itself.
 
-Explicit `return_results=False` requires a batch graph with the summary
-configuration above, or service mode. Other graph configurations raise
+Explicit `GraphIngestor.ingest(return_results=False)` requires the batch
+summary configuration above. Other graph configurations raise
 `ValueError`. In batch summary mode, `get_dataset()` returns the summary.
 Refer to [Return a batch ingest summary](vdbs.md#batch-ingest-summary) for
 supported backends and count definitions.
 
-The lower-level `RayDataExecutor.ingest()` keeps its default
-`return_results=True`. It does not select the fluent API's context-dependent
-default.
+Direct `RayDataExecutor.ingest()` also defaults `return_results` to `None`.
+It returns a summary when the graph has one streaming-capable VDB upload as
+its final stage, and full records for other graphs. Pass `return_results=True`
+to retain full records. Explicit `False` requires that terminal streaming VDB
+configuration and raises `ValueError` otherwise.
 
 ::: nemo_retriever.ingestor.graph_ingestor.GraphIngestor
     options:
