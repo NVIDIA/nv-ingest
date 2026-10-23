@@ -218,7 +218,7 @@ def _collection_rows(
             metadata = record.get("metadata")
             if not isinstance(metadata, dict):
                 continue
-            vector = metadata.get("embedding")
+            vector = record.get("embedding")
             if not isinstance(vector, (list, tuple)) or not vector:
                 continue
             content_metadata = metadata.get("content_metadata")

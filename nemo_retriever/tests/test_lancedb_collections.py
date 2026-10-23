@@ -91,8 +91,8 @@ def _records(
         [
             {
                 "document_type": "text",
+                "embedding": vector or [1.0, 0.0],
                 "metadata": {
-                    "embedding": vector or [1.0, 0.0],
                     "content": text,
                     "content_metadata": {
                         "type": "text",

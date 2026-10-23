@@ -157,7 +157,7 @@ def test_process_returns_original_graph_rows_and_delegates_converted_records_to_
     assert operator.postprocess(data) is data
     assert vdb.run_calls[0][0][0]["document_type"] == "text"
     assert vdb.run_calls[0][0][0]["metadata"]["content"] == "first chunk"
-    assert vdb.run_calls[0][0][0]["metadata"]["embedding"] == [0.1] * 2048
+    assert vdb.run_calls[0][0][0]["embedding"] == [0.1] * 2048
 
 
 def test_vdb_op_constructs_client_vdb(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -199,8 +199,8 @@ def test_ingest_operator_converts_graph_rows_to_client_vdb_records() -> None:
             [
                 {
                     "document_type": "text",
+                    "embedding": [0.1] * 2048,
                     "metadata": {
-                        "embedding": [0.1] * 2048,
                         "content": "graph chunk",
                         "content_metadata": {"page_number": 7},
                         "source_metadata": {
@@ -278,7 +278,7 @@ def test_ingest_operator_retains_embedded_blank_image_row_without_text_fidelity(
     record = vdb.run_calls[0][0][0]
     assert record["document_type"] == "image"
     assert record["metadata"]["content"] == ""
-    assert record["metadata"]["embedding"] == [0.1] * 2048
+    assert record["embedding"] == [0.1] * 2048
     assert record["metadata"]["content_metadata"] == {
         "type": "image",
         "page_number": 7,
@@ -653,8 +653,8 @@ def test_ingest_operator_preserves_canonical_batches_for_collection_write() -> N
         [
             {
                 "document_type": "text",
+                "embedding": [0.1, 0.2],
                 "metadata": {
-                    "embedding": [0.1, 0.2],
                     "content": "canonical chunk",
                     "content_metadata": {"page_number": 9},
                     "source_metadata": {"source_id": "/tmp/canonical.pdf"},

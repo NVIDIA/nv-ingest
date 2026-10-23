@@ -82,9 +82,9 @@ def test_apply_sidecar_merges_into_content_metadata(tmp_path: Path) -> None:
         [
             {
                 "document_type": "text",
+                "embedding": [0.0],
                 "metadata": {
                     "content": "hello",
-                    "embedding": [0.0],
                     "content_metadata": {"type": "text", "page_number": 0},
                     "source_metadata": {"source_id": "/data/doc_one.pdf", "source_name": "doc_one.pdf"},
                 },

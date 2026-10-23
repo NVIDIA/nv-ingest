@@ -879,7 +879,7 @@ def test_run_pipeline_in_process_uses_effective_embedding_output_column(
 
     assert row_count == 1
     assert rows[0]["embedding"] == [0.1]
-    assert posted[0][0][0]["metadata"]["embedding"] == [0.1]
+    assert posted[0][0][0]["embedding"] == [0.1]
 
 
 def test_build_graph_ingestor_omits_asr_params_when_worker_unconfigured() -> None:
@@ -977,7 +977,8 @@ def test_run_pipeline_posts_canonical_pdf_table_image_provenance(
     record = payload["records"][0][0]
     assert record["document_type"] == "text"
     metadata = record["metadata"]
-    assert metadata["embedding"] == [0.1, 0.2]
+    assert record["embedding"] == [0.1, 0.2]
+    assert "embedding" not in metadata
     assert metadata["content"] == "table content"
     assert metadata["source_metadata"] == {
         "source_id": "/documents/report.pdf",
@@ -1024,8 +1025,8 @@ def test_post_records_to_vectordb_uses_canonical_internal_payload(monkeypatch: p
         [
             {
                 "document_type": "text",
+                "embedding": [0.1, 0.2],
                 "metadata": {
-                    "embedding": [0.1, 0.2],
                     "content": "canonical chunk",
                     "content_metadata": {"page_number": 7},
                 },
@@ -1076,7 +1077,7 @@ def test_post_records_to_vectordb_fails_the_document_when_the_write_times_out(
         raise TimeoutError("timed out")
 
     monkeypatch.setattr("urllib.request.urlopen", _urlopen)
-    records = [[{"document_type": "text", "metadata": {"embedding": [0.1], "content": "chunk"}}]]
+    records = [[{"document_type": "text", "embedding": [0.1], "metadata": {"content": "chunk"}}]]
 
     # A legacy fixed-table write, i.e. no collection context.
     with pytest.raises(RuntimeError, match="VectorDB write failed for gamma.txt"):
@@ -1108,7 +1109,7 @@ def test_post_records_to_vectordb_honors_the_configured_write_timeout(
 
     monkeypatch.setattr("urllib.request.urlopen", _urlopen)
     _post_records_to_vectordb(
-        [[{"document_type": "text", "metadata": {"embedding": [0.1], "content": "chunk"}}]],
+        [[{"document_type": "text", "embedding": [0.1], "metadata": {"content": "chunk"}}]],
         "http://vectordb:7671",
         "gamma.txt",
         context=DocumentWriteContext(),

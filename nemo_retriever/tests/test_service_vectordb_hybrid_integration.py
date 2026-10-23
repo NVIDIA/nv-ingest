@@ -28,8 +28,8 @@ def _record(
 ) -> dict:
     return {
         "document_type": "text",
+        "embedding": vector or [1.0, 0.0, 0.0, 0.0],
         "metadata": {
-            "embedding": vector or [1.0, 0.0, 0.0, 0.0],
             "content": text,
             "content_metadata": {"page_number": 12, "type": "text"},
             "source_metadata": {

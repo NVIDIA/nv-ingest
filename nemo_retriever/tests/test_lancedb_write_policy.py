@@ -20,8 +20,8 @@ def _records(text: str = "hello", vector: list[float] | None = None) -> list[lis
         [
             {
                 "document_type": "text",
+                "embedding": vector or [1.0, 0.0],
                 "metadata": {
-                    "embedding": vector or [1.0, 0.0],
                     "content": text,
                     "content_metadata": {"page_number": 1},
                     "source_metadata": {"source_name": "doc.pdf"},
@@ -44,9 +44,10 @@ def _image_only_records(vector: list[float] | None = None) -> list[list[dict]]:
         },
         "source_metadata": {"source_id": "scanned.pdf", "source_name": "scanned.pdf"},
     }
+    record: dict = {"document_type": "image", "metadata": metadata}
     if vector is not None:
-        metadata["embedding"] = vector
-    return [[{"document_type": "image", "metadata": metadata}]]
+        record["embedding"] = vector
+    return [[record]]
 
 
 def _write_rows(tmp_path: Path, records: list[list[dict]], *, sparse: bool = False) -> list[dict]:

@@ -1138,7 +1138,7 @@ def test_split_rows_reach_vdb_conversion_with_complete_coverage() -> None:
     assert len(records) == 1
     assert len(records[0]) == 5
     assert [record["metadata"]["content_metadata"]["page_number"] for record in records[0]] == [1, 2, 2, 2, 3]
-    assert all(record["metadata"]["embedding"] for record in records[0])
+    assert all(record["embedding"] for record in records[0])
 
 
 def test_split_fallback_content_is_the_text_written_to_vdb() -> None:

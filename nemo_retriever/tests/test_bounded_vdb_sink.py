@@ -42,8 +42,8 @@ def _record(
     vector = embedding if embedding is not None else [float(row_id), *[1.0] * (vector_dim - 1)]
     return {
         "document_type": "text",
+        "embedding": vector,
         "metadata": {
-            "embedding": vector,
             "content": f"{text_prefix}-{row_id} " + ("x" * padding),
             "content_metadata": {
                 "type": "text",

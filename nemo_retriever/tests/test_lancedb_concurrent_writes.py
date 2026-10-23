@@ -47,8 +47,8 @@ def _bounded_index_ready_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
 def _record(text: str, vector: list[float]) -> dict:
     return {
         "document_type": "text",
+        "embedding": vector,
         "metadata": {
-            "embedding": vector,
             "content": text,
             "content_metadata": {"page_number": 1, "type": "text"},
             "source_metadata": {"source_id": f"/data/{text}.txt", "source_name": f"{text}.txt"},

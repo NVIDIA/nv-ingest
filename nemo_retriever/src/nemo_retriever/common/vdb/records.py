@@ -345,14 +345,15 @@ def _client_record_from_graph_row(
         source_metadata.setdefault("source_name", source_name)
 
     record_metadata = dict(metadata)
-    if embedding is not None:
-        record_metadata["embedding"] = embedding
     record_metadata["content"] = "" if text is None else text
     record_metadata["content_metadata"] = content_metadata
     record_metadata["source_metadata"] = source_metadata
 
     document_type = "image" if image_only else row.get("document_type") or "text"
-    return {"document_type": str(document_type), "metadata": record_metadata}
+    record: dict[str, Any] = {"document_type": str(document_type), "metadata": record_metadata}
+    if embedding is not None:
+        record["embedding"] = embedding
+    return record
 
 
 def _row_has_uploadable_content_without_embedding(
@@ -498,7 +499,7 @@ def to_client_vdb_records(rows: Any, *, embedding_column: str = "embedding") -> 
         missing_embeddings = sum(
             _row_has_uploadable_content_without_embedding(
                 record,
-                embedding_vector(_dict_or_empty(record.get("metadata")).get("embedding")),
+                embedding_vector(record.get("embedding")),
             )
             for record in canonical_records
         )

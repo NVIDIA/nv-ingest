@@ -121,9 +121,9 @@ def test_lancedb_metadata_round_trip_drives_query_model(monkeypatch: pytest.Monk
         [
             {
                 "document_type": "text",
+                "embedding": [1.0, 0.0],
                 "metadata": {
                     "content": "alpha safety manual",
-                    "embedding": [1.0, 0.0],
                     "content_metadata": {"id": "alpha"},
                     "source_metadata": {"source_id": "alpha.pdf"},
                 },

@@ -160,8 +160,8 @@ def test_canonical_record_batches_pass_through_without_reconversion() -> None:
         [
             {
                 "document_type": "text",
+                "embedding": [0.1, 0.2],
                 "metadata": {
-                    "embedding": [0.1, 0.2],
                     "content": "already canonical",
                 },
             }
@@ -177,8 +177,8 @@ def test_canonical_record_batches_pass_through_without_reconversion() -> None:
         pytest.param([[]], [], id="single-empty-batch"),
         pytest.param([[], []], [], id="multiple-empty-batches"),
         pytest.param(
-            [[], [{"metadata": {"content": "canonical", "embedding": [0.1, 0.2]}}], []],
-            [[{"metadata": {"content": "canonical", "embedding": [0.1, 0.2]}}]],
+            [[], [{"embedding": [0.1, 0.2], "metadata": {"content": "canonical"}}], []],
+            [[{"embedding": [0.1, 0.2], "metadata": {"content": "canonical"}}]],
             id="mixed",
         ),
     ],
@@ -226,7 +226,8 @@ def test_graph_record_conversion_preserves_service_provenance() -> None:
     )
 
     metadata = records[0][0]["metadata"]
-    assert metadata["embedding"] == [0.1, 0.2]
+    assert records[0][0]["embedding"] == [0.1, 0.2]
+    assert "embedding" not in metadata
     assert metadata["content"] == "table content"
     assert metadata["source_metadata"] == {
         "source_id": "/tmp/source.pdf",
@@ -295,15 +296,15 @@ def test_graph_record_conversion_normalizes_arrow_backed_bbox_array() -> None:
 def test_graph_record_conversion_normalizes_arrow_backed_embedding_array() -> None:
     records = to_client_vdb_records([{"text": "embedded content", "embedding": np.array([0.1, 0.2])}])
 
-    assert records[0][0]["metadata"]["embedding"] == [0.1, 0.2]
+    assert records[0][0]["embedding"] == [0.1, 0.2]
 
 
 def test_custom_embedding_column_converts_eager_and_streaming_records() -> None:
     embedded_row = {"text": "embedded content", "vec": [0.5, 0.25], "vec_error": None}
     expected_record = {
         "document_type": "text",
+        "embedding": [0.5, 0.25],
         "metadata": {
-            "embedding": [0.5, 0.25],
             "content": "embedded content",
             "content_metadata": {},
             "source_metadata": {},
@@ -336,7 +337,7 @@ def test_graph_record_conversion_normalizes_arrow_embedding_column() -> None:
 
     records = to_client_vdb_records(list(_iter_batch_rows([frame])))
 
-    assert records[0][0]["metadata"]["embedding"] == [0.5, 0.25]
+    assert records[0][0]["embedding"] == [0.5, 0.25]
 
 
 def test_graph_row_does_not_read_embedding_from_metadata() -> None:
@@ -387,17 +388,17 @@ def test_dense_record_conversion_rejects_partial_canonical_embedding_coverage() 
         [
             {
                 "document_type": "text",
+                "embedding": [0.1, 0.2],
                 "metadata": {
                     "content": "embedded child",
-                    "embedding": [0.1, 0.2],
                     "embedding_split": {"chunk_id": "child-0", "content": "embedded child"},
                 },
             },
             {
                 "document_type": "text",
+                "embedding": [],
                 "metadata": {
                     "content": "missing child",
-                    "embedding": [],
                     "embedding_split": {"chunk_id": "child-1", "content": "missing child"},
                 },
             },

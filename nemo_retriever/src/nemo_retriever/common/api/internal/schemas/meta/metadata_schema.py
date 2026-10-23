@@ -319,9 +319,6 @@ class MetadataSchema(BaseModelNoExt):
     content_url: str = ""
     """A URL that points to the location of the content, if applicable."""
 
-    embedding: Optional[List[float]] = None
-    """An optional numerical vector representation (embedding) of the content."""
-
     source_metadata: Optional[SourceMetadataSchema] = None
     """Metadata about the original source of the content."""
 

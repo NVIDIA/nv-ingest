@@ -95,13 +95,12 @@ The following is a detailed explanation of the `MetadataSchema` and its constitu
 
 ### MetadataSchema
 
-The `MetadataSchema` is the primary container for all metadata. It includes the core content, its URL, embedding, and various specialized metadata blocks.
+The `MetadataSchema` is the primary container for all metadata. It includes the core content, its URL, and various specialized metadata blocks.
 
 | Field                 | Type                                  | Default Value/Behavior | Description                                                                                                |
 |-----------------------|---------------------------------------|------------------------|------------------------------------------------------------------------------------------------------------|
 | `content`             | `str`                                 | `""`                   | The actual textual content extracted from the source.                                                      |
 | `content_url`         | `str`                                 | `""`                   | URL pointing to the location of the content, if applicable.                                                |
-| `embedding`           | `Optional[List[float]]`               | `None`                 | Optional numerical vector representation (embedding) of the content.                                       |
 | `source_metadata`     | `Optional[SourceMetadataSchema]`      | `None`                 | Metadata about the original source of the content. Refer to [SourceMetadataSchema](#sourcemetadataschema).       |
 | `content_metadata`    | `Optional[ContentMetadataSchema]`     | `None`                 | General metadata about the extracted content itself. Refer to [ContentMetadataSchema](#contentmetadataschema).    |
 | `audio_metadata`      | `Optional[AudioMetadataSchema]`       | `None`                 | Specific metadata for audio content. Automatically set to `None` if `content_metadata.type` is not `audio`. Refer to [AudioMetadataSchema](#audiometadataschema). |
