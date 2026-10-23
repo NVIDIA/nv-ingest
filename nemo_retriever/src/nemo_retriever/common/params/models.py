@@ -343,7 +343,14 @@ class IngestExecuteParams(_ParamsModel):
     show_progress: bool = False
     return_failures: bool = False
     return_traces: bool = False
-    return_results: bool = True
+    return_results: bool | None = Field(
+        default=None,
+        description=(
+            "Return full result rows when true. None selects the context default: "
+            "summary counts for eligible batch VDB uploads, metadata only for service ingestion, "
+            "and full rows for other graph pipelines."
+        ),
+    )
     result_schema: Literal["legacy", "compact"] = "legacy"
     return_embeddings: bool = False
     return_images: bool = False

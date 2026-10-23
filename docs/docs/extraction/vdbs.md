@@ -119,10 +119,17 @@ For URI, table name, and other parameters, refer to the [Python API guide](nemo-
 
 ### Return a batch ingest summary { #batch-ingest-summary }
 
-When you only need to index documents, pass `return_results=False` to
-`.ingest()` in batch mode. This returns a one-row pandas `DataFrame` with
-counts, without retaining each consumed batch for the final result.
-The default `return_results=True` returns the full records.
+Batch `.ingest()` returns a one-row pandas `DataFrame` with counts by default
+when the pipeline ends in a streaming-capable VDB upload and uses
+`error_policy="raise"` with `return_failures=False`. It does not retain each
+consumed batch for the final result. The default local LanceDB configuration
+supports this path.
+
+Pass `return_results=True` when you need the full records for inspection or
+further processing. Omitting the setting or passing `None` keeps full records
+for other graph configurations. Refer to
+[Choose whether to return result rows](nemo-retriever-api-reference.md#return-ingest-results)
+for the defaults across run modes.
 
 The following example writes to the default local LanceDB table and returns
 a summary.
@@ -136,7 +143,7 @@ summary = (
     .extract(extract_text=True)
     .embed()
     .vdb_upload()
-    .ingest(return_results=False)
+    .ingest()
 )
 print(summary)
 ```
@@ -152,22 +159,28 @@ When no rows reach the upload stage, both counts are zero.
 Backend filtering or retry handling can change how many rows are written,
 so `submitted_records` is not a count of newly stored rows.
 
-This option requires a final VDB upload stage that supports streaming ingest,
-`error_policy="raise"`, and `return_failures=False`. The default local LanceDB
+Explicit `return_results=False` requires a final VDB upload stage that supports
+streaming ingest, `error_policy="raise"`, and `return_failures=False`. The default local LanceDB
 configuration supports it. For supported LanceDB locations, refer to
 [streaming ingest](#vdb-backends-implementations). Batch summary mode keeps the
 existing [raise error policy coverage](nemo-retriever-api-reference.md#what-the-raise-error-policy-covers).
 
-When the only input is blank inline text, ingestion validates the pipeline and
-VDB backend before returning zero counts. Invalid backend configuration,
-missing streaming support, or a stage after VDB upload raises an error.
+The lower-level `RayDataExecutor.ingest()` returns full records by default.
+Pass `return_results=False` explicitly when using that executor for a
+supported terminal VDB write.
+
+When the only input is blank inline text, summary mode validates the pipeline
+and VDB backend before returning zero counts. Invalid backend configuration
+raises an error. With explicit `return_results=False`, missing streaming
+support or a stage after VDB upload also raises an error.
 Valid blank input does not start Ray or write to the VDB.
 
 ### Direct LanceDB ingest and retrieval { #direct-lancedb-ingest-and-retrieval }
 
 You can also construct a `LanceDB` instance and call `run` and `retrieval` directly. This is the optional low-level path. Prefer `.vdb_upload()` for typical ingest.
 
-By default, graph ingest returns a pandas `DataFrame` of flat rows. Use the following input shapes:
+Pass `return_results=True` to graph `.ingest()` when you need a pandas
+`DataFrame` of flat rows for a separate upload. Use the following input shapes:
 
 - `LanceDB.run()` expects nested client record batches: a `list` of batches, and each batch is a `list` of record dictionaries. Convert graph or `DataFrame` rows with `to_client_vdb_records()` before you call `run()`.
 - `LanceDB.run()` does not accept the graph `DataFrame` or a flat `list` of dictionaries from `DataFrame.to_dict("records")`.
@@ -176,7 +189,7 @@ By default, graph ingest returns a pandas `DataFrame` of flat rows. Use the foll
 
 The following example uses a two-dimensional fixture so you can copy it without a GPU or embedding NIM:
 
-- Replace `graph_rows` with your `.ingest()` `DataFrame` when you already have embeddings.
+- Replace `graph_rows` with your `.ingest(return_results=True)` `DataFrame` when you already have embeddings.
 - Set `vector_dim` to your embedding length. The `LanceDB` default `vector_dim` is 2048.
 - The fixture sets `create_index=False` so the one-row table is written without building the default `IVF_HNSW_SQ` index. Default ingest builds that index.
 
@@ -191,7 +204,7 @@ from nemo_retriever.common.vdb.lancedb import LanceDB
 from nemo_retriever.common.vdb.records import to_client_vdb_records
 from nemo_retriever.operators.vdb import IngestVdbOperator
 
-# Graph ingest rows after extract and embed. Substitute your .ingest() DataFrame.
+# Graph rows after extract and embed. Substitute your .ingest(return_results=True) DataFrame.
 graph_rows = pd.DataFrame(
     [
         {

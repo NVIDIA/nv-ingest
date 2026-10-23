@@ -23,7 +23,7 @@ result = (
     create_ingestor(run_mode="inprocess")
     .files(["document.md"])
     .extract()
-    .ingest()
+    .ingest(return_results=True)
 )
 
 for record in result.to_dict(orient="records"):

@@ -17,6 +17,7 @@ lancedb = pytest.importorskip("lancedb", minversion="0.34.0")
 
 from nemo_retriever.graph.executor import RayDataExecutor
 from nemo_retriever.graph.pipeline_graph import Graph
+from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
 from nemo_retriever.operators.abstract_operator import AbstractOperator
 from nemo_retriever.operators.vdb import IngestVdbOperator
 
@@ -76,7 +77,7 @@ def _source_table(block_id: int) -> pa.Table:
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("return_results", [True, False])
+@pytest.mark.parametrize("return_results", [True, False, None])
 def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
     tmp_path, monkeypatch, return_results
 ) -> None:
@@ -87,7 +88,7 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
 
     if ray.is_initialized():
         ray.shutdown()
-    ray.init(num_cpus=4, num_gpus=0, include_dashboard=False, log_to_driver=False)
+    ray.init(address="local", num_cpus=4, num_gpus=0, include_dashboard=False, log_to_driver=False)
 
     try:
 
@@ -161,7 +162,14 @@ def test_ray_streams_three_blocks_into_real_lancedb_and_preserves_contract(
 
         monkeypatch.setattr(ray.data.Dataset, "repartition", reject_global_repartition)
 
-        result = executor.ingest(dataset, return_results=return_results)
+        if return_results is None:
+            ingestor = GraphIngestor(run_mode="batch").texts(["source"]).vdb_upload()
+            monkeypatch.setattr("nemo_retriever.ingestor.graph_ingestor.build_graph", lambda **_kwargs: graph)
+            monkeypatch.setattr(ingestor, "_inline_text_dataset", lambda _data: dataset)
+            result = ingestor.ingest()
+            assert ingestor.get_dataset() is result
+        else:
+            result = executor.ingest(dataset, return_results=return_results)
 
         assert Counter(ray.get(completed.completed_blocks.remote())) == Counter({0: 1, 1: 1, 2: 1})
 

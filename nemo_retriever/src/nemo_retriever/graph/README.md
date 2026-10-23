@@ -218,6 +218,14 @@ executor = RayDataExecutor(graph, batch_size=8)
 result_ds = executor.ingest(["/path/to/*.pdf"])
 ```
 
+`RayDataExecutor.ingest()` returns the full result DataFrame by default
+(`return_results=True`). For a graph ending in a streaming-capable VDB upload,
+pass `return_results=False` to release consumed batches and return a summary
+with `input_rows` and `submitted_records`. The fluent `GraphIngestor` API
+selects its default from the pipeline configuration; direct executor calls
+keep the explicit `True` default. Refer to
+[ingest result defaults](../../../../docs/docs/extraction/nemo-retriever-api-reference.md#return-ingest-results).
+
 ## Notes About Graph Shape
 
 The base `Graph` type supports multiple roots and fan-out.

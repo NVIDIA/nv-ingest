@@ -168,9 +168,11 @@ class ingestor:
 
         In ``run_mode='batch'``, ``return_results=False`` returns a one-row
         DataFrame with ``input_rows`` and ``submitted_records`` counts for a
-        terminal streaming VDB upload. The default returns full records.
+        terminal streaming VDB upload. Omitted values and ``None`` select
+        summary mode for eligible batch uploads with raised errors and no
+        returned failures, and full records for other graph configurations.
 
-        In ``run_mode='service'``, ``return_results`` (default ``True``)
+        In ``run_mode='service'``, ``return_results`` (default ``False``)
         controls whether completed rows are fetched into
         ``ServiceIngestResult.dataframe``.
         """

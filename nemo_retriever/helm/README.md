@@ -36,12 +36,14 @@ The chart ships two deployable layers behind feature flags:
 > loses every accepted job, queued item, active lease, status record, and SSE
 > catch-up event owned by that process. Drain accepted work before any rollout.
 
-> For behavioral consistency between local HuggingFace deployments and Helm service deployments: 
-> `results = ingestor.ingest(...return_results=True)
-> return_results defaults to True. This incurs a significant performance and system memory usage cost. 
-> Unless you know explicitly you need to fetch extraction results to the client, you should use:
-> return_results=False
-> If you must return results, you may need to increase pod memory specs to support the increased pod memory usage.
+> **Python service client results.** `ServiceIngestor.ingest()` and
+> `.ingest_async()` skip result downloads by default and return completion
+> metadata and failures with `.dataframe=None`. Pass `return_results=True`
+> when you need extraction rows on the client. Fetching full results increases
+> memory use and transfer costs; size client and pod memory for that workload.
+> `.save_to_disk(...)` still fetches the payloads needed to write files.
+> Refer to [ingest result defaults](../../docs/docs/extraction/nemo-retriever-api-reference.md#return-ingest-results)
+> for the distinct defaults of local and batch graph ingestion.
 
 ---
 

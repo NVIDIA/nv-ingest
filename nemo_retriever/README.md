@@ -144,7 +144,7 @@ from nemo_retriever import create_ingestor
 
 texts = ["some text", "another longer text"]
 
-chunks = (
+summary = (
   create_ingestor(run_mode="batch")
   .texts(texts)
   .embed()
@@ -152,6 +152,10 @@ chunks = (
   .ingest()
 )
 ```
+
+This batch pipeline ends in the default streaming-capable LanceDB upload, so
+`.ingest()` returns a summary with `input_rows` and `submitted_records`.
+Pass `return_results=True` if you need the embedded rows.
 
 Each string is treated as a raw document and split with `TextChunkParams`
 defaults. To override chunking for every text source in the ingest, add
@@ -179,8 +183,18 @@ uv run python nemo_retriever/src/nemo_retriever/examples/batch_pipeline.py /path
 
 ```python
 # ingestor.ingest() actually executes the pipeline
-chunks = ingestor.ingest()  # pandas.DataFrame (batch and inprocess)
+chunks = ingestor.ingest(return_results=True)  # Extracted rows as a pandas.DataFrame.
 ```
+
+Omitting `return_results` or setting it to `None` selects the pipeline default.
+Batch graphs return a summary only with a final streaming-capable VDB upload,
+`error_policy="raise"`, and `return_failures=False`. Other graph configurations
+return full records. In service mode, `.ingest()` and `.ingest_async()` return
+completion metadata without downloading rows; pass `return_results=True` to
+populate `ServiceIngestResult.dataframe`. `.save_to_disk(...)` still fetches
+payloads needed to write files. Refer to
+[ingest result defaults](../docs/docs/extraction/nemo-retriever-api-reference.md#return-ingest-results)
+for the complete contract.
 
 ### Ingest a test corpus (CLI)
 
@@ -623,7 +637,7 @@ ingestor = (
   ingestor.files(documents)
   .extract(split_config={"text": {"max_tokens": 5}, "html": {"max_tokens": 5}}) # 1024 by default, set low here to demonstrate chunking
 )
-results = ingestor.ingest()
+results = ingestor.ingest(return_results=True)
 document_path = results["path"].iloc[0]
 document_results = results[results["path"] == document_path]
 markdown_doc = to_markdown(document_results)

@@ -22,6 +22,7 @@ from nemo_retriever.graph.ingestor_runtime import (
     default_concurrency_node_names,
     _image_embedding_requires_page_image,
 )
+from nemo_retriever.ingestor.execute_flags import resolve_batch_return_results
 from nemo_retriever.ingestor.manifest import (
     ExtractionBranchPlan,
     ResolvedExtractionInputs,
@@ -126,7 +127,7 @@ class ExtractionBranchExecutor:
     show_progress: bool
     allow_no_gpu: bool
     ensure_batch_runtime: Callable[[], tuple[Any, Any]]
-    return_results: bool = True
+    return_results: bool | None = None
     validate_batch: Callable[[Any], None] | None = None
 
     def execute(self) -> Any:
@@ -140,6 +141,18 @@ class ExtractionBranchExecutor:
         return self._execute_inprocess()
 
     def _execute_batch(self) -> Any:
+        logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
+        post_graph = build_post_extract_graph(
+            dedup_params=self.dedup_params,
+            embed_params=self.embed_params,
+            caption_params=self.caption_params,
+            store_params=self.store_params,
+            vdb_upload_params=self.vdb_upload_params,
+            webhook_params=self.webhook_params,
+            stage_order=self.post_extract_order,
+            reshape_content_before_embed=self._should_reshape_content_before_embed(),
+        )
+        return_results = resolve_batch_return_results(post_graph, self.return_results)
         ray_module, cluster_resources = self.ensure_batch_runtime()
         effective_allow_no_gpu = self.allow_no_gpu or cluster_resources.total_gpu_count() == 0
         branch_datasets: list[Any] = []
@@ -193,17 +206,6 @@ class ExtractionBranchExecutor:
                 branch_executors.append(executor)
                 branch_inputs.append((executor, input_data))
 
-        logger.info("Retriever ingest post-extraction stages: %s", format_post_stage_summary(self.post_extract_order))
-        post_graph = build_post_extract_graph(
-            dedup_params=self.dedup_params,
-            embed_params=self.embed_params,
-            caption_params=self.caption_params,
-            store_params=self.store_params,
-            vdb_upload_params=self.vdb_upload_params,
-            webhook_params=self.webhook_params,
-            stage_order=self.post_extract_order,
-            reshape_content_before_embed=self._should_reshape_content_before_embed(),
-        )
         post_overrides = batch_tuning_to_node_overrides(
             None,
             self.embed_params,
@@ -243,7 +245,7 @@ class ExtractionBranchExecutor:
         combined = normalized[0]
         for branch_ds in normalized[1:]:
             combined = combined.union(branch_ds)
-        if self.return_results:
+        if return_results:
             return post_executor.ingest(combined)
         return post_executor._ingest(combined, return_results=False, validate_batch=self.validate_batch)
 
