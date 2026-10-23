@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Dict
 from urllib.parse import urlsplit
 
 if TYPE_CHECKING:
-    from nemo_retriever.common.params.models import BatchTuningParams
+    from nemo_retriever.common.params.models import BatchTuningParams, EmbedInputAuditParams
 
 
 NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL = "nvidia/NVIDIA-Nemotron-Parse-v1.2"
@@ -91,9 +91,12 @@ def build_embed_option_kwargs(
     embed_model_revision: str | None = None,
     embed_inference_batch_size: int | None = None,
     embed_reshape_workers: int | None = None,
+    embed_input_audit: EmbedInputAuditParams | None = None,
 ) -> Dict[str, Any]:
     """Build ``EmbedParams`` kwargs from CLI/request option values."""
     embed_kwargs: Dict[str, Any] = {}
+    if embed_input_audit is not None:
+        embed_kwargs["embed_input_audit"] = embed_input_audit
     if embed_invoke_url is not None:
         embed_kwargs["embed_invoke_url"] = embed_invoke_url
     if embed_model_name is not None:
@@ -160,7 +163,7 @@ def build_embed_kwargs(resolved: Any, *, include_batch_tuning: bool = False) -> 
     Merges ``runtime`` (always) and optionally ``batch_tuning`` sub-models.
     Also normalises ``embed_invoke_url`` → ``embedding_endpoint``.
     """
-    exclude = {"runtime", "batch_tuning"}
+    exclude = {"runtime", "batch_tuning", "embed_input_audit"}
     kwargs: Dict[str, Any] = {
         **resolved.model_dump(mode="python", exclude=exclude, exclude_none=True),
         **resolved.runtime.model_dump(mode="python", exclude_none=True),

@@ -45,6 +45,12 @@ def decode_base64_image(image_b64: str) -> Image.Image:
         raise ValueError(f"Failed to decode base64 image: {exc}") from exc
     try:
         with Image.open(io.BytesIO(image_bytes)) as image:
-            return image.convert("RGB")
+            rgb = image.convert("RGB")
+            from nemo_retriever.models.inference.input_audit import current_rows
+
+            audit = current_rows()
+            if audit is not None:
+                audit.image(image_bytes, rgb)
+            return rgb
     except (OSError, Image.DecompressionBombError) as exc:
         raise ValueError(f"Failed to decode base64 image: {exc}") from exc

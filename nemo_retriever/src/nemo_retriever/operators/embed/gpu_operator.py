@@ -35,6 +35,13 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
 
         self._params = params
         self._kwargs = build_embed_kwargs(params)
+        self._input_audit = None
+        audit = params.embed_input_audit
+        if audit is not None and audit.enabled:
+            from nemo_retriever.models.inference.input_audit import InputAuditSink
+
+            InputAuditSink.validate_model_config(self._kwargs)
+            self._input_audit = InputAuditSink(audit)
 
         endpoint = (self._kwargs.get("embedding_endpoint") or self._kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:
@@ -65,7 +72,10 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
     @nvtx.annotate("nrl.batch::embedding.batch", color="blue")
     def process(self, data: Any, **kwargs: Any) -> Any:
         ensure_embedding_input_policy_for_batch(self._kwargs, data)
-        return embed_text_main_text_embed(data, model=self._model, **self._kwargs)
+        if self._input_audit is None:
+            return embed_text_main_text_embed(data, model=self._model, **self._kwargs)
+        with self._input_audit.activate(role=str(self._params.input_type)):
+            return embed_text_main_text_embed(data, model=self._model, **self._kwargs)
 
     def postprocess(self, data: Any, **kwargs: Any) -> Any:
         return data

@@ -36,6 +36,8 @@ out_df, _info = create_text_embeddings_for_df(
 
 from __future__ import annotations
 
+from nemo_retriever.models.inference.input_audit import invoke_with_rows
+
 import atexit
 import logging
 import random
@@ -221,7 +223,9 @@ def _multimodal_callable_runner(
         ]
 
         if embed_modality == "image":
-            vecs = embedder.embed_images(images_b64, batch_size=bs)
+            vecs = invoke_with_rows(
+                chunk, lambda: embedder.embed_images(images_b64, batch_size=bs), text_column=text_column
+            )
             tolist = getattr(vecs, "tolist", None)
             vecs_list = tolist() if callable(tolist) else list(vecs)
 
@@ -239,7 +243,12 @@ def _multimodal_callable_runner(
             mm_images = [b for b, h in zip(images_b64, has_image) if h]
             mm_vecs_list: List[Optional[Sequence[float]]] = []
             if mm_images:
-                vecs = embedder.embed_text_image(mm_texts, mm_images, batch_size=bs)
+                vecs = invoke_with_rows(
+                    chunk,
+                    lambda: embedder.embed_text_image(mm_texts, mm_images, batch_size=bs),
+                    text_column=text_column,
+                    positions=lambda: [i for i, h in enumerate(has_image) if h],
+                )
                 tolist = getattr(vecs, "tolist", None)
                 mm_vecs_list = tolist() if callable(tolist) else list(vecs)
                 if len(mm_vecs_list) != len(mm_images):
@@ -251,7 +260,12 @@ def _multimodal_callable_runner(
             fb_texts = [t for t, h in zip(text_inputs, has_image) if not h and t]
             fb_vecs_list: List[Optional[Sequence[float]]] = []
             if fb_texts:
-                vecs = embedder.embed(fb_texts, batch_size=bs)
+                vecs = invoke_with_rows(
+                    chunk,
+                    lambda: embedder.embed(fb_texts, batch_size=bs),
+                    text_column=text_column,
+                    positions=lambda: [i for i, (h, t) in enumerate(zip(has_image, text_inputs)) if not h and t],
+                )
                 tolist = getattr(vecs, "tolist", None)
                 fb_vecs_list = tolist() if callable(tolist) else list(vecs)
                 if len(fb_vecs_list) != len(fb_texts):
@@ -632,16 +646,25 @@ def _callable_runner(
     *,
     embedder: EmbeddingCallable,
     batch_size: int,
+    audit_frame=None,
+    text_column: str = "text",
 ) -> dict:
     flat_embeddings: List[Optional[Sequence[float]]] = []
     flat_info_msgs: List[Optional[dict]] = []
 
+    offset = 0
     for prompt_batch in prompts:
         if not prompt_batch:
             continue
         for i in range(0, len(prompt_batch), max(1, int(batch_size))):
             chunk = prompt_batch[i : i + max(1, int(batch_size))]
-            vecs = embedder(chunk)
+            vecs = invoke_with_rows(
+                audit_frame,
+                lambda: embedder(chunk),
+                text_column=text_column,
+                positions=lambda: list(range(offset, offset + len(chunk))),
+            )
+            offset += len(chunk)
             vecs_list = list(vecs)
             if len(vecs_list) != len(chunk):
                 raise ValueError(
@@ -885,6 +908,8 @@ def create_text_embeddings_for_df(
                     filtered_content_batches,
                     embedder=embedder,
                     batch_size=local_batch_size,
+                    audit_frame=lambda: df_content.loc[valid_content_mask],
+                    text_column=str(transform_config.text_column),
                 )
             else:
                 raise ValueError(

@@ -26,6 +26,7 @@ from nemo_retriever.common.params import (
     BatchTuningParams,
     CaptionParams,
     DedupParams,
+    EmbedInputAuditParams,
     EmbedParams,
     ExtractParams,
     HtmlChunkParams,
@@ -203,6 +204,7 @@ class IngestEmbedOptions:
     embed_granularity: str | None = None
     batch: IngestEmbedBatchOptions = field(default_factory=IngestEmbedBatchOptions)
     embed_inference_batch_size: int | None = None
+    embed_input_audit: EmbedInputAuditParams | None = None
 
 
 @dataclass(frozen=True)
@@ -697,9 +699,12 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         if not remote_embedding or embed.embed_model_name is not None or embed.embed_model_provider_prefix is not None
         else None
     )
+    if resolved_index_mode == "sparse" and embed.embed_input_audit is not None and embed.embed_input_audit.enabled:
+        raise ValueError("embed_input_audit requires a dense embedding stage.")
     embed_kwargs = build_embed_option_kwargs(
         embed.embed_invoke_url,
         embed_runtime_model_name,
+        embed_input_audit=embed.embed_input_audit,
         embed_model_revision=embedding_model_revision if embed_runtime_model_name is not None else None,
         local_ingest_embed_backend=embed.local_ingest_embed_backend,
         embed_api_key=embed.embed_api_key,
