@@ -29,6 +29,8 @@ class _BatchEmbedCPUActor(AbstractOperator, CPUOperator):
     def __init__(self, params: EmbedParams) -> None:
         super().__init__()
         self._params = params
+        if params.embed_input_audit is not None and params.embed_input_audit.enabled:
+            raise ValueError("embed_input_audit supports only the local HF Nemotron 3.5 adapter.")
         self._kwargs = build_embed_kwargs(params)
         if "embedding_endpoint" not in self._kwargs:
             self._kwargs["embedding_endpoint"] = self._kwargs.get("embed_invoke_url") or self.DEFAULT_EMBED_INVOKE_URL

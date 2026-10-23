@@ -7,6 +7,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Literal, Sequence
 
+from nemo_retriever.common.params import EmbedInputAuditParams
+
 QueryRetrievalMode = Literal["auto", "dense", "hybrid", "sparse"]
 
 
@@ -27,6 +29,8 @@ class QueryEmbedOptions:
     embed_model_name: str | None = None
     embed_model_provider_prefix: str | None = None
     embed_api_key: str | None = None
+    local_query_embed_backend: Literal["hf", "vllm"] | None = None
+    embed_input_audit: EmbedInputAuditParams | None = None
 
 
 @dataclass(frozen=True)

@@ -19,7 +19,7 @@ from typing import Any, Literal, Optional, Sequence
 
 import pandas as pd
 
-from nemo_retriever.common.params import build_embed_option_kwargs
+from nemo_retriever.common.params import EmbedInputAuditParams, build_embed_option_kwargs
 from nemo_retriever.operators.abstract_operator import AbstractOperator
 from nemo_retriever.models import VL_RERANK_MODEL
 from nemo_retriever.query.agentic_options import (
@@ -221,6 +221,7 @@ class AgenticRetrievalConfig:
     top_k: int = AGENTIC_TARGET_TOP_K
     # Wider pre-filter and pre-rerank candidate pool for each retrieval hop.
     candidate_k: Optional[int] = None
+    embed_input_audit: EmbedInputAuditParams | None = None
 
     def __post_init__(self) -> None:
         invoke_url = _none_if_empty(self.invoke_url)
@@ -404,6 +405,7 @@ class AgenticRetriever:
             cfg.query_embedder,
             embed_api_key=cfg.embedding_api_key,
             embed_model_provider_prefix=cfg.query_embedder_provider_prefix,
+            embed_input_audit=cfg.embed_input_audit,
         )
         if cfg.local_query_embed_backend is not None:
             embed_kwargs["local_ingest_embed_backend"] = str(cfg.local_query_embed_backend)

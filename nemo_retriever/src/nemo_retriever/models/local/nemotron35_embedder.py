@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 import torch
 
+from nemo_retriever.models.inference.input_audit import _current_rows
+
 if TYPE_CHECKING:
     from nemo_retriever.models.inference.embedding_input import EmbeddingSplitPlan
 
@@ -108,6 +110,9 @@ class Nemotron35Embedder:
         if not texts:
             return torch.empty((0, self.output_dimension), dtype=torch.float32)
         self._ensure_loaded()
+        audit = _current_rows()
+        if audit is not None:
+            audit.sink.model_header(self)
         prefix = self.query_prefix if query else self.document_prefix
         limit = self.query_max_length if query else self.max_length
         prompts = [render_retrieval_input(self._template, prefix, text, image=images is not None) for text in texts]
@@ -140,11 +145,15 @@ class Nemotron35Embedder:
                         f"Text+image embedding exceeds max_length={limit} after image expansion; "
                         "shorten the text or increase the configured limit within the checkpoint maximum."
                     )
+            if audit is not None:
+                audit.processor(batch, texts[i : i + step], current, i)
             if self.backend == "hf":
                 batch = batch.to(self._model.device)
                 # Position real tokens independently of padding side/batch peers.
                 positions = batch["attention_mask"].long().cumsum(-1) - 1
                 batch["position_ids"] = positions.masked_fill(batch["attention_mask"] == 0, 0)
+                if audit is not None:
+                    audit.model_call(batch, i, len(current))
                 with torch.inference_mode():
                     hidden = self._model(**batch).last_hidden_state.float()
                     mask = batch["attention_mask"].unsqueeze(-1).float()
@@ -188,7 +197,10 @@ class Nemotron35Embedder:
                 vectors = torch.tensor([r.outputs.embedding for r in responses], dtype=torch.float32)
             if vectors.shape != (len(current), self.output_dimension) or not torch.isfinite(vectors).all():
                 raise ValueError("Checkpoint returned invalid dense embedding vectors.")
-            outputs.append(torch.nn.functional.normalize(vectors, dim=-1) if self.normalize else vectors)
+            final = torch.nn.functional.normalize(vectors, dim=-1) if self.normalize else vectors
+            if audit is not None:
+                audit.outputs(vectors, final, i)
+            outputs.append(final)
         return torch.cat(outputs)
 
     def embed(self, texts: Sequence[str], *, batch_size: int = 64) -> torch.Tensor:

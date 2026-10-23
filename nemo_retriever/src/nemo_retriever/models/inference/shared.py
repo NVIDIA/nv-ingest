@@ -20,7 +20,7 @@ def _to_bool(v: object, default: bool = False) -> bool:
 
 def build_embed_kwargs(params: EmbedParams) -> dict[str, object]:
     kwargs = {
-        **params.model_dump(mode="python", exclude={"runtime", "batch_tuning"}, exclude_none=True),
+        **params.model_dump(mode="python", exclude={"runtime", "batch_tuning", "embed_input_audit"}, exclude_none=True),
         **params.runtime.model_dump(mode="python", exclude_none=True),
     }
     return normalize_embed_kwargs(kwargs)
