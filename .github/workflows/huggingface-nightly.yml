@@ -384,9 +384,6 @@ jobs:
               "torch": f"~={os.environ['OCR_TORCH_VERSION']}",
               "torchvision": f"~={os.environ['OCR_TORCHVISION_VERSION']}",
           }
-          expected_license = "Apache-2.0"
-          expected_license_classifier = "License :: OSI Approved :: Apache Software License"
-
           def expanded_compatible_specifier(specifier):
               if not specifier.startswith("~="):
                   return None
@@ -421,18 +418,6 @@ jobs:
               if f"Name: {expected_project}" not in metadata:
                   raise SystemExit(f"Built wheel metadata does not declare project {expected_project!r}")
               metadata_version = metadata_message.get("Version")
-              metadata_license = metadata_message.get("License")
-              if metadata_license != expected_license:
-                  raise SystemExit(
-                      "Built wheel metadata does not declare expected license "
-                      f"{expected_license!r}; got {metadata_license!r}"
-                  )
-              metadata_classifiers = metadata_message.get_all("Classifier", [])
-              if expected_license_classifier not in metadata_classifiers:
-                  raise SystemExit(
-                      "Built wheel metadata does not declare expected license classifier "
-                      f"{expected_license_classifier!r}; got {metadata_classifiers!r}"
-                  )
               if release_type == "stable" and metadata_version != expected_version:
                   raise SystemExit(
                       "Built wheel metadata does not declare expected version "

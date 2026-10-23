@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tomllib
 import zipfile
+from email.parser import BytesParser
 from pathlib import Path
 
 
@@ -499,8 +500,8 @@ _PROPRIETARY_LICENSE_CLASSIFIER = "License :: Other/Proprietary License"
 _ORCHESTRATOR_APACHE_LICENSE = Path(__file__).resolve().parents[2] / "nemo_retriever" / "LICENSE"
 
 
-def _pyproject_license_line(license_text: str) -> str:
-    if license_text == "Apache-2.0":
+def _pyproject_license_line(license_text: str, *, legacy: bool = False) -> str:
+    if license_text == "Apache-2.0" and not legacy:
         return 'license = "Apache-2.0"\n'
     return f'license = {{text = "{license_text}"}}\n'
 
@@ -523,6 +524,8 @@ def _patch_pyproject_license(
         return False
 
     text = _read_text(pyproject)
+    build_backend = tomllib.loads(text).get("build-system", {}).get("build-backend", "")
+    use_legacy_license = isinstance(build_backend, str) and build_backend.startswith("setuptools.")
     core_bounds = _project_core_bounds(text)
     if core_bounds is None:
         return False
@@ -532,7 +535,7 @@ def _patch_pyproject_license(
     changed = False
 
     if not re.search(r"(?m)^\s*license\s*=", project_text):
-        line = _pyproject_license_line(license_text)
+        line = _pyproject_license_line(license_text, legacy=use_legacy_license)
         version_m = re.search(r"(?m)^(\s*version\s*=\s*[^\n]+\n)", project_text)
         if version_m:
             insert_at = version_m.end()
@@ -544,7 +547,7 @@ def _patch_pyproject_license(
     else:
         license_m = re.search(r"(?m)^(\s*license\s*=\s*)(.+)$", project_text)
         if license_m:
-            desired = _pyproject_license_line(license_text).strip()
+            desired = _pyproject_license_line(license_text, legacy=use_legacy_license).strip()
             if license_m.group(0).strip() != desired:
                 project_text = project_text[: license_m.start()] + desired + "\n" + project_text[license_m.end() :]
                 changed = True
@@ -945,6 +948,52 @@ def _validate_required_wheel_members(dist_dir: Path, required_members: list[str]
         raise RuntimeError("Required wheel member validation failed:\n" + "\n".join(failures))
 
 
+def _validate_wheel_license_metadata(
+    dist_dir: Path,
+    *,
+    license_text: str,
+    license_classifier: str | None,
+) -> None:
+    """Require the configured license metadata in every wheel before publication."""
+    wheels = sorted(dist_dir.glob("*.whl"))
+    if not wheels:
+        raise RuntimeError(f"No wheels found in {dist_dir} to validate license metadata")
+
+    failures: list[str] = []
+    for wheel in wheels:
+        expression: str | None = None
+        legacy: str | None = None
+        classifiers: list[str] = []
+        errors: list[str] = []
+
+        with zipfile.ZipFile(wheel) as zf:
+            metadata_names = [name for name in zf.namelist() if name.endswith(".dist-info/METADATA")]
+            if len(metadata_names) != 1:
+                errors.append(f"expected exactly one .dist-info/METADATA member, found {len(metadata_names)}")
+            else:
+                metadata = BytesParser().parsebytes(zf.read(metadata_names[0]))
+                expression = metadata.get("License-Expression")
+                legacy = metadata.get("License")
+                classifiers = metadata.get_all("Classifier", [])
+
+                # PEP 639 metadata is authoritative when present. Fall back to
+                # the legacy License field only for older metadata producers.
+                observed_license = expression if expression is not None else legacy
+                if observed_license != license_text:
+                    errors.append(f"expected license {license_text!r}, got {observed_license!r}")
+                if license_classifier and license_classifier not in classifiers:
+                    errors.append(f"missing classifier {license_classifier!r}")
+
+        if errors:
+            failures.append(
+                f"{wheel.name}: {'; '.join(errors)} "
+                f"(License-Expression={expression!r}, License={legacy!r}, Classifier={classifiers!r})"
+            )
+
+    if failures:
+        raise RuntimeError("Wheel license metadata validation failed:\n" + "\n".join(failures))
+
+
 def _twine_upload(
     dist_dir: Path,
     repository_url: str,
@@ -1200,6 +1249,13 @@ def main() -> int:
         _auditwheel_repair_dist_dir(out_dir, exclude_libs=args.auditwheel_exclude)
 
     _validate_required_wheel_members(out_dir, args.require_wheel_member)
+
+    if args.license_text:
+        _validate_wheel_license_metadata(
+            out_dir,
+            license_text=args.license_text,
+            license_classifier=args.license_classifier or None,
+        )
 
     if args.upload:
         token = os.environ.get(args.token_env)

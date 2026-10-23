@@ -306,6 +306,36 @@ classifiers = [
     assert "License :: Other/Proprietary License" not in text
 
 
+def test_nightly_builder_uses_legacy_license_with_setuptools_classifier(tmp_path: Path) -> None:
+    project_dir = tmp_path / "project"
+    project_dir.mkdir()
+    pyproject = project_dir / "pyproject.toml"
+    pyproject.write_text(
+        """
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "example"
+version = "1.0.0"
+""".lstrip(),
+        encoding="utf-8",
+    )
+    nightly_build_publish = _load_nightly_build_publish_module()
+
+    assert nightly_build_publish._patch_pyproject_license(
+        project_dir,
+        license_text=nightly_build_publish._DEFAULT_LICENSE_TEXT,
+        license_classifier=nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER,
+    )
+
+    text = pyproject.read_text(encoding="utf-8")
+    assert 'license = {text = "Apache-2.0"}' in text
+    assert 'license = "Apache-2.0"' not in text
+    assert '"License :: OSI Approved :: Apache Software License"' in text
+
+
 def test_nightly_builder_leaves_existing_apache_license_metadata_unchanged(tmp_path: Path) -> None:
     project_dir = tmp_path / "project"
     project_dir.mkdir()
@@ -330,12 +360,15 @@ classifiers = [
     assert pyproject.read_text(encoding="utf-8") == original
 
 
-def test_huggingface_workflow_verifies_ocr_wheel_license_metadata() -> None:
+def test_huggingface_workflow_leaves_license_validation_to_shared_builder() -> None:
     workflow = (REPO_ROOT / ".github" / "workflows" / "huggingface-nightly.yml").read_text(encoding="utf-8")
 
-    assert 'expected_license = "Apache-2.0"' in workflow
-    assert 'expected_license_classifier = "License :: OSI Approved :: Apache Software License"' in workflow
-    assert "Built wheel metadata does not declare expected license" in workflow
+    ocr_validation = workflow.split("export EXPECTED_OCR_VERSION", 1)[1]
+    assert 'expected_license = "Apache-2.0"' not in ocr_validation
+    assert "Built wheel metadata does not declare expected license" not in ocr_validation
+    assert "Built wheel metadata does not declare expected version" in ocr_validation
+    assert "Built wheel metadata does not declare runtime dependency" in ocr_validation
+    assert "Built wheel is missing nemotron_ocr_cpp extension artifact" in ocr_validation
 
 
 def test_huggingface_ocr_job_prefers_https_apt_mirrors_on_arm() -> None:
@@ -357,6 +390,123 @@ def _write_wheel(path: Path, members: list[str]) -> None:
     with zipfile.ZipFile(path, "w") as zf:
         for member in members:
             zf.writestr(member, "")
+
+
+def _write_wheel_metadata(
+    path: Path,
+    *,
+    license_expression: str | None = None,
+    license_text: str | None = None,
+    classifiers: list[str] | None = None,
+) -> None:
+    headers = ["Metadata-Version: 2.4", "Name: example", "Version: 1.0.0"]
+    if license_expression is not None:
+        headers.append(f"License-Expression: {license_expression}")
+    if license_text is not None:
+        headers.append(f"License: {license_text}")
+    headers.extend(f"Classifier: {classifier}" for classifier in classifiers or [])
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("example-1.0.0.dist-info/METADATA", "\n".join(headers) + "\n\n")
+
+
+@pytest.mark.parametrize(
+    ("license_expression", "license_text"),
+    [("Apache-2.0", None), (None, "Apache-2.0")],
+)
+def test_nightly_builder_accepts_modern_or_legacy_wheel_license_metadata(
+    tmp_path: Path,
+    license_expression: str | None,
+    license_text: str | None,
+) -> None:
+    nightly_build_publish = _load_nightly_build_publish_module()
+    _write_wheel_metadata(
+        tmp_path / "example.whl",
+        license_expression=license_expression,
+        license_text=license_text,
+        classifiers=[nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER],
+    )
+
+    nightly_build_publish._validate_wheel_license_metadata(
+        tmp_path,
+        license_text="Apache-2.0",
+        license_classifier=nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER,
+    )
+
+
+def test_nightly_builder_prefers_modern_license_expression_over_legacy_field(tmp_path: Path) -> None:
+    nightly_build_publish = _load_nightly_build_publish_module()
+    _write_wheel_metadata(
+        tmp_path / "example.whl",
+        license_expression="MIT",
+        license_text="Apache-2.0",
+        classifiers=[nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER],
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            r"example\.whl: expected license 'Apache-2\.0', got 'MIT'.*"
+            r"License-Expression='MIT'.*License='Apache-2\.0'"
+        ),
+    ):
+        nightly_build_publish._validate_wheel_license_metadata(
+            tmp_path,
+            license_text="Apache-2.0",
+            license_classifier=nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER,
+        )
+
+
+@pytest.mark.parametrize(("license_expression", "license_text"), [(None, None), ("MIT", None)])
+def test_nightly_builder_rejects_missing_or_incorrect_wheel_license_metadata(
+    tmp_path: Path,
+    license_expression: str | None,
+    license_text: str | None,
+) -> None:
+    nightly_build_publish = _load_nightly_build_publish_module()
+    _write_wheel_metadata(
+        tmp_path / "example.whl",
+        license_expression=license_expression,
+        license_text=license_text,
+        classifiers=[nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER],
+    )
+
+    with pytest.raises(RuntimeError, match=r"example\.whl: expected license 'Apache-2\.0'"):
+        nightly_build_publish._validate_wheel_license_metadata(
+            tmp_path,
+            license_text="Apache-2.0",
+            license_classifier=nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER,
+        )
+
+
+def test_nightly_builder_rejects_missing_wheel_license_classifier(tmp_path: Path) -> None:
+    nightly_build_publish = _load_nightly_build_publish_module()
+    _write_wheel_metadata(tmp_path / "example.whl", license_expression="Apache-2.0")
+
+    with pytest.raises(RuntimeError, match="missing classifier"):
+        nightly_build_publish._validate_wheel_license_metadata(
+            tmp_path,
+            license_text="Apache-2.0",
+            license_classifier=nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER,
+        )
+
+
+def test_nightly_builder_validates_license_metadata_in_every_wheel(tmp_path: Path) -> None:
+    nightly_build_publish = _load_nightly_build_publish_module()
+    classifier = nightly_build_publish._DEFAULT_LICENSE_CLASSIFIER
+    _write_wheel_metadata(
+        tmp_path / "passing.whl",
+        license_expression="Apache-2.0",
+        classifiers=[classifier],
+    )
+    _write_wheel_metadata(tmp_path / "failing.whl", license_expression="MIT", classifiers=[classifier])
+
+    with pytest.raises(RuntimeError, match=r"failing\.whl: expected license") as exc_info:
+        nightly_build_publish._validate_wheel_license_metadata(
+            tmp_path,
+            license_text="Apache-2.0",
+            license_classifier=classifier,
+        )
+    assert "passing.whl" not in str(exc_info.value)
 
 
 def test_nightly_builder_validates_required_members_in_every_wheel(tmp_path: Path) -> None:
@@ -393,6 +543,7 @@ def test_nightly_builder_validates_wheels_before_upload() -> None:
     main_source = script.split("def main() -> int:", 1)[1]
 
     assert main_source.index("_validate_required_wheel_members(") < main_source.index("if args.upload:")
+    assert main_source.index("_validate_wheel_license_metadata(") < main_source.index("if args.upload:")
 
 
 def test_huggingface_ocr_wheels_require_base_and_v2_pipeline_modules() -> None:
