@@ -359,7 +359,7 @@ def test_ray_pipeline_ingest_decorator(capture_ranges, monkeypatch: pytest.Monke
     module = importlib.import_module("nemo_retriever.graph.executor")
     module = importlib.reload(module)
     executor = object.__new__(module.RayDataExecutor)
-    executor.graph = object()
+    executor.graph = module.Graph()
     monkeypatch.setattr(executor, "_linearize", lambda graph: [])
     monkeypatch.setattr(executor, "_stream_ingest_index", lambda nodes, *, require_terminal=False: None)
     public_result = object()

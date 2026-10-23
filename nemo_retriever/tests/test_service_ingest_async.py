@@ -117,9 +117,8 @@ def stub_ingestor() -> Iterator[ServiceIngestor]:
 
 
 def test_ingest_default_returns_service_ingest_result(stub_ingestor: ServiceIngestor) -> None:
-    """Default flags ⇒ ServiceIngestResult with fetched row payloads."""
-    with pytest.warns(DeprecationWarning, match="legacy result rows are deprecated"):
-        result = stub_ingestor.ingest()
+    """Default flags preserve completion metadata without fetching row payloads."""
+    result = stub_ingestor.ingest()
     assert isinstance(result, ServiceIngestResult)
     assert not isinstance(result, tuple)
     assert result.job_id == "JOB-1"
@@ -130,6 +129,13 @@ def test_ingest_default_returns_service_ingest_result(stub_ingestor: ServiceInge
     assert len(result) == 2
     assert result.failures == [("doc-b", "boom")]
     assert result.document_filenames == {"doc-a": "a.pdf", "doc-b": "b.pdf"}
+    assert result.dataframe is None
+    assert getattr(stub_ingestor, "_stream_calls")[-1]["retain_results"] is False
+
+
+def test_ingest_explicit_results_preserve_dataframe(stub_ingestor: ServiceIngestor) -> None:
+    with pytest.warns(DeprecationWarning, match="legacy result rows are deprecated"):
+        result = stub_ingestor.ingest(return_results=True)
     assert result.dataframe is not None
     assert len(result.dataframe) == 1
     assert "document_id" not in result.dataframe.columns
@@ -211,7 +217,7 @@ def test_ingest_return_results_kwargs_override_params(stub_ingestor: ServiceInge
 
 def test_ingest_forwards_bulk_result_flags_from_kwargs(stub_ingestor: ServiceIngestor) -> None:
     with pytest.warns(DeprecationWarning, match="legacy result rows are deprecated"):
-        stub_ingestor.ingest(return_embeddings=True, return_images=True)
+        stub_ingestor.ingest(return_results=True, return_embeddings=True, return_images=True)
 
     stream_calls = getattr(stub_ingestor, "_stream_calls")
     assert stream_calls[-1]["return_embeddings"] is True
@@ -219,7 +225,7 @@ def test_ingest_forwards_bulk_result_flags_from_kwargs(stub_ingestor: ServiceIng
 
 
 def test_ingest_forwards_bulk_result_flags_from_params_model(stub_ingestor: ServiceIngestor) -> None:
-    params = IngestExecuteParams(return_embeddings=True, return_images=True)
+    params = IngestExecuteParams(return_results=True, return_embeddings=True, return_images=True)
     with pytest.warns(DeprecationWarning, match="legacy result rows are deprecated"):
         stub_ingestor.ingest(params=params)
 
@@ -274,21 +280,48 @@ def test_ingest_async_default_matches_ingest_default(stub_ingestor: ServiceInges
     out = future.result(timeout=5.0)
     assert isinstance(out, ServiceIngestResult)
     assert not isinstance(out, tuple)
-
-
-def test_ingest_async_forwards_return_results(stub_ingestor: ServiceIngestor) -> None:
-    future = stub_ingestor.ingest_async(return_results=False)
-    out = future.result(timeout=5.0)
-    assert isinstance(out, ServiceIngestResult)
     assert out.dataframe is None
 
 
-def test_ingest_return_results_false_creates_no_result_client(stub_ingestor: ServiceIngestor) -> None:
+@pytest.mark.parametrize("return_results", [False, True, None])
+def test_ingest_async_forwards_return_results(stub_ingestor: ServiceIngestor, return_results) -> None:
+    future = stub_ingestor.ingest_async(return_results=return_results, result_schema="compact")
+    out = future.result(timeout=5.0)
+    assert isinstance(out, ServiceIngestResult)
+    assert (out.dataframe is not None) is bool(return_results)
+
+
+@pytest.mark.parametrize(
+    "options",
+    [
+        {},
+        {"return_results": None},
+        {"return_results": False},
+        {"params": {}},
+        {"params": IngestExecuteParams()},
+        {"params": IngestExecuteParams().model_dump()},
+        {"params": IngestExecuteParams(return_results=True), "return_results": None},
+        {"params": {"return_results": True}, "return_results": False},
+    ],
+)
+def test_ingest_default_creates_no_result_client(stub_ingestor: ServiceIngestor, options) -> None:
     with patch.object(
         stub_ingestor,
         "_new_result_fetch_client",
         side_effect=AssertionError("result client must not be created"),
     ):
-        result = stub_ingestor.ingest(return_results=False)
+        result = stub_ingestor.ingest(**options)
 
     assert result.dataframe is None
+
+
+def test_ingest_default_still_fetches_disk_output(stub_ingestor: ServiceIngestor, tmp_path) -> None:
+    import json
+
+    stub_ingestor.save_to_disk(output_directory=str(tmp_path), compression=None)
+    result = stub_ingestor.ingest(result_schema="compact")
+
+    assert result.dataframe is None
+    assert getattr(stub_ingestor, "_stream_calls")[-1]["retain_results"] is True
+    saved = json.loads((tmp_path / "doc-a.json").read_text())
+    assert saved["rows"][0]["text"] == "content-doc-a"

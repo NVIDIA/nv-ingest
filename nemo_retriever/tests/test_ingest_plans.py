@@ -4,6 +4,7 @@ from tests import _have_ffmpeg_binary
 from nemo_retriever.graph.ingestor_runtime import batch_tuning_to_node_overrides
 from nemo_retriever.graph.ingestor_runtime import build_graph
 from nemo_retriever.graph.ingestor_runtime import build_inprocess_graph
+from nemo_retriever.graph.ingestor_runtime import build_post_extract_graph
 from nemo_retriever.graph.pipeline_graph import Graph
 from nemo_retriever.operators.extract.ocr.ocr import OCRActor
 from nemo_retriever.operators.extract.page_elements.page_elements import PageElementDetectionActor
@@ -13,6 +14,7 @@ from nemo_retriever.operators.operator_archetype import ArchetypeOperator
 from nemo_retriever.operators.cpu_operator import CPUOperator
 from nemo_retriever.operators.gpu_operator import GPUOperator
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
+from nemo_retriever.ingest.plan import IngestExtractBatchOptions
 from nemo_retriever.ingestor.plans import BaseIngestPlan
 from nemo_retriever.common.params import ASRParams
 from nemo_retriever.common.params import AudioChunkParams
@@ -27,6 +29,21 @@ from nemo_retriever.common.params import VdbUploadParams
 from nemo_retriever.common.params import WebhookParams
 from nemo_retriever.common.ray_resource_hueristics import ClusterResources
 from nemo_retriever.common.ray_resource_hueristics import Resources
+
+
+def test_extract_batch_options_preserve_existing_positional_arguments() -> None:
+    batch = IngestExtractBatchOptions(1, 2, 3, 0.5, 4, 8, 0.25, 0.5, 5, 16, 0.75, 1.0, 6, 32, 1.25, 0.5, 7, 64, 1.0)
+
+    assert batch.page_elements_cpus_per_actor == 0.25
+    assert batch.page_elements_gpus_per_actor == 0.5
+    assert batch.ocr_workers == 5
+    assert batch.table_structure_cpus_per_actor == 1.25
+    assert batch.table_structure_gpus_per_actor == 0.5
+    assert batch.nemotron_parse_workers == 7
+    assert batch.nemotron_parse_batch_size == 64
+    assert batch.nemotron_parse_gpus_per_actor == 1.0
+    assert batch.page_elements_repartition is None
+    assert batch.table_structure_repartition is None
 
 
 def _linear_nodes(graph):
@@ -257,7 +274,7 @@ def test_build_graph_keeps_archetype_operator_classes(
         "PDFExtractionActor",
         "PageElementDetectionActor",
         expected_actor_name,
-        "UDFOperator",
+        "ExplodeContentToRows",
         "_BatchEmbedActor",
     ]
     assert nodes[3].operator_class is PageElementDetectionActor
@@ -452,6 +469,48 @@ def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> N
     assert overrides["CaptionActor"]["num_gpus"] == 1.0
     assert overrides["_BatchEmbedActor"]["concurrency"] == 2
     assert overrides["_BatchEmbedActor"]["num_gpus"] == 0.5
+
+
+@pytest.mark.parametrize(
+    ("granularity", "reshape_node"),
+    [("page", "CollapseContentToPageRows"), ("element", "ExplodeContentToRows")],
+)
+def test_batch_tuning_to_node_overrides_parallelizes_only_named_embed_reshape_nodes(granularity, reshape_node) -> None:
+    embed_params = EmbedParams(
+        embed_granularity=granularity,
+        batch_tuning=BatchTuningParams(embed_workers=12, embed_reshape_workers=4),
+    )
+
+    overrides = batch_tuning_to_node_overrides(None, embed_params)
+    graph = build_post_extract_graph(
+        embed_params=embed_params, dedup_params=DedupParams(), stage_order=("dedup", "embed")
+    )
+    nodes = _linear_nodes(graph)
+    dedup_node = next(node for node in nodes if getattr(node.operator, "name", None) == "DedupImages")
+
+    assert overrides["CollapseContentToPageRows"]["concurrency"] == 4
+    assert overrides["ExplodeContentToRows"]["concurrency"] == 4
+    assert reshape_node in [node.name for node in nodes]
+    assert dedup_node.name not in overrides
+    assert "UDFOperator" not in overrides
+
+
+def test_batch_tuning_leaves_embed_reshape_concurrency_unset_by_default() -> None:
+    overrides = batch_tuning_to_node_overrides(None, EmbedParams())
+
+    assert "CollapseContentToPageRows" not in overrides
+    assert "ExplodeContentToRows" not in overrides
+
+
+def test_batch_tuning_to_node_overrides_can_skip_embed_repartition() -> None:
+    embed_params = EmbedParams(
+        batch_tuning=BatchTuningParams(embed_batch_size=128, embed_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(None, embed_params)
+
+    assert overrides["_BatchEmbedActor"]["batch_size"] == 128
+    assert "target_num_rows_per_block" not in overrides["_BatchEmbedActor"]
 
 
 def test_batch_preflight_reduces_default_pools_on_constrained_cluster() -> None:
@@ -670,6 +729,46 @@ def test_batch_tuning_to_node_overrides_honors_table_structure_tuning() -> None:
     assert overrides["TableStructureActor"]["num_gpus"] == 0.25
 
 
+def test_batch_tuning_to_node_overrides_can_skip_page_elements_repartition() -> None:
+    extract_params = ExtractParams(
+        batch_tuning=BatchTuningParams(page_elements_batch_size=8, page_elements_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["PageElementDetectionActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["PageElementDetectionActor"]
+
+
+def test_batch_tuning_to_node_overrides_can_skip_table_structure_repartition() -> None:
+    extract_params = ExtractParams(
+        use_table_structure=True,
+        batch_tuning=BatchTuningParams(table_structure_batch_size=8, table_structure_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["TableStructureActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["TableStructureActor"]
+
+
+def test_batch_tuning_to_node_overrides_repartitions_pdf_pages_for_extraction() -> None:
+    extract_params = ExtractParams(
+        batch_tuning=BatchTuningParams(
+            pdf_extract_workers=32,
+            pdf_extract_batch_size=4,
+            pdf_extract_num_cpus=2.0,
+        ),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["PDFExtractionActor"]["concurrency"] == 32
+    assert overrides["PDFExtractionActor"]["batch_size"] == 4
+    assert overrides["PDFExtractionActor"]["target_num_rows_per_block"] == 4
+    assert overrides["PDFExtractionActor"]["num_cpus"] == 2.0
+
+
 def test_batch_tuning_to_node_overrides_adds_default_store_tuning() -> None:
     overrides = batch_tuning_to_node_overrides(
         extract_params=None,
@@ -732,7 +831,8 @@ def test_graph_ingestor_autodetects_no_gpu_for_batch_overrides(monkeypatch) -> N
         def __init__(self, graph, **kwargs):
             self.graph = graph
 
-        def ingest(self, data):
+        def ingest(self, data, *, return_results):
+            assert return_results is True
             return {"data": data, "graph": self.graph}
 
     def _fake_batch_tuning_to_node_overrides(

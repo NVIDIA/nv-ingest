@@ -17,7 +17,7 @@ Three execution surfaces are exposed:
    holding per-document completion events, plus ``job_id`` / ``failures``
    / ``document_ids`` / ``document_filenames`` / ``elapsed_s`` /
    ``job_status`` / ``trace_id`` / ``dataframe``
-   attributes). By default ``return_results=True`` fetches each
+   attributes). Explicit ``return_results=True`` fetches each
    completed document's rows from the status endpoint into
    ``result.dataframe``. Each
    call implicitly opens one server-side job aggregate sized to
@@ -87,6 +87,7 @@ import httpx
 from nemo_retriever.ingestor.results import ResultSchema, concat_ingest_results
 from nemo_retriever.ingestor import _merge_params, ingestor
 from nemo_retriever.common.inline_text import inline_text_source_id, is_blank_inline_corpus, normalize_inline_texts
+from nemo_retriever.ingestor.execute_flags import resolve_return_results_option
 from nemo_retriever.common.params import (
     CaptionParams,
     IngestExecuteParams,
@@ -164,7 +165,7 @@ class ServiceIngestResult(list):
         a trace id in the job creation event.
     dataframe
         When :meth:`ServiceIngestor.ingest` is called with
-        ``return_results=True`` (the default), a ``pandas.DataFrame``
+        ``return_results=True``, a ``pandas.DataFrame``
         of all successfully ingested rows fetched from the service via
         ``GET /v1/ingest/status/{document_id}``, concatenated in upload
         order. The current default ``result_schema="legacy"`` preserves
@@ -172,7 +173,7 @@ class ServiceIngestResult(list):
         ``inprocess`` / ``batch`` run modes. It preserves full text and strips
         bulky raw image and embedding values from cells before transport. Pass
         ``result_schema="compact"`` to opt into the future compact schema.
-        ``None`` when ``return_results=False``.
+        ``None`` by default, or when ``return_results=False``.
     """
 
     def __init__(self, items: list[dict[str, Any]] | None = None) -> None:
@@ -1253,11 +1254,12 @@ class ServiceIngestor(ingestor):
             in service mode is driven by the pipeline spec, not by
             execute-time knobs).
         return_results
-            When ``True`` (default), fetch each completed document's
+            Defaults to ``False``. When ``True``, fetch each completed document's
             ``result_data`` from ``GET /v1/ingest/status/{id}`` and
             expose the combined rows on ``result.dataframe`` as a
             ``pandas.DataFrame``. Set to ``False`` to skip those HTTP
-            round-trips when only job metadata is needed.
+            round-trips when only job metadata is needed. Omitted values and
+            ``None`` skip result downloads. Disk output still fetches rows.
         result_schema
             ``"legacy"`` (default) preserves the existing service
             DataFrame column layout with bulky values stripped and emits
@@ -1468,11 +1470,8 @@ class ServiceIngestor(ingestor):
         return_traces = (
             bool(kwargs["return_traces"]) if "return_traces" in kwargs else _from_params("return_traces", default=False)
         )
-        return_results = (
-            bool(kwargs["return_results"])
-            if "return_results" in kwargs
-            else _from_params("return_results", default=True)
-        )
+        requested_results = resolve_return_results_option(params, kwargs)
+        return_results = False if requested_results is None else requested_results
         result_schema = cls._normalize_result_schema(
             kwargs["result_schema"]
             if "result_schema" in kwargs
@@ -1659,7 +1658,7 @@ class ServiceIngestor(ingestor):
         *,
         return_failures: bool = False,
         return_traces: bool = False,
-        return_results: bool = True,
+        return_results: bool | None = False,
         result_schema: ResultSchema = "legacy",
         return_embeddings: bool = False,
         return_images: bool = False,

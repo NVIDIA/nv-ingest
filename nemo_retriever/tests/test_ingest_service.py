@@ -146,7 +146,7 @@ def test_execute_service_ingest_request_raises_for_document_failures(monkeypatch
         execute_service_ingest_request(request)
 
 
-def test_execute_service_ingest_request_materializes_results_by_default(
+def test_execute_service_ingest_request_can_materialize_results(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -163,14 +163,14 @@ def test_execute_service_ingest_request_materializes_results_by_default(
         lambda _request: SimpleNamespace(ingest=ingest),
     )
 
-    execution = execute_service_ingest_request(request)
+    execution = execute_service_ingest_request(request, return_results=True)
 
     assert captured == {"return_results": True}
     assert execution.n_rows == 2
     assert execution.result_n_rows == 2
 
 
-def test_execute_service_ingest_request_can_disable_materialization_and_count_event_rows(
+def test_execute_service_ingest_request_defaults_to_event_row_counts(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -193,7 +193,7 @@ def test_execute_service_ingest_request_can_disable_materialization_and_count_ev
         lambda _request: SimpleNamespace(ingest=ingest),
     )
 
-    execution = execute_service_ingest_request(request, return_results=False)
+    execution = execute_service_ingest_request(request)
 
     assert captured == {"return_results": False}
     assert execution.n_rows == 5

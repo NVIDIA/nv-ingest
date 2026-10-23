@@ -8,6 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Sequence
 
+import pandas as pd
+
 from nemo_retriever.ingest.plan import ResolvedIngestPlan
 from nemo_retriever.ingestor.manifest import format_branch_summary
 from nemo_retriever.ingestor import Ingestor, create_ingestor
@@ -22,8 +24,9 @@ class IngestExecutionResult:
     """Structured result from executing a resolved ingest plan.
 
     ``result`` is the raw value returned by ``Ingestor.ingest()`` and may be a
-    large dataframe-like object. ``result_n_rows`` counts that current result
-    when possible. ``initial_n_rows`` and ``n_rows`` are LanceDB table counts
+    large dataframe-like object or a one-row summary. ``result_n_rows`` counts
+    current output rows, using ``input_rows`` when the result is a summary.
+    ``initial_n_rows`` and ``n_rows`` are LanceDB table counts
     before and after execution when row verification is enabled.
     ``run_metadata`` holds execution-level details, not per-chunk metadata.
     """
@@ -89,6 +92,7 @@ def execute_ingest_plan(
     *,
     verify_rows: bool = True,
     raise_on_empty: bool = True,
+    return_results: bool | None = None,
 ) -> IngestExecutionResult:
     """Execute a resolved ingest plan and return structured execution data.
 
@@ -100,6 +104,9 @@ def execute_ingest_plan(
             for extraction/embed-only plans that intentionally omit VDB upload.
         raise_on_empty: When true, raise if verification proves the current run
             produced no rows or failed to add rows to an append target.
+        return_results: Retain full result rows when true. None uses the
+            ingest pipeline's context default, including summary counts for
+            eligible batch VDB uploads.
     """
 
     lancedb_target = _resolve_lancedb_target(plan)
@@ -114,7 +121,7 @@ def execute_ingest_plan(
     if verify_rows and not overwrite:
         initial_n_rows = _count_lancedb_rows(lancedb_uri, table_name)
 
-    result = build_ingest_pipeline(plan).ingest()
+    result = build_ingest_pipeline(plan).ingest(return_results=return_results)
     if plan.sparse:
         _write_sparse_lancedb_result(result, lancedb_uri=lancedb_uri, table_name=table_name, overwrite=overwrite)
 
@@ -208,6 +215,12 @@ def _raise_for_empty_ingest(
 
 
 def _count_result_rows(result: object) -> int | None:
+    if (
+        isinstance(result, pd.DataFrame)
+        and len(result) == 1
+        and set(result.columns) == {"input_rows", "submitted_records"}
+    ):
+        return int(result.iloc[0]["input_rows"])
     try:
         return len(result)  # type: ignore[arg-type]
     except TypeError:

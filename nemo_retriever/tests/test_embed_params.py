@@ -10,8 +10,11 @@ import warnings
 
 import pytest
 
-from nemo_retriever.common.params.models import EmbedParams, IMAGE_MODALITIES
+from pydantic import ValidationError
+
+from nemo_retriever.common.params.models import BatchTuningParams, EmbedParams, IMAGE_MODALITIES
 from nemo_retriever.common.params.utils import build_embed_option_kwargs
+from nemo_retriever.ingest.plan import IngestEmbedBatchOptions, IngestEmbedOptions
 
 
 def test_image_text_alias_is_rejected():
@@ -53,6 +56,102 @@ def test_image_modalities_constant():
     """IMAGE_MODALITIES contains only canonical image-bearing modalities."""
     assert IMAGE_MODALITIES == {"image", "text_image"}
     assert isinstance(IMAGE_MODALITIES, frozenset)
+
+
+def test_build_embed_option_kwargs_propagates_inference_batch_size():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_inference_batch_size=8,
+    )
+
+    assert kwargs["embed_inference_batch_size"] == 8
+
+
+def test_build_embed_option_kwargs_propagates_reshape_workers():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_reshape_workers=4,
+    )
+
+    assert kwargs["batch_tuning"].embed_reshape_workers == 4
+
+
+def test_embed_batch_options_preserve_existing_positional_arguments():
+    batch = IngestEmbedBatchOptions(2, 64, 0.5, 0.25)
+
+    assert batch.embed_workers == 2
+    assert batch.embed_batch_size == 64
+    assert batch.embed_cpus_per_actor == 0.5
+    assert batch.embed_gpus_per_actor == 0.25
+    assert batch.embed_reshape_workers is None
+
+
+def test_embed_options_preserve_existing_positional_batch_argument():
+    batch = IngestEmbedBatchOptions(embed_batch_size=64)
+    options = IngestEmbedOptions(None, None, None, None, None, None, None, None, None, batch)
+
+    assert options.batch is batch
+    assert options.embed_inference_batch_size is None
+
+
+def test_build_embed_option_kwargs_preserves_existing_positional_arguments():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "test/model",
+        "hf",
+        "test-key",
+        "nvidia",
+        "text_image",
+        "text",
+        "image",
+        "page",
+        2,
+        64,
+        0.5,
+        0.25,
+        "test-revision",
+    )
+
+    assert kwargs["embed_granularity"] == "page"
+    assert kwargs["embed_model_revision"] == "test-revision"
+    assert "embed_inference_batch_size" not in kwargs
+    tuning = kwargs["batch_tuning"]
+    assert tuning.embed_workers == 2
+    assert tuning.embed_batch_size == 64
+    assert tuning.embed_cpus_per_actor == 0.5
+    assert tuning.gpu_embed == 0.25
+    assert tuning.embed_reshape_workers is None
+
+
+@pytest.mark.parametrize("workers", [0, -1])
+@pytest.mark.parametrize("from_dict", [False, True])
+def test_embed_reshape_workers_rejects_nonpositive_counts(workers, from_dict):
+    with pytest.raises(ValidationError, match="embed_reshape_workers"):
+        if from_dict:
+            EmbedParams.model_validate({"batch_tuning": {"embed_reshape_workers": workers}})
+        else:
+            BatchTuningParams(embed_reshape_workers=workers)
+
+
+@pytest.mark.parametrize("workers", [None, 1, 4])
+def test_embed_reshape_workers_accepts_executor_default_or_positive_count(workers):
+    direct = BatchTuningParams(embed_reshape_workers=workers)
+    nested = EmbedParams.model_validate({"batch_tuning": {"embed_reshape_workers": workers}})
+
+    assert direct.embed_reshape_workers == workers
+    assert nested.batch_tuning.embed_reshape_workers == workers
+
+
+def test_build_embed_option_kwargs_propagates_repartition_opt_out():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_repartition=False,
+    )
+
+    assert kwargs["batch_tuning"].embed_repartition is False
 
 
 def test_build_embed_option_kwargs_defers_remote_model_provider_prefix():
@@ -103,9 +202,10 @@ def test_build_embed_option_kwargs_retains_prefix_when_model_is_omitted():
     }
 
 
-# ===================================================================
+# ============================================================
+
 # embed_granularity
-# ===================================================================
+# ============================================================
 
 
 class TestEmbedParamsGranularity:

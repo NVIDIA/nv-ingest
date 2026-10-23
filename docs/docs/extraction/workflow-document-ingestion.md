@@ -88,7 +88,7 @@ ingestor = (
     .embed()
 )
 
-result = ingestor.ingest()  # ``pandas.DataFrame`` (``batch`` and ``inprocess``)
+result = ingestor.ingest(return_results=True)  # Extracted rows as a pandas.DataFrame.
 ```
 
 Run the above with your working directory at the repository root (so `data/multimodal_test.pdf` resolves), or adjust `documents` to the absolute path of the test PDF.

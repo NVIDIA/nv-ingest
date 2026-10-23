@@ -275,13 +275,13 @@ def build_service_ingestor(request: ServiceIngestRequest) -> Any:
 def execute_service_ingest_request(
     request: ServiceIngestRequest,
     *,
-    return_results: bool = True,
+    return_results: bool | None = False,
 ) -> ServiceIngestExecutionResult:
     """Execute a service ingest request and return its structured result.
 
     ``return_results`` defaults to the user-facing service client behavior.
-    Callers that only need completion metadata may disable retained-result
-    downloads explicitly.
+    Result rows are downloaded only when explicitly requested. Completion
+    metadata and event row counts remain available without retained rows.
     """
 
     result = build_service_ingestor(request).ingest(return_results=return_results)

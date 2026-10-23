@@ -15,7 +15,7 @@ from nemo_retriever.operators.extract.caption.caption import CaptionActor
 from nemo_retriever.operators.extract.audio.asr_actor import ASRActor
 from nemo_retriever.operators.extract.audio.chunk_actor import MediaChunkActor
 from nemo_retriever.operators.dedup import dedup_images
-from nemo_retriever.graph import Graph, StoreOperator, UDFOperator, WebhookNotifyOperator
+from nemo_retriever.graph import Graph, Node, StoreOperator, UDFOperator, WebhookNotifyOperator
 from nemo_retriever.common.modality.content_transforms import (
     _CONTENT_COLUMNS,
     collapse_content_to_page_rows,
@@ -48,6 +48,8 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_STORE_WORKERS = 4
 DEFAULT_STORE_CPUS_PER_ACTOR = 0.1
+COLLAPSE_CONTENT_NODE = "CollapseContentToPageRows"
+EXPLODE_CONTENT_NODE = "ExplodeContentToRows"
 
 
 def _batch_tuning(params: Any) -> Any:
@@ -203,7 +205,8 @@ def batch_tuning_to_node_overrides(
         explicit_bs = getattr(embed_tuning, "embed_batch_size", None) if embed_tuning is not None else None
         embed_bs = _positive(explicit_bs) or (plan.embed_batch_size if plan else None)
         _set(_BatchEmbedActor.__name__, "batch_size", embed_bs)
-        if embed_bs:
+        embed_repartition = getattr(embed_tuning, "embed_repartition", True) if embed_tuning is not None else True
+        if embed_bs and embed_repartition:
             overrides.setdefault(_BatchEmbedActor.__name__, {})["target_num_rows_per_block"] = embed_bs
         explicit_embed_workers = getattr(embed_tuning, "embed_workers", None) if embed_tuning is not None else None
         embed_workers_fallback = plan.embed_initial_actors if plan else None
@@ -228,6 +231,9 @@ def batch_tuning_to_node_overrides(
             or 0
         )
         _set(_BatchEmbedActor.__name__, "concurrency", embed_concurrency or None)
+        reshape_workers = getattr(embed_tuning, "embed_reshape_workers", None) if embed_tuning is not None else None
+        _set(COLLAPSE_CONTENT_NODE, "concurrency", reshape_workers)
+        _set(EXPLODE_CONTENT_NODE, "concurrency", reshape_workers)
         embed_cpus = (
             _resolve(
                 getattr(embed_tuning, "embed_cpus_per_actor", None) if embed_tuning is not None else None,
@@ -299,7 +305,10 @@ def batch_tuning_to_node_overrides(
             getattr(extract_tuning, "page_elements_batch_size", None) if extract_tuning is not None else None
         ) or (plan.page_elements_batch_size if plan else None)
         _set(PageElementDetectionActor.__name__, "batch_size", pe_bs)
-        if pe_bs:
+        pe_repartition = (
+            getattr(extract_tuning, "page_elements_repartition", True) if extract_tuning is not None else True
+        )
+        if pe_bs and pe_repartition:
             overrides.setdefault(PageElementDetectionActor.__name__, {})["target_num_rows_per_block"] = pe_bs
         page_elements_concurrency = (
             _resolve(
@@ -331,7 +340,10 @@ def batch_tuning_to_node_overrides(
             getattr(extract_tuning, "table_structure_batch_size", None) if extract_tuning is not None else None
         ) or (plan.table_structure_batch_size if plan else None)
         _set(TableStructureActor.__name__, "batch_size", ts_bs)
-        if ts_bs:
+        ts_repartition = (
+            getattr(extract_tuning, "table_structure_repartition", True) if extract_tuning is not None else True
+        )
+        if ts_bs and ts_repartition:
             overrides.setdefault(TableStructureActor.__name__, {})["target_num_rows_per_block"] = ts_bs
         ts_concurrency = _resolve(
             getattr(extract_tuning, "table_structure_workers", None) if extract_tuning is not None else None,
@@ -389,6 +401,8 @@ def batch_tuning_to_node_overrides(
         )
 
         _set(PDFExtractionActor.__name__, "batch_size", pdf_bs)
+        if pdf_bs:
+            overrides.setdefault(PDFExtractionActor.__name__, {})["target_num_rows_per_block"] = pdf_bs
         _set(PDFExtractionActor.__name__, "concurrency", pdf_extract_tasks)
         _set(PDFExtractionActor.__name__, "num_cpus", pdf_extract_cpus if pdf_extract_cpus != 1.0 else None)
 
@@ -581,27 +595,34 @@ def _append_ordered_transform_stages(
             if reshape_content_before_embed:
                 content_columns = (_CONTENT_COLUMNS + ("images",)) if caption_params is not None else _CONTENT_COLUMNS
                 if embed_params.embed_granularity == "page":
-                    graph = graph >> UDFOperator(
-                        partial(
-                            collapse_content_to_page_rows,
-                            modality=embed_params.embed_modality,
-                            content_columns=content_columns,
+                    graph = graph >> Node(
+                        UDFOperator(
+                            partial(
+                                collapse_content_to_page_rows,
+                                modality=embed_params.embed_modality,
+                                content_columns=content_columns,
+                            ),
+                            name=COLLAPSE_CONTENT_NODE,
+                            preserve_pandas_output=True,
                         ),
-                        name="CollapseContentToPageRows",
-                        preserve_pandas_output=True,
+                        name=COLLAPSE_CONTENT_NODE,
                     )
                 else:
-                    graph = graph >> UDFOperator(
-                        partial(
-                            explode_content_to_rows,
-                            modality=embed_params.embed_modality,
-                            text_elements_modality=embed_params.text_elements_modality or embed_params.embed_modality,
-                            structured_elements_modality=embed_params.structured_elements_modality
-                            or embed_params.embed_modality,
-                            content_columns=content_columns,
+                    graph = graph >> Node(
+                        UDFOperator(
+                            partial(
+                                explode_content_to_rows,
+                                modality=embed_params.embed_modality,
+                                text_elements_modality=embed_params.text_elements_modality
+                                or embed_params.embed_modality,
+                                structured_elements_modality=embed_params.structured_elements_modality
+                                or embed_params.embed_modality,
+                                content_columns=content_columns,
+                            ),
+                            name=EXPLODE_CONTENT_NODE,
+                            preserve_pandas_output=True,
                         ),
-                        name="ExplodeContentToRows",
-                        preserve_pandas_output=True,
+                        name=EXPLODE_CONTENT_NODE,
                     )
             graph = graph >> _BatchEmbedActor(
                 params=embed_params,

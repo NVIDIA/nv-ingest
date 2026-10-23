@@ -452,7 +452,8 @@ def test_batch_local_and_url_inputs_share_one_extraction_executor(monkeypatch, t
             build_inputs.append(data)
             return FakeDataset()
 
-        def ingest(self, data):
+        def ingest(self, data, *, return_results):
+            assert return_results is True
             return pd.DataFrame({"done": [True]})
 
     def fake_preflight(executors, resources, *, reserved_cpus=0):

@@ -343,7 +343,14 @@ class IngestExecuteParams(_ParamsModel):
     show_progress: bool = False
     return_failures: bool = False
     return_traces: bool = False
-    return_results: bool = True
+    return_results: bool | None = Field(
+        default=None,
+        description=(
+            "Return full result rows when true. None selects the context default: "
+            "summary counts for eligible batch VDB uploads, metadata only for service ingestion, "
+            "and full rows for other graph pipelines."
+        ),
+    )
     result_schema: Literal["legacy", "compact"] = "legacy"
     return_embeddings: bool = False
     return_images: bool = False
@@ -493,6 +500,13 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_num_cpus: float = 2
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
+    page_elements_repartition: bool = Field(
+        default=True,
+        description=(
+            "Whether to derive the Page Elements block-size target. False skips the target without changing "
+            "batch sizes or worker counts."
+        ),
+    )
     detect_batch_size: int = 24
     ocr_inference_batch_size: Optional[int] = None
     page_elements_workers: Optional[int] = None
@@ -502,9 +516,28 @@ class BatchTuningParams(_ParamsModel):
     ocr_cpus_per_actor: float = 1
     table_structure_workers: Optional[int] = None
     table_structure_batch_size: Optional[int] = None
+    table_structure_repartition: bool = Field(
+        default=True,
+        description=(
+            "Whether to derive the Table Structure block-size target. False skips the target without changing "
+            "batch sizes or worker counts."
+        ),
+    )
     table_structure_cpus_per_actor: float = 1
     embed_workers: Optional[int] = None
+    embed_reshape_workers: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="Number of workers for content collapse/explode before embedding. None uses executor defaults.",
+    )
     embed_batch_size: int = 32
+    embed_repartition: bool = Field(
+        default=True,
+        description=(
+            "Whether to derive the embedding block-size target. False skips the target without changing "
+            "batch sizes or worker counts."
+        ),
+    )
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
     gpu_ocr: Optional[float] = None

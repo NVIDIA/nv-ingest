@@ -218,6 +218,15 @@ executor = RayDataExecutor(graph, batch_size=8)
 result_ds = executor.ingest(["/path/to/*.pdf"])
 ```
 
+`RayDataExecutor.ingest()` defaults `return_results` to `None`. When the graph
+has one streaming-capable VDB upload as its final stage, it releases consumed
+batches and returns a summary with `input_rows` and `submitted_records`.
+Other graphs return full result rows. Pass `return_results=True` when you need
+those rows. Explicit `False` requires the supported terminal VDB configuration
+and raises `ValueError` otherwise. The fluent `GraphIngestor` API also checks
+its error policy and `return_failures` setting when choosing a default. Refer to
+[ingest result defaults](../../../../docs/docs/extraction/nemo-retriever-api-reference.md#return-ingest-results).
+
 ## Notes About Graph Shape
 
 The base `Graph` type supports multiple roots and fan-out.

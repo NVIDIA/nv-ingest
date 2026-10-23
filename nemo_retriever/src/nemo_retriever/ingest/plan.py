@@ -114,6 +114,8 @@ class IngestExtractBatchOptions:
     nemotron_parse_workers: int | None = None
     nemotron_parse_batch_size: int | None = None
     nemotron_parse_gpus_per_actor: float | None = None
+    page_elements_repartition: bool | None = None
+    table_structure_repartition: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -187,6 +189,8 @@ class IngestEmbedBatchOptions:
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
+    embed_reshape_workers: int | None = None
+    embed_repartition: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -201,6 +205,7 @@ class IngestEmbedOptions:
     structured_elements_modality: str | None = None
     embed_granularity: str | None = None
     batch: IngestEmbedBatchOptions = field(default_factory=IngestEmbedBatchOptions)
+    embed_inference_batch_size: int | None = None
 
 
 @dataclass(frozen=True)
@@ -534,6 +539,7 @@ def _build_extract_batch_tuning(batch: IngestExtractBatchOptions) -> BatchTuning
             "pdf_extract_num_cpus": batch.pdf_extract_cpus_per_task,
             "page_elements_workers": batch.page_elements_workers,
             "page_elements_batch_size": batch.page_elements_batch_size,
+            "page_elements_repartition": batch.page_elements_repartition,
             "page_elements_cpus_per_actor": batch.page_elements_cpus_per_actor,
             "gpu_page_elements": batch.page_elements_gpus_per_actor,
             "ocr_workers": batch.ocr_workers,
@@ -542,6 +548,7 @@ def _build_extract_batch_tuning(batch: IngestExtractBatchOptions) -> BatchTuning
             "gpu_ocr": batch.ocr_gpus_per_actor,
             "table_structure_workers": batch.table_structure_workers,
             "table_structure_batch_size": batch.table_structure_batch_size,
+            "table_structure_repartition": batch.table_structure_repartition,
             "table_structure_cpus_per_actor": batch.table_structure_cpus_per_actor,
             "gpu_table_structure": batch.table_structure_gpus_per_actor,
             "nemotron_parse_workers": batch.nemotron_parse_workers,
@@ -706,8 +713,11 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         text_elements_modality=embed.text_elements_modality,
         structured_elements_modality=embed.structured_elements_modality,
         embed_granularity=embed.embed_granularity,
+        embed_inference_batch_size=embed.embed_inference_batch_size,
         embed_workers=embed.batch.embed_workers,
+        embed_reshape_workers=embed.batch.embed_reshape_workers,
         embed_batch_size=embed.batch.embed_batch_size,
+        embed_repartition=embed.batch.embed_repartition,
         embed_cpus_per_actor=embed.batch.embed_cpus_per_actor,
         embed_gpus_per_actor=embed.batch.embed_gpus_per_actor,
     )

@@ -429,12 +429,34 @@ service = create_ingestor(run_mode="service", base_url="http://localhost:7670")
 
 `GraphIngestor` methods include `extract_html()`, `extract_audio()`, `extract_video()`, `get_error_rows()`, and `get_dataset()`. `get_error_rows()` filters rows that contain stage error payloads from a pandas DataFrame or Ray Dataset. If you omit `dataset`, it uses the dataset retained from the last `ingest()` call. `get_dataset()` returns that retained dataset.
 
-In batch mode, `.ingest(return_results=False)` returns a one-row summary
-instead of retaining full result records. You can also pass
-`IngestExecuteParams(return_results=False)` through `params`. This requires a
-final streaming VDB upload stage and the default raise error policy. Refer to
-[Return a batch ingest summary](vdbs.md#batch-ingest-summary) for the counts,
-requirements, and an example. `get_dataset()` then returns the summary.
+#### Choose whether to return result rows { #return-ingest-results }
+
+`IngestExecuteParams.return_results` defaults to `None`. Omitting the setting
+or passing `None` selects the behavior for your pipeline, as shown below.
+You can pass the setting directly to `.ingest()` or through `params`.
+
+| Pipeline | Default result |
+| --- | --- |
+| Batch graph with a final streaming-capable VDB upload, `error_policy="raise"`, and `return_failures=False`. | A one-row summary DataFrame with `input_rows` and `submitted_records`. |
+| Other graph configurations, including in-process and extraction-only pipelines. | Full result rows in a DataFrame. |
+| Service `.ingest()` and `.ingest_async()`. | Completion metadata and failures in `ServiceIngestResult`, with `.dataframe=None`. |
+
+Pass `return_results=True` when your application reads extracted rows. In
+service mode, this also fetches completed result payloads into
+`ServiceIngestResult.dataframe`. Requesting embeddings or a result schema
+does not enable result fetching by itself.
+
+Explicit `GraphIngestor.ingest(return_results=False)` requires the batch
+summary configuration above. Other graph configurations raise
+`ValueError`. In batch summary mode, `get_dataset()` returns the summary.
+Refer to [Return a batch ingest summary](vdbs.md#batch-ingest-summary) for
+supported backends and count definitions.
+
+Direct `RayDataExecutor.ingest()` also defaults `return_results` to `None`.
+It returns a summary when the graph has one streaming-capable VDB upload as
+its final stage, and full records for other graphs. Pass `return_results=True`
+to retain full records. Explicit `False` requires that terminal streaming VDB
+configuration and raises `ValueError` otherwise.
 
 ::: nemo_retriever.ingestor.graph_ingestor.GraphIngestor
     options:
@@ -456,10 +478,18 @@ requirements, and an example. `get_dataset()` then returns the summary.
 
 Service-only methods include `split()`, `pdf_split_config()`, `save_to_disk()`, `ingest_stream()`, `aingest_stream()`, and `cancel()`. `cancel()` is part of the public class. It currently raises `NotImplementedError` because the service does not expose a cancel endpoint.
 
+By default, `.ingest()` and `.ingest_async()` skip result downloads. Job IDs,
+document IDs, completion events, and failures remain available on the returned
+`ServiceIngestResult`. Pass `return_results=True` to populate `.dataframe`.
+The future returned by `.ingest_async()` produces the same result contract.
+
+Calling `.save_to_disk(...)` still fetches the payloads needed to write files.
+Without `return_results=True`, those payloads are not retained in `.dataframe`.
+
 #### Choose a service result schema { #service-result-schema }
 
-`ServiceIngestor.ingest()` returns result rows in the `legacy` schema by
-default. You can pass `result_schema="compact"` to use the compact schema.
+When you request result rows, `ServiceIngestor.ingest()` uses the `legacy`
+schema by default. You can pass `result_schema="compact"` to use the compact schema.
 The schemas return text and embeddings as follows.
 
 | Schema | Text | Embeddings |
@@ -488,7 +518,7 @@ result = (
     create_ingestor(run_mode="service", base_url="http://localhost:7670")
     .texts(["Text to embed and return."])
     .embed()
-    .ingest(result_schema="compact", return_embeddings=True)
+    .ingest(return_results=True, result_schema="compact", return_embeddings=True)
 )
 
 for row in result.dataframe.to_dict(orient="records"):

@@ -67,6 +67,7 @@ chunks = (
     .embed(
         batch_tuning=BatchTuningParams(
             embed_workers=2,
+            embed_reshape_workers=4,
         )
     )
     .ingest()
@@ -76,6 +77,79 @@ chunks = (
 Related batch-size, CPU, and GPU-per-actor flags are documented in the [CLI ingest options](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/docs/cli/README.md).
 
 Use the Ray dashboard to verify the available-resource snapshot and the planned worker allocation when you tune throughput.
+
+### Tune embedding preparation and remote requests
+
+Embedding preparation, actor batches, and HTTP requests have separate concurrency and batch-size controls. Pass the following settings through `.embed(...)` in the Python API.
+
+| Setting | Behavior |
+| --- | --- |
+| `batch_tuning.embed_reshape_workers` | Sets a positive concurrency limit for the CPU stages that collapse content into page rows or expand content into element rows before embedding. |
+| `batch_tuning.embed_workers` | Sets the number of Ray embedding actors. |
+| `batch_tuning.embed_batch_size` | Sets the number of rows in each Ray embedding actor batch. |
+| `inference_batch_size` | Limits the number of inputs in each embedding inference batch. |
+| `embed_inference_batch_size` | Adds a limit on the number of image-bearing inputs in each remote embedding HTTP request. |
+| `nim_http_max_concurrent` | Caps concurrent remote embedding HTTP requests within each actor batch. |
+
+Set `embed_reshape_workers` when CPU content preparation limits throughput. This setting applies to the named `CollapseContentToPageRows` and `ExplodeContentToRows` graph stages when present.
+
+For remote image-bearing inputs, the request size is at most `min(inference_batch_size, embed_inference_batch_size)`. For example, `.embed(inference_batch_size=32, embed_inference_batch_size=8)` sends at most 8 image-bearing inputs per request. Select a multimodal model that your endpoint supports, as described in [multimodal embedding](embedding.md).
+
+Benchmark these settings with representative documents. Monitor CPU capacity, endpoint GPU memory, HTTP errors, and output counts as you increase concurrency or batch sizes.
+
+### Control row repartitioning
+
+!!! note "Unreleased controls"
+
+    These repartition controls are under development. They are not available
+    in current NVIDIA `main` or a released package.
+
+In batch mode, the following `BatchTuningParams` controls enable size-based Ray
+repartitioning before each stage. Each control defaults to `True`.
+
+| Stage | Control | Row-batch setting |
+| --- | --- | --- |
+| Page Elements | `page_elements_repartition` | `page_elements_batch_size` |
+| Table Structure | `table_structure_repartition` | `table_structure_batch_size` |
+| Embedding | `embed_repartition` | `embed_batch_size` |
+
+When enabled and a stage has a positive batch size, the library uses that size
+as `target_num_rows_per_block` before the stage runs. Set a control to `False`
+to omit this derived block-size target. The stage still uses its configured
+batch size and worker settings. Required grouping in other graph stages still
+applies.
+
+The following example disables these three block-size targets. Replace
+`/path/to/your/document.pdf` with a PDF file that you supply.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import BatchTuningParams
+
+chunks = (
+    create_ingestor(run_mode="batch")
+    .files(["/path/to/your/document.pdf"])
+    .extract(
+        batch_tuning=BatchTuningParams(
+            page_elements_repartition=False,
+            table_structure_repartition=False,
+        )
+    )
+    .embed(
+        batch_tuning=BatchTuningParams(
+            embed_repartition=False,
+        )
+    )
+    .ingest()
+)
+```
+
+For typed ingest plans, set the extraction controls in
+`IngestExtractBatchOptions` and the embedding control in
+`IngestEmbedBatchOptions`. These optional fields default to `None`, which
+preserves the `True` defaults when the shared ingest plan resolves them.
+Compare throughput, memory use, errors, and extracted outputs against a
+representative baseline after changing these controls.
 
 ## Profile batch ingestion with Nsight Systems
 

@@ -33,8 +33,13 @@ from io import BytesIO
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Self, Sequence, Tuple, Union
 
 from nemo_retriever.graph import InprocessExecutor, RayDataExecutor
-from nemo_retriever.graph.executor import arrow_table_to_pandas, call_pandas_function_on_arrow
+from nemo_retriever.graph.executor import (
+    arrow_table_to_pandas,
+    call_pandas_function_on_arrow,
+    resolve_batch_return_results,
+)
 from nemo_retriever.ingestor.branch_extraction import ExtractionBranchExecutor, merge_node_overrides
+from nemo_retriever.ingestor.execute_flags import resolve_return_results_option
 from nemo_retriever.graph.ingestor_runtime import (
     batch_tuning_to_node_overrides,
     build_graph,
@@ -900,13 +905,14 @@ class GraphIngestor(ingestor):
             ``input_rows`` and ``submitted_records`` instead of retaining the
             extracted records. Requires a terminal streaming VDB upload,
             ``error_policy='raise'``, and ``return_failures=False``. Submitted
-            records are counted before any backend filtering.
+            records are counted before any backend filtering. Omitted values
+            and ``None`` select this summary for eligible batch graphs and
+            full records otherwise. Set ``True`` to retain extracted rows.
 
         Returns
         -------
         pandas.DataFrame
-            Extracted rows for ``run_mode='batch'`` or
-            ``run_mode='inprocess'``.
+            Extracted rows, or summary counts for an eligible batch VDB upload.
         tuple[pandas.DataFrame, list[tuple[str, str]]]
             ``(result, failures)`` when ``return_failures=True``. Failures use
             service-style ``(source, error)`` tuples.
@@ -923,8 +929,16 @@ class GraphIngestor(ingestor):
             ``return_failures`` is false.
         """
         return_failures = self._resolve_execute_flag(params, kwargs, "return_failures", default=False)
-        return_results = self._resolve_execute_flag(params, kwargs, "return_results", default=True)
-        if not return_results:
+        return_results = resolve_return_results_option(params, kwargs)
+        summary_eligible = (
+            self._run_mode == "batch"
+            and self._vdb_upload_params is not None
+            and self._error_policy == "raise"
+            and not return_failures
+        )
+        if return_results is None and not summary_eligible:
+            return_results = True
+        if return_results is False:
             if self._run_mode != "batch" or self._vdb_upload_params is None:
                 raise ValueError("return_results=False requires run_mode='batch' with a VDB upload")
             if return_failures or self._error_policy == "collect":
@@ -936,14 +950,14 @@ class GraphIngestor(ingestor):
         finally:
             self._cleanup_url_inputs()
 
-    def _ingest_prepared(self, *, return_failures: bool, return_results: bool) -> Any:
+    def _ingest_prepared(self, *, return_failures: bool, return_results: bool | None) -> Any:
         """Execute ingestion after URL inputs have been fetched and classified."""
         if (
             return_results
             and not self._documents
             and not self._url_documents()
             and not self._all_buffers()
-            and is_blank_inline_corpus(self._inline_texts)
+            and is_blank_inline_corpus(self._inline_texts or [])
         ):
             result = empty_text_chunks_df()
             if self._run_mode == "batch":
@@ -1004,7 +1018,7 @@ class GraphIngestor(ingestor):
         *,
         dedup_params: DedupParams | None,
         post_extract_order: tuple[str, ...],
-        return_results: bool = True,
+        return_results: bool | None = None,
     ) -> Any:
         if self._run_mode == "batch":
             return self._execute_single_graph_batch(
@@ -1025,7 +1039,7 @@ class GraphIngestor(ingestor):
         *,
         dedup_params: DedupParams | None,
         post_extract_order: tuple[str, ...],
-        return_results: bool = True,
+        return_results: bool | None = None,
     ) -> Any:
         graph = build_graph(
             extraction_mode=effective_extraction.extraction_mode,
@@ -1046,17 +1060,18 @@ class GraphIngestor(ingestor):
             webhook_params=self._webhook_params,
             stage_order=post_extract_order,
         )
+        return_results = resolve_batch_return_results(graph, return_results)
         if (
-            not return_results
-            and not self._documents
+            not self._documents
             and not self._url_documents()
             and not self._all_buffers()
-            and is_blank_inline_corpus(self._inline_texts)
+            and is_blank_inline_corpus(self._inline_texts or [])
         ):
             import pandas as pd
 
-            RayDataExecutor._stream_ingest_index(RayDataExecutor._linearize(graph), require_terminal=True)
-            result = pd.DataFrame([{"input_rows": 0, "submitted_records": 0}])
+            result = (
+                empty_text_chunks_df() if return_results else pd.DataFrame([{"input_rows": 0, "submitted_records": 0}])
+            )
             self._rd_dataset = result
             return result
 
@@ -1091,7 +1106,7 @@ class GraphIngestor(ingestor):
         )
         executor_input = self._inline_text_dataset(ray.data) if self._inline_texts else self._documents
         if return_results:
-            result = executor.ingest(executor_input)
+            result = executor.ingest(executor_input, return_results=True)
         else:
             result = executor._ingest(
                 executor_input,
@@ -1144,7 +1159,7 @@ class GraphIngestor(ingestor):
         *,
         dedup_params: DedupParams | None,
         post_extract_order: tuple[str, ...],
-        return_results: bool = True,
+        return_results: bool | None = None,
     ) -> Any:
         result = ExtractionBranchExecutor(
             run_mode=self._run_mode,
@@ -1179,7 +1194,7 @@ class GraphIngestor(ingestor):
             allow_no_gpu=self._allow_no_gpu,
             ensure_batch_runtime=self._ensure_batch_runtime,
             return_results=return_results,
-            validate_batch=self._raise_for_stage_errors if not return_results else None,
+            validate_batch=self._raise_for_stage_errors,
         ).execute()
         self._rd_dataset = result if self._run_mode == "batch" else None
         return result

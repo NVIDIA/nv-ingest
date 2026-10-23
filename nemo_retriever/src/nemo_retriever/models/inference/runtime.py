@@ -41,6 +41,7 @@ def _embed_group(
     api_key: Optional[str],
     text_column: str,
     inference_batch_size: int,
+    remote_image_batch_size: int = 4,
     output_column: str,
     resolved_model_name: str,
     embed_model_provider_prefix: Optional[str] = None,
@@ -69,12 +70,11 @@ def _embed_group(
                     return vectors.detach().to("cpu").float().numpy()
                 return vectors
 
-    default_remote_image_batch_size = 4
     default_local_image_batch_size = 8
     effective_batch_size = inference_batch_size
     if group_modality in IMAGE_MODALITIES:
         if endpoint is not None:
-            effective_batch_size = min(inference_batch_size, default_remote_image_batch_size)
+            effective_batch_size = min(inference_batch_size, remote_image_batch_size)
         else:
             effective_batch_size = min(inference_batch_size, default_local_image_batch_size)
 
@@ -120,6 +120,7 @@ def embed_text_main_text_embed(
     api_key: Optional[str] = None,
     text_column: str = "text",
     inference_batch_size: int = 16,
+    embed_inference_batch_size: int = 4,
     output_column: str = "embedding",
     embed_modality: str = "text",
     embed_model_provider_prefix: Optional[str] = None,
@@ -134,6 +135,8 @@ def embed_text_main_text_embed(
         raise NotImplementedError("embed_text_main_text_embed currently only supports pandas.DataFrame input.")
     if inference_batch_size <= 0:
         raise ValueError("inference_batch_size must be > 0")
+    if embed_inference_batch_size <= 0:
+        raise ValueError("embed_inference_batch_size must be > 0")
 
     if request_timeout_s is None:
         request_timeout_s = float(_extras.get("request_timeout_s", 600.0))
@@ -200,6 +203,7 @@ def embed_text_main_text_embed(
                 api_key=api_key,
                 text_column=text_column,
                 inference_batch_size=inference_batch_size,
+                remote_image_batch_size=embed_inference_batch_size,
                 output_column=output_column,
                 resolved_model_name=resolved_model_name,
                 embed_model_provider_prefix=embed_model_provider_prefix,

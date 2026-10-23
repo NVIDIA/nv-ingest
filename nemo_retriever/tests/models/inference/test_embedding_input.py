@@ -21,8 +21,19 @@ from nemo_retriever.models.inference.embedding_input import (
     prepare_embedding_inputs,
     resolve_embedding_input_policy,
 )
+from nemo_retriever.models.inference.main_text_embed import _close_embed_http_resources
 from nemo_retriever.models.inference.runtime import embed_text_main_text_embed
 from nemo_retriever.models.local.llama_nemotron_embed_1b_v2_embedder import LlamaNemotronEmbed1BV2Embedder
+
+
+@pytest.fixture(autouse=True)
+def _isolate_embed_http_resources():
+    # Each test owns its MockTransport; keep pooled clients within that test.
+    _close_embed_http_resources()
+    try:
+        yield
+    finally:
+        _close_embed_http_resources()
 
 
 class _LengthEmbedder:
