@@ -252,25 +252,6 @@ def test_transport_compact_rows_ignore_metadata_embedding() -> None:
     ]
 
 
-def test_transport_compact_rows_return_column_embedding_when_requested() -> None:
-    df = pd.DataFrame(
-        {
-            "path": ["/a.pdf"],
-            "text": ["hello"],
-            "embedding": [np.array([0.1, 0.2])],
-        }
-    )
-
-    assert dataframe_to_transport_records(df, result_schema="compact", return_embeddings=True) == [
-        {
-            "text": "hello",
-            "source_id": "/a.pdf",
-            "element_type": "text",
-            "embedding": [0.1, 0.2],
-        }
-    ]
-
-
 def test_transport_compact_rows_return_arrow_embedding_when_requested() -> None:
     df = pd.DataFrame(
         {

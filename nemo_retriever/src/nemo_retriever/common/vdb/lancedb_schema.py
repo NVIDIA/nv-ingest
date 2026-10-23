@@ -170,43 +170,6 @@ def build_lancedb_row(
     return row_out
 
 
-def build_lancedb_rows(
-    df: Any,
-    *,
-    embedding_column: str = "embedding",
-    text_column: str = "text",
-    include_text: bool = True,
-) -> List[Dict[str, Any]]:
-    """Build LanceDB rows from a pandas DataFrame."""
-    import pandas as pd
-
-    # Extract _page_number explicitly since itertuples() mangles
-    # underscore-prefixed column names into positional _0, _1, etc.
-    has_provenance = isinstance(df, pd.DataFrame) and "_page_number" in df.columns
-    provenance_pages = df["_page_number"].tolist() if has_provenance else None
-    # Same for the embedding column: names like "my-vector" are not namedtuple fields.
-    embeddings = [None] * len(df)
-    if isinstance(df, pd.DataFrame) and embedding_column in df.columns:
-        embedding_values = df[embedding_column]
-        if isinstance(embedding_values, pd.DataFrame):
-            embedding_values = embedding_values.iloc[:, 0]
-        embeddings = embedding_values.tolist()
-
-    rows: List[Dict[str, Any]] = []
-    for i, row in enumerate(df.itertuples(index=False)):
-        pp = int(provenance_pages[i]) if provenance_pages is not None else None
-        row_out = build_lancedb_row(
-            row,
-            embedding=embeddings[i],
-            text_column=text_column,
-            include_text=include_text,
-            provenance_page=pp,
-        )
-        if row_out is not None:
-            rows.append(row_out)
-    return rows
-
-
 def lancedb_schema(vector_dim: int = 2048, *, collection_managed: bool = False) -> Any:
     """Return a PyArrow schema for the standard LanceDB table layout."""
     import pyarrow as pa  # type: ignore

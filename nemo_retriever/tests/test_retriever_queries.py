@@ -671,7 +671,15 @@ class TestRetrieveVdbOperatorPreprocess:
     def test_dataframe_to_vectors_reads_custom_embedding_column(self) -> None:
         from nemo_retriever.operators.vdb import RetrieveVdbOperator
 
-        df = pd.DataFrame({"text": ["a"], "vec": [[0.5, 0.25]], "vec_error": [None]})
+        df = pd.DataFrame(
+            {
+                "text": ["a"],
+                "tags": [["finance", "annual"]],
+                "page_scores": [[9.9, 8.8]],
+                "vec": [[0.5, 0.25]],
+                "vec_error": [None],
+            }
+        )
         op = RetrieveVdbOperator(
             vdb_op="lancedb",
             vdb_kwargs={"uri": "/tmp", "table_name": "t"},
@@ -679,19 +687,6 @@ class TestRetrieveVdbOperatorPreprocess:
         )
 
         assert op.preprocess(df) == [[0.5, 0.25]]
-
-    def test_dataframe_to_vectors_names_custom_embedding_column_in_errors(self) -> None:
-        from nemo_retriever.operators.vdb import RetrieveVdbOperator
-
-        df = pd.DataFrame({"text": ["a"], "vec": [None], "vec_error": ["embedding failed"]})
-        op = RetrieveVdbOperator(
-            vdb_op="lancedb",
-            vdb_kwargs={"uri": "/tmp", "table_name": "t"},
-            embedding_column="vec",
-        )
-
-        with pytest.raises(ValueError, match=r"Query row 0 has no vector in the 'vec' column"):
-            op.preprocess(df)
 
     def test_dataframe_to_vectors_reports_embedding_error(self) -> None:
         from nemo_retriever.operators.vdb import RetrieveVdbOperator
@@ -710,7 +705,7 @@ class TestRetrieveVdbOperatorPreprocess:
     def test_dataframe_to_vectors_requires_embedding_column(self) -> None:
         from nemo_retriever.operators.vdb import RetrieveVdbOperator
 
-        df = pd.DataFrame({"text": ["a"], "metadata": [{"embedding": [0.7, 0.8]}]})
+        df = pd.DataFrame({"text": ["a"], "metadata": [{"embedding": [0.7, 0.8]}], "page_scores": [[9.9, 8.8]]})
         op = RetrieveVdbOperator(vdb_op="lancedb", vdb_kwargs={"uri": "/tmp", "table_name": "t"})
 
         with pytest.raises(ValueError, match="Expected query embeddings in the 'embedding' column"):

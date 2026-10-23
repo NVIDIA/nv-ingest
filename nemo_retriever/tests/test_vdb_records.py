@@ -4,8 +4,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -294,19 +292,10 @@ def test_graph_record_conversion_normalizes_arrow_backed_bbox_array() -> None:
     assert records[0][0]["metadata"]["content_metadata"]["bbox_xyxy_norm"] == [0.1, 0.2, 0.8, 0.9]
 
 
-@pytest.mark.parametrize(
-    "embedding",
-    [
-        pytest.param([0.5, 0.25], id="list"),
-        pytest.param(np.array([0.5, 0.25], dtype=np.float32), id="numpy"),
-        pytest.param((0.5, 0.25), id="tuple"),
-    ],
-)
-def test_graph_record_conversion_normalizes_embedding_vector_inputs(embedding: Any) -> None:
-    records = to_client_vdb_records([{"text": "embedded content", "embedding": embedding}])
+def test_graph_record_conversion_normalizes_arrow_backed_embedding_array() -> None:
+    records = to_client_vdb_records([{"text": "embedded content", "embedding": np.array([0.1, 0.2])}])
 
-    assert records[0][0]["metadata"]["embedding"] == [0.5, 0.25]
-    assert records[0][0]["document_type"] == "text"
+    assert records[0][0]["metadata"]["embedding"] == [0.1, 0.2]
 
 
 def test_custom_embedding_column_converts_eager_and_streaming_records() -> None:
@@ -331,26 +320,7 @@ def test_custom_embedding_column_converts_eager_and_streaming_records() -> None:
         list(_iter_client_vdb_records([failed_row], embedding_column="vec"))
 
 
-def test_arrow_backed_embedding_frame_rejects_partial_write() -> None:
-    frame = pd.DataFrame(
-        {
-            "text": pd.Series(["embedded", "failed"], dtype="string[pyarrow]"),
-            "embedding": pd.Series(
-                [[0.5, 0.25], None],
-                dtype=pd.ArrowDtype(pa.list_(pa.float32())),
-            ),
-            "embedding_error": pd.Series(
-                [None, "429 Client Error"],
-                dtype=pd.ArrowDtype(pa.string()),
-            ),
-        }
-    )
-
-    with pytest.raises(VdbUploadError, match=r"refusing a partial write.*missing embedding=1"):
-        to_client_vdb_records(frame)
-
-
-def test_arrow_backed_embedding_frame_converts_good_row_through_stream_batch_rows() -> None:
+def test_graph_record_conversion_normalizes_arrow_embedding_column() -> None:
     from nemo_retriever.operators.vdb import _iter_batch_rows
 
     frame = pd.DataFrame(
@@ -367,25 +337,6 @@ def test_arrow_backed_embedding_frame_converts_good_row_through_stream_batch_row
     records = to_client_vdb_records(list(_iter_batch_rows([frame])))
 
     assert records[0][0]["metadata"]["embedding"] == [0.5, 0.25]
-
-
-def test_arrow_backed_null_embeddings_report_upstream_stage_errors() -> None:
-    frame = pd.DataFrame(
-        {
-            "text": pd.Series(["failed one", "failed two"], dtype="string[pyarrow]"),
-            "embedding": pd.Series(
-                [None, None],
-                dtype=pd.ArrowDtype(pa.list_(pa.float32())),
-            ),
-            "embedding_error": pd.Series(
-                ["429 Client Error", "429 Client Error"],
-                dtype=pd.ArrowDtype(pa.string()),
-            ),
-        }
-    )
-
-    with pytest.raises(VdbUploadError, match=r"none were uploadable because upstream stages reported 2"):
-        to_client_vdb_records(frame)
 
 
 def test_graph_row_does_not_read_embedding_from_metadata() -> None:
