@@ -182,6 +182,8 @@ results = ingestor.ingest()
 
 For a remote endpoint, explicitly select a multimodal model that the endpoint supports. The default Nemotron 3 embedding NIM is text-only.
 
+For CPU preparation concurrency and remote image request batch sizes, refer to [Tune embedding preparation and remote requests](performance_guide.md#tune-embedding-preparation-and-remote-requests).
+
 ## Example with Embedding Entire PDF Pages as Images { #example-with-embedding-entire-pdf-pages-as-images }
 
 For documents where the entire page layout is important (such as infographics, complex diagrams, or forms), 

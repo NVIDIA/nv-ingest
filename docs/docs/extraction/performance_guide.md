@@ -67,6 +67,7 @@ chunks = (
     .embed(
         batch_tuning=BatchTuningParams(
             embed_workers=2,
+            embed_reshape_workers=4,
         )
     )
     .ingest()
@@ -76,6 +77,25 @@ chunks = (
 Related batch-size, CPU, and GPU-per-actor flags are documented in the [CLI ingest options](https://github.com/NVIDIA/NeMo-Retriever/blob/26.08.1/nemo_retriever/docs/cli/README.md).
 
 Use the Ray dashboard to verify the available-resource snapshot and the planned worker allocation when you tune throughput.
+
+### Tune embedding preparation and remote requests
+
+Embedding preparation, actor batches, and HTTP requests have separate concurrency and batch-size controls. Pass the following settings through `.embed(...)` in the Python API.
+
+| Setting | Behavior |
+| --- | --- |
+| `batch_tuning.embed_reshape_workers` | Sets a positive concurrency limit for the CPU stages that collapse content into page rows or expand content into element rows before embedding. |
+| `batch_tuning.embed_workers` | Sets the number of Ray embedding actors. |
+| `batch_tuning.embed_batch_size` | Sets the number of rows in each Ray embedding actor batch. |
+| `inference_batch_size` | Limits the number of inputs in each embedding inference batch. |
+| `embed_inference_batch_size` | Adds a limit on the number of image-bearing inputs in each remote embedding HTTP request. |
+| `nim_http_max_concurrent` | Caps concurrent remote embedding HTTP requests within each actor batch. |
+
+Set `embed_reshape_workers` when CPU content preparation limits throughput. This setting applies to the named `CollapseContentToPageRows` and `ExplodeContentToRows` graph stages when present.
+
+For remote image-bearing inputs, the request size is at most `min(inference_batch_size, embed_inference_batch_size)`. For example, `.embed(inference_batch_size=32, embed_inference_batch_size=8)` sends at most 8 image-bearing inputs per request. Select a multimodal model that your endpoint supports, as described in [multimodal embedding](embedding.md).
+
+Benchmark these settings with representative documents. Monitor CPU capacity, endpoint GPU memory, HTTP errors, and output counts as you increase concurrency or batch sizes.
 
 ## Profile batch ingestion with Nsight Systems
 

@@ -505,7 +505,11 @@ class BatchTuningParams(_ParamsModel):
     table_structure_batch_size: Optional[int] = None
     table_structure_cpus_per_actor: float = 1
     embed_workers: Optional[int] = None
-    embed_reshape_workers: Optional[int] = None
+    embed_reshape_workers: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="Number of workers for content collapse/explode before embedding. None uses executor defaults.",
+    )
     embed_batch_size: int = 32
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None

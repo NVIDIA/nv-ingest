@@ -294,7 +294,7 @@ def _get_embed_http_client() -> Any:
             if _embed_http_client is None:
                 try:
                     import httpx  # type: ignore
-                except Exception as e:  # pragma: no cover
+                except ImportError as e:  # pragma: no cover
                     raise RuntimeError("Remote embedding requested but `httpx` is not installed.") from e
                 _embed_http_client = httpx.Client()
     return _embed_http_client
@@ -380,7 +380,7 @@ def _http_embed_openai_compat(
     """
     try:
         import httpx  # type: ignore
-    except Exception as e:  # pragma: no cover
+    except ImportError as e:  # pragma: no cover
         raise RuntimeError("Remote embedding requested but `httpx` is not installed.") from e
 
     url = _normalize_embeddings_endpoint(_pick_embed_endpoint(endpoint_url))

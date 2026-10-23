@@ -455,20 +455,35 @@ def test_batch_tuning_to_node_overrides_scales_local_caption_on_multi_gpu() -> N
     assert overrides["_BatchEmbedActor"]["num_gpus"] == 0.5
 
 
-def test_batch_tuning_to_node_overrides_parallelizes_only_named_embed_reshape_nodes() -> None:
+@pytest.mark.parametrize(
+    ("granularity", "reshape_node"),
+    [("page", "CollapseContentToPageRows"), ("element", "ExplodeContentToRows")],
+)
+def test_batch_tuning_to_node_overrides_parallelizes_only_named_embed_reshape_nodes(granularity, reshape_node) -> None:
     embed_params = EmbedParams(
-        embed_granularity="page",
+        embed_granularity=granularity,
         batch_tuning=BatchTuningParams(embed_workers=12, embed_reshape_workers=4),
     )
 
     overrides = batch_tuning_to_node_overrides(None, embed_params)
-    graph = build_post_extract_graph(embed_params=embed_params, stage_order=("embed",))
-    names = [node.name for node in _linear_nodes(graph)]
+    graph = build_post_extract_graph(
+        embed_params=embed_params, dedup_params=DedupParams(), stage_order=("dedup", "embed")
+    )
+    nodes = _linear_nodes(graph)
+    dedup_node = next(node for node in nodes if getattr(node.operator, "name", None) == "DedupImages")
 
     assert overrides["CollapseContentToPageRows"]["concurrency"] == 4
     assert overrides["ExplodeContentToRows"]["concurrency"] == 4
-    assert "CollapseContentToPageRows" in names
-    assert "UDFOperator" not in names
+    assert reshape_node in [node.name for node in nodes]
+    assert dedup_node.name not in overrides
+    assert "UDFOperator" not in overrides
+
+
+def test_batch_tuning_leaves_embed_reshape_concurrency_unset_by_default() -> None:
+    overrides = batch_tuning_to_node_overrides(None, EmbedParams())
+
+    assert "CollapseContentToPageRows" not in overrides
+    assert "ExplodeContentToRows" not in overrides
 
 
 def test_batch_preflight_reduces_default_pools_on_constrained_cluster() -> None:

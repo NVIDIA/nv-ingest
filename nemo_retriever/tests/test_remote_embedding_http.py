@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import builtins
 import json
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ from nemo_retriever.models.inference.main_text_embed import (
     TextEmbeddingConfig,
     _async_request_handler,
     _close_embed_http_resources,
+    _get_embed_http_client,
     _http_embed_openai_compat,
     _http_retry_delay_s,
     create_text_embeddings_for_df,
@@ -131,6 +133,28 @@ def test_async_request_handler_reuses_http_client_and_executor():
 
 def test_retry_delay_honors_numeric_retry_after():
     assert _http_retry_delay_s(0, retry_after="7") == 7.0
+
+
+@pytest.mark.parametrize("error_type", [ImportError, RuntimeError])
+def test_http_client_import_preserves_unexpected_failures(monkeypatch, error_type):
+    original_import = builtins.__import__
+    failure = error_type("httpx import failed")
+
+    def import_httpx(name, *args, **kwargs):
+        if name == "httpx":
+            raise failure
+        return original_import(name, *args, **kwargs)
+
+    _close_embed_http_resources()
+    monkeypatch.setattr(builtins, "__import__", import_httpx)
+    with pytest.raises(RuntimeError) as caught:
+        _get_embed_http_client()
+
+    if error_type is ImportError:
+        assert caught.value.__cause__ is failure
+        assert "not installed" in str(caught.value)
+    else:
+        assert caught.value is failure
 
 
 def test_text_dataframe_routes_explicit_text_modalities():

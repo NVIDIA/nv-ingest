@@ -245,7 +245,7 @@ explicitly. Do not use `--append` to mix embeddings from the two models. You can
 continue to query a tagged old table with its recorded model, but an untagged
 dense or hybrid table must be rebuilt. For service deployments, rebuild persisted
 legacy and collection tables before access or configure the service with the old
-index model. Refer to [Keep the embedding model aligned](../../../docs/docs/extraction/vdbs.md#lancedb-embedding-model-compatibility).
+index model. Refer to [Keep the embedding model aligned](https://docs.nvidia.com/nemo/retriever/latest/extraction/vdbs/#lancedb-embedding-model-compatibility).
 
 `--content-types` accepts comma-separated content types such as `text`, `table`,
 `chart`, `image`, and `infographic`. `images` is accepted as an alias for

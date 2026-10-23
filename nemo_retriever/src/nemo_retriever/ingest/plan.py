@@ -184,10 +184,10 @@ class IngestChunkOptions:
 @dataclass(frozen=True)
 class IngestEmbedBatchOptions:
     embed_workers: int | None = None
-    embed_reshape_workers: int | None = None
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
+    embed_reshape_workers: int | None = None
 
 
 @dataclass(frozen=True)
@@ -201,8 +201,8 @@ class IngestEmbedOptions:
     text_elements_modality: str | None = None
     structured_elements_modality: str | None = None
     embed_granularity: str | None = None
-    embed_inference_batch_size: int | None = None
     batch: IngestEmbedBatchOptions = field(default_factory=IngestEmbedBatchOptions)
+    embed_inference_batch_size: int | None = None
 
 
 @dataclass(frozen=True)
