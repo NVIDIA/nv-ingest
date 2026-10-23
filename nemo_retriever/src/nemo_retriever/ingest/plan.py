@@ -187,6 +187,7 @@ class IngestEmbedBatchOptions:
     embed_batch_size: int | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
+    embed_reshape_workers: int | None = None
 
 
 @dataclass(frozen=True)
@@ -201,6 +202,7 @@ class IngestEmbedOptions:
     structured_elements_modality: str | None = None
     embed_granularity: str | None = None
     batch: IngestEmbedBatchOptions = field(default_factory=IngestEmbedBatchOptions)
+    embed_inference_batch_size: int | None = None
 
 
 @dataclass(frozen=True)
@@ -706,7 +708,9 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         text_elements_modality=embed.text_elements_modality,
         structured_elements_modality=embed.structured_elements_modality,
         embed_granularity=embed.embed_granularity,
+        embed_inference_batch_size=embed.embed_inference_batch_size,
         embed_workers=embed.batch.embed_workers,
+        embed_reshape_workers=embed.batch.embed_reshape_workers,
         embed_batch_size=embed.batch.embed_batch_size,
         embed_cpus_per_actor=embed.batch.embed_cpus_per_actor,
         embed_gpus_per_actor=embed.batch.embed_gpus_per_actor,
