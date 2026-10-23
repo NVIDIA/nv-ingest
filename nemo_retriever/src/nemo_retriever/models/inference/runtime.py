@@ -24,6 +24,7 @@ from nemo_retriever.models.inference.embedding_input import (
 )
 from nemo_retriever.models.inference.main_text_embed import (
     TextEmbeddingConfig,
+    assign_embedding_columns,
     create_text_embeddings_for_df,
 )
 from nemo_retriever.models.nim.error_reporter import report_error
@@ -65,10 +66,9 @@ def _embed_group(
                 else:
                     batch = texts if skip_prefix else [format_embedding_input(text, "passage: ") for text in texts]
                     vectors = model.embed(batch, batch_size=int(inference_batch_size))
-                tolist = getattr(vectors, "tolist", None)
-                if callable(tolist):
-                    return tolist()
-                return vectors  # type: ignore[return-value]
+                if hasattr(vectors, "detach"):
+                    return vectors.detach().to("cpu").float().numpy()
+                return vectors
 
     default_local_image_batch_size = 8
     effective_batch_size = inference_batch_size
@@ -80,9 +80,7 @@ def _embed_group(
 
     cfg = TextEmbeddingConfig(
         text_column=str(text_column),
-        output_payload_column=str(output_column) if output_column else None,
-        write_embedding_to_metadata=True,
-        metadata_column="metadata",
+        output_column=str(output_column),
         batch_size=int(effective_batch_size),
         encoding_format="float",
         input_type=str(input_type),
@@ -123,9 +121,7 @@ def embed_text_main_text_embed(
     text_column: str = "text",
     inference_batch_size: int = 16,
     embed_inference_batch_size: int = 4,
-    output_column: str = "text_embeddings_1b_v2",
-    embedding_dim_column: str = "text_embeddings_1b_v2_dim",
-    has_embedding_column: str = "text_embeddings_1b_v2_has_embedding",
+    output_column: str = "embedding",
     embed_modality: str = "text",
     embed_model_provider_prefix: Optional[str] = None,
     nim_http_max_concurrent: int = 32,
@@ -134,7 +130,7 @@ def embed_text_main_text_embed(
     embedding_input_policy: EmbeddingInputPolicy | None = None,
     **_extras: Any,
 ) -> Any:
-    """Embed graph batches while preserving the legacy output columns."""
+    """Embed graph batches into a typed vector column and matching error column."""
     if not isinstance(batch_df, pd.DataFrame):
         raise NotImplementedError("embed_text_main_text_embed currently only supports pandas.DataFrame input.")
     if inference_batch_size <= 0:
@@ -227,44 +223,26 @@ def embed_text_main_text_embed(
             logger.debug("torch.cuda.empty_cache() failed during error cleanup: %s", _cache_exc)
         logger.error("Embedding failed: %s: %s", type(exc).__name__, exc, exc_info=True)
         report_error("embed", exc)
-        out_df = prepared_df.copy()
         public_error = f"{type(exc).__name__}: embedding batch failed; inspect embed-stage logs for the cause"
-        out_df[output_column] = [{"embedding": [], "error": public_error} for _ in out_df.index]
-        out_df[embedding_dim_column] = 0
-        out_df[has_embedding_column] = False
+        out_df = assign_embedding_columns(
+            prepared_df,
+            [None] * len(prepared_df),
+            [public_error] * len(prepared_df),
+            output_column=output_column,
+        )
         if "_embed_modality" in out_df.columns:
             out_df = out_df.drop(columns=["_embed_modality"])
 
     if remote_text_admission:
         out_df.index = original_index
 
-    if embedding_dim_column:
-
-        def dim(row: pd.Series) -> int:
-            metadata = row.get("metadata")
-            if isinstance(metadata, dict):
-                embedding = metadata.get("embedding")
-                if isinstance(embedding, list):
-                    return int(len(embedding))
-            payload = row.get(output_column) if output_column else None
-            if isinstance(payload, dict) and isinstance(payload.get("embedding"), list):
-                return int(len(payload.get("embedding") or []))
-            return 0
-
-        out_df[embedding_dim_column] = out_df.apply(dim, axis=1)
-    else:
-        out_df[embedding_dim_column] = [0 for _ in range(len(out_df.index))]
-
-    out_df[has_embedding_column] = [bool(int(d) > 0) for d in out_df[embedding_dim_column].tolist()]
-
-    embedded_flags = out_df[has_embedding_column].tolist()
+    embedded_flags = out_df[output_column].notna().tolist()
+    failed_flags = out_df[f"{output_column}_error"].notna().tolist()
     out_df["embedding_v1_num_detections"] = [int(f) for f in embedded_flags]
     counts_by_label: list[dict[str, int]] = []
-    for position, (_, row) in enumerate(out_df.iterrows()):
-        embedded = bool(row.get(has_embedding_column))
+    for position, (embedded, failed) in enumerate(zip(embedded_flags, failed_flags)):
         counts = {"embedded": 1} if embedded else {"unembedded": 1}
-        payload = row.get(output_column)
-        if isinstance(payload, dict) and payload.get("error") is not None:
+        if failed:
             counts["failed"] = 1
         if position in current_split_child_positions:
             counts["split_child"] = 1

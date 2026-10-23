@@ -621,7 +621,6 @@ def _to_service_lancedb_row(row: dict[str, Any]) -> dict[str, Any] | None:
     wide_row = build_lancedb_row(
         SimpleNamespace(
             metadata={
-                "embedding": row.get("vector"),
                 "source_path": source_id,
                 "content_metadata": content_metadata,
             },
@@ -631,7 +630,8 @@ def _to_service_lancedb_row(row: dict[str, Any]) -> dict[str, Any] | None:
             _stored_image_uri=content_metadata.get("stored_image_uri"),
             _content_type=content_type,
             _bbox_xyxy_norm=content_metadata.get("bbox_xyxy_norm"),
-        )
+        ),
+        embedding=row.get("vector"),
     )
     if wide_row is None:
         return None

@@ -149,7 +149,7 @@ def test_ingest_operator_passes_merged_records_to_vdb(tmp_path: Path, monkeypatc
     data = [
         {
             "text": "chunk",
-            "text_embeddings_1b_v2": {"embedding": [0.1] * 2048},
+            "embedding": [0.1] * 2048,
             "path": "/tmp/doc-a.pdf",
             "page_number": 1,
             "metadata": {"content_metadata": {"type": "text"}},

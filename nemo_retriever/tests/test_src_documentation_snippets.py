@@ -308,7 +308,7 @@ def test_main_text_embed_module_doc_example() -> None:
         df,
         task_config={"embedder": local_embedder, "endpoint_url": None, "local_batch_size": 64},
     )
-    assert out_df.loc[0, "metadata"]["embedding"] == [0.0, 1.0]
+    assert out_df.loc[0, "embedding"] == [0.0, 1.0]
 
 
 def test_clustering_doc_boxes_overlap_example() -> None:

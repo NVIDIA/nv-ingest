@@ -5,15 +5,17 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
+import pyarrow as pa
 import pytest
 from nemo_retriever.common.schemas.collections import QueryHit
 from nemo_retriever.common.vdb.records import (
     VdbUploadError,
+    _iter_client_vdb_records,
     normalize_retrieval_results,
     to_client_vdb_records,
 )
 from pydantic import ValidationError
-from ray.data.extensions import TensorArray
 
 
 def _normalize_one(hit: dict) -> dict:
@@ -24,8 +26,8 @@ def _normalize_one(hit: dict) -> dict:
 @pytest.mark.parametrize("auxiliary_embedding", [None, [0.3, 0.4]])
 def test_vdb_ignores_auxiliary_text_beside_embedded_rows(auxiliary_field, auxiliary_embedding) -> None:
     rows = [
-        {"text": "valid", "metadata": {"embedding": [0.1, 0.2]}},
-        {auxiliary_field: "auxiliary text", "metadata": {"embedding": auxiliary_embedding}},
+        {"text": "valid", "embedding": [0.1, 0.2]},
+        {auxiliary_field: "auxiliary text", "embedding": auxiliary_embedding},
     ]
 
     records = to_client_vdb_records(rows)[0]
@@ -41,7 +43,7 @@ def test_vdb_content_precedence_ignores_embedding_only_fallbacks() -> None:
         {"chunk": "chunk", "page_text": "page", "metadata": {"content": " metadata "}},
     ]
     for row in rows:
-        row["metadata"]["embedding"] = [0.1, 0.2]
+        row["embedding"] = [0.1, 0.2]
 
     records = to_client_vdb_records(rows)[0]
 
@@ -193,7 +195,7 @@ def test_graph_record_conversion_preserves_service_provenance() -> None:
         [
             {
                 "text": "table content",
-                "text_embeddings_1b_v2": {"embedding": [0.1, 0.2]},
+                "embedding": [0.1, 0.2],
                 "path": "/tmp/source.pdf",
                 "page_number": 1,
                 "_page_number": 7,
@@ -262,7 +264,7 @@ def test_graph_record_conversion_does_not_publish_inherited_page_uri(content_typ
         [
             {
                 "text": "structured content",
-                "text_embeddings_1b_v2": {"embedding": [0.1, 0.2]},
+                "embedding": [0.1, 0.2],
                 "_content_type": content_type,
                 "_stored_image_uri": "s3://artifacts/page.png",
                 "page_image": {"stored_image_uri": "s3://artifacts/page.png"},
@@ -280,7 +282,7 @@ def test_graph_record_conversion_normalizes_arrow_backed_bbox_array() -> None:
         [
             {
                 "text": "table content",
-                "text_embeddings_1b_v2": {"embedding": [0.1, 0.2]},
+                "embedding": [0.1, 0.2],
                 "_content_type": "table",
                 "_bbox_xyxy_norm": np.array([0.1, 0.2, 0.8, 0.9]),
             }
@@ -291,35 +293,64 @@ def test_graph_record_conversion_normalizes_arrow_backed_bbox_array() -> None:
 
 
 def test_graph_record_conversion_normalizes_arrow_backed_embedding_array() -> None:
-    records = to_client_vdb_records(
-        [
-            {
-                "text": "embedded content",
-                "metadata": {"embedding": np.array([0.1, 0.2])},
-            }
-        ]
+    records = to_client_vdb_records([{"text": "embedded content", "embedding": np.array([0.1, 0.2])}])
+
+    assert records[0][0]["metadata"]["embedding"] == [0.1, 0.2]
+
+
+def test_custom_embedding_column_converts_eager_and_streaming_records() -> None:
+    embedded_row = {"text": "embedded content", "vec": [0.5, 0.25], "vec_error": None}
+    expected_record = {
+        "document_type": "text",
+        "metadata": {
+            "embedding": [0.5, 0.25],
+            "content": "embedded content",
+            "content_metadata": {},
+            "source_metadata": {},
+        },
+    }
+
+    assert to_client_vdb_records([embedded_row], embedding_column="vec") == [[expected_record]]
+    assert list(_iter_client_vdb_records([embedded_row], embedding_column="vec")) == [expected_record]
+
+    failed_row = {"text": "failed content", "vec": None, "vec_error": "embedding failed"}
+    with pytest.raises(VdbUploadError, match="reported 1 structured row error"):
+        to_client_vdb_records([failed_row], embedding_column="vec")
+    with pytest.raises(VdbUploadError, match="reported 1 structured row error"):
+        list(_iter_client_vdb_records([failed_row], embedding_column="vec"))
+
+
+def test_graph_record_conversion_normalizes_arrow_embedding_column() -> None:
+    from nemo_retriever.operators.vdb import _iter_batch_rows
+
+    frame = pd.DataFrame(
+        {
+            "text": pd.Series(["embedded"], dtype="string[pyarrow]"),
+            "embedding": pd.Series(
+                [[0.5, 0.25]],
+                dtype=pd.ArrowDtype(pa.list_(pa.float32())),
+            ),
+            "embedding_error": pd.Series([None], dtype=pd.ArrowDtype(pa.string())),
+        }
     )
 
-    assert records[0][0]["metadata"]["embedding"] == [0.1, 0.2]
+    records = to_client_vdb_records(list(_iter_batch_rows([frame])))
+
+    assert records[0][0]["metadata"]["embedding"] == [0.5, 0.25]
 
 
-def test_graph_record_conversion_normalizes_ray_tensor_embedding() -> None:
-    embedding = TensorArray([np.array([0.1, 0.2])])[0]
-    records = to_client_vdb_records([{"text": "embedded content", "metadata": {"embedding": embedding}}])
-
-    assert records[0][0]["metadata"]["embedding"] == [0.1, 0.2]
+def test_graph_row_does_not_read_embedding_from_metadata() -> None:
+    with pytest.raises(VdbUploadError, match="provide vectors in the `embedding` column"):
+        to_client_vdb_records([{"text": "embedded content", "metadata": {"embedding": [0.5, 0.25]}}])
 
 
 def test_dense_record_conversion_rejects_partial_embedding_coverage() -> None:
     rows = [
-        {"text": "embedded", "metadata": {"embedding": [0.1, 0.2]}},
+        {"text": "embedded", "embedding": [0.1, 0.2]},
         {
             "text": "failed",
-            "metadata": {"embedding": None},
-            "text_embeddings_1b_v2": {
-                "embedding": None,
-                "error": {"stage": "embed", "type": "ValueError", "message": "invalid input"},
-            },
+            "embedding": None,
+            "embedding_error": "invalid input",
         },
     ]
 
@@ -334,17 +365,13 @@ def test_dense_record_conversion_rejects_runtime_failure_empty_vectors() -> None
     rows = [
         {
             "text": "failed before",
-            "text_embeddings_1b_v2": {
-                "embedding": [],
-                "error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
-            },
+            "embedding": None,
+            "embedding_error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
         },
         {
             "text": "failed after",
-            "text_embeddings_1b_v2": {
-                "embedding": [],
-                "error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
-            },
+            "embedding": None,
+            "embedding_error": "RuntimeError: embedding batch failed; inspect embed-stage logs for the cause",
         },
     ]
 
@@ -383,11 +410,11 @@ def test_dense_record_conversion_rejects_partial_canonical_embedding_coverage() 
 
 def test_dense_record_conversion_preserves_whitespace_only_embedding_child() -> None:
     rows = [
-        {"text": "embedded", "metadata": {"embedding": [0.1, 0.2]}},
+        {"text": "embedded", "embedding": [0.1, 0.2]},
         {
             "text": "  ",
+            "embedding": [0.3, 0.4],
             "metadata": {
-                "embedding": [0.3, 0.4],
                 "embedding_split": {
                     "content": "  ",
                     "parent_id": "parent",
@@ -409,11 +436,10 @@ def test_dense_record_conversion_preserves_whitespace_only_embedding_child() -> 
 
 def test_dense_record_conversion_rejects_missing_whitespace_only_child_embedding() -> None:
     rows = [
-        {"text": "embedded", "metadata": {"embedding": [0.1, 0.2]}},
+        {"text": "embedded", "embedding": [0.1, 0.2]},
         {
             "text": "  ",
             "metadata": {
-                "embedding": None,
                 "embedding_split": {
                     "content": "  ",
                     "parent_id": "parent",
@@ -461,7 +487,7 @@ def test_canonical_record_rejects_missing_whitespace_only_child_embedding() -> N
 
 def test_dense_record_conversion_ignores_inherited_page_uri_without_searchable_content() -> None:
     rows = [
-        {"text": "embedded", "metadata": {"embedding": [0.1, 0.2]}},
+        {"text": "embedded", "embedding": [0.1, 0.2]},
         {
             "_content_type": "table_caption",
             "_stored_image_uri": "s3://artifacts/page.png",

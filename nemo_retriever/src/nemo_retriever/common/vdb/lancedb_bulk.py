@@ -57,7 +57,9 @@ def _build_lancedb_rows_from_df(rows: List[Dict[str, Any]]) -> List[Dict[str, An
     for row in rows:
         if not isinstance(row, dict):
             continue
-        row_out = build_lancedb_row(_MappingRow(row), provenance_page=row.get("_page_number"))
+        row_out = build_lancedb_row(
+            _MappingRow(row), embedding=row.get("embedding"), provenance_page=row.get("_page_number")
+        )
         if row_out is not None:
             out.append(row_out)
     return out

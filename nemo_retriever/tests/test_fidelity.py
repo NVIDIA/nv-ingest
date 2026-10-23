@@ -14,14 +14,14 @@ def _fidelity_of(row: dict) -> object:
 
 
 def _row(content_type, *, needs_ocr=None, subtype=None) -> dict:
-    meta: dict = {"embedding": [0.1, 0.2]}
+    meta: dict = {}
     if needs_ocr is not None:
         meta["needs_ocr_for_text"] = needs_ocr
     cm: dict = {"page_number": 1}
     if subtype is not None:
         cm["subtype"] = subtype
     meta["content_metadata"] = cm
-    return {"text": "x", "metadata": meta, "_content_type": content_type}
+    return {"text": "x", "embedding": [0.1, 0.2], "metadata": meta, "_content_type": content_type}
 
 
 def test_derive_fidelity_pure_mapping() -> None:

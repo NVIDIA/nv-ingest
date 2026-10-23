@@ -414,7 +414,7 @@ class TestLanceDBStoredImageURI:
         from nemo_retriever.common.vdb.lancedb_schema import build_lancedb_row
 
         row = MagicMock()
-        row.metadata = {"embedding": [0.1] * 2048}
+        row.embedding = [0.1] * 2048
         row.path = "/tmp/test.pdf"
         row.page_number = 1
         row.text = "hello"
@@ -422,7 +422,7 @@ class TestLanceDBStoredImageURI:
         row._content_type = "text"
         row._bbox_xyxy_norm = None
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == "file:///tmp/page_1.png"
         assert result["content_type"] == "text"
@@ -432,7 +432,7 @@ class TestLanceDBStoredImageURI:
         from nemo_retriever.common.vdb.lancedb_schema import build_lancedb_row
 
         row = MagicMock()
-        row.metadata = {"embedding": [0.1] * 2048}
+        row.embedding = [0.1] * 2048
         row.path = "/tmp/test.pdf"
         row.page_number = 1
         row.text = "hello"
@@ -440,19 +440,19 @@ class TestLanceDBStoredImageURI:
         row._content_type = None
         row._bbox_xyxy_norm = None
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == ""
 
     def test_build_lancedb_row_missing_attr(self):
         from nemo_retriever.common.vdb.lancedb_schema import build_lancedb_row
 
-        row = MagicMock(spec=["metadata", "path", "page_number", "text"])
-        row.metadata = {"embedding": [0.1] * 2048}
+        row = MagicMock(spec=["embedding", "metadata", "path", "page_number", "text"])
+        row.embedding = [0.1] * 2048
         row.path = "/tmp/test.pdf"
         row.page_number = 1
         row.text = "hello"
 
-        result = build_lancedb_row(row)
+        result = build_lancedb_row(row, embedding=row.embedding)
         assert result is not None
         assert result["stored_image_uri"] == ""
