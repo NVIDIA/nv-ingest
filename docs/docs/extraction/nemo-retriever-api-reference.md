@@ -160,22 +160,31 @@ Do not configure an invoke URL for either local path. Install the local GPU
 and Parse dependencies with
 `pip install "nemo-retriever[local,nemotron-parse]"`.
 
-The following example uses the default local Parse 3.5 checkpoint.
+The following example uses the default local Parse 3.5 checkpoint. Standalone
+scripts need the `__main__` guard to prevent ingestion from running again in
+spawned workers.
 
 ```python
 from nemo_retriever import create_ingestor
 from nemo_retriever.common.params import ExtractParams
 
-result = (
-    create_ingestor(run_mode="inprocess")
-    .files(["report.pdf"])
-    .extract(
-        ExtractParams(
-            method="nemotron_parse",
+
+def main():
+    result = (
+        create_ingestor(run_mode="inprocess")
+        .files(["report.pdf"])
+        .extract(
+            ExtractParams(
+                method="nemotron_parse",
+            )
         )
+        .ingest()
     )
-    .ingest()
-)
+    return result
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 The Parse 3.5 adapter downloads the checkpoint and its official vLLM plugin
