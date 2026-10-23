@@ -24,7 +24,7 @@ override-dependencies = [
   "requests>=2.33.0",
   "idna>=3.15",
   "pydantic-settings>=2.14.2",
-  "vllm==0.25.1",
+  "vllm==0.26.0",
   "transformers>=5.17.0",
   "ray>=2.56.1",
   "nltk>=3.10.3",
@@ -163,10 +163,12 @@ local = [
   # vLLM compiles CUDA kernels at runtime via torch inductor (requires Python.h).
   # Use a uv-managed Python (`uv python install 3.12`) so headers are available;
   # system Python installs typically omit them and will fail with InductorError.
-  "vllm==0.25.1; sys_platform == 'linux'",
-  # Keep the CUDA inference stack reproducible; vLLM 0.25.1 requires FlashInfer 0.6.13.
-  "flashinfer-cubin==0.6.13; sys_platform == 'linux'",
-  "flashinfer-python==0.6.13; sys_platform == 'linux'",
+  "vllm==0.26.0; sys_platform == 'linux'",
+  # Older Quack releases use APIs removed in vLLM 0.26's required CUTLASS 4.6.
+  "quack-kernels==0.6.1; sys_platform == 'linux'",
+  # vLLM 0.26 requires FlashInfer 0.6.14. No matching cubin wheel is published;
+  # use FlashInfer's artifact cache rather than the incompatible 0.6.13 wheel.
+  "flashinfer-python==0.6.14; sys_platform == 'linux'",
 ]
 
 # ── Multimedia — audio/ASR and SVG rendering ────────────────────────────────
@@ -223,6 +225,7 @@ retriever = "nemo_retriever.__main__:main"
 
 [project.entry-points."vllm.general_plugins"]
 nrl_nemotron35_embedding = "nemo_retriever.models.inference.nemotron35_vllm:register_nemotron35_vllm"
+nrl_nemotron35_parse = "nemo_retriever.models.inference.nemotron_parse35_vllm:register_nemotron_parse35_vllm"
 
 # uv-only developer install: include every published extra plus the published
 # dev extra, then overlay the prerelease Nemotron selection without exposing it

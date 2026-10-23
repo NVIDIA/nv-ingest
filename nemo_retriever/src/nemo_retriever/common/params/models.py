@@ -25,7 +25,7 @@ from pydantic import (
 
 from nemo_retriever.common.modality.caption.model_profiles import DEFAULT_LOCAL_CAPTION_MODEL_ID
 from nemo_retriever.common.params.utils import (
-    NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL,
+    NEMOTRON_PARSE_LOCAL_MODELS,
     validate_nemotron_parse_endpoint_list,
 )
 from nemo_retriever.common.remote_auth import resolve_remote_api_key
@@ -646,10 +646,10 @@ class ExtractParams(_ParamsModel):
             if (
                 not parse_endpoints
                 and self.nemotron_parse_model is not None
-                and self.nemotron_parse_model != NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL
+                and self.nemotron_parse_model not in NEMOTRON_PARSE_LOCAL_MODELS
             ):
                 raise ValueError(
-                    f"Local Nemotron Parse supports only `{NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL}` in this release; "
+                    f"Local Nemotron Parse supports only {', '.join(NEMOTRON_PARSE_LOCAL_MODELS)} in this release; "
                     f"received `{self.nemotron_parse_model}`. Configure `nemotron_parse_invoke_url` or `invoke_url` "
                     "to use a compatible remote model."
                 )

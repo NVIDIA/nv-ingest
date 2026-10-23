@@ -29,6 +29,34 @@ Before you begin using [NeMo Retriever Library](overview.md), confirm your softw
 >
 > When you use UV, create the environment with Python 3.12 — for example, `uv venv --python 3.12`. This matches the `requires-python` metadata in the library packages.
 
+### Local GPU kernel cache { #local-gpu-kernel-cache }
+
+Local vLLM inference uses FlashInfer, which downloads missing GPU kernel
+artifacts on demand. Allow HTTPS access to `edge.urm.nvidia.com` and provide a
+writable cache. The default artifact cache is `~/.cache/flashinfer/cubins`;
+set `FLASHINFER_CUBIN_DIR` before starting Python to use another directory.
+This setting relocates artifacts only. By default, runtime compilation
+caches remain under `~/.cache/flashinfer`.
+
+Use a fresh environment when upgrading. A retained `flashinfer-cubin==0.6.13`
+wheel prevents `flashinfer-python==0.6.14` from importing, even when
+`FLASHINFER_CUBIN_DIR` is set. If you reuse an environment, remove the old wheel
+with `python -m pip uninstall flashinfer-cubin`. Install a cubin wheel only
+when its version exactly matches FlashInfer; do not disable the version check.
+
+Before an offline deployment, prefetch artifacts in the installed local GPU
+environment while network access is available.
+
+```bash
+python -m flashinfer download-cubin
+```
+
+Inspect the command output for download or checksum failures; a zero exit code
+alone does not establish success. Run your intended model on matching GPU
+hardware to populate and validate runtime compilation caches. Retain both
+caches, the same dependency versions, and the same cache settings when moving
+offline. Kernel prefetching does not download model weights.
+
 ## Kubernetes Helm Storage Requirements { #kubernetes-helm-storage-requirements }
 
 The production Helm chart requires a working persistent-volume provisioning and binding strategy. A default install creates **seven** PersistentVolumeClaims: three chart-managed service claims and four NIM Operator NIMCache claims for the core NIMs.

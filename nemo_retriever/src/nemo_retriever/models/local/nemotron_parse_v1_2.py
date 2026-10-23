@@ -4,20 +4,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, List, Optional, Sequence, Union
+from typing import Any, List, Optional, Sequence
 
-import numpy as np
-import torch
 from PIL import Image
 
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import get_hf_revision
+from nemo_retriever.models.inference.parse_image import ImageInput, normalize_parse_image
 from nemo_retriever.models.model import BaseModel, ModelRunMode
-
-# Type alias for all supported single-image input formats.
-ImageInput = Union[torch.Tensor, np.ndarray, Image.Image, str, Path]
-
 
 # ---------------------------------------------------------------------------
 # vLLM processor bug workaround
@@ -129,48 +123,23 @@ class NemotronParseV12(BaseModel):
     # ------------------------------------------------------------------
 
     def preprocess(self, input_data: ImageInput) -> Image.Image:
-        """Normalize supported input formats to an RGB PIL image."""
-        if isinstance(input_data, Image.Image):
-            return input_data.convert("RGB")
+        """Normalize a page to RGB, retaining legacy float scaling.
 
-        if isinstance(input_data, (str, Path)):
-            return Image.open(Path(input_data)).convert("RGB")
+        Args:
+            input_data: PIL image, path, or HWC/CHW array/tensor with one, three,
+                or four channels and an optional leading batch of size one.
+                HWC wins ambiguous layouts. Floating pixels with maximum at
+                most 1.5 are multiplied by 255 before clipping, as in v1.2.
 
-        if isinstance(input_data, torch.Tensor):
-            x = input_data.detach().cpu()
-            if x.ndim == 4:
-                if int(x.shape[0]) != 1:
-                    raise ValueError(f"Expected batch size 1 tensor, got shape {tuple(x.shape)}")
-                x = x[0]
-            if x.ndim != 3:
-                raise ValueError(f"Expected CHW/HWC tensor, got shape {tuple(x.shape)}")
-            if int(x.shape[0]) in (1, 3):
-                x = x.permute(1, 2, 0).contiguous()
-            if x.dtype.is_floating_point:
-                max_v = float(x.max().item()) if x.numel() else 1.0
-                if max_v <= 1.5:
-                    x = x * 255.0
-            arr = x.clamp(0, 255).to(torch.uint8).numpy()
-            return Image.fromarray(arr).convert("RGB")
+        Returns:
+            Independently owned RGB image without resizing; alpha is discarded.
 
-        if isinstance(input_data, np.ndarray):
-            arr = input_data
-            if arr.ndim == 4:
-                if int(arr.shape[0]) != 1:
-                    raise ValueError(f"Expected batch size 1 array, got shape {arr.shape}")
-                arr = arr[0]
-            if arr.ndim != 3:
-                raise ValueError(f"Expected HWC/CHW array, got shape {arr.shape}")
-            if int(arr.shape[0]) in (1, 3) and int(arr.shape[-1]) not in (1, 3):
-                arr = np.transpose(arr, (1, 2, 0))
-            if np.issubdtype(arr.dtype, np.floating):
-                max_v = float(arr.max()) if arr.size else 1.0
-                if max_v <= 1.5:
-                    arr = arr * 255.0
-            arr = np.clip(arr, 0, 255).astype(np.uint8)
-            return Image.fromarray(arr).convert("RGB")
-
-        raise TypeError(f"Unsupported input type for Nemotron Parse: {type(input_data)!r}")
+        Raises:
+            TypeError: If the image type or pixel dtype is unsupported.
+            ValueError: If the image shape, channels, or pixels are invalid.
+            OSError: If an image path cannot be opened or decoded.
+        """
+        return normalize_parse_image(input_data, legacy_float_scaling=True)
 
     # ------------------------------------------------------------------
     # Inference

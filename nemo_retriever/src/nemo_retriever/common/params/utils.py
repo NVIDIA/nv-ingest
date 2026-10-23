@@ -13,7 +13,10 @@ if TYPE_CHECKING:
     from nemo_retriever.common.params.models import BatchTuningParams
 
 
-NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL = "nvidia/NVIDIA-Nemotron-Parse-v1.2"
+NEMOTRON_PARSE35_MODEL = "nvidia/Nemotron-3.5-Parse"
+NEMOTRON_PARSE_V12_MODEL = "nvidia/NVIDIA-Nemotron-Parse-v1.2"
+NEMOTRON_PARSE_LOCAL_DEFAULT_MODEL = NEMOTRON_PARSE35_MODEL
+NEMOTRON_PARSE_LOCAL_MODELS = (NEMOTRON_PARSE35_MODEL, NEMOTRON_PARSE_V12_MODEL)
 
 
 def validate_nemotron_parse_endpoint_list(invoke_url: str | None) -> tuple[str, ...]:
