@@ -486,6 +486,17 @@ def test_batch_tuning_leaves_embed_reshape_concurrency_unset_by_default() -> Non
     assert "ExplodeContentToRows" not in overrides
 
 
+def test_batch_tuning_to_node_overrides_can_skip_embed_repartition() -> None:
+    embed_params = EmbedParams(
+        batch_tuning=BatchTuningParams(embed_batch_size=128, embed_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(None, embed_params)
+
+    assert overrides["_BatchEmbedActor"]["batch_size"] == 128
+    assert "target_num_rows_per_block" not in overrides["_BatchEmbedActor"]
+
+
 def test_batch_preflight_reduces_default_pools_on_constrained_cluster() -> None:
     from nemo_retriever.graph.executor import RayDataExecutor
 
@@ -700,6 +711,29 @@ def test_batch_tuning_to_node_overrides_honors_table_structure_tuning() -> None:
     assert overrides["TableStructureActor"]["target_num_rows_per_block"] == 12
     assert overrides["TableStructureActor"]["num_cpus"] == 0.4
     assert overrides["TableStructureActor"]["num_gpus"] == 0.25
+
+
+def test_batch_tuning_to_node_overrides_can_skip_page_elements_repartition() -> None:
+    extract_params = ExtractParams(
+        batch_tuning=BatchTuningParams(page_elements_batch_size=8, page_elements_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["PageElementDetectionActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["PageElementDetectionActor"]
+
+
+def test_batch_tuning_to_node_overrides_can_skip_table_structure_repartition() -> None:
+    extract_params = ExtractParams(
+        use_table_structure=True,
+        batch_tuning=BatchTuningParams(table_structure_batch_size=8, table_structure_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["TableStructureActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["TableStructureActor"]
 
 
 def test_batch_tuning_to_node_overrides_repartitions_pdf_pages_for_extraction() -> None:

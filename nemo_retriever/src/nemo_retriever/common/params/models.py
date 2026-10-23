@@ -501,6 +501,7 @@ class BatchTuningParams(_ParamsModel):
     pdf_extract_num_cpus: float = 2
     pdf_extract_workers: Optional[int] = None
     page_elements_batch_size: int = 24
+    page_elements_repartition: bool = True
     detect_batch_size: int = 24
     ocr_inference_batch_size: Optional[int] = None
     page_elements_workers: Optional[int] = None
@@ -510,6 +511,7 @@ class BatchTuningParams(_ParamsModel):
     ocr_cpus_per_actor: float = 1
     table_structure_workers: Optional[int] = None
     table_structure_batch_size: Optional[int] = None
+    table_structure_repartition: bool = True
     table_structure_cpus_per_actor: float = 1
     embed_workers: Optional[int] = None
     embed_reshape_workers: Optional[int] = Field(
@@ -518,6 +520,7 @@ class BatchTuningParams(_ParamsModel):
         description="Number of workers for content collapse/explode before embedding. None uses executor defaults.",
     )
     embed_batch_size: int = 32
+    embed_repartition: bool = True
     embed_cpus_per_actor: float = 1
     gpu_page_elements: Optional[float] = None
     gpu_ocr: Optional[float] = None
