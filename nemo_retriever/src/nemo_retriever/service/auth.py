@@ -36,6 +36,16 @@ def _is_gateway_proxy_path(path: str) -> bool:
     return path in _GATEWAY_PROXY_PATHS or path.startswith("/v1/ingest/sidecar/")
 
 
+def tokens_match(supplied: str, expected: str) -> bool:
+    """Compare two credentials in constant time, whatever characters they hold.
+
+    ``hmac.compare_digest`` raises ``TypeError`` for a ``str`` with non-ASCII
+    characters, and Starlette decodes header bytes as latin-1, so comparing the
+    header text directly let a client turn a wrong credential into a 500.
+    """
+    return hmac.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8"))
+
+
 def _strip_bearer(value: str) -> str:
     if value.lower().startswith(_BEARER_PREFIX):
         return value[len(_BEARER_PREFIX) :].strip()
@@ -145,7 +155,7 @@ class ScopeAuthorizer:
             return None, 401
         allowed: frozenset[str] | None = None
         for token, scopes in self._records:
-            if hmac.compare_digest(provided_token, token):
+            if tokens_match(provided_token, token):
                 allowed = scopes
         if allowed is None:
             return None, 401
@@ -191,7 +201,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
 
         if path.startswith("/v1/internal/") and self._internal_api_token:
             supplied = request.headers.get(_INTERNAL_TOKEN_HEADER, "").strip()
-            if not supplied or not hmac.compare_digest(supplied, self._internal_api_token):
+            if not supplied or not tokens_match(supplied, self._internal_api_token):
                 return JSONResponse(
                     status_code=401,
                     content={"detail": "Missing or invalid internal credential."},
@@ -208,7 +218,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         ):
             supplied = request.headers.get(_INTERNAL_TOKEN_HEADER, "").strip()
             scope = request.headers.get(_AUTHORIZED_SCOPE_HEADER, "").strip()
-            if supplied and scope and hmac.compare_digest(supplied, self._internal_api_token):
+            if supplied and scope and tokens_match(supplied, self._internal_api_token):
                 request.state.authorized_scope = scope
                 request.state.caller_fingerprint = request.headers.get(_CALLER_FINGERPRINT_HEADER, "").strip() or None
                 return await call_next(request)

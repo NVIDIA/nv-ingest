@@ -14,6 +14,7 @@ import httpx
 import lancedb
 import pyarrow as pa
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from nemo_retriever import RetrieverServiceClient
@@ -25,7 +26,7 @@ from nemo_retriever.common.vdb.adt_vdb import (
     VDBResourceNotFound,
 )
 from nemo_retriever.common.vdb.lancedb import LanceDB
-from nemo_retriever.service.auth import ScopeAuthorizer
+from nemo_retriever.service.auth import BearerAuthMiddleware, ScopeAuthorizer
 from nemo_retriever.service.app import create_app
 from nemo_retriever.service.config import AuthConfig, LLMConfig, ServiceConfig, VectorDbConfig
 from nemo_retriever.service.query_schema import QueryRequest
@@ -360,6 +361,56 @@ def test_scope_authorizer_secret_mapping_and_internal_vectordb_token(tmp_path) -
         assert client.get("/v1/collections").status_code == 401
         assert client.get("/v1/collections", headers={"X-NRL-Internal-Token": "wrong"}).status_code == 401
         assert client.get("/v1/collections", headers={"X-NRL-Internal-Token": "internal-secret"}).status_code == 200
+
+
+def test_non_ascii_credentials_are_rejected_with_401(tmp_path) -> None:
+    # Starlette decodes header bytes as latin-1, so a non-ASCII byte reaches the
+    # comparison as non-ASCII text.
+    secret = tmp_path / "scope-tokens.json"
+    secret.write_text('{"tokens":[{"token":"alpha-token","scopes":["alpha"]}]}', encoding="utf-8")
+    authorizer = ScopeAuthorizer(AuthConfig(enabled=True, scope_token_file=str(secret)))
+    assert authorizer.authorize("alpha-tok\xe9n", "alpha") == (None, 401)
+
+    vectordb = create_vectordb_app(
+        lancedb_uri=str(tmp_path / "db"),
+        embed_endpoint="http://embed",
+        internal_api_token="internal-secret",
+    )
+    with TestClient(vectordb) as client:
+        assert client.get("/v1/collections", headers={"X-NRL-Internal-Token": b"internal-secr\xe9t"}).status_code == 401
+
+    gateway = create_app(
+        ServiceConfig(
+            mode="gateway",
+            auth=AuthConfig(enabled=True, api_token="alpha-token", default_scope="alpha"),
+            vectordb=VectorDbConfig(internal_api_token="internal-secret"),
+        )
+    )
+    with TestClient(gateway) as client:
+        assert client.get("/v1/collections", headers={"Authorization": b"Bearer alpha-tok\xe9n"}).status_code == 401
+        assert (
+            client.get(
+                "/v1/internal/document-result/missing",
+                headers={"X-NRL-Internal-Token": b"internal-secr\xe9t"},
+            ).status_code
+            == 401
+        )
+
+    # A realtime or batch worker checks the same token on a gateway handoff.
+    worker = FastAPI()
+    worker.add_api_route("/v1/ingest/sidecar", lambda: {}, methods=["GET"])
+    worker.add_middleware(
+        BearerAuthMiddleware,
+        config=AuthConfig(enabled=True, api_token="alpha-token", default_scope="alpha"),
+        internal_api_token="internal-secret",
+        service_mode="realtime",
+    )
+    handoff = {"X-NRL-Gateway-Handoff": "v1", "X-NRL-Authorized-Scope": "alpha"}
+    with TestClient(worker) as client:
+        ok = client.get("/v1/ingest/sidecar", headers={**handoff, "X-NRL-Internal-Token": "internal-secret"})
+        assert ok.status_code == 200
+        bad = client.get("/v1/ingest/sidecar", headers={**handoff, "X-NRL-Internal-Token": b"internal-secr\xe9t"})
+        assert bad.status_code == 401
 
 
 def test_scope_authorizer_defaults_to_unprotected_and_fails_closed_when_enabled() -> None:
