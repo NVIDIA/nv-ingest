@@ -38,10 +38,10 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
         self._input_audit = None
         audit = params.embed_input_audit
         if audit is not None and audit.enabled:
-            from nemo_retriever.models.inference.input_audit import InputAuditSink
+            from nemo_retriever.models.inference.input_audit import _InputAuditSink
 
-            InputAuditSink.validate_model_config(self._kwargs)
-            self._input_audit = InputAuditSink(audit)
+            _InputAuditSink.validate_model_config(self._kwargs)
+            self._input_audit = _InputAuditSink(audit)
 
         endpoint = (self._kwargs.get("embedding_endpoint") or self._kwargs.get("embed_invoke_url") or "").strip()
         if endpoint:

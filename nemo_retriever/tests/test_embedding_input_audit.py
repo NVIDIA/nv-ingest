@@ -18,11 +18,11 @@ from PIL import Image
 from nemo_retriever.common.params import EmbedInputAuditParams, EmbedParams
 from nemo_retriever.common.params.utils import build_embed_option_kwargs
 from nemo_retriever.models.inference.input_audit import (
-    InputAuditSink,
+    _InputAuditSink,
     _canonical,
-    audit_rows,
-    current_rows,
-    invoke_with_rows,
+    _audit_rows,
+    _current_rows,
+    _invoke_with_rows,
 )
 from nemo_retriever.models.inference.runtime import _embed_group
 from nemo_retriever.models.inference.shared import build_embed_kwargs
@@ -30,7 +30,7 @@ from nemo_retriever.models.local.nemotron35_embedder import Nemotron35Embedder
 
 
 def sink(tmp_path, **options):
-    return InputAuditSink(EmbedInputAuditParams(enabled=True, output_dir=str(tmp_path / "private"), **options))
+    return _InputAuditSink(EmbedInputAuditParams(enabled=True, output_dir=str(tmp_path / "private"), **options))
 
 
 def documents(value):
@@ -142,8 +142,8 @@ def test_disabled_path_does_not_select_rows_hash_or_write(tmp_path, monkeypatch)
         def iloc(self):
             raise AssertionError("disabled diagnostic selected rows")
 
-    assert invoke_with_rows(NoFrame(), lambda: 7, text_column="text", positions=[0]) == 7
-    assert current_rows() is None
+    assert _invoke_with_rows(NoFrame(), lambda: 7, text_column="text", positions=[0]) == 7
+    assert _current_rows() is None
     assert list(tmp_path.iterdir()) == []
 
 
@@ -174,7 +174,7 @@ def test_private_directory_and_shard_permissions(tmp_path):
     public.mkdir(mode=0o755)
     public.chmod(0o755)
     with pytest.raises(ValueError, match="private directory"):
-        InputAuditSink(EmbedInputAuditParams(enabled=True, output_dir=str(public)))
+        _InputAuditSink(EmbedInputAuditParams(enabled=True, output_dir=str(public)))
 
 
 def test_tensor_hash_preserves_bf16_shape_and_logical_order(tmp_path):
@@ -249,7 +249,7 @@ def test_same_warmed_model_uses_independent_call_contexts(tmp_path):
         with value.activate(role="query"):
             embed(frame([text]), shared, modality="text", role="query")
     assert left.path != right.path
-    assert current_rows() is None
+    assert _current_rows() is None
     assert not hasattr(shared, "_input_audit")
     assert len([e for e in documents(left) if e["event"] == "model_identity"]) == 1
     assert len([e for e in documents(right) if e["event"] == "model_identity"]) == 1
@@ -286,7 +286,7 @@ def test_budget_stop_is_explicit_and_does_not_change_embeddings(tmp_path, option
     assert value.path.stat().st_size <= value.params.max_output_bytes
 
 
-def test_capture_error_exports_only_type_not_exception_content(tmp_path):
+def test_capture_error_exports_only_type_not_exception_content(tmp_path, caplog):
     value = sink(tmp_path)
 
     def fail():
@@ -295,6 +295,8 @@ def test_capture_error_exports_only_type_not_exception_content(tmp_path):
     value.capture("broken", fail)
     text = value.path.read_text()
     assert "secret corpus" not in text and "credential" not in text
+    assert "ValueError" in caplog.text
+    assert "secret corpus" not in caplog.text and "credential" not in caplog.text
     assert documents(value)[-1]["error_type"] == "ValueError"
     assert documents(value)[-1]["complete"] is False
 
@@ -312,13 +314,13 @@ def test_unsupported_paths_rejected_before_model_metadata_resolution(config, mon
 
     monkeypatch.setattr("nemo_retriever.models.local_embedder_spec.LocalEmbedderSpec.from_config", forbidden)
     with pytest.raises(ValueError, match="local HF"):
-        InputAuditSink.validate_model_config(config)
+        _InputAuditSink.validate_model_config(config)
 
 
 def test_missing_model_output_cannot_claim_complete_evidence(tmp_path):
     value = sink(tmp_path)
     with value.activate(role="passage"):
-        with audit_rows(frame(["private text"]), text_column="text"):
+        with _audit_rows(frame(["private text"]), text_column="text"):
             pass  # Deliberately omit the model result in a synthetic failure.
     assert documents(value)[-1]["event"] == "audit_stopped"
     assert documents(value)[-1]["reason"] == "missing_model_outputs"
@@ -329,7 +331,7 @@ def test_disabled_frame_and_positions_factories_are_never_evaluated():
     def forbidden():
         raise AssertionError("disabled diagnostics allocated frame/positions")
 
-    assert invoke_with_rows(forbidden, lambda: 11, text_column="text", positions=forbidden) == 11
+    assert _invoke_with_rows(forbidden, lambda: 11, text_column="text", positions=forbidden) == 11
 
 
 def test_canonical_hash_metadata_uses_stable_yaml_key_order():
@@ -345,3 +347,66 @@ def test_canonical_yaml_ignores_shared_container_aliasing():
     shared = [1, 2]
     assert _canonical({"a": shared, "b": shared}) == _canonical({"a": [1, 2], "b": [1, 2]})
     assert b"&id" not in _canonical({"a": shared, "b": shared})
+
+
+@pytest.mark.parametrize("chunk_location", ["metadata", "row"])
+def test_existing_chunks_on_one_page_have_distinct_stable_identities(tmp_path, chunk_location):
+    data = frame(["same text", "same text"])
+    for ordinal, metadata in enumerate(data["metadata"]):
+        metadata["content_metadata"]["page_number"] = 1
+        if chunk_location == "metadata":
+            metadata["chunk_index"] = ordinal
+    if chunk_location == "row":
+        data["chunk_index"] = [0, 1]
+    left = sink(tmp_path / "left")
+    right = sink(tmp_path / "right")
+    identities = []
+    for value, batch in ((left, data), (right, data.iloc[::-1])):
+        with value.activate(role="passage"):
+            embed(batch, model(), modality="text")
+        events = documents(value)
+        inputs = next(event for event in events if event["event"] == "row_inputs")
+        attached = next(event for event in events if event["event"] == "row_handoff")
+        row_ids = [item["identity"] for item in inputs["items"]]
+        assert len(set(row_ids)) == 2
+        assert [item["identity"] for item in attached["items"]] == row_ids
+        identities.append(row_ids)
+    assert identities[1] == list(reversed(identities[0]))
+
+
+def test_receipt_write_failure_reports_only_sanitized_context(tmp_path, monkeypatch, caplog):
+    value = sink(tmp_path)
+
+    def fail(*args, **kwargs):
+        raise OSError("secret corpus credential private output path")
+
+    monkeypatch.setattr(value, "_emit", fail)
+    value.capture("processor", lambda: {})
+
+    assert not value.active
+    assert "capture stopped" in caplog.text
+    assert "incomplete-capture receipt" in caplog.text
+    assert "OSError" in caplog.text
+    assert "secret corpus" not in caplog.text and "credential" not in caplog.text
+    assert "private output path" not in caplog.text
+
+
+def test_agentic_query_preserves_audit_and_backend_settings(tmp_path):
+    from nemo_retriever.query.agentic import AgenticRetriever
+    from nemo_retriever.query.options import QueryAgenticOptions, QueryEmbedOptions, QueryRequest
+    from nemo_retriever.query.workflow import build_agentic_config
+
+    audit = EmbedInputAuditParams(enabled=True, output_dir=str(tmp_path / "private"))
+    request = QueryRequest(
+        query="diagnostic query",
+        embed=QueryEmbedOptions(local_query_embed_backend="hf", embed_input_audit=audit),
+        agentic=QueryAgenticOptions(enabled=True, llm_model="test-model", invoke_url="http://llm.test/v1"),
+    )
+
+    config = build_agentic_config(request)
+    agent = AgenticRetriever(config)
+
+    assert config.local_query_embed_backend == "hf"
+    assert config.embed_input_audit is audit
+    assert agent._retriever.embed_kwargs["local_ingest_embed_backend"] == "hf"
+    assert agent._retriever.embed_kwargs["embed_input_audit"] is audit

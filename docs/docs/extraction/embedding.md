@@ -286,6 +286,9 @@ For typed query plans, import `QueryEmbedOptions` from
 you enable the audit. This option accepts `"hf"` or `"vllm"`. Its default,
 `None`, preserves existing backend selection. You can select a query backend
 without enabling the audit. Enabling the audit does not select a backend.
+These settings also apply to retrieval embeddings in local agentic query
+workflows. For direct `AgenticRetriever` construction, set these fields on
+`AgenticRetrievalConfig` from `nemo_retriever.query.agentic`.
 
 `output_dir` is required when the audit is enabled and must be an absolute
 directory owned by the worker's user, with no group or other permissions.
@@ -305,6 +308,10 @@ Compare valid content and batch context separately. The shard header records
 Hash metadata uses sorted, alias-free UTF-8 YAML with explicit document markers
 and LF line endings. Compare fingerprints only under compatible hash contracts.
 
+Audit row identities include existing top-level `chunk_index`,
+`metadata["chunk_index"]`, and embedding-split identifiers when available.
+These fields distinguish separate chunks from one source page.
+
 The following limits apply independently to each actor.
 
 | Field | Default | Limit |
@@ -316,7 +323,10 @@ The following limits apply independently to each actor.
 
 After setup, a budget limit or capture failure stops only that actor's audit.
 The shard records `complete: false` and a reason or error type. Embedding
-continues. A missing completion receipt also means capture is incomplete.
+continues. Capture failures and failures to write an incomplete audit receipt
+emit warnings with failure types. These warnings omit source content,
+exception messages, and tracebacks. A missing completion receipt also means
+capture is incomplete.
 Inspect every shard's coverage and completion status before comparing runs;
 partial evidence does not establish equal inputs across the full dataset.
 

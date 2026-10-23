@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 import torch
 
-from nemo_retriever.models.inference.input_audit import current_rows
+from nemo_retriever.models.inference.input_audit import _current_rows
 
 if TYPE_CHECKING:
     from nemo_retriever.models.inference.embedding_input import EmbeddingSplitPlan
@@ -110,7 +110,7 @@ class Nemotron35Embedder:
         if not texts:
             return torch.empty((0, self.output_dimension), dtype=torch.float32)
         self._ensure_loaded()
-        audit = current_rows()
+        audit = _current_rows()
         if audit is not None:
             audit.sink.model_header(self)
         prefix = self.query_prefix if query else self.document_prefix

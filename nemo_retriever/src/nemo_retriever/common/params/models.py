@@ -654,12 +654,32 @@ class EmbedInputAuditParams(BaseModel):
 
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
-    enabled: bool = False
-    output_dir: str | None = None
-    max_records: int = Field(default=4096, ge=1, le=1_000_000)
-    max_hashed_bytes: int = Field(default=64 * 1024**3, ge=1)
-    max_output_bytes: int = Field(default=16 * 1024**2, ge=4096)
-    chunk_bytes: int = Field(default=8 * 1024**2, ge=1024, le=8 * 1024**2)
+    enabled: bool = Field(default=False, description="Enable private input fingerprints for diagnostic embedding runs.")
+    output_dir: str | None = Field(
+        default=None, description="Absolute path to an owned private directory for each actor's YAML shard."
+    )
+    max_records: int = Field(
+        default=4096,
+        ge=1,
+        le=1_000_000,
+        description="Maximum admitted embedding rows per actor, accumulated across calls.",
+    )
+    max_hashed_bytes: int = Field(
+        default=64 * 1024**3,
+        ge=1,
+        description="Maximum bytes hashed per actor across all diagnostic records and calls.",
+    )
+    max_output_bytes: int = Field(
+        default=16 * 1024**2,
+        ge=4096,
+        description="Maximum bytes written to each actor's YAML shard, including its incomplete-capture receipt.",
+    )
+    chunk_bytes: int = Field(
+        default=8 * 1024**2,
+        ge=1024,
+        le=8 * 1024**2,
+        description="Maximum bytes in each actor's tensor hashing slab or decoded image strip.",
+    )
 
     @model_validator(mode="after")
     def _validate_destination(self) -> "EmbedInputAuditParams":
@@ -669,7 +689,9 @@ class EmbedInputAuditParams(BaseModel):
 
 
 class EmbedParams(_ParamsModel):
-    embed_input_audit: EmbedInputAuditParams | None = None
+    embed_input_audit: EmbedInputAuditParams | None = Field(
+        default=None, description="Optional bounded private diagnostics for local HF Nemotron 3.5 embeddings."
+    )
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None

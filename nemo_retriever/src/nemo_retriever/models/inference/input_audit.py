@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 import hashlib
+import logging
 import math
 import os
 from pathlib import Path
@@ -27,8 +28,10 @@ import yaml
 
 from nemo_retriever.common.params import EmbedInputAuditParams
 
+logger = logging.getLogger(__name__)
+
 _ACTIVE: ContextVar[tuple | None] = ContextVar("embed_input_audit", default=None)
-_ROWS: ContextVar[AuditRows | None] = ContextVar("embed_input_audit_rows", default=None)
+_ROWS: ContextVar[_AuditRows | None] = ContextVar("embed_input_audit_rows", default=None)
 
 
 def _fresh_values(value: Any) -> Any:
@@ -80,18 +83,18 @@ def _identity_value(value: Any) -> Any:
 
 
 def _digest(domain: str, data: bytes) -> str:
-    h = hashlib.sha256()
+    hasher = hashlib.sha256()
     for part in (b"nrl-input-audit-v1", domain.encode(), data):
-        h.update(len(part).to_bytes(8, "little"))
-        h.update(part)
-    return h.hexdigest()
+        hasher.update(len(part).to_bytes(8, "little"))
+        hasher.update(part)
+    return hasher.hexdigest()
 
 
 class _BudgetExceeded(Exception):
     pass
 
 
-class InputAuditSink:
+class _InputAuditSink:
     """One actor owns one private multi-document YAML shard and finite budgets."""
 
     def __init__(self, params: EmbedInputAuditParams):
@@ -175,9 +178,13 @@ class InputAuditSink:
                 },
                 terminal=True,
             )
-        except Exception:
-            # A missing final receipt must be interpreted as incomplete too.
-            pass
+        except (OSError, _BudgetExceeded, yaml.YAMLError) as exc:
+            # Exception text and tracebacks can expose source data or paths.
+            logger.warning(
+                "Embedding input audit could not write its incomplete-capture receipt "
+                "(error_type=%s). Treat the shard as incomplete and check the private output directory.",
+                type(exc).__name__,
+            )
 
     def capture(self, event: str, build: Callable[[], dict]) -> None:
         with self._lock:
@@ -188,8 +195,24 @@ class InputAuditSink:
                 self._emit({"event": event, "call_id": state[2] if state else None, **build()})
             except _BudgetExceeded as exc:
                 self._stop(str(exc))
-            except Exception as exc:
-                # Exception messages can contain source text, URLs or paths.
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                TypeError,
+                KeyError,
+                IndexError,
+                AttributeError,
+                yaml.YAMLError,
+            ) as exc:
+                # Report only the failure type: messages and tracebacks can
+                # contain source text, URLs, paths, or processor input values.
+                logger.warning(
+                    "Embedding input audit capture stopped (event=%s, error_type=%s). "
+                    "Embedding continues; treat the shard as incomplete.",
+                    event,
+                    type(exc).__name__,
+                )
                 self._stop("capture_error", type(exc).__name__)
 
     def bytes_hash(self, domain: str, value: bytes) -> str:
@@ -208,10 +231,10 @@ class InputAuditSink:
         info = {"dtype": str(value.dtype), "shape": list(value.shape)}
         byte_count = value.numel() * value.element_size()
         self._charge(byte_count)
-        h = hashlib.sha256()
+        hasher = hashlib.sha256()
         header = _canonical({"domain": "nrl-input-audit-tensor-v1", "byte_order": "little", **info})
-        h.update(len(header).to_bytes(8, "little"))
-        h.update(header)
+        hasher.update(len(header).to_bytes(8, "little"))
+        hasher.update(header)
         # CUDA deployments and supported CPU runners are little-endian. Reject
         # other hosts rather than silently changing the canonical contract.
         import sys
@@ -225,13 +248,13 @@ class InputAuditSink:
                 step = max(1, self.params.chunk_bytes // tensor.element_size())
                 for start in range(0, flat.numel(), step):
                     slab = flat[start : start + step].cpu().contiguous().view(torch.uint8)
-                    h.update(memoryview(slab.numpy()))
+                    hasher.update(memoryview(slab.numpy()))
             else:
                 for child in tensor.unbind(0):
                     visit(child)
 
         visit(value)
-        return {**info, "sha256": h.hexdigest(), "byte_count": byte_count}
+        return {**info, "sha256": hasher.hexdigest(), "byte_count": byte_count}
 
     @contextmanager
     def activate(self, *, role: str):
@@ -304,8 +327,8 @@ class InputAuditSink:
 
 
 @dataclass
-class AuditRows:
-    sink: InputAuditSink
+class _AuditRows:
+    sink: _InputAuditSink
     identities: list[str]
     image_ordinal: int = 0
     output_rows: int = 0
@@ -316,10 +339,10 @@ class AuditRows:
         self.image_ordinal += 1
 
         def build():
-            h = hashlib.sha256()
+            hasher = hashlib.sha256()
             header = _canonical({"domain": "RGB-v1", "mode": image.mode, "size": list(image.size)})
-            h.update(len(header).to_bytes(8, "little"))
-            h.update(header)
+            hasher.update(len(header).to_bytes(8, "little"))
+            hasher.update(header)
             width, height = image.size
             row_bytes = width * len(image.getbands())
             self.sink._charge(row_bytes * height)
@@ -328,7 +351,7 @@ class AuditRows:
                 raise _BudgetExceeded("image_row_bytes")
             for top in range(0, height, step):
                 with image.crop((0, top, width, min(height, top + step))) as strip:
-                    h.update(strip.tobytes())
+                    hasher.update(strip.tobytes())
             return {
                 "identity": self.identities[ordinal],
                 "image_ordinal": ordinal,
@@ -336,7 +359,7 @@ class AuditRows:
                 "compressed_byte_count": len(encoded),
                 "size": [width, height],
                 "mode": image.mode,
-                "rgb_sha256": h.hexdigest(),
+                "rgb_sha256": hasher.hexdigest(),
             }
 
         self.sink.capture("decoded_image", build)
@@ -426,13 +449,13 @@ class AuditRows:
         self.sink.capture("model_output", build)
 
 
-def current_rows() -> AuditRows | None:
+def _current_rows() -> _AuditRows | None:
     value = _ROWS.get()
     return value if value is not None and value.sink.active else None
 
 
 @contextmanager
-def audit_rows(frame, *, text_column: str, admit: bool = True):
+def _audit_rows(frame, *, text_column: str, admit: bool = True):
     """Bind exact DataFrame row identities to one real model invocation."""
     state = _ACTIVE.get()
     if state is None or not state[0].active:
@@ -466,6 +489,7 @@ def audit_rows(frame, *, text_column: str, admit: bool = True):
                 },
                 "row": {k: row.get(k) for k in ("source_id", "source_name", "page_number", "element_id")},
                 "split": {k: split.get(k) for k in ("parent_id", "chunk_id", "chunk_index")},
+                "chunk": {"metadata_index": metadata.get("chunk_index"), "row_index": row.get("chunk_index")},
             }
             # Missing/NaN scalar identity values are normalized explicitly.
             components = _identity_value(components)
@@ -474,7 +498,7 @@ def audit_rows(frame, *, text_column: str, admit: bool = True):
                 components = {"fallback_text_sha256": text_hash}
 
             identity_basis = (
-                "source_page_element" if has_source_identity else "text_fallback_not_stable_under_text_change"
+                "source_page_element_chunk" if has_source_identity else "text_fallback_not_stable_under_text_change"
             )
             query_index = row.get("_nrl_query_index")
             if role == "query":
@@ -499,7 +523,7 @@ def audit_rows(frame, *, text_column: str, admit: bool = True):
         return {"role": role, "items": records}
 
     sink.capture("row_inputs", build)
-    context = AuditRows(sink, identities) if sink.active else None
+    context = _AuditRows(sink, identities) if sink.active else None
     token = _ROWS.set(context)
     try:
         yield
@@ -510,7 +534,7 @@ def audit_rows(frame, *, text_column: str, admit: bool = True):
         _ROWS.reset(token)
 
 
-def invoke_with_rows(frame, invoke, *, text_column: str, positions=None):
+def _invoke_with_rows(frame, invoke, *, text_column: str, positions=None):
     """Avoid DataFrame selection and all hashing when diagnostics are off."""
     state = _ACTIVE.get()
     if state is None or not state[0].active:
@@ -518,18 +542,18 @@ def invoke_with_rows(frame, invoke, *, text_column: str, positions=None):
     frame = frame() if callable(frame) else frame
     positions = positions() if callable(positions) else positions
     selected = frame if positions is None else frame.iloc[positions]
-    with audit_rows(selected, text_column=text_column):
+    with _audit_rows(selected, text_column=text_column):
         return invoke()
 
 
-def audit_handoff(frame, *, output_column: str, text_column: str) -> None:
+def _audit_handoff(frame, *, output_column: str, text_column: str) -> None:
     """Fingerprint row-to-vector attachment before the VDB writer sees it."""
     state = _ACTIVE.get()
     if state is None or not state[0].active:
         return
     sink = state[0]
-    with audit_rows(frame, text_column=text_column, admit=False):
-        rows = current_rows()
+    with _audit_rows(frame, text_column=text_column, admit=False):
+        rows = _current_rows()
         if rows is None:
             return
 

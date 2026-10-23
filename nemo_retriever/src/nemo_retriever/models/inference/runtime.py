@@ -109,9 +109,9 @@ def _embed_group(
         },
         transform_config=cfg,
     )
-    from nemo_retriever.models.inference.input_audit import audit_handoff
+    from nemo_retriever.models.inference.input_audit import _audit_handoff
 
-    audit_handoff(out_df, output_column=output_column, text_column=text_column)
+    _audit_handoff(out_df, output_column=output_column, text_column=text_column)
     return out_df
 
 

@@ -213,6 +213,8 @@ def build_agentic_config(request: QueryRequest, *, top_k: int | None = None) -> 
         "candidate_k": request.retrieval.candidate_k,
         "embedding_endpoint": request.embed.embed_invoke_url,
         "embedding_api_key": api_key or "",
+        "local_query_embed_backend": request.embed.local_query_embed_backend,
+        "embed_input_audit": request.embed.embed_input_audit,
         "llm_model": request.agentic.llm_model,
         "invoke_url": request.agentic.invoke_url,
         "local_llm_backend": request.agentic.local_llm_backend,

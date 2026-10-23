@@ -36,7 +36,7 @@ out_df, _info = create_text_embeddings_for_df(
 
 from __future__ import annotations
 
-from nemo_retriever.models.inference.input_audit import invoke_with_rows
+from nemo_retriever.models.inference.input_audit import _invoke_with_rows
 
 import atexit
 import logging
@@ -223,7 +223,7 @@ def _multimodal_callable_runner(
         ]
 
         if embed_modality == "image":
-            vecs = invoke_with_rows(
+            vecs = _invoke_with_rows(
                 chunk, lambda: embedder.embed_images(images_b64, batch_size=bs), text_column=text_column
             )
             tolist = getattr(vecs, "tolist", None)
@@ -243,7 +243,7 @@ def _multimodal_callable_runner(
             mm_images = [b for b, h in zip(images_b64, has_image) if h]
             mm_vecs_list: List[Optional[Sequence[float]]] = []
             if mm_images:
-                vecs = invoke_with_rows(
+                vecs = _invoke_with_rows(
                     chunk,
                     lambda: embedder.embed_text_image(mm_texts, mm_images, batch_size=bs),
                     text_column=text_column,
@@ -260,7 +260,7 @@ def _multimodal_callable_runner(
             fb_texts = [t for t, h in zip(text_inputs, has_image) if not h and t]
             fb_vecs_list: List[Optional[Sequence[float]]] = []
             if fb_texts:
-                vecs = invoke_with_rows(
+                vecs = _invoke_with_rows(
                     chunk,
                     lambda: embedder.embed(fb_texts, batch_size=bs),
                     text_column=text_column,
@@ -658,7 +658,7 @@ def _callable_runner(
             continue
         for i in range(0, len(prompt_batch), max(1, int(batch_size))):
             chunk = prompt_batch[i : i + max(1, int(batch_size))]
-            vecs = invoke_with_rows(
+            vecs = _invoke_with_rows(
                 audit_frame,
                 lambda: embedder(chunk),
                 text_column=text_column,
