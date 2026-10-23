@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, cast
 
 import pandas as pd
@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 _QUERY_ROUTING_VDB_KWARGS = frozenset({"retrieval_mode"})
 
 if TYPE_CHECKING:
+    from nemo_retriever.query.comparison import DenseSearchComparisonResult
     from nemo_retriever.models.llm.types import (
         AnswerJudge,
         AnswerResult,
@@ -104,6 +105,7 @@ class Retriever:
     _lancedb_capabilities_cache: dict[tuple[str, str], LanceTableCapabilities] = field(
         default_factory=dict, init=False, repr=False, compare=False
     )
+    _dense_search_capture: Any = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.run_mode not in ("local", "service"):
@@ -175,11 +177,22 @@ class Retriever:
             embed_op = _BatchEmbedActor(params=embed_params)
 
         vdb_init = _coerce_vdb_init(self.vdb_kwargs)
-        retrieve = RetrieveVdbOperator(
-            explode_for_rerank=self.rerank,
-            _query_text_column=str(embed_params.text_column),
-            **vdb_init,
-        )
+        if self._dense_search_capture is None:
+            retrieve = RetrieveVdbOperator(
+                explode_for_rerank=self.rerank,
+                _query_text_column=str(embed_params.text_column),
+                **vdb_init,
+            )
+        else:
+            from nemo_retriever.operators.search_comparison import _CompareDenseSearchOperator
+
+            self._dense_search_capture.expected_model_name = embed_params.embed_model_name or embed_params.model_name
+            self._dense_search_capture.expected_model_revision = embed_params.embed_model_revision
+            retrieve = _CompareDenseSearchOperator(
+                capture=self._dense_search_capture,
+                _query_text_column=str(embed_params.text_column),
+                **vdb_init,
+            )
 
         chain = embed_op >> retrieve
         if self.rerank:
@@ -432,6 +445,89 @@ class Retriever:
         }
         vdb = LanceDB(uri=uri, table_name=table_name, overwrite=False, sparse=True)
         return normalize_retrieval_results(vdb.sparse_retrieval(query_texts, **retrieval_kwargs))
+
+    def query_compare_exact(
+        self,
+        query: str,
+        *,
+        top_k: Optional[int] = None,
+        candidate_k: Optional[int] = None,
+        page_dedup: bool = False,
+        content_types: str | Sequence[str] | None = None,
+        vdb_kwargs: Optional[dict[str, Any]] = None,
+        embed_kwargs: Optional[dict[str, Any]] = None,
+    ) -> DenseSearchComparisonResult:
+        """Diagnose indexed versus exhaustive search with one query embedding.
+
+        Supports the local default graph and dense filesystem LanceDB, without
+        reranking or collections. Both legs use the same immutable table version,
+        query vectors, expansion regrouping and final hit shaping. Returned
+        evidence contains hashes, never vectors. Diagnostic timings must not be
+        used for performance qualification or baseline promotion.
+        """
+        from nemo_retriever.common.vdb.lancedb import _is_filesystem_lancedb_uri
+        from nemo_retriever.query.comparison import DenseSearchComparisonResult, _DenseSearchCapture
+        from nemo_retriever.query.shaping import normalize_query_content_type_allowlist
+        from threading import Lock
+
+        if not isinstance(query, str):
+            raise TypeError("Exact-search comparison requires a query string.")
+        if self.run_mode != "local" or self.graph is not None or self.rerank:
+            raise ValueError("Exact-search comparison requires the local default graph without reranking.")
+        if any((vdb_kwargs or {}).get(key) is not None for key in ("scope", "collection_name")):
+            raise ValueError("Exact-search comparison does not support collections.")
+        effective_top_k = int(top_k) if top_k is not None else int(self.top_k)
+        if effective_top_k <= 0:
+            raise ValueError("Exact-search comparison requires positive top_k.")
+        # Retain a separate diagnostic graph/delegate across the serial query
+        # loop, avoiding repeated local model construction. It shares no graph
+        # state with ordinary query(). The lock also isolates per-call evidence.
+        session = self.__dict__.get("_exact_search_session")
+        if session is None:
+            session = self.__dict__.setdefault(
+                "_exact_search_session", (replace(self), _DenseSearchCapture(query_text=""), Lock())
+            )
+        diagnostic, capture, lock = session
+        with lock:
+            for key in ("run_mode", "top_k", "embed_kwargs", "vdb_kwargs", "rerank_kwargs"):
+                setattr(diagnostic, key, getattr(self, key))
+            mode = diagnostic._resolve_lancedb_query_mode(vdb_kwargs)
+            if mode is None or mode[0] != "dense" or not _is_filesystem_lancedb_uri(mode[2]):
+                raise ValueError("Exact-search comparison requires dense filesystem LanceDB retrieval.")
+            capture.query_text = query
+            diagnostic._dense_search_capture = capture
+            try:
+                indexed = diagnostic.query(
+                    query,
+                    top_k=top_k,
+                    candidate_k=candidate_k,
+                    page_dedup=page_dedup,
+                    content_types=content_types,
+                    vdb_kwargs=vdb_kwargs,
+                    embed_kwargs=embed_kwargs,
+                )
+                if capture.calls != 1 or capture.evidence is None or capture.exact_hits is None:
+                    raise RuntimeError("Exact-search comparison is missing complete paired-query evidence.")
+                if len(capture.exact_hits) != 1:
+                    raise RuntimeError("Exact-search comparison did not cover exactly one original query.")
+                exact = shape_query_hits(
+                    capture.exact_hits[0], top_k=effective_top_k, page_dedup=page_dedup, content_types=content_types
+                )
+                allowed_types = normalize_query_content_type_allowlist(content_types)
+                evidence = replace(
+                    capture.evidence,
+                    complete=True,
+                    top_k=effective_top_k,
+                    page_dedup=bool(page_dedup),
+                    content_types=tuple(sorted(allowed_types)) if allowed_types is not None else None,
+                )
+                return DenseSearchComparisonResult(indexed_hits=indexed, exact_hits=exact, evidence=evidence)
+            finally:
+                capture.query_text = ""
+                capture.exact_hits = None
+                capture.evidence = None
+                capture.calls = 0
+                capture.backend_evidence.clear()
 
     def query(
         self,
