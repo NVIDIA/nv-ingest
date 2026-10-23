@@ -33,6 +33,7 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
             category=FutureWarning,
         )
 
+        self._owns_model = False
         self._params = params
         self._kwargs = build_embed_kwargs(params)
 
@@ -58,6 +59,7 @@ class _BatchEmbedActor(AbstractOperator, GPUOperator):
             return
 
         self._model = local_spec.create()
+        self._owns_model = True
 
     def preprocess(self, data: Any, **kwargs: Any) -> Any:
         return data

@@ -104,6 +104,7 @@ class ResolvedQueryPlan:
     embed_kwargs: dict[str, Any]
     rerank: bool
     rerank_kwargs: dict[str, Any]
+    ef: int | None = None
 
     def retriever_kwargs(self) -> dict[str, Any]:
         vdb_kwargs: dict[str, Any] = {
@@ -129,11 +130,14 @@ class ResolvedQueryPlan:
         return Retriever(**self.retriever_kwargs())
 
     def query_kwargs(self) -> dict[str, Any]:
-        return {
+        kwargs: dict[str, Any] = {
             "candidate_k": self.candidate_k,
             "page_dedup": self.page_dedup,
             "content_types": self.content_types,
         }
+        if self.ef is not None:
+            kwargs["vdb_kwargs"] = {"ef": self.ef}
+        return kwargs
 
 
 def resolve_query_plan(request: QueryRequest) -> ResolvedQueryPlan:
@@ -158,6 +162,7 @@ def resolve_query_plan(request: QueryRequest) -> ResolvedQueryPlan:
         embed_kwargs=embed_kwargs,
         rerank=bool(request.rerank.enabled),
         rerank_kwargs=rerank_kwargs,
+        ef=request.retrieval.ef,
     )
 
 
@@ -192,6 +197,8 @@ def build_agentic_config(request: QueryRequest, *, top_k: int | None = None) -> 
     ``Retriever`` that backs the agent's ``retrieve`` tool. ``top_k`` overrides the
     final document count the agent targets.
     """
+    if request.retrieval.ef is not None:
+        raise ValueError("ef is not supported by agentic query requests.")
     from nemo_retriever.query.agentic import AgenticRetrievalConfig
 
     api_key = resolve_remote_api_key(request.embed.embed_api_key)

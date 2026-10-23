@@ -97,6 +97,33 @@ For remote image-bearing inputs, the request size is at most `min(inference_batc
 
 Benchmark these settings with representative documents. Monitor CPU capacity, endpoint GPU memory, HTTP errors, and output counts as you increase concurrency or batch sizes.
 
+## Evaluate a dense index family { #evaluate-dense-index-family }
+
+!!! note "Unreleased option"
+
+    `IngestStorageOptions.index_type` is under development. It is not
+    available in current NVIDIA `main` or a released package.
+
+Use an explicit `"IVF_HNSW_SQ"` or `"IVF_FLAT"` value to compare a fresh
+dense index build through the normal typed ingest workflow. Omit the field
+or leave it as `None` to preserve existing defaults. The explicit override
+requires dense mode and `overwrite=True`; it does not support sparse,
+hybrid, append, or reuse of a prebuilt index.
+
+Compare matched datasets, model revisions, embeddings, and query settings.
+Record the actual built index family and coverage, index-build time, memory,
+query latency, and retrieval-quality metrics. Keep each build in a separate
+target table so you can inspect both results. An IVF index is not built for
+fewer than 2 rows.
+
+Selecting `IVF_FLAT` does not establish exhaustive retrieval, explain
+differences between separately ingested tables, or guarantee a performance
+benefit. Evaluate the result with representative queries and relevance
+judgments before changing your deployment.
+
+For the accepted values, admission rules, and a complete execution example,
+refer to [Select a dense ingest index family](nemo-retriever-api-reference.md#dense-ingest-index-family).
+
 ## Profile batch ingestion with Nsight Systems
 
 Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray

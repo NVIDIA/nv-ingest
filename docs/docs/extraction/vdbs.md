@@ -254,6 +254,7 @@ Semantic retrieval uses dense embeddings to find content that is similar in mean
 - [Concepts](concepts.md) for broader pipeline and search patterns
 - [Use the NeMo Retriever Library Python API](nemo-retriever-api-reference.md) for `Retriever.query` and `LanceDB.retrieval` parameters
 - [Workflow: Agentic retrieval](workflow-agentic-retrieval.md) for the LLM-driven ReAct query path over the same LanceDB table
+- [Compare indexed and exact dense search](nemo-retriever-api-reference.md#indexed-exact-dense-search) for the unreleased diagnostic that shares query vectors across both searches.
 
 **Evaluation** — For evaluation and metrics, refer to [Evaluate on your data](evaluate-on-your-data.md).
 

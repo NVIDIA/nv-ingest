@@ -22,6 +22,8 @@ import lancedb
 import pyarrow as pa
 from filelock import FileLock
 
+from nemo_retriever.common.vdb.query_options import validate_hnsw_ef
+
 from nemo_retriever.common.schemas.collections import (
     CollectionCreateRequest,
     CollectionDeleteResult,
@@ -2019,6 +2021,8 @@ class LanceDB(VDB):
 
     def sparse_retrieval(self, query_texts: Iterable[str], **kwargs: Any) -> list[list[dict[str, Any]]]:
         """Search a LanceDB FTS-only table without query embeddings."""
+        if validate_hnsw_ef(kwargs.pop("ef", None)) is not None:
+            raise ValueError("ef requires dense or hybrid LanceDB retrieval.")
         table_path = kwargs.pop("table_path", self.uri)
         table_name = kwargs.pop("table_name", self.table_name)
         result_fields = kwargs.pop("result_fields", None)
@@ -2109,6 +2113,7 @@ class LanceDB(VDB):
         top_k = int(kwargs.pop("top_k", 10))
         refine_factor = int(kwargs.pop("refine_factor", 50))
         n_probe = int(kwargs.pop("n_probe", kwargs.pop("nprobes", 64)))
+        ef = validate_hnsw_ef(kwargs.pop("ef", None))
         vector_column_name = str(kwargs.pop("vector_column_name", "vector"))
 
         search_kwargs_raw = kwargs.pop("search_kwargs", None)
@@ -2180,6 +2185,8 @@ class LanceDB(VDB):
                         query = query.where(where_clause)
                     query_limit = max(top_k, hybrid_fusion.candidate_depth) if hybrid_fusion is not None else top_k
                     query = query.limit(query_limit).refine_factor(refine_factor).nprobes(n_probe)
+                    if ef is not None:
+                        query = query.ef(ef)
                     if hybrid_fusion is not None:
                         query = query.rerank(WeightedRRFReranker(hybrid_fusion))
                     if result_fields is not None:
@@ -2197,6 +2204,8 @@ class LanceDB(VDB):
                 if where_clause is not None:
                     query = query.where(where_clause)
                 query = query.limit(top_k).refine_factor(refine_factor).nprobes(n_probe)
+                if ef is not None:
+                    query = query.ef(ef)
                 if result_fields is not None:
                     query = query.select(result_fields)
                 results = query.to_list()
