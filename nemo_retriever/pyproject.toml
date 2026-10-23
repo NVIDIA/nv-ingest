@@ -97,8 +97,9 @@ dependencies = [
   "nltk>=3.10.3",
   "markitdown",
   "langchain-nvidia-ai-endpoints>=1.4.0",
-  # Default VDB solution
+  # Default VDB solution; pylance writes worker-side Lance fragments and compacts tables.
   "lancedb",
+  "pylance>=13.0.0",
   # gRPC client for Parakeet/Riva ASR. Required for ASRCPUActor when it
   # targets the public NVCF Parakeet endpoint (the default) or any remote NIM.
   "nvidia-riva-client>=2.25.1",

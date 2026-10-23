@@ -2,10 +2,13 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import copy
+import functools
 import hashlib
 import json
 import logging
 import os
+import tempfile
 import threading
 import time
 from collections.abc import Iterable, Iterator, Sequence
@@ -14,11 +17,12 @@ from datetime import datetime, timezone
 from itertools import chain
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Final, FrozenSet
+from typing import Any, Callable, Final, FrozenSet
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 
 import lancedb
+import numpy as np
 import pyarrow as pa
 from filelock import FileLock
 
@@ -34,22 +38,28 @@ from nemo_retriever.common.schemas.collections import (
 )
 from nemo_retriever.common.schemas.embedding import EMBEDDING_SPLIT_METADATA_KEY, embedding_split_content
 from nemo_retriever.common.vdb._lancedb_stream import (
-    DataCommittedFinalizationError,
-    VdbWriteNotFinalized,
+    _apply_bad_vector_policy,
     _apply_deferred_bad_vector_policy,
     _assert_lancedb_table_ready,
     _bounded_create_is_finalized,
+    _bounded_record_batches,
+    _estimated_prepared_row_bytes,
+    _row_chunks,
     _checked_batches,
     _infer_vector_dim_with_spooled_prefix,
     _inspect_vector,
     _matches_create_identity,
+    _PreparedColumns,
     _reject_empty_operation_bypass,
     _rows_at_version,
     _schemas_have_same_fields,
     _StreamStats,
     _table_content_identity,
     _validate_index_coverage,
+    _vector_lengths,
     _with_create_identity,
+    DataCommittedFinalizationError,
+    VdbWriteNotFinalized,
 )
 from nemo_retriever.common.vdb._lancedb_stream_state import (
     CommitOutcomeUnknown,
@@ -77,6 +87,7 @@ from nemo_retriever.common.vdb.lancedb_schema import (
     lancedb_schema,
     normalize_content_type,
 )
+from nemo_retriever.common.vdb.records import CanonicalRecordBatch
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +137,59 @@ def _local_table_lock(uri: str, table_name: str, *, phase: str) -> AbstractConte
     lock_dir.mkdir(parents=True, exist_ok=True)
     table_token = hashlib.sha256(table_name.encode("utf-8")).hexdigest()[:24]
     return FileLock(lock_dir / f"{phase}-{table_token}.lock")
+
+
+# Data-file version LanceDB 0.34's writer emits for its default ``data_storage_version="stable"``.
+# Rows per Lance page for fixed-size-list vector columns. Lance flushes a vector page only at the
+# boundary of an Arrow batch, after the page reached its ~8 MiB target, so a batch larger than that
+# becomes one oversized page (``max_rows_per_group``/``max_bytes_per_file`` do not split it). 1024
+# rows x 2048-d float32 is one 8 MiB page, the layout the streaming writer gets from
+# ``_bounded_record_batches``; 8192-row batches gave 64 MiB pages and 5-10x slower index-bypass
+# (brute-force) vector scans, with ANN unaffected. ``write_fragments`` and ``compact_files`` both
+# take their batch size from here so worker-written and compacted tables keep the writer's layout.
+_LANCE_ROWS_PER_PAGE = 1024
+_WORKER_WRITE_ROWS_PER_BATCH = _LANCE_ROWS_PER_PAGE
+
+
+def _rebatched(batches: Iterable[pa.RecordBatch], rows: int) -> Iterator[pa.RecordBatch]:
+    """Yield ``batches`` re-sliced so that no batch exceeds ``rows`` rows."""
+
+    for batch in batches:
+        for start in range(0, batch.num_rows, rows):
+            yield batch.slice(start, min(rows, batch.num_rows - start))
+
+
+def _optimize_lancedb_table(table: Any) -> None:
+    """``table.optimize()`` with compaction pinned to ``_LANCE_ROWS_PER_PAGE``-row pages.
+
+    LanceDB's ``optimize()`` compacts with Lance's default read batch, which rewrites the vector column
+    into pages of thousands of rows and slows brute-force scans 5-10x (stream- and worker-written tables
+    alike). Running the three optimize steps (compact, prune, index update) through pylance lets
+    compaction keep the writer's page size.
+    """
+
+    try:
+        import lance  # noqa: F401 - LanceDB only exposes compaction options through pylance.
+    except ImportError:
+        logger.warning(
+            "pylance is not installed; LanceDB optimize() may rewrite vector pages larger than %d rows, "
+            "which slows index-bypass scans. Install pylance to keep the writer's page size.",
+            _LANCE_ROWS_PER_PAGE,
+        )
+        table.optimize()
+        return
+    dataset = table.to_lance()
+    dataset.optimize.compact_files(batch_size=_LANCE_ROWS_PER_PAGE)
+    dataset.cleanup_old_versions()
+    dataset.optimize.optimize_indices()
+    table.checkout_latest()
+
+
+def _fragment_json(fragment: Any) -> str:
+    """Serialize ``lance.fragment.FragmentMetadata`` to the string ``from_json`` accepts."""
+
+    encoded = fragment.to_json()
+    return encoded if isinstance(encoded, str) else json.dumps(encoded)
 
 
 def _table_mutation_lock(uri: str, table_name: str) -> AbstractContextManager[Any]:
@@ -468,7 +532,6 @@ def _create_lancedb_result(
     """Project one canonical NRL record, returning its drop reason if rejected."""
 
     metadata = element.get("metadata", {})
-    doc_type = element.get("document_type")
     embedding = metadata.get("embedding")
     if embedding is None:
         return None, "dropped_no_embedding"
@@ -479,10 +542,21 @@ def _create_lancedb_result(
             "Dropping row with bad embedding (got_len=%s, expected=%d, doc_type=%s)",
             got_len,
             expected_dim,
-            doc_type,
+            element.get("document_type"),
         )
         return None, "dropped_bad_length"
 
+    fields, drop_reason = _lancedb_row_fields(element)
+    if fields is None:
+        return None, drop_reason
+    return {"vector": embedding, **fields}, None
+
+
+def _lancedb_row_fields(element: dict[str, Any]) -> tuple[dict[str, Any] | None, str | None]:
+    """Project the stored string columns of one canonical record; the vector is handled by the caller."""
+
+    metadata = element.get("metadata", {})
+    doc_type = element.get("document_type")
     content_meta = metadata.get("content_metadata", {})
     split_content = embedding_split_content(metadata)
     text = split_content if split_content is not None else _get_text_for_element(element)
@@ -510,7 +584,6 @@ def _create_lancedb_result(
         row_id = metadata.get("id")
     return (
         {
-            "vector": embedding,
             "text": text,
             "metadata": _json_str(content_meta),
             "source": _json_str(metadata.get("source_metadata", {})),
@@ -700,6 +773,145 @@ def _create_sparse_lancedb_results(results) -> tuple[list, dict[str, int]]:
     return lancedb_rows, counts
 
 
+class _StreamSource:
+    """One canonical input stream, opened once, then packed into bounded Arrow batches."""
+
+    #: The exception the input raised while LanceDB was pulling batches, if any.
+    #: LanceDB's reader re-raises it as a generic error; the writer restores it.
+    input_failure: BaseException | None = None
+
+    def open(self, stats: _StreamStats) -> bool:
+        """Consume input until the first storable item; return whether the stream needs a write.
+
+        Sets ``stats.vector_dim`` when the stream has to infer it.
+        """
+        raise NotImplementedError
+
+    def arrow_batches(
+        self, *, schema: pa.Schema, max_batch_bytes: int, stats: _StreamStats, include_digest: bool
+    ) -> Iterator[pa.RecordBatch]:
+        return self._recording_failures(
+            self._arrow_batches(
+                schema=schema, max_batch_bytes=max_batch_bytes, stats=stats, include_digest=include_digest
+            )
+        )
+
+    def _arrow_batches(
+        self, *, schema: pa.Schema, max_batch_bytes: int, stats: _StreamStats, include_digest: bool
+    ) -> Iterator[pa.RecordBatch]:
+        raise NotImplementedError
+
+    def _recording_failures(self, batches: Iterator[pa.RecordBatch]) -> Iterator[pa.RecordBatch]:
+        """Remember the input-side exception: LanceDB's reader rewraps it before it reaches the caller."""
+        try:
+            yield from batches
+        except Exception as exc:
+            self.input_failure = exc
+            # Type only: conversion errors can quote row content, and the
+            # exception itself is re-raised to the caller with full context.
+            logger.error(
+                "VDB stream input failed (%s) while LanceDB was consuming batches; nothing was committed.",
+                type(exc).__name__,
+            )
+            raise
+
+
+class _RecordStreamSource(_StreamSource):
+    """Canonical record dictionaries: per-row projection and vector policy."""
+
+    def __init__(self, backend: "LanceDB", records: Iterable[dict[str, Any]]) -> None:
+        self._backend = backend
+        self._records = records
+        self._rows: Iterator[dict[str, Any]] = iter(())
+
+    def open(self, stats: _StreamStats) -> bool:
+        backend = self._backend
+        canonical_rows = backend._iter_stream_rows(self._records, stats)
+        missing = object()
+        first_canonical_row = next(canonical_rows, missing)
+        if first_canonical_row is missing and stats.client_records == 0:
+            return False
+        canonical_row_stream = chain(
+            () if first_canonical_row is missing else (first_canonical_row,),
+            canonical_rows,
+        )
+        if stats.vector_dim is None and not backend.sparse:
+            stats.vector_dim, canonical_row_stream = _infer_vector_dim_with_spooled_prefix(
+                canonical_row_stream,
+                validate_vector_length=backend.validate_vector_length,
+                on_bad_vectors=backend.on_bad_vectors,
+            )
+        self._rows = _apply_deferred_bad_vector_policy(
+            canonical_row_stream,
+            vector_dim=int(stats.vector_dim or 0),
+            sparse=backend.sparse,
+            on_bad_vectors=backend.on_bad_vectors,
+            fill_value=backend.fill_value,
+        )
+        return True
+
+    def _arrow_batches(
+        self, *, schema: pa.Schema, max_batch_bytes: int, stats: _StreamStats, include_digest: bool
+    ) -> Iterator[pa.RecordBatch]:
+        return _checked_batches(
+            self._rows,
+            schema=schema,
+            max_batch_bytes=max_batch_bytes,
+            stats=stats,
+            include_digest=include_digest,
+        )
+
+
+class _BatchStreamSource(_StreamSource):
+    """Canonical record batches: per-row string projection, one Arrow operation per vector column."""
+
+    def __init__(self, backend: "LanceDB", batches: Iterable[CanonicalRecordBatch]) -> None:
+        self._backend = backend
+        self._batches = batches
+        self._columns: Iterator[_PreparedColumns] = iter(())
+
+    def open(self, stats: _StreamStats) -> bool:
+        columns = self._backend._iter_stream_columns(self._batches, stats)
+        first = next(columns, None)
+        if first is None:
+            # Every record was dropped: the stream still finalizes like the record path.
+            return stats.client_records > 0
+        self._columns = chain((first,), columns)
+        return True
+
+    def _arrow_batches(
+        self, *, schema: pa.Schema, max_batch_bytes: int, stats: _StreamStats, include_digest: bool
+    ) -> Iterator[pa.RecordBatch]:
+        return _bounded_record_batches(
+            self._columns,
+            schema=schema,
+            max_batch_bytes=max_batch_bytes,
+            stats=stats,
+            include_digest=include_digest,
+        )
+
+
+_PROCESS_LOCAL_LOCKS: dict[str, Callable[[], Any]] = {
+    "_collection_store_lock": threading.Lock,
+    "_connection_lock": threading.RLock,
+    "_write_lock": threading.Lock,
+    "_stream_lock": threading.Lock,
+    "_index_lock": threading.Lock,
+    "_index_generation_lock": threading.Lock,
+}
+
+
+@functools.lru_cache(maxsize=1)
+def _lancedb_default_storage_version() -> str:
+    """Lance data-file version that this LanceDB release writes for a new table."""
+
+    import lance
+
+    with tempfile.TemporaryDirectory(prefix="nrl-lance-version-") as probe:
+        lancedb.connect(uri=probe).create_table("probe", schema=pa.schema([pa.field("x", pa.int32())]))
+        return str(lance.dataset(os.path.join(probe, "probe.lance")).data_storage_version)
+
+
 class LanceDB(VDB):
     """LanceDB operator implementing the VDB interface."""
 
@@ -726,6 +938,7 @@ class LanceDB(VDB):
         stream_batch_bytes: int = _DEFAULT_STREAM_BATCH_BYTES,
         stream_optimize: bool = False,
         stream_operation_id: str | None = None,
+        worker_write_rows: int = 2048,
         **kwargs,
     ):
         create_index = kwargs.pop("create_index", None)
@@ -773,6 +986,15 @@ class LanceDB(VDB):
         self.supports_stream_ingest = (
             _is_filesystem_lancedb_uri(self.uri) and not service_table_schema and service_index_mode is None
         )
+        # Sparse tables store no vector, so they keep the record stream.
+        self.supports_stream_ingest_batches = self.supports_stream_ingest and not self.sparse
+        # Worker-native sink: Ray workers project + write Lance fragments (``write_partition``),
+        # the driver commits once (``commit_partitions``). ``worker_write_rows`` bounds rows per
+        # write (one fragment each).
+        self.worker_write_rows = int(worker_write_rows)
+        if self.worker_write_rows < 1:
+            raise ValueError(f"worker_write_rows must be a positive integer, got {worker_write_rows!r}")
+        self.supports_worker_write = self.supports_stream_ingest
         self._service_table_schema = service_table_schema
         self._service_index_mode = str(service_index_mode) if service_index_mode is not None else None
         self._writes_since_optimize = 0
@@ -862,7 +1084,7 @@ class LanceDB(VDB):
         ):
             return
         try:
-            table.optimize()
+            _optimize_lancedb_table(table)
         except Exception as exc:
             self._last_optimization = {
                 "status": "error",
@@ -1421,6 +1643,71 @@ class LanceDB(VDB):
         else:
             _log_lancedb_result_counts(dense_counts, expected_dim=stats.vector_dim)
 
+    def _iter_stream_columns(
+        self,
+        batches: Iterable[CanonicalRecordBatch],
+        stats: _StreamStats,
+    ) -> Iterator[_PreparedColumns]:
+        """Project canonical record batches for LanceDB storage, vectors staying in Arrow.
+
+        Row selection, drop counts, and the bad-vector policy match
+        :meth:`_iter_stream_rows` followed by the deferred row policy; only the
+        vector column is handled as one Arrow operation per chunk. Each yielded
+        chunk is sized from per-row byte estimates to stay under
+        ``stream_batch_bytes`` before any Arrow column is built, and only that
+        chunk's vectors are copied out of the input batch.
+        """
+
+        counts = {
+            "accepted": 0,
+            "dropped_no_embedding": 0,
+            "dropped_bad_length": 0,
+            "dropped_no_text": 0,
+        }
+        enforce_dim = self.validate_vector_length and self.on_bad_vectors != "error"
+        for batch in batches:
+            stats.client_records += len(batch.records)
+            fields: list[dict[str, Any]] = []
+            kept: list[int] = []
+            for index, record in enumerate(batch.records):
+                row_fields, _drop_reason = _lancedb_row_fields(record)
+                if row_fields is None:
+                    counts["dropped_no_text"] += 1
+                    continue
+                kept.append(index)
+                fields.append(row_fields)
+            if not kept:
+                continue
+            kept_positions = np.asarray(kept, dtype=np.int64)
+            lengths = _vector_lengths(batch.vectors)[kept_positions]
+            if stats.vector_dim is None:
+                stats.vector_dim = int(lengths[0])
+            vector_dim = int(stats.vector_dim)
+            selected = np.arange(len(kept))
+            if enforce_dim:
+                selected = np.flatnonzero(lengths == vector_dim)
+                counts["dropped_bad_length"] += len(kept) - selected.size
+            estimates = [
+                _estimated_prepared_row_bytes(fields[position], vector_dim=vector_dim) for position in selected
+            ]
+            for chunk in _row_chunks(selected, estimates, max_batch_bytes=self.stream_batch_bytes):
+                policy_kept, fixed_vectors = _apply_bad_vector_policy(
+                    batch.vectors.take(pa.array(kept_positions[chunk], type=pa.int64())),
+                    vector_dim=vector_dim,
+                    on_bad_vectors=self.on_bad_vectors,
+                    fill_value=self.fill_value,
+                )
+                chunk_fields = [fields[position] for position in chunk[policy_kept]]
+                counts["accepted"] += len(chunk_fields)
+                yield _PreparedColumns(
+                    vector=fixed_vectors,
+                    text=pa.array([row["text"] for row in chunk_fields], type=pa.string()),
+                    metadata=pa.array([row["metadata"] for row in chunk_fields], type=pa.string()),
+                    source=pa.array([row["source"] for row in chunk_fields], type=pa.string()),
+                    id=pa.array([row["id"] for row in chunk_fields], type=pa.string()),
+                )
+        _log_lancedb_result_counts(counts, expected_dim=stats.vector_dim)
+
     def _stream_schema(self, vector_dim: int | None) -> pa.Schema:
         if self.sparse:
             return _sparse_lancedb_arrow_schema()
@@ -1515,6 +1802,11 @@ class LanceDB(VDB):
                 except ValueError as open_exc:
                     if not _is_missing_lancedb_table_error(open_exc):
                         raise
+                if created_table is None:
+                    # A create that failed mid-read leaves an uncommitted table
+                    # directory that lists but does not open; remove it so the
+                    # target looks exactly as it did before this attempt.
+                    db.drop_table(self.table_name, ignore_missing=True)
                 if created_table is not None:
                     created_table.checkout_latest()
                     created_version = int(created_table.version)
@@ -1588,7 +1880,7 @@ class LanceDB(VDB):
         if self.stream_optimize:
             with self._index_lock, _table_index_lock(self.uri, self.table_name):
                 fresh_table.checkout_latest()
-                fresh_table.optimize()
+                _optimize_lancedb_table(fresh_table)
 
         fresh_table.checkout_latest()
         if not _schemas_have_same_fields(_table_schema(fresh_table), expected_schema):
@@ -1711,8 +2003,368 @@ class LanceDB(VDB):
         self._remember_table(self.table_name, existing_table)
         return None
 
-    def _write_stream_records(self, records: Iterable[dict[str, Any]], *, operation_id: str | None) -> None:
-        """Consume canonical NRL records through one coordinated LanceDB mutation."""
+    def __getstate__(self) -> dict[str, Any]:
+        """Settings only: locks and open LanceDB handles stay in the process that created them."""
+
+        state = dict(self.__dict__)
+        for name in _PROCESS_LOCAL_LOCKS:
+            state.pop(name, None)
+        state.update(_connections={}, _opened_tables={}, _collection_store=None)
+        return state
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        for name, lock_type in _PROCESS_LOCAL_LOCKS.items():
+            setattr(self, name, lock_type())
+
+    def _worker_copy(self) -> "LanceDB":
+        """Copy of this backend for Ray write tasks.
+
+        An append with ``vector_dim=None`` takes the existing table's width, as the stream path does,
+        so a task does not infer its width from its own first vector.
+        """
+
+        worker = copy.copy(self)
+        if worker.vector_dim is None and not worker.overwrite and not worker.sparse:
+            try:
+                table = lancedb.connect(uri=self.uri).open_table(self.table_name)
+            except ValueError as exc:
+                if not _is_missing_lancedb_table_error(exc):
+                    raise
+            else:
+                worker.vector_dim = _schema_vector_dim(_table_schema(table))
+        return worker
+
+    def _lance_table_uri(self) -> str:
+        path = _filesystem_lancedb_path(self.uri)
+        if path is None:
+            raise ValueError(f"worker_write requires a local LanceDB uri, got {self.uri!r}")
+        return str(path / f"{self.table_name}.lance")
+
+    def _worker_write_storage_version(self) -> str:
+        """Lance data-file version for worker-written fragments.
+
+        Appends reuse the table's version; new/overwritten tables use the version the LanceDB
+        writer (``create_table``/``add``) produces, so fragment-written tables scan like
+        stream-written ones. That version changes between LanceDB releases, so it is probed.
+        """
+
+        import lance
+
+        if not self.overwrite:
+            try:
+                return str(lance.dataset(self._lance_table_uri()).data_storage_version)
+            except ValueError:
+                pass
+        return _lancedb_default_storage_version()
+
+    def write_partition(self, batches: Iterable[CanonicalRecordBatch]) -> dict[str, Any]:
+        """Worker side of the worker-native sink: project one partition and write Lance fragments.
+
+        Runs the same canonical projection as ``stream_ingest_batches`` (``_iter_stream_columns``
+        + ``_bounded_record_batches``) but hands the Arrow batches to ``lance.write_fragments``
+        instead of a LanceDB table. Returns a JSON-safe receipt with the fragment metadata and
+        the row tallies ``commit_partitions`` needs.
+        """
+
+        return self._write_partition_source(_BatchStreamSource(self, batches))
+
+    def write_partition_records(self, records: Iterable[dict[str, Any]]) -> dict[str, Any]:
+        """Write one partition of canonical record dictionaries as Lance fragments (worker side, sparse tables).
+
+        ``write_partition`` for the record form that ``stream_ingest`` takes. Nothing is committed: the
+        caller passes the receipt to ``commit_partitions`` on the driver, or to ``discard_partitions``.
+
+        Parameters
+        ----------
+        records
+            Canonical NRL records for this partition, in the shape ``stream_ingest`` accepts.
+
+        Returns
+        -------
+        dict
+            JSON-safe receipt: written fragment metadata and the row counts and row hashes
+            ``commit_partitions`` aggregates.
+
+        Raises
+        ------
+        ValueError
+            A record does not match this table's schema (for example, a vector of the wrong width).
+        OSError
+            Lance cannot write the fragment files under the table path.
+        """
+
+        return self._write_partition_source(_RecordStreamSource(self, records))
+
+    def _write_partition_source(self, source: _StreamSource) -> dict[str, Any]:
+        import lance.fragment
+
+        stats = _StreamStats(vector_dim=self.vector_dim)
+        receipt: dict[str, Any] = {"fragments": [], "rows_written": 0, "client_records": 0, "vector_dim": 0}
+        if not source.open(stats):
+            receipt["client_records"] = stats.client_records
+            return receipt
+        schema = self._stream_schema(stats.vector_dim)
+        reader = pa.RecordBatchReader.from_batches(
+            schema,
+            _rebatched(
+                source.arrow_batches(
+                    schema=schema,
+                    max_batch_bytes=self.stream_batch_bytes,
+                    stats=stats,
+                    include_digest=self.stream_operation_id is not None,
+                ),
+                _WORKER_WRITE_ROWS_PER_BATCH,
+            ),
+        )
+        fragments = lance.fragment.write_fragments(
+            reader,
+            self._lance_table_uri(),
+            schema=schema,
+            data_storage_version=self._worker_write_storage_version(),
+        )
+        receipt.update(
+            fragments=[_fragment_json(fragment) for fragment in fragments],
+            rows_written=stats.rows_written,
+            client_records=stats.client_records,
+            vector_dim=int(stats.vector_dim or 0),
+            # Order-independent row identity (decimal strings: the sums exceed 64 bits).
+            stored_hash_sum=str(stats.stored_hash_sum),
+            stored_hash_xor=str(stats.stored_hash_xor),
+        )
+        return receipt
+
+    def discard_partitions(self, receipts: Iterable[dict[str, Any]]) -> None:
+        """Delete the data files that ``write_partition`` wrote for receipts that will never be committed.
+
+        Only files named in these receipts are removed, so a rejected upload leaves no orphaned
+        fragments behind and committed table data is never touched.
+        """
+
+        data_dir = Path(self._lance_table_uri()) / "data"
+        for receipt in receipts:
+            for encoded in receipt.get("fragments") or ():
+                fragment = json.loads(encoded) if isinstance(encoded, str) else encoded
+                for data_file in fragment.get("files") or ():
+                    try:
+                        (data_dir / data_file["path"]).unlink(missing_ok=True)
+                    except OSError:
+                        logger.warning("Could not remove uncommitted Lance data file %s", data_file["path"])
+
+    def commit_partitions(self, receipts: Iterable[dict[str, Any]]) -> None:
+        """Driver side of the worker-native sink: one Lance commit, then the stream path's finalize.
+
+        With ``stream_operation_id`` the commit records the same durable Lance tags as the stream path,
+        with the digest combined from the partitions' row hashes, so a retry that finds the operation
+        committed drops its own fragments instead of appending them again. A finalization failure after
+        the commit raises ``DataCommittedFinalizationError``.
+        """
+
+        receipts = list(receipts)
+        progress = {"commit_attempted": False}
+        try:
+            self._commit_worker_partitions(receipts, progress)
+        except Exception as exc:
+            # Before the commit nothing references the fragments, so a rejected upload removes them.
+            # Once the commit was attempted, the files may belong to a table version: keep them.
+            if not progress["commit_attempted"]:
+                # Type only: validation errors can quote row content; the caller gets the full exception.
+                logger.error(
+                    "Worker-write upload rejected before commit (%s); removing its fragments.", type(exc).__name__
+                )
+                self.discard_partitions(receipts)
+            raise
+
+    def _commit_worker_partitions(self, receipts: list[dict[str, Any]], progress: dict[str, bool]) -> None:
+        from lance.fragment import FragmentMetadata
+
+        operation_id = self.stream_operation_id
+        stats = _StreamStats(vector_dim=self.vector_dim)
+        fragments: list[FragmentMetadata] = []
+        for receipt in receipts:
+            stats.client_records += int(receipt["client_records"])
+            stats.rows_written += int(receipt["rows_written"])
+            stats.stored_hash_sum += int(receipt.get("stored_hash_sum") or 0)
+            stats.stored_hash_xor ^= int(receipt.get("stored_hash_xor") or 0)
+            dim = int(receipt.get("vector_dim") or 0)
+            if dim:
+                if stats.vector_dim is None:
+                    stats.vector_dim = dim
+                elif dim != int(stats.vector_dim):
+                    raise ValueError(f"worker partitions disagree on vector_dim: {dim} vs {stats.vector_dim}")
+            fragments.extend(FragmentMetadata.from_json(encoded) for encoded in receipt["fragments"])
+
+        with self._stream_lock, _table_mutation_lock(self.uri, self.table_name), self._write_lock:
+            db = lancedb.connect(uri=self.uri)
+            try:
+                existing_table = db.open_table(self.table_name)
+            except ValueError as exc:
+                if not _is_missing_lancedb_table_error(exc):
+                    raise
+                existing_table = None
+            base_version: int | None = None
+            base_rows = 0
+            if existing_table is not None:
+                existing_table.checkout_latest()
+                base_version = int(existing_table.version)
+                if operation_id is None:
+                    _assert_lancedb_table_ready(existing_table)
+                if not self.overwrite:
+                    base_rows = int(existing_table.count_rows())
+                    if stats.vector_dim is None and not self.sparse:
+                        stats.vector_dim = _schema_vector_dim(_table_schema(existing_table))
+            if stats.client_records == 0:
+                # Same as the stream path: nothing to write, and no table is created.
+                if operation_id is not None:
+                    _reject_empty_operation_bypass(existing_table, operation_id=operation_id)
+                if existing_table is not None:
+                    self._remember_table(self.table_name, existing_table)
+                return
+
+            base_schema = self._stream_schema(stats.vector_dim)
+            mode = "overwrite" if self.overwrite else "append"
+            schema, request_fingerprint, recovered_create = base_schema, None, False
+            if operation_id is not None:
+                schema, request_fingerprint, recovered_create = self._durable_stream_schema(
+                    existing_table=existing_table, base_schema=base_schema, operation_id=operation_id, mode=mode
+                )
+            appending = existing_table is not None and not self.overwrite
+            expected_schema = base_schema
+            if appending:
+                _validate_append_schema(existing_table, schema, table_name=self.table_name, uri=self.uri)
+                _validate_append_embedding_model(
+                    existing_table,
+                    self.embedding_model_name,
+                    self.embedding_model_revision,
+                    table_name=self.table_name,
+                    uri=self.uri,
+                )
+                expected_schema = _table_schema(existing_table)
+
+            markers: SinkOperationMarkers | None = None
+            if operation_id is not None:
+                # The receipts already carry the rows and digest, so recovery has no batches to drain.
+                markers = self._prepare_durable_stream_recovery(
+                    existing_table=existing_table,
+                    operation_id=operation_id,
+                    request_fingerprint=request_fingerprint,
+                    mode=mode,
+                    recovered_create=recovered_create,
+                    arrow_batches=iter(()),
+                    base_schema=base_schema,
+                    stats=stats,
+                )
+                if markers is None or markers.state == "data":
+                    # An earlier attempt with this operation ID committed the same rows: drop this copy.
+                    self.discard_partitions(receipts)
+                    if markers is None:
+                        return
+                else:
+                    base_version = markers.base_version
+
+            if markers is not None and markers.state == "data":
+                data_version = int(markers.recorded_version)
+            elif appending and stats.rows_written == 0:
+                # As the stream path: an append whose rows were all dropped keeps the table version.
+                self.discard_partitions(receipts)
+                existing_table.checkout_latest()
+                data_version = int(existing_table.version)
+                if markers is not None:
+                    markers.mark_data(existing_table, version=data_version, rows=0, digest=stats.digest)
+            else:
+                data_version = self._commit_worker_fragments(
+                    fragments,
+                    schema=schema,
+                    appending=appending,
+                    base_version=base_version,
+                    existing_table=existing_table,
+                    markers=markers,
+                    stats=stats,
+                    progress=progress,
+                )
+
+            if self.overwrite or existing_table is None or recovered_create:
+                expected_rows = stats.rows_written
+            else:
+                append_base = (
+                    base_rows if markers is None else _rows_at_version(self.uri, self.table_name, markers.base_version)
+                )
+                expected_rows = append_base + stats.rows_written
+            try:
+                self._finalize_stream_write(
+                    markers=markers,
+                    data_version=data_version,
+                    expected_schema=expected_schema,
+                    expected_rows=expected_rows,
+                    stats=stats,
+                )
+            except Exception as exc:  # noqa: BLE001 - the data is committed; callers must not replay it.
+                logger.error(
+                    "LanceDB data committed at version %s but finalization failed for table %r.",
+                    data_version,
+                    self.table_name,
+                    exc_info=True,
+                )
+                raise DataCommittedFinalizationError(
+                    self.table_name, data_version, retry_operation_id=operation_id
+                ) from exc
+
+    def _commit_worker_fragments(
+        self,
+        fragments: list[Any],
+        *,
+        schema: pa.Schema,
+        appending: bool,
+        base_version: int | None,
+        existing_table: Any | None,
+        markers: SinkOperationMarkers | None,
+        stats: _StreamStats,
+        progress: dict[str, bool],
+    ) -> int:
+        """Commit the worker fragments as one Lance version and record the durable data marker."""
+
+        import lance
+
+        operation: Any = (
+            lance.LanceOperation.Append(fragments) if appending else lance.LanceOperation.Overwrite(schema, fragments)
+        )
+        progress["commit_attempted"] = True
+        try:
+            dataset = lance.LanceDataset.commit(self._lance_table_uri(), operation, read_version=base_version)
+        except Exception:
+            # The pending marker stays when the table moved, so an append retry fails closed.
+            if markers is not None:
+                markers.abort_if_unchanged(existing_table)
+            raise
+        data_version = int(dataset.version)
+        if markers is not None:
+            try:
+                markers.mark_data(
+                    lancedb.connect(uri=self.uri).open_table(self.table_name),
+                    version=data_version,
+                    rows=stats.rows_written,
+                    digest=stats.digest,
+                )
+            except (OSError, RuntimeError, ValueError) as exc:
+                raise DataCommittedFinalizationError(
+                    self.table_name,
+                    data_version,
+                    retry_operation_id=markers.operation_id if not appending else None,
+                    recovery_action=(
+                        None
+                        if not appending
+                        else (
+                            "The durable data marker was not recorded. Do not replay this append. "
+                            f"Inspect committed version {data_version}, complete the configured index maintenance, "
+                            f"then delete pending Lance tag {markers.pending_tag!r} only after confirming "
+                            "that the version contains the intended rows."
+                        )
+                    ),
+                ) from exc
+        return data_version
+
+    def _write_stream(self, source: _StreamSource, *, operation_id: str | None) -> None:
+        """Consume one canonical stream through one coordinated LanceDB mutation."""
 
         stats = _StreamStats(vector_dim=self.vector_dim)
         with self._write_lock:
@@ -1737,35 +2389,12 @@ class LanceDB(VDB):
             if stats.vector_dim is None and existing_table is not None and not self.overwrite and not self.sparse:
                 stats.vector_dim = _schema_vector_dim(_table_schema(existing_table))
 
-            canonical_rows = self._iter_stream_rows(records, stats)
-            missing = object()
-            first_canonical_row = next(canonical_rows, missing)
-            if first_canonical_row is missing:
-                if stats.client_records == 0:
-                    if operation_id is not None:
-                        _reject_empty_operation_bypass(existing_table, operation_id=operation_id)
-                    if existing_table is not None:
-                        self._remember_table(self.table_name, existing_table)
-                    return
-
-            canonical_row_stream = chain(
-                () if first_canonical_row is missing else (first_canonical_row,),
-                canonical_rows,
-            )
-            if stats.vector_dim is None and not self.sparse:
-                stats.vector_dim, canonical_row_stream = _infer_vector_dim_with_spooled_prefix(
-                    canonical_row_stream,
-                    validate_vector_length=self.validate_vector_length,
-                    on_bad_vectors=self.on_bad_vectors,
-                )
-
-            policy_rows = _apply_deferred_bad_vector_policy(
-                canonical_row_stream,
-                vector_dim=int(stats.vector_dim or 0),
-                sparse=self.sparse,
-                on_bad_vectors=self.on_bad_vectors,
-                fill_value=self.fill_value,
-            )
+            if not source.open(stats):
+                if operation_id is not None:
+                    _reject_empty_operation_bypass(existing_table, operation_id=operation_id)
+                if existing_table is not None:
+                    self._remember_table(self.table_name, existing_table)
+                return
 
             base_schema = self._stream_schema(stats.vector_dim)
             mode = "overwrite" if self.overwrite else "append"
@@ -1793,8 +2422,7 @@ class LanceDB(VDB):
                 )
                 expected_schema = _table_schema(existing_table)
 
-            arrow_batches = _checked_batches(
-                policy_rows,
+            arrow_batches = source.arrow_batches(
                 schema=schema,
                 max_batch_bytes=self.stream_batch_bytes,
                 stats=stats,
@@ -1823,16 +2451,26 @@ class LanceDB(VDB):
                 (pa.RecordBatch.from_pylist([], schema=schema),) if first_batch is None else (first_batch,)
             )
 
-            data_version = self._mutate_stream_data(
-                db=db,
-                existing_table=existing_table,
-                markers=markers,
-                mode=mode,
-                base_version=mutation_base_version,
-                schema=schema,
-                batches=chain(initial_batches, arrow_batches),
-                stats=stats,
-            )
+            try:
+                data_version = self._mutate_stream_data(
+                    db=db,
+                    existing_table=existing_table,
+                    markers=markers,
+                    mode=mode,
+                    base_version=mutation_base_version,
+                    schema=schema,
+                    batches=chain(initial_batches, arrow_batches),
+                    stats=stats,
+                )
+            except (CommitOutcomeUnknown, DataCommittedFinalizationError):
+                raise
+            except RuntimeError as exc:
+                # LanceDB's Arrow reader surfaces our generator's exception as a
+                # generic RuntimeError; restore the original so callers keep its type.
+                input_failure = source.input_failure
+                if input_failure is not None and input_failure is not exc:
+                    raise input_failure from exc
+                raise
             try:
                 created_from_absent = not table_exists or recovered_create
                 if self.overwrite or created_from_absent:
@@ -1895,7 +2533,41 @@ class LanceDB(VDB):
             raise UnsupportedVDBOperation("LanceDB.stream_ingest() is unavailable; use the legacy global-batch path.")
 
         with self._stream_lock, _table_mutation_lock(self.uri, self.table_name):
-            self._write_stream_records(records, operation_id=self.stream_operation_id)
+            self._write_stream(_RecordStreamSource(self, records), operation_id=self.stream_operation_id)
+
+    def stream_ingest_batches(self, batches: Iterable[CanonicalRecordBatch]) -> None:
+        """Ingest canonical record batches whose vectors stay in Arrow until the table write.
+
+        Same lifecycle, table schema, drop policy, and stored rows as
+        :meth:`stream_ingest`; the vector column skips the Python list roundtrip.
+
+        Args:
+            batches: Lazy, single-pass iterable of
+                :class:`~nemo_retriever.common.vdb.records.CanonicalRecordBatch`
+                values, consumed to exhaustion inside one table mutation.
+
+        Returns:
+            None. Rows are committed when the iterable is exhausted.
+
+        Raises:
+            UnsupportedVDBOperation: If this instance does not support the
+                columnar stream (remote URI, private schema, or sparse table).
+            Exception: Whatever the input iterator raised (for example
+                ``VdbUploadError`` from record conversion) propagates with its
+                original type; nothing is committed.
+            OversizedVdbRowError: If one row exceeds ``stream_batch_bytes``.
+            ValueError: If ``on_bad_vectors="error"`` meets a bad vector.
+            CommitOutcomeUnknown, DataCommittedFinalizationError: As for
+                :meth:`stream_ingest`.
+        """
+
+        if not self.supports_stream_ingest_batches:
+            raise UnsupportedVDBOperation(
+                "LanceDB.stream_ingest_batches() is unavailable; use stream_ingest() or the legacy global-batch path."
+            )
+
+        with self._stream_lock, _table_mutation_lock(self.uri, self.table_name):
+            self._write_stream(_BatchStreamSource(self, batches), operation_id=self.stream_operation_id)
 
     def _reject_stream_controls_for_legacy_operation(self, operation: str) -> None:
         active_controls = []

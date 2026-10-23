@@ -9,10 +9,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterator
 import math
+import json
 import time
 from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
 import nvtx
 import pandas as pd
+import pyarrow as pa
 
 if TYPE_CHECKING:
     import ray.data
@@ -50,6 +52,7 @@ _DatasetSegment = Literal["all", "before_stream_ingest", "after_stream_ingest"]
 # not capacity held by another active workload.
 _RESOURCE_RELEASE_WAIT_SECONDS = 1.0
 _RESOURCE_RELEASE_POLL_SECONDS = 0.01
+_WORKER_WRITE_ACTORS = 2
 
 
 def resolve_batch_return_results(graph: Graph, return_results: bool | None) -> bool:
@@ -691,6 +694,77 @@ class RayDataExecutor(AbstractExecutor):
             raise TypeError(f"RayDataExecutor.ingest() does not accept setting(s): {unsupported}")
         return self._ingest(data, return_results=resolve_batch_return_results(self.graph, return_results))
 
+    def _worker_write_ingest(
+        self,
+        dataset: Any,
+        sink_node: Node,
+        *,
+        validate_batch: Callable[[pd.DataFrame], None] | None = None,
+        preserve_pandas_blocks: bool = False,
+    ) -> pd.DataFrame:
+        """Worker-native LanceDB sink: a pool of long-lived Ray Data write actors projects and writes
+        Lance fragments; the driver commits once.
+
+        Each of the ``_WORKER_WRITE_ACTORS`` actors runs ``_write_partition`` on one bundle of
+        ``worker_write_rows`` rows per call and returns a one-row receipt frame. Receipts are the only
+        data that crosses to the driver. ``validate_batch`` runs inside the actor before the write, so a
+        stage error surfaces as a ``RayTaskError`` wrapping it.
+        Blocks that upstream stages deliberately keep in pandas are handed over as pandas, not re-encoded
+        as Arrow. Write actors run on the driver's node, where the commit reads the fragments back.
+        """
+        import ray
+        from ray.data import ActorPoolStrategy
+        from ray.util.scheduling_strategies import NodeAffinitySchedulingStrategy
+
+        partition_writer = sink_node.operator._partition_writer()
+        rows_per_task = int(sink_node.operator._vdb.worker_write_rows)
+
+        def write_partition(block: pa.Table | pd.DataFrame) -> pd.DataFrame:
+            frame = block if isinstance(block, pd.DataFrame) else arrow_table_to_pandas(block)
+            if validate_batch is not None:
+                validate_batch(frame)
+            receipt = partition_writer(frame)
+            receipt["fragments"] = json.dumps(receipt["fragments"])
+            receipt["conversion"] = json.dumps(receipt["conversion"])
+            receipt["input_rows"] = len(frame)
+            return pd.DataFrame([receipt])
+
+        class PartitionWriter:
+            def __call__(self, block: pa.Table | pd.DataFrame) -> pd.DataFrame:
+                return write_partition(block)
+
+        # num_cpus=0: with 1-CPU writers Ray Data has no budget left for the read task,
+        # so execution never starts.
+        written = dataset.map_batches(
+            PartitionWriter,
+            compute=ActorPoolStrategy(size=_WORKER_WRITE_ACTORS),
+            num_cpus=0,
+            batch_format="pandas" if preserve_pandas_blocks else "pyarrow",
+            batch_size=rows_per_task,
+            zero_copy_batch=True,
+            scheduling_strategy=NodeAffinitySchedulingStrategy(
+                node_id=ray.get_runtime_context().get_node_id(), soft=False
+            ),
+        )
+        receipts: list[dict[str, Any]] = []
+        try:
+            for row in written.iter_rows():
+                receipts.append(
+                    {**row, "fragments": json.loads(row["fragments"]), "conversion": json.loads(row["conversion"])}
+                )
+        except Exception as exc:
+            # Type only: a stage error can quote row content; the caller gets the full exception.
+            logger.error(
+                "Worker write task failed (%s); removing the fragments of %d finished tasks.",
+                type(exc).__name__,
+                len(receipts),
+            )
+            sink_node.operator._vdb.discard_partitions(receipts)
+            raise
+        submitted_records = sink_node.operator._commit_partitions(receipts)
+        input_rows = sum(int(receipt["input_rows"]) for receipt in receipts)
+        return pd.DataFrame([{"input_rows": input_rows, "submitted_records": submitted_records}])
+
     @nvtx.annotate("nrl.batch::pipeline.ingest", color="blue")
     def _ingest(
         self,
@@ -712,6 +786,29 @@ class RayDataExecutor(AbstractExecutor):
             data,
             segment="before_stream_ingest",
         )
+
+        supports_worker_write = getattr(sink_operator, "_supports_worker_write", None)
+        if supports_worker_write is not None and supports_worker_write():
+            preserve_pandas_blocks = _requires_stable_pandas_blocks(nodes[:sink_index])
+            if return_results:
+                # The write tasks and the returned rows read the same computed blocks.
+                dataset = dataset.materialize()
+            summary = self._worker_write_ingest(
+                dataset,
+                nodes[sink_index],
+                validate_batch=validate_batch,
+                preserve_pandas_blocks=preserve_pandas_blocks,
+            )
+            if not return_results:
+                return summary
+            if has_downstream_nodes:
+                downstream = self._build_dataset(
+                    dataset,
+                    segment="after_stream_ingest",
+                    input_preserves_pandas_output=preserve_pandas_blocks,
+                )
+                return ray_dataset_to_pandas(downstream)
+            return ray_dataset_to_pandas(dataset)
 
         terminal_frames: list[pd.DataFrame] = []
         input_rows = 0
