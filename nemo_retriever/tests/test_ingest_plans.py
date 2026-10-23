@@ -14,6 +14,7 @@ from nemo_retriever.operators.operator_archetype import ArchetypeOperator
 from nemo_retriever.operators.cpu_operator import CPUOperator
 from nemo_retriever.operators.gpu_operator import GPUOperator
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
+from nemo_retriever.ingest.plan import IngestExtractBatchOptions
 from nemo_retriever.ingestor.plans import BaseIngestPlan
 from nemo_retriever.common.params import ASRParams
 from nemo_retriever.common.params import AudioChunkParams
@@ -28,6 +29,21 @@ from nemo_retriever.common.params import VdbUploadParams
 from nemo_retriever.common.params import WebhookParams
 from nemo_retriever.common.ray_resource_hueristics import ClusterResources
 from nemo_retriever.common.ray_resource_hueristics import Resources
+
+
+def test_extract_batch_options_preserve_existing_positional_arguments() -> None:
+    batch = IngestExtractBatchOptions(1, 2, 3, 0.5, 4, 8, 0.25, 0.5, 5, 16, 0.75, 1.0, 6, 32, 1.25, 0.5, 7, 64, 1.0)
+
+    assert batch.page_elements_cpus_per_actor == 0.25
+    assert batch.page_elements_gpus_per_actor == 0.5
+    assert batch.ocr_workers == 5
+    assert batch.table_structure_cpus_per_actor == 1.25
+    assert batch.table_structure_gpus_per_actor == 0.5
+    assert batch.nemotron_parse_workers == 7
+    assert batch.nemotron_parse_batch_size == 64
+    assert batch.nemotron_parse_gpus_per_actor == 1.0
+    assert batch.page_elements_repartition is None
+    assert batch.table_structure_repartition is None
 
 
 def _linear_nodes(graph):
@@ -486,6 +502,17 @@ def test_batch_tuning_leaves_embed_reshape_concurrency_unset_by_default() -> Non
     assert "ExplodeContentToRows" not in overrides
 
 
+def test_batch_tuning_to_node_overrides_can_skip_embed_repartition() -> None:
+    embed_params = EmbedParams(
+        batch_tuning=BatchTuningParams(embed_batch_size=128, embed_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(None, embed_params)
+
+    assert overrides["_BatchEmbedActor"]["batch_size"] == 128
+    assert "target_num_rows_per_block" not in overrides["_BatchEmbedActor"]
+
+
 def test_batch_preflight_reduces_default_pools_on_constrained_cluster() -> None:
     from nemo_retriever.graph.executor import RayDataExecutor
 
@@ -700,6 +727,29 @@ def test_batch_tuning_to_node_overrides_honors_table_structure_tuning() -> None:
     assert overrides["TableStructureActor"]["target_num_rows_per_block"] == 12
     assert overrides["TableStructureActor"]["num_cpus"] == 0.4
     assert overrides["TableStructureActor"]["num_gpus"] == 0.25
+
+
+def test_batch_tuning_to_node_overrides_can_skip_page_elements_repartition() -> None:
+    extract_params = ExtractParams(
+        batch_tuning=BatchTuningParams(page_elements_batch_size=8, page_elements_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["PageElementDetectionActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["PageElementDetectionActor"]
+
+
+def test_batch_tuning_to_node_overrides_can_skip_table_structure_repartition() -> None:
+    extract_params = ExtractParams(
+        use_table_structure=True,
+        batch_tuning=BatchTuningParams(table_structure_batch_size=8, table_structure_repartition=False),
+    )
+
+    overrides = batch_tuning_to_node_overrides(extract_params=extract_params, embed_params=None)
+
+    assert overrides["TableStructureActor"]["batch_size"] == 8
+    assert "target_num_rows_per_block" not in overrides["TableStructureActor"]
 
 
 def test_batch_tuning_to_node_overrides_repartitions_pdf_pages_for_extraction() -> None:

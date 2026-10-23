@@ -205,7 +205,8 @@ def batch_tuning_to_node_overrides(
         explicit_bs = getattr(embed_tuning, "embed_batch_size", None) if embed_tuning is not None else None
         embed_bs = _positive(explicit_bs) or (plan.embed_batch_size if plan else None)
         _set(_BatchEmbedActor.__name__, "batch_size", embed_bs)
-        if embed_bs:
+        embed_repartition = getattr(embed_tuning, "embed_repartition", True) if embed_tuning is not None else True
+        if embed_bs and embed_repartition:
             overrides.setdefault(_BatchEmbedActor.__name__, {})["target_num_rows_per_block"] = embed_bs
         explicit_embed_workers = getattr(embed_tuning, "embed_workers", None) if embed_tuning is not None else None
         embed_workers_fallback = plan.embed_initial_actors if plan else None
@@ -304,7 +305,10 @@ def batch_tuning_to_node_overrides(
             getattr(extract_tuning, "page_elements_batch_size", None) if extract_tuning is not None else None
         ) or (plan.page_elements_batch_size if plan else None)
         _set(PageElementDetectionActor.__name__, "batch_size", pe_bs)
-        if pe_bs:
+        pe_repartition = (
+            getattr(extract_tuning, "page_elements_repartition", True) if extract_tuning is not None else True
+        )
+        if pe_bs and pe_repartition:
             overrides.setdefault(PageElementDetectionActor.__name__, {})["target_num_rows_per_block"] = pe_bs
         page_elements_concurrency = (
             _resolve(
@@ -336,7 +340,10 @@ def batch_tuning_to_node_overrides(
             getattr(extract_tuning, "table_structure_batch_size", None) if extract_tuning is not None else None
         ) or (plan.table_structure_batch_size if plan else None)
         _set(TableStructureActor.__name__, "batch_size", ts_bs)
-        if ts_bs:
+        ts_repartition = (
+            getattr(extract_tuning, "table_structure_repartition", True) if extract_tuning is not None else True
+        )
+        if ts_bs and ts_repartition:
             overrides.setdefault(TableStructureActor.__name__, {})["target_num_rows_per_block"] = ts_bs
         ts_concurrency = _resolve(
             getattr(extract_tuning, "table_structure_workers", None) if extract_tuning is not None else None,

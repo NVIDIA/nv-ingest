@@ -97,6 +97,60 @@ For remote image-bearing inputs, the request size is at most `min(inference_batc
 
 Benchmark these settings with representative documents. Monitor CPU capacity, endpoint GPU memory, HTTP errors, and output counts as you increase concurrency or batch sizes.
 
+### Control row repartitioning
+
+!!! note "Unreleased controls"
+
+    These repartition controls are under development. They are not available
+    in current NVIDIA `main` or a released package.
+
+In batch mode, the following `BatchTuningParams` controls enable size-based Ray
+repartitioning before each stage. Each control defaults to `True`.
+
+| Stage | Control | Row-batch setting |
+| --- | --- | --- |
+| Page Elements | `page_elements_repartition` | `page_elements_batch_size` |
+| Table Structure | `table_structure_repartition` | `table_structure_batch_size` |
+| Embedding | `embed_repartition` | `embed_batch_size` |
+
+When enabled and a stage has a positive batch size, the library uses that size
+as `target_num_rows_per_block` before the stage runs. Set a control to `False`
+to omit this derived block-size target. The stage still uses its configured
+batch size and worker settings. Required grouping in other graph stages still
+applies.
+
+The following example disables these three block-size targets. Replace
+`/path/to/your/document.pdf` with a PDF file that you supply.
+
+```python
+from nemo_retriever import create_ingestor
+from nemo_retriever.common.params import BatchTuningParams
+
+chunks = (
+    create_ingestor(run_mode="batch")
+    .files(["/path/to/your/document.pdf"])
+    .extract(
+        batch_tuning=BatchTuningParams(
+            page_elements_repartition=False,
+            table_structure_repartition=False,
+        )
+    )
+    .embed(
+        batch_tuning=BatchTuningParams(
+            embed_repartition=False,
+        )
+    )
+    .ingest()
+)
+```
+
+For typed ingest plans, set the extraction controls in
+`IngestExtractBatchOptions` and the embedding control in
+`IngestEmbedBatchOptions`. These optional fields default to `None`, which
+preserves the `True` defaults when the shared ingest plan resolves them.
+Compare throughput, memory use, errors, and extracted outputs against a
+representative baseline after changing these controls.
+
 ## Profile batch ingestion with Nsight Systems
 
 Batch mode emits NVIDIA Tools Extension (NVTX) ranges from the driver and Ray

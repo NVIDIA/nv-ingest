@@ -144,6 +144,16 @@ def test_embed_reshape_workers_accepts_executor_default_or_positive_count(worker
     assert nested.batch_tuning.embed_reshape_workers == workers
 
 
+def test_build_embed_option_kwargs_propagates_repartition_opt_out():
+    kwargs = build_embed_option_kwargs(
+        "https://embed.example.com/v1/embeddings",
+        "nvidia/Nemotron-3.5-Embed-1B-BF16",
+        embed_repartition=False,
+    )
+
+    assert kwargs["batch_tuning"].embed_repartition is False
+
+
 def test_build_embed_option_kwargs_defers_remote_model_provider_prefix():
     kwargs = build_embed_option_kwargs(
         "https://litellm.example.com/v1/embeddings",
@@ -192,9 +202,10 @@ def test_build_embed_option_kwargs_retains_prefix_when_model_is_omitted():
     }
 
 
-# ===================================================================
+# ============================================================
+
 # embed_granularity
-# ===================================================================
+# ============================================================
 
 
 class TestEmbedParamsGranularity:

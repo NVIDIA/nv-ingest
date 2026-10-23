@@ -91,6 +91,7 @@ def build_embed_option_kwargs(
     embed_model_revision: str | None = None,
     embed_inference_batch_size: int | None = None,
     embed_reshape_workers: int | None = None,
+    embed_repartition: bool | None = None,
 ) -> Dict[str, Any]:
     """Build ``EmbedParams`` kwargs from CLI/request option values."""
     embed_kwargs: Dict[str, Any] = {}
@@ -122,6 +123,7 @@ def build_embed_option_kwargs(
         embed_workers=embed_workers,
         embed_reshape_workers=embed_reshape_workers,
         embed_batch_size=embed_batch_size,
+        embed_repartition=embed_repartition,
         embed_cpus_per_actor=embed_cpus_per_actor,
         embed_gpus_per_actor=embed_gpus_per_actor,
     )
@@ -135,6 +137,7 @@ def _build_embed_batch_tuning(
     embed_workers: int | None,
     embed_reshape_workers: int | None,
     embed_batch_size: int | None,
+    embed_repartition: bool | None,
     embed_cpus_per_actor: float | None,
     embed_gpus_per_actor: float | None,
 ) -> BatchTuningParams | None:
@@ -146,6 +149,7 @@ def _build_embed_batch_tuning(
             "embed_workers": embed_workers,
             "embed_reshape_workers": embed_reshape_workers,
             "embed_batch_size": embed_batch_size,
+            "embed_repartition": embed_repartition,
             "embed_cpus_per_actor": embed_cpus_per_actor,
             "gpu_embed": embed_gpus_per_actor,
         }.items()
