@@ -375,6 +375,240 @@ For LiteLLM `nvidia_nim/...` models, including the default `LiteLLMClient` and `
 
 Serializing a graph containing a literal API key fails with a contextual error instead of guessing which provider credential should be used on a worker.
 
+## Select a dense ingest index family { #dense-ingest-index-family }
+
+!!! note "Unreleased option"
+
+    `IngestStorageOptions.index_type` is under development. It is not
+    available in current NVIDIA `main` or a released package.
+
+Typed library ingestion accepts an optional vector-index family through
+`IngestPlanRequest.storage.index_type`. Import `IngestStorageOptions` from
+`nemo_retriever.ingest.plan` and use the following values.
+
+| Value | Behavior |
+| --- | --- |
+| `None` | Omits the override and preserves existing upload kwargs and backend defaults. This is the default. |
+| `"IVF_HNSW_SQ"` | Explicitly selects the existing default vector-index family. |
+| `"IVF_FLAT"` | Selects the backend's IVF flat vector-index family. |
+
+An explicit family requires resolved `index_mode="dense"` and
+`overwrite=True` to build the requested vector index. Unsupported values,
+sparse or hybrid modes, and non-overwrite requests raise `ValueError` during
+plan resolution. Fresh `index_mode="auto"` resolves to hybrid, so set
+`index_mode="dense"` explicitly. This setting does not change a prebuilt
+index in place.
+
+The following example creates a typed batch ingest plan and executes it.
+Replace the input path with your PDF. Use a new table name because
+`overwrite=True` replaces an existing target table.
+
+```python
+from nemo_retriever.ingest.execution import execute_ingest_plan
+from nemo_retriever.ingest.plan import (
+    IngestPlanRequest,
+    IngestRuntimeOptions,
+    IngestSourceOptions,
+    IngestStorageOptions,
+    resolve_ingest_plan,
+)
+
+plan = resolve_ingest_plan(
+    IngestPlanRequest(
+        source=IngestSourceOptions(documents=["/path/to/your/document.pdf"]),
+        runtime=IngestRuntimeOptions(run_mode="batch"),
+        storage=IngestStorageOptions(
+            lancedb_uri="./lancedb-index-family",
+            table_name="dense-ivf-flat",
+            overwrite=True,
+            index_mode="dense",
+            index_type="IVF_FLAT",
+        ),
+    )
+)
+result = execute_ingest_plan(plan)
+```
+
+The plan forwards an explicit value to the existing `vdb_kwargs.index_type`
+option. It does not change query search budgets or add other index-tuning
+controls. Existing small-table behavior still applies: IVF vector-index
+creation requires at least 2 rows.
+
+The CLI does not expose a standalone index-family flag.
+
+`IVF_FLAT` does not guarantee exhaustive search results or better throughput.
+For comparison guidance, refer to
+[Evaluate a dense index family](performance_guide.md#evaluate-dense-index-family).
+
+## Tune HNSW search { #hnsw-query-ef }
+
+!!! note "Unreleased option"
+
+    Explicit `ef` is under development. It is not available in current
+    NVIDIA `main` or a released package.
+
+For LanceDB HNSW indexes, `ef` controls the search candidate list size. Larger
+values can improve recall at the cost of query latency. They do not guarantee
+that indexed search matches exhaustive search. This setting applies to dense
+retrieval and the vector search in hybrid retrieval.
+
+Pass a positive Python integer to set `ef`. Booleans, floating-point values,
+strings, zero, and negative values raise `ValueError`. The default, `None`,
+leaves the native LanceDB builder setting unchanged. It does not establish an
+effective numeric default.
+
+Use `QueryRetrievalOptions.ef` with the typed local query workflow.
+
+```python
+from nemo_retriever.query.options import (
+    QueryRequest,
+    QueryRetrievalOptions,
+    QueryStorageOptions,
+)
+from nemo_retriever.query.workflow import query_documents
+
+hits = query_documents(
+    QueryRequest(
+        query="What methods improve document retrieval?",
+        retrieval=QueryRetrievalOptions(retrieval_mode="dense", ef=4096),
+        storage=QueryStorageOptions(lancedb_uri="./lancedb", table_name="nemo-retriever"),
+    )
+)
+```
+
+`Retriever.query()` also accepts `ef` in its per-query `vdb_kwargs`.
+
+```python
+from nemo_retriever.graph.retriever import Retriever
+
+retriever = Retriever(vdb_kwargs={"uri": "./lancedb", "table_name": "nemo-retriever"})
+hits = retriever.query("What methods improve document retrieval?", vdb_kwargs={"ef": 4096})
+```
+
+The backend can impose additional bounds based on its candidate and
+refinement settings. Check the installed LanceDB version before choosing an
+explicit value. The examples use `4096` to illustrate configuration; this
+value is not a retrieval-quality or latency recommendation. `ef` does not
+change `top_k` or the `candidate_k` result bound.
+
+Sparse retrieval rejects explicit `ef`. Typed service and agentic query
+workflows also reject it rather than ignoring it. The CLI does not expose an
+`--ef` option.
+
+## Compare indexed and exact dense search { #indexed-exact-dense-search }
+
+!!! note "Unreleased diagnostic"
+
+    `Retriever.query_compare_exact()` and explicit `ef` tuning are under
+    development. These APIs are not available in current NVIDIA `main` or a
+    released package.
+
+Use `Retriever.query_compare_exact()` to compare approximate nearest neighbor
+(ANN) search with exhaustive dense search. The method embeds your query once
+and submits the same ordered vectors to both searches on one frozen LanceDB
+table version. Normal `Retriever.query()` and `Retriever.queries()` behavior
+remains unchanged.
+
+The diagnostic supports `run_mode="local"`, the default query graph, and a
+dense-only filesystem LanceDB table with a verified `l2` vector index. The
+table must have exactly one index on the selected vector column. The method rejects
+service execution, custom graphs, reranking, and sparse or hybrid retrieval.
+Agentic retrieval and collection service workflows do not expose this
+diagnostic.
+
+The following example queries an existing dense-only table. Use the same
+LanceDB location that you configured during ingestion. The table must retain
+its embedding-model identity so normal query compatibility checks can resolve
+the matching model and revision.
+
+```python
+from nemo_retriever.graph.retriever import Retriever
+
+retriever = Retriever(
+    vdb_kwargs={"uri": "./lancedb", "table_name": "nemo-retriever"},
+)
+comparison = retriever.query_compare_exact(
+    "What methods improve document retrieval?",
+    top_k=10,
+    candidate_k=50,
+)
+
+indexed_hits = comparison.indexed_hits
+exact_hits = comparison.exact_hits
+shared_input_evidence = comparison.evidence
+```
+
+`DenseSearchComparisonResult` contains `indexed_hits`, `exact_hits`, and typed
+`evidence`. Import the result and evidence types from
+`nemo_retriever.query.comparison` when you need explicit type annotations.
+Both hit lists use the normal retrieval hit format. `top_k` limits final
+results after normal hit shaping. `candidate_k` controls the candidate bound
+shared by both searches and must be at least `top_k`. The method also
+accepts `page_dedup`, `content_types`, `vdb_kwargs`, and `embed_kwargs`.
+
+To tune HNSW search, pass `vdb_kwargs={"ef": 4096}` to
+`query_compare_exact()`. Only the indexed search applies this value. The exact
+search never applies `ef`. The evidence field `indexed_ef` records the explicit
+integer, or `None` when you request the native default. It does not report the
+native effective value. Refer to [Tune HNSW search](#hnsw-query-ef) for accepted
+values and tuning guidance.
+
+For an overlength query, the normal embedding path can produce multiple rows.
+Both searches receive those rows in the same order and apply the existing
+fusion policy independently. Each call accepts up to 256 expanded query rows
+and vector dimensions from 1 through 65,536. Refer to
+[Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+
+### Verify the shared inputs { #indexed-exact-shared-inputs }
+
+The comparison evidence records the frozen table identity, version, vector
+column, dimension, effective distance metric, and embedding-model identity.
+It also records ordered query-row identities and hashes of the vector values
+submitted to each search. The diagnostic verifies complete row coverage and
+equal shared inputs. An invalid vector, changed table identity, or evidence
+mismatch raises an error instead of returning a successful comparison.
+
+Successful evidence sets `complete=True` and `timing_qualification=False`.
+You can convert the evidence to ordinary Python containers with
+`dataclasses.asdict()` for YAML serialization. Vector hashes use SHA-256 over
+an IEEE 754 little-endian float64 encoding of the extracted Python values.
+Metadata hashes use deterministic safe YAML. Hashing does not change the
+values submitted to either search.
+
+The evidence contains hashes and metadata rather than query vectors, raw
+query text, images, or model tensors. Vectors remain in memory for the current
+query. Repeated calls with the same configuration reuse a separate diagnostic
+graph and embedding model. Calls on one `Retriever` are serialized, and each
+call clears its temporary capture state. Query vectors are not cached by query
+text. The hit lists retain their normal document text and metadata, so they
+are separate from the hash-only evidence privacy contract.
+
+The indexed search applies `ef` only when you supply it. The exact search
+calls LanceDB's `bypass_vector_index()`
+query-builder method to scan the stored vectors. It does not rebuild the index
+or re-ingest documents. ANN probe, refinement, and `ef` settings do not tune
+the exhaustive search.
+
+### Interpret the comparison { #indexed-exact-interpretation }
+
+Matching results reduce the indexed-search explanation for this fixed table
+and these query vectors. They do not establish that earlier runs used the
+same query vectors, corpus vectors, or model inputs.
+
+Different results establish a search-path contribution with shared inputs.
+Inspect distance ties and their ordering before attributing a recall or
+ranking difference to missed neighbors. The comparison does not establish a
+cause for differences between separately ingested tables.
+
+Use both hit lists with the same evaluator, relevance judgments, document-ID
+mapping, and cutoff values. The method returns retrieval results and evidence;
+it does not compute retrieval-quality metrics.
+
+This is a ranking diagnostic. Hashing, exhaustive search, and the sequential
+search order change the work and cache state. Exclude the complete diagnostic
+run from throughput qualification and baseline promotion. Search durations
+cannot establish production latency or throughput gains.
+
 ## Generated Python API { #generated-python-api }
 
 The signatures below are the supported public ingest, retrieve, generation, and parameter surfaces. Private helpers, module loggers, and duplicate re-exports are omitted.
@@ -541,6 +775,9 @@ queries are split losslessly, searched, and fused before optional reranking
 with the original full query text. `top_k` limits the final hits per original
 query. For the fusion policy, refer to
 [Text inputs that exceed the model limit](embedding.md#text-input-overflow).
+
+For the unreleased paired search API, refer to
+[Compare indexed and exact dense search](#indexed-exact-dense-search).
 
 `Retriever.answer()` requires an `LLMClient` and returns `AnswerResult`. Pass an `AnswerJudge` only when you also pass `reference`. Those types are documented in [LLM clients, tasks, and results](#llm-clients-tasks-and-results).
 
