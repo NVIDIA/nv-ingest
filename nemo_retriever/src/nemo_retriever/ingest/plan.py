@@ -217,6 +217,7 @@ class IngestStorageOptions:
     table_name: str = "nemo-retriever"
     overwrite: bool = True
     index_mode: IngestIndexModeValue = "auto"
+    index_type: Literal["IVF_HNSW_SQ", "IVF_FLAT"] | None = None
 
 
 @dataclass(frozen=True)
@@ -616,6 +617,12 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
     embed = request.embed
     storage = request.storage
 
+    if storage.index_type is not None:
+        if storage.index_type not in ("IVF_HNSW_SQ", "IVF_FLAT"):
+            raise ValueError("storage.index_type must be IVF_HNSW_SQ, IVF_FLAT, or None.")
+        if storage.overwrite is not True:
+            raise ValueError("storage.index_type requires overwrite=True to build the requested vector index.")
+
     validated_run_mode = _validate_run_mode(runtime.run_mode)
     validated_profile = validate_ingest_profile(source.profile)
     validated_input_type = validate_ingest_input_type(source.input_type)
@@ -628,6 +635,8 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
         overwrite=storage.overwrite,
         existing_mode=existing_index_mode,
     )
+    if storage.index_type is not None and resolved_index_mode != "dense":
+        raise ValueError("storage.index_type requires index_mode='dense'.")
     validated_audio_split_type = _validate_audio_split_type(media.audio_split_type)
     document_list = expand_ingest_documents(source.documents, input_type=validated_input_type)
     branches = plan_extraction_branches(build_input_manifest(document_list))
@@ -724,6 +733,8 @@ def resolve_ingest_plan(request: IngestPlanRequest) -> ResolvedIngestPlan:
     }
     # Pass the resolved mode explicitly so the upload does not resolve ``auto`` again.
     vdb_upload_kwargs.update(lancedb_index_mode_kwargs(resolved_index_mode))
+    if storage.index_type is not None:
+        vdb_upload_kwargs["index_type"] = storage.index_type
     if embedding_model_name is not None:
         vdb_upload_kwargs["embedding_model_name"] = embedding_model_name
         if embed.embed_model_name is not None:
