@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import gc
 import weakref
+from types import SimpleNamespace
 from unittest.mock import Mock
 
 import pandas as pd
@@ -67,17 +68,25 @@ def executor_for(monkeypatch, backend, batches):
     return executor
 
 
-@pytest.mark.parametrize("return_results", [True, False])
-def test_streaming_summary_releases_batches_and_preserves_canonical_records(monkeypatch, return_results):
-    batches = GeneratedBatches(check_release=not return_results)
+@pytest.mark.parametrize(
+    "options,retain",
+    [
+        ({}, False),
+        ({"return_results": None}, False),
+        ({"return_results": False}, False),
+        ({"return_results": True}, True),
+    ],
+)
+def test_streaming_summary_releases_batches_and_preserves_canonical_records(monkeypatch, options, retain):
+    batches = GeneratedBatches(check_release=not retain)
     backend = StreamingBackend()
     executor = executor_for(monkeypatch, backend, batches)
 
-    result = executor.ingest(object(), return_results=return_results)
+    result = executor.ingest(object(), **options)
 
     assert backend.texts == [f"page-{i}" for i in range(6)]
     assert batches.closed
-    if return_results:
+    if retain:
         assert len(result) == 12
         assert "result_only" in result
     else:
@@ -86,7 +95,8 @@ def test_streaming_summary_releases_batches_and_preserves_canonical_records(monk
         assert all(ref() is None for ref in batches.refs)
 
 
-def test_summary_does_not_return_success_on_finalization_failure(monkeypatch):
+@pytest.mark.parametrize("options", [{}, {"return_results": None}, {"return_results": False}])
+def test_summary_does_not_return_success_on_finalization_failure(monkeypatch, options):
     class FailingBackend(StreamingBackend):
         def stream_ingest(self, records):
             super().stream_ingest(records)
@@ -95,7 +105,7 @@ def test_summary_does_not_return_success_on_finalization_failure(monkeypatch):
     batches = GeneratedBatches(check_release=True)
     executor = executor_for(monkeypatch, FailingBackend(), batches)
     with pytest.raises(RuntimeError, match="index creation failed"):
-        executor.ingest(object(), return_results=False)
+        executor.ingest(object(), **options)
     assert batches.closed
 
 
@@ -140,6 +150,9 @@ def test_summary_rejects_unsupported_graph_before_execution(monkeypatch, shape):
 @pytest.mark.parametrize(
     "options",
     [
+        {},
+        {"return_results": None},
+        {"params": IngestExecuteParams()},
         {"return_results": False},
         {"params": {"return_results": False}},
         {"params": IngestExecuteParams(return_results=False)},
@@ -242,3 +255,153 @@ def test_empty_summary_rejects_invalid_pipeline(monkeypatch, shape):
         ingestor.ingest(return_results=False)
 
     construct.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "options,retain",
+    [
+        ({}, False),
+        ({"return_results": None}, False),
+        ({"params": {}}, False),
+        ({"params": IngestExecuteParams()}, False),
+        ({"params": IngestExecuteParams().model_dump()}, False),
+        ({"params": IngestExecuteParams.model_validate_json(IngestExecuteParams().model_dump_json())}, False),
+        ({"return_results": True}, True),
+        ({"params": IngestExecuteParams(return_results=True)}, True),
+        ({"params": {"return_results": True}}, True),
+        ({"params": IngestExecuteParams(return_results=False), "return_results": True}, True),
+        ({"params": {"return_results": True}, "return_results": None}, False),
+        ({"params": IngestExecuteParams(return_results=True), "return_results": False}, False),
+        ({"return_failures": True}, True),
+    ],
+)
+def test_public_context_default_streams_without_retaining_batches(monkeypatch, tmp_path, options, retain):
+    document = tmp_path / "doc.txt"
+    document.write_text("source text")
+    ingestor = GraphIngestor(run_mode="batch").files([str(document)]).extract().vdb_upload()
+    backend = StreamingBackend()
+    batches = GeneratedBatches(check_release=not retain)
+    cluster = SimpleNamespace(
+        total_gpu_count=lambda: 0,
+        available_gpu_count=lambda: 0,
+        total_cpu_count=lambda: 4,
+        available_cpu_count=lambda: 4,
+    )
+    monkeypatch.setattr(ingestor, "_ensure_batch_runtime", lambda: (None, cluster))
+    monkeypatch.setattr("nemo_retriever.operators.vdb._construct_vdb", lambda *args, **kwargs: backend)
+    monkeypatch.setattr(RayDataExecutor, "_build_dataset", lambda *args, **kwargs: batches)
+
+    result = ingestor.ingest(**options)
+    if options.get("return_failures"):
+        result, failures = result
+        assert failures == []
+
+    assert backend.texts == [f"page-{i}" for i in range(6)]
+    assert batches.closed
+    assert ingestor.get_dataset() is result
+    if retain:
+        assert len(result) == 12
+        assert "result_only" in result
+    else:
+        assert result.to_dict("records") == [{"input_rows": 12, "submitted_records": 6}]
+        gc.collect()
+        assert all(ref() is None for ref in batches.refs)
+
+
+@pytest.mark.parametrize("shape", ["streaming", "legacy_sink", "downstream", "invalid_config"])
+def test_empty_context_default_resolves_capability_before_starting_ray(monkeypatch, shape):
+    ingestor = GraphIngestor(run_mode="batch").texts([" "]).vdb_upload()
+    backend = StreamingBackend()
+    backend.supports_stream_ingest = shape != "legacy_sink"
+    if shape == "downstream":
+        ingestor.webhook(endpoint_url="http://invalid.test/webhook")
+    construct = Mock(return_value=backend)
+    if shape == "invalid_config":
+        construct.side_effect = ValueError("invalid backend configuration")
+    monkeypatch.setattr("nemo_retriever.operators.vdb._construct_vdb", construct)
+    monkeypatch.setattr(ingestor, "_ensure_batch_runtime", lambda: pytest.fail("empty input must not start Ray"))
+
+    if shape == "invalid_config":
+        with pytest.raises(ValueError, match="invalid backend configuration"):
+            ingestor.ingest()
+    else:
+        result = ingestor.ingest()
+        if shape == "streaming":
+            assert result.to_dict("records") == [{"input_rows": 0, "submitted_records": 0}]
+        else:
+            assert result.empty
+            assert "input_rows" not in result.columns
+        assert ingestor.get_dataset() is result
+    construct.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "run_mode,upload,error_policy,return_failures",
+    [
+        ("inprocess", False, "raise", False),
+        ("inprocess", True, "raise", False),
+        ("batch", False, "raise", False),
+        ("batch", True, "collect", False),
+        ("batch", True, "raise", True),
+    ],
+)
+def test_context_default_preserves_incompatible_graph_workflows(
+    monkeypatch, run_mode, upload, error_policy, return_failures
+):
+    ingestor = GraphIngestor(run_mode=run_mode, error_policy=error_policy).texts([" "])
+    if upload:
+        ingestor.vdb_upload()
+    monkeypatch.setattr(ingestor, "_ensure_batch_runtime", lambda: pytest.fail("empty input must not start Ray"))
+    result = ingestor.ingest(params=IngestExecuteParams(return_failures=return_failures))
+    if return_failures:
+        result, failures = result
+        assert failures == []
+    assert result.empty
+    assert "input_rows" not in result.columns
+
+
+@pytest.mark.parametrize("shape", ["no_sink", "legacy_sink", "downstream", "multiple_sinks"])
+@pytest.mark.parametrize("options", [{}, {"return_results": None}, {"return_results": True}])
+def test_direct_executor_retains_results_for_unsupported_summary_graphs(monkeypatch, shape, options):
+    backend = StreamingBackend()
+    backend.supports_stream_ingest = shape != "legacy_sink"
+    graph = Graph()
+    if shape != "no_sink":
+        graph = graph >> IngestVdbOperator(vdb=backend)
+    if shape == "downstream":
+        graph = graph >> UDFOperator(lambda batch: batch)
+    elif shape == "multiple_sinks":
+        graph = graph >> IngestVdbOperator(vdb=StreamingBackend())
+    executor = RayDataExecutor(graph)
+    data = object()
+    retained = pd.DataFrame({"text": ["extracted row"]})
+    execute = Mock(return_value=retained)
+    monkeypatch.setattr(executor, "_ingest", execute)
+
+    result = executor.ingest(data, **options)
+
+    assert result is retained
+    execute.assert_called_once_with(data, return_results=True)
+
+
+def test_fluent_collect_policy_retains_rows_with_terminal_streaming_vdb(monkeypatch, tmp_path):
+    document = tmp_path / "doc.txt"
+    document.write_text("source text")
+    ingestor = GraphIngestor(run_mode="batch", error_policy="collect").files([str(document)]).extract().vdb_upload()
+    backend = StreamingBackend()
+    batches = GeneratedBatches()
+    cluster = SimpleNamespace(
+        total_gpu_count=lambda: 0,
+        available_gpu_count=lambda: 0,
+        total_cpu_count=lambda: 4,
+        available_cpu_count=lambda: 4,
+    )
+    monkeypatch.setattr(ingestor, "_ensure_batch_runtime", lambda: (None, cluster))
+    monkeypatch.setattr("nemo_retriever.operators.vdb._construct_vdb", lambda *args, **kwargs: backend)
+    monkeypatch.setattr(RayDataExecutor, "_build_dataset", lambda *args, **kwargs: batches)
+
+    result = ingestor.ingest()
+
+    assert len(result) == 12
+    assert "result_only" in result
+    assert backend.texts == [f"page-{i}" for i in range(6)]

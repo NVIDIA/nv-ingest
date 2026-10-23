@@ -176,9 +176,14 @@ def test_service_empty_inline_list_preserves_explicit_extraction_mode(
         ("compact", ["text", "source_id", "element_type", "page_number"]),
     ],
 )
+@pytest.mark.parametrize(
+    "execute_options",
+    [{}, {"return_results": None}, {"return_results": False}, {"return_results": True}],
+)
 def test_service_blank_inline_corpus_short_circuits_with_schema(
     result_schema: str,
     expected_columns: list[str],
+    execute_options: dict[str, bool | None],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     ingestor = ServiceIngestor(base_url="http://retriever.example").texts(["", "  \n"]).embed()
@@ -188,12 +193,16 @@ def test_service_blank_inline_corpus_short_circuits_with_schema(
         lambda **kwargs: pytest.fail("empty inline corpus must not contact the service"),
     )
 
-    result = ingestor.ingest(result_schema=result_schema)
+    result = ingestor.ingest(result_schema=result_schema, **execute_options)
 
     assert result.job_id is None
     assert result.failures == []
-    assert result.dataframe.empty
-    assert result.dataframe.columns.tolist() == expected_columns
+    if execute_options.get("return_results") is True:
+        assert result.dataframe is not None
+        assert result.dataframe.empty
+        assert result.dataframe.columns.tolist() == expected_columns
+    else:
+        assert result.dataframe is None
     assert ingestor._collect_inputs() == []
 
 

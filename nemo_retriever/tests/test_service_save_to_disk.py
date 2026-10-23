@@ -223,7 +223,7 @@ def test_ingest_reuses_one_result_client_across_documents(monkeypatch: pytest.Mo
         return client
 
     monkeypatch.setattr(ing, "_new_result_fetch_client", client_factory)
-    result = ing.ingest(result_schema="compact")
+    result = ing.ingest(return_results=True, result_schema="compact")
 
     assert len(clients) == 1
     assert clients[0].is_closed
@@ -259,7 +259,7 @@ def test_ingest_retries_transient_result_fetch_on_fresh_client(
         return client
 
     monkeypatch.setattr(ing, "_new_result_fetch_client", client_factory)
-    result = ing.ingest(result_schema="compact")
+    result = ing.ingest(return_results=True, result_schema="compact")
 
     assert len(clients) == 2
     assert all(client.is_closed for client in clients)
@@ -282,7 +282,7 @@ def test_ingest_exhausted_result_retry_remains_visible(monkeypatch: pytest.Monke
         return client
 
     monkeypatch.setattr(ing, "_new_result_fetch_client", client_factory)
-    result = ing.ingest(result_schema="compact")
+    result = ing.ingest(return_results=True, result_schema="compact")
 
     assert len(clients) == 2
     assert all(client.is_closed for client in clients)
@@ -305,7 +305,7 @@ def test_ingest_does_not_retry_http_status_failure(monkeypatch: pytest.MonkeyPat
         return client
 
     monkeypatch.setattr(ing, "_new_result_fetch_client", client_factory)
-    result = ing.ingest(result_schema="compact")
+    result = ing.ingest(return_results=True, result_schema="compact")
 
     assert len(clients) == 1
     assert clients[0].is_closed

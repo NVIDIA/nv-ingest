@@ -318,7 +318,7 @@ def test_root_ingest_service_mode_uses_service_ingest_core(tmp_path, monkeypatch
     assert captured["dedup_params"].iou_threshold == 0.6
     assert captured["caption_params"].context_text_max_chars == 12
     assert captured["embed_params"].embed_granularity == "page"
-    assert captured["ingest_kwargs"] == {"return_results": True}
+    assert captured["ingest_kwargs"] == {"return_results": False}
     assert "through retriever service http://retriever-service:7670" in result.output
 
 
@@ -1133,6 +1133,66 @@ def test_execute_ingest_plan_requires_vdb_stage_for_row_verification(monkeypatch
 
     with pytest.raises(ValueError, match="Row verification checks the effective VDB upload target"):
         ingest_execution.execute_ingest_plan(plan)
+
+
+@pytest.mark.parametrize("return_results", [None, True, False])
+def test_execute_ingest_plan_counts_summary_rows_and_forwards_option(monkeypatch, tmp_path, return_results) -> None:
+    import pandas as pd
+
+    fake_ingestor = _make_fake_ingestor()
+    fake_ingestor.ingest.return_value = pd.DataFrame([{"input_rows": 7, "submitted_records": 5}])
+    document = tmp_path / "summary.txt"
+    document.write_text("document")
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **_kwargs: fake_ingestor)
+    counts = iter([2, 7])
+    monkeypatch.setattr(ingest_execution, "_count_lancedb_rows", lambda *_, **__: next(counts))
+    plan = ingest_plan.resolve_ingest_plan(
+        ingest_plan.IngestPlanRequest(
+            source=ingest_plan.IngestSourceOptions(documents=[str(document)]),
+            runtime=ingest_plan.IngestRuntimeOptions(run_mode="batch"),
+            storage=ingest_plan.IngestStorageOptions(overwrite=False),
+        )
+    )
+
+    execution = ingest_execution.execute_ingest_plan(plan, return_results=return_results)
+
+    fake_ingestor.ingest.assert_called_once_with(return_results=return_results)
+    assert execution.result_n_rows == 7
+    assert execution.n_rows == 7
+    assert execution.to_summary_dict()["result_n_rows"] == 7
+
+
+def test_root_ingest_rejects_zero_summary_with_existing_table(monkeypatch, tmp_path) -> None:
+    import pandas as pd
+
+    document = tmp_path / "empty.txt"
+    document.write_text("document")
+    fake_ingestor = _make_fake_ingestor()
+    fake_ingestor.ingest.return_value = pd.DataFrame([{"input_rows": 0, "submitted_records": 0}])
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **_kwargs: fake_ingestor)
+    monkeypatch.setattr(ingest_execution, "_count_lancedb_rows", lambda *_, **__: 9)
+
+    result = RUNNER.invoke(cli_main.app, ["ingest", "batch", str(document), "--append"])
+
+    assert result.exit_code != 0
+    assert "produced 0 rows before LanceDB write" in result.output
+
+
+def test_root_ingest_reports_summary_input_rows(monkeypatch, tmp_path) -> None:
+    import pandas as pd
+
+    document = tmp_path / "summary.txt"
+    document.write_text("document")
+    fake_ingestor = _make_fake_ingestor()
+    fake_ingestor.ingest.return_value = pd.DataFrame([{"input_rows": 7, "submitted_records": 5}])
+    monkeypatch.setattr(ingest_execution, "create_ingestor", lambda **_kwargs: fake_ingestor)
+    counts = iter([2, 7])
+    monkeypatch.setattr(ingest_execution, "_count_lancedb_rows", lambda *_, **__: next(counts))
+
+    result = RUNNER.invoke(cli_main.app, ["ingest", "batch", str(document), "--append"])
+
+    assert result.exit_code == 0, result.output
+    assert "7 row(s)" in result.output
 
 
 def test_root_ingest_reports_empty_directory_error(tmp_path) -> None:
