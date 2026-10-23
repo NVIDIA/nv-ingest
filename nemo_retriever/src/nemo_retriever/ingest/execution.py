@@ -8,6 +8,8 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Sequence
 
+import pandas as pd
+
 from nemo_retriever.ingest.plan import ResolvedIngestPlan
 from nemo_retriever.ingestor.manifest import format_branch_summary
 from nemo_retriever.ingestor import Ingestor, create_ingestor
@@ -213,8 +215,6 @@ def _raise_for_empty_ingest(
 
 
 def _count_result_rows(result: object) -> int | None:
-    import pandas as pd
-
     if (
         isinstance(result, pd.DataFrame)
         and len(result) == 1
