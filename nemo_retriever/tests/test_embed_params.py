@@ -208,7 +208,6 @@ def test_build_embed_option_kwargs_retains_prefix_when_model_is_omitted():
 # ============================================================
 
 
-
 class TestEmbedParamsGranularity:
     def test_default_is_element(self):
         params = EmbedParams()

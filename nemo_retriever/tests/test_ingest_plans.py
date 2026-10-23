@@ -14,6 +14,7 @@ from nemo_retriever.operators.operator_archetype import ArchetypeOperator
 from nemo_retriever.operators.cpu_operator import CPUOperator
 from nemo_retriever.operators.gpu_operator import GPUOperator
 from nemo_retriever.ingestor.graph_ingestor import GraphIngestor
+from nemo_retriever.ingest.plan import IngestExtractBatchOptions
 from nemo_retriever.ingestor.plans import BaseIngestPlan
 from nemo_retriever.common.params import ASRParams
 from nemo_retriever.common.params import AudioChunkParams
@@ -28,6 +29,21 @@ from nemo_retriever.common.params import VdbUploadParams
 from nemo_retriever.common.params import WebhookParams
 from nemo_retriever.common.ray_resource_hueristics import ClusterResources
 from nemo_retriever.common.ray_resource_hueristics import Resources
+
+
+def test_extract_batch_options_preserve_existing_positional_arguments() -> None:
+    batch = IngestExtractBatchOptions(1, 2, 3, 0.5, 4, 8, 0.25, 0.5, 5, 16, 0.75, 1.0, 6, 32, 1.25, 0.5, 7, 64, 1.0)
+
+    assert batch.page_elements_cpus_per_actor == 0.25
+    assert batch.page_elements_gpus_per_actor == 0.5
+    assert batch.ocr_workers == 5
+    assert batch.table_structure_cpus_per_actor == 1.25
+    assert batch.table_structure_gpus_per_actor == 0.5
+    assert batch.nemotron_parse_workers == 7
+    assert batch.nemotron_parse_batch_size == 64
+    assert batch.nemotron_parse_gpus_per_actor == 1.0
+    assert batch.page_elements_repartition is None
+    assert batch.table_structure_repartition is None
 
 
 def _linear_nodes(graph):

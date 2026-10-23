@@ -86,12 +86,12 @@ def build_embed_option_kwargs(
     embed_granularity: str | None = None,
     embed_workers: int | None = None,
     embed_batch_size: int | None = None,
-    embed_repartition: bool | None = None,
     embed_cpus_per_actor: float | None = None,
     embed_gpus_per_actor: float | None = None,
     embed_model_revision: str | None = None,
     embed_inference_batch_size: int | None = None,
     embed_reshape_workers: int | None = None,
+    embed_repartition: bool | None = None,
 ) -> Dict[str, Any]:
     """Build ``EmbedParams`` kwargs from CLI/request option values."""
     embed_kwargs: Dict[str, Any] = {}

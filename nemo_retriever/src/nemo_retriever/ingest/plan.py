@@ -101,7 +101,6 @@ class IngestExtractBatchOptions:
     pdf_extract_cpus_per_task: float | None = None
     page_elements_workers: int | None = None
     page_elements_batch_size: int | None = None
-    page_elements_repartition: bool | None = None
     page_elements_cpus_per_actor: float | None = None
     page_elements_gpus_per_actor: float | None = None
     ocr_workers: int | None = None
@@ -110,12 +109,13 @@ class IngestExtractBatchOptions:
     ocr_gpus_per_actor: float | None = None
     table_structure_workers: int | None = None
     table_structure_batch_size: int | None = None
-    table_structure_repartition: bool | None = None
     table_structure_cpus_per_actor: float | None = None
     table_structure_gpus_per_actor: float | None = None
     nemotron_parse_workers: int | None = None
     nemotron_parse_batch_size: int | None = None
     nemotron_parse_gpus_per_actor: float | None = None
+    page_elements_repartition: bool | None = None
+    table_structure_repartition: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -187,10 +187,10 @@ class IngestChunkOptions:
 class IngestEmbedBatchOptions:
     embed_workers: int | None = None
     embed_batch_size: int | None = None
-    embed_repartition: bool | None = None
     embed_cpus_per_actor: float | None = None
     embed_gpus_per_actor: float | None = None
     embed_reshape_workers: int | None = None
+    embed_repartition: bool | None = None
 
 
 @dataclass(frozen=True)
