@@ -10,6 +10,7 @@ import pandas as pd
 import torch
 
 from nemo_retriever.models.local.llama_nemotron_embed_1b_v2_hf_embedder import LlamaNemotronEmbed1BV2HFEmbedder
+from nemo_retriever.models.inference import runtime
 from nemo_retriever.models.inference.runtime import _embed_group
 
 
@@ -122,6 +123,32 @@ class _FakeTextModel:
     def embed_queries(self, texts, *, batch_size):
         self.embed_query_calls.append(list(texts))
         return [[0.0, 1.0] for _ in texts]
+
+
+def test_runtime_remote_image_batch_size_is_configurable(monkeypatch) -> None:
+    captured: dict[str, int] = {}
+
+    def fake_create(group_df, *, task_config, transform_config):
+        del task_config
+        captured["batch_size"] = transform_config.batch_size
+        return group_df.copy(), {}
+
+    monkeypatch.setattr(runtime, "create_text_embeddings_for_df", fake_create)
+
+    _embed_group(
+        pd.DataFrame({"text": ["page"]}),
+        group_modality="text_image",
+        model=None,
+        endpoint="http://embed.example/v1/embeddings",
+        api_key=None,
+        text_column="text",
+        inference_batch_size=32,
+        remote_image_batch_size=8,
+        output_column="embedding",
+        resolved_model_name="nvidia/Nemotron-3.5-Embed-1B-BF16",
+    )
+
+    assert captured["batch_size"] == 8
 
 
 def test_runtime_local_query_embedding_uses_embed_queries() -> None:
