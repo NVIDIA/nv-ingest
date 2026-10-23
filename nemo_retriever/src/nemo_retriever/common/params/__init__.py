@@ -9,6 +9,7 @@ from nemo_retriever.common.params.models import BatchTuningParams
 from nemo_retriever.common.params.models import CaptionParams
 from nemo_retriever.common.params.models import ChartParams
 from nemo_retriever.common.params.models import DedupParams
+from nemo_retriever.common.params.models import EmbedInputAuditParams
 from nemo_retriever.common.params.models import EmbedParams
 from nemo_retriever.common.params.models import ExtractParams
 from nemo_retriever.common.params.models import GpuAllocationParams
@@ -49,6 +50,7 @@ __all__ = [
     "CaptionParams",
     "ChartParams",
     "DedupParams",
+    "EmbedInputAuditParams",
     "EmbedParams",
     "ExtractParams",
     "GpuAllocationParams",

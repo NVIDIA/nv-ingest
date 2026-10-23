@@ -645,7 +645,31 @@ VALID_EMBED_MODALITIES: frozenset[str] = frozenset({"text", "image", "text_image
 IMAGE_MODALITIES: frozenset[str] = frozenset({"image", "text_image"})
 
 
+class EmbedInputAuditParams(BaseModel):
+    """Bounded private HF input diagnostics; disabled unless explicitly enabled.
+
+    Budgets apply independently to each actor. Diagnostic hashing and device
+    synchronization add overhead, so audited runs are not timing qualification.
+    """
+
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+
+    enabled: bool = False
+    output_dir: str | None = None
+    max_records: int = Field(default=4096, ge=1, le=1_000_000)
+    max_hashed_bytes: int = Field(default=64 * 1024**3, ge=1)
+    max_output_bytes: int = Field(default=16 * 1024**2, ge=4096)
+    chunk_bytes: int = Field(default=8 * 1024**2, ge=1024, le=8 * 1024**2)
+
+    @model_validator(mode="after")
+    def _validate_destination(self) -> "EmbedInputAuditParams":
+        if self.enabled and (not self.output_dir or not os.path.isabs(self.output_dir)):
+            raise ValueError("Enabled embed_input_audit requires an absolute private output_dir.")
+        return self
+
+
 class EmbedParams(_ParamsModel):
+    embed_input_audit: EmbedInputAuditParams | None = None
     model_name: Optional[str] = None
     embedding_endpoint: Optional[str] = None
     embed_invoke_url: Optional[str] = None
