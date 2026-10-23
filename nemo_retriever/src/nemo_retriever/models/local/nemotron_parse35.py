@@ -6,19 +6,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any, Literal, Sequence
 
-import numpy as np
 import torch
 from PIL import Image
 
 from nemo_retriever.common.params.utils import NEMOTRON_PARSE35_MODEL
 from nemo_retriever.models.hf_cache import configure_global_hf_cache_base
 from nemo_retriever.models.hf_model_registry import get_hf_revision
+from nemo_retriever.models.inference.parse_image import ImageInput, normalize_parse_image
 from nemo_retriever.models.model import BaseModel, ModelRunMode
 
-ImageInput = Image.Image | str | Path | np.ndarray | torch.Tensor
 _DEFAULT_TASK_PROMPT = "</s><s><predict_bbox><predict_classes><output_markdown><predict_no_text_in_pic>"
 
 
@@ -129,10 +127,12 @@ class NemotronParse35(BaseModel):
         apply_vllm_startup_defaults()
         # CUDA availability checks and other extraction stages may initialize
         # CUDA on the actor before engine creation. Fork cannot reuse that state.
-        os.environ.setdefault("VLLM_WORKER_MULTIPROC_METHOD", "spawn")
-        previous_snapshot = os.environ.get(PARSE35_SNAPSHOT_ENV)
-        os.environ[PARSE35_SNAPSHOT_ENV] = snapshot
+        previous_environment = {
+            name: os.environ.get(name) for name in (PARSE35_SNAPSHOT_ENV, "VLLM_WORKER_MULTIPROC_METHOD")
+        }
         try:
+            os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+            os.environ[PARSE35_SNAPSHOT_ENV] = snapshot
             register_nemotron_parse35_vllm()
             from vllm import LLM, SamplingParams
 
@@ -157,19 +157,21 @@ class NemotronParse35(BaseModel):
                 gpu_memory_utilization=0.8,
             )
         finally:
-            # Engine workers inherit the snapshot during startup; later unrelated
-            # vLLM engines must not discover the Parse plugin through our env var.
-            if previous_snapshot is None:
-                os.environ.pop(PARSE35_SNAPSHOT_ENV, None)
-            else:
-                os.environ[PARSE35_SNAPSHOT_ENV] = previous_snapshot
+            # Workers inherit startup settings; unrelated engines retain the
+            # caller's original settings even if plugin registration/loading fails.
+            for name, previous_value in previous_environment.items():
+                if previous_value is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous_value
 
     def preprocess(self, input_data: ImageInput) -> Image.Image:
         """Convert a single page to an RGB image without resizing its content.
 
         Args:
-            input_data: PIL image, image path, HWC/CHW array, or tensor. Arrays
-                and tensors can have a leading batch dimension of size one.
+            input_data: PIL image, image path, HWC/CHW array, or tensor with one,
+                three, or four channels and an optional leading batch of size one.
+                HWC wins when both first and last dimensions look like channels.
                 Floating-point pixels in [0, 1] are scaled to [0, 255].
 
         Returns:
@@ -180,33 +182,7 @@ class NemotronParse35(BaseModel):
             ValueError: If the image shape or pixels are invalid.
             OSError: If an image path cannot be opened or decoded.
         """
-        if isinstance(input_data, Image.Image):
-            return input_data.convert("RGB")
-        if isinstance(input_data, (str, Path)):
-            with Image.open(Path(input_data).expanduser()) as image:
-                return image.convert("RGB")
-        if isinstance(input_data, torch.Tensor):
-            tensor = input_data.detach().cpu()
-            if tensor.dtype == torch.bfloat16:
-                tensor = tensor.float()
-            input_data = tensor.numpy()
-        if not isinstance(input_data, np.ndarray):
-            raise TypeError(f"Unsupported input type for Nemotron Parse: {type(input_data)!r}")
-        pixels = input_data
-        if pixels.ndim == 4 and pixels.shape[0] == 1:
-            pixels = pixels[0]
-        if pixels.ndim != 3 or not pixels.size:
-            raise ValueError(f"Expected a nonempty HWC/CHW image, got {pixels.shape}")
-        if pixels.shape[0] in (1, 3) and pixels.shape[-1] not in (1, 3):
-            pixels = pixels.transpose(1, 2, 0)
-        if pixels.shape[-1] not in (1, 3, 4) or not np.isfinite(pixels).all():
-            raise ValueError("Expected finite pixels with 1, 3, or 4 channels.")
-        if np.issubdtype(pixels.dtype, np.floating) and pixels.min() >= 0 and pixels.max() <= 1:
-            pixels = pixels * 255
-        pixels = np.clip(pixels, 0, 255).astype(np.uint8)
-        if pixels.shape[-1] == 1:
-            pixels = pixels[..., 0]
-        return Image.fromarray(pixels).convert("RGB")
+        return normalize_parse_image(input_data)
 
     def invoke(self, input_data: ImageInput, task_prompt: str | None = None) -> str:
         """Generate structured Parse output for one page.

@@ -116,6 +116,51 @@ def test_snapshot_environment_does_not_leak_to_other_engines(
     assert plugin_module.PARSE35_SNAPSHOT_ENV not in os.environ
 
 
+@pytest.mark.parametrize("previous_method", [None, "fork", "spawn", "forkserver"])
+@pytest.mark.parametrize("previous_snapshot", [None, "/previous/snapshot"])
+@pytest.mark.parametrize("failure_stage", [None, "registration", "engine"])
+def test_startup_forces_spawn_and_restores_caller_environment(
+    vllm_runtime: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+    previous_method: str | None,
+    previous_snapshot: str | None,
+    failure_stage: str | None,
+) -> None:
+    previous_environment = {
+        "VLLM_WORKER_MULTIPROC_METHOD": previous_method,
+        plugin_module.PARSE35_SNAPSHOT_ENV: previous_snapshot,
+    }
+    for name, value in previous_environment.items():
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+
+    def check_environment(stage: str) -> None:
+        assert os.environ["VLLM_WORKER_MULTIPROC_METHOD"] == "spawn"
+        assert os.environ[plugin_module.PARSE35_SNAPSHOT_ENV] == vllm_runtime.download.return_value
+        if failure_stage == stage:
+            raise RuntimeError(f"{stage} failed")
+
+    def register() -> None:
+        check_environment("registration")
+
+    def load_engine(**kwargs: object) -> MagicMock:
+        check_environment("engine")
+        return vllm_runtime.engine
+
+    vllm_runtime.register.side_effect = register
+    vllm_runtime.llm.side_effect = load_engine
+    parser = NemotronParse35()
+    if failure_stage is None:
+        assert parser(Image.new("RGB", (16, 16))) == "<class_Text>page"
+    else:
+        with pytest.raises(RuntimeError, match=f"{failure_stage} failed"):
+            parser(Image.new("RGB", (16, 16)))
+    for name, value in previous_environment.items():
+        assert os.environ.get(name) == value
+
+
 @pytest.mark.parametrize("device", ["cpu", "cuda:1"])
 def test_vllm_rejects_unsupported_devices_before_download(device: str) -> None:
     with pytest.raises(ValueError, match="worker GPU set"):

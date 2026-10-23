@@ -181,6 +181,9 @@ result = (
 The Parse 3.5 adapter downloads the checkpoint and its official vLLM plugin
 from the same revision pinned in the model registry. It registers the plugin
 in vLLM workers automatically; no separate plugin installation is required.
+During engine startup, the adapter temporarily selects the pinned plugin
+snapshot and forces `VLLM_WORKER_MULTIPROC_METHOD="spawn"`. It restores both
+environment settings after startup, including when startup fails.
 The adapter executes checkpoint custom code with `trust_remote_code=True`.
 Review the checkpoint and plugin code before use. The adapter retains the
 existing task prompt, which disables text prediction inside pictures. The
@@ -200,6 +203,14 @@ The adapter does not fall back to Transformers or CPU automatically.
 Batch parsing converts and generates one page at a time, preserving input
 order without retaining converted copies of the entire batch. If a page fails,
 the adapter does not return a partial batch.
+
+Both local Parse adapters accept PIL images, image paths, and HWC or CHW
+NumPy arrays and tensors with 1, 3, or 4 channels. Arrays and tensors can
+include a leading batch dimension of size one. If both layouts are possible,
+inputs are interpreted as HWC. Inputs are converted to RGB; invalid shapes
+and nonfinite pixels raise `ValueError`. Parse 3.5 scales floating-point
+pixels in `[0, 1]` to `[0, 255]`. The v1.2 adapter retains its legacy scaling
+heuristic for floating-point inputs whose maximum is at most `1.5`.
 
 Other local Parse model values, including
 `nvidia/NVIDIA-Nemotron-Parse-2.0`, raise a Pydantic `ValidationError` before
