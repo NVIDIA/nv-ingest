@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from collections import defaultdict
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import logging
 import math
@@ -143,6 +143,17 @@ class BeirDataset:
     query_ids: list[str]
     queries: list[str]
     qrels: dict[str, dict[str, int]]
+    query_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+BEIR_METADATA_FIELDS: tuple[str, ...] = (
+    "modality",
+    "content_type",
+    "query_types",
+    "query_format",
+    "language",
+    "source_type",
+)
 
 
 @dataclass(frozen=True)
@@ -366,6 +377,7 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
     query_ids: list[str] = []
     queries: list[str] = []
     qrels: dict[str, dict[str, int]] = {}
+    query_metadata: dict[str, dict[str, Any]] = {}
 
     with dataset_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -399,6 +411,8 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
             query_ids.append(query_id)
             queries.append(query_text)
             qrels[query_id] = {corpus_id: 1}
+            # Retain the supplied annotation, not the retrieval-ID fallback.
+            query_metadata[query_id] = {key: row[key] for key in BEIR_METADATA_FIELDS if row.get(key)}
 
     if not query_ids:
         raise ValueError(f"No queries loaded from {dataset_path}")
@@ -408,6 +422,7 @@ def _load_annotations_csv_dataset(*, dataset_name: str, doc_id_field: str, loade
         query_ids=query_ids,
         queries=queries,
         qrels=qrels,
+        query_metadata=query_metadata,
     )
 
 
@@ -669,6 +684,13 @@ def load_beir_dataset(
         query_ids=filtered_query_ids,
         queries=filtered_queries,
         qrels={qid: qrels[qid] for qid in filtered_query_ids},
+        query_metadata={
+            str(_row_get(row, "query_id", idx)): {
+                key: _row_get(row, key) for key in BEIR_METADATA_FIELDS if _row_get(row, key) is not None
+            }
+            for idx, row in enumerate(queries_rows)
+            if str(_row_get(row, "query_id", idx)) in qrels
+        },
     )
 
 
@@ -860,6 +882,16 @@ def compute_beir_metrics(
             top_binary = [1 if rel > 0 else 0 for rel in top_relevances]
             hits = sum(top_binary)
 
+            precision_at_k = hits / float(k)
+            cumulative_hits = 0
+            precision_sum = 0.0
+            for rank, relevant in enumerate(top_binary, start=1):
+                cumulative_hits += relevant
+                if relevant:
+                    precision_sum += cumulative_hits / float(rank)
+            # TREC map_cut divides by all relevant targets, even when R > k.
+            average_precision_at_k = precision_sum / relevant_count if relevant_count else 0.0
+
             recall_at_k = (hits / float(relevant_count)) if relevant_count else 0.0
 
             ideal_relevances = sorted(relevant_scores, reverse=True)
@@ -868,8 +900,105 @@ def compute_beir_metrics(
 
             aggregates[f"recall@{k}"].append(recall_at_k)
             aggregates[f"ndcg@{k}"].append(ndcg_at_k)
+            aggregates[f"map@{k}"].append(average_precision_at_k)
+            aggregates[f"precision@{k}"].append(precision_at_k)
 
     return {metric_name: sum(values) / float(len(values)) for metric_name, values in sorted(aggregates.items())}
+
+
+def compute_beir_breakdowns(
+    qrels: dict[str, dict[str, int]],
+    run: dict[str, dict[str, float]],
+    query_metadata: dict[str, dict[str, Any]],
+    *,
+    ks: Sequence[int] = DEFAULT_BEIR_KS,
+    fields: Sequence[str] = BEIR_METADATA_FIELDS,
+) -> dict[str, Any]:
+    """Compute BEIR metrics for metadata groups and report label coverage.
+
+    Args:
+        qrels: Relevance judgments, keyed by query ID and then document ID.
+            These query IDs define the population for coverage and grouping.
+            Each group retains its queries' complete relevance judgments.
+        run: Retrieval scores, keyed by query ID and then document ID. Each
+            group retains its queries' complete rankings. Missing query results
+            contribute zero, as in :func:`compute_beir_metrics`. Queries absent
+            from ``qrels`` are ignored.
+        query_metadata: Metadata dictionaries keyed by the original query IDs.
+            Requested values can be strings or lists or tuples of strings.
+            Labels are stripped of whitespace and deduplicated per query.
+            Empty and non-string labels are ignored. Queries without a usable
+            label remain uncovered.
+        ks: Rank cutoffs passed to :func:`compute_beir_metrics` for every
+            nonempty group. The scorer converts values with ``int()``, drops
+            nonpositive values, removes duplicates, and sorts the result.
+            Defaults to ``(1, 3, 5, 10)``. Short rankings receive no synthetic
+            hits, and precision retains the cutoff as its denominator.
+        fields: Metadata fields to group independently. Defaults to
+            :data:`BEIR_METADATA_FIELDS`. Duplicate fields are evaluated once.
+            An empty sequence disables grouping and scoring.
+
+    Returns:
+        A dictionary with the following nested structure:
+
+        * ``schema_version``: The integer ``1``.
+        * ``query_count``: The number of queries in ``qrels``.
+        * ``fields``: A mapping from each requested field to a dictionary with
+          ``covered_query_count``, ``missing_query_count``, and ``groups``.
+          Coverage counts queries with at least one supported, nonempty label.
+          Missing coverage includes every other query in ``qrels``.
+        * Each ``groups`` mapping is keyed by label and contains dictionaries
+          with ``query_count`` and ``metrics``. Metrics are the flat
+          ``recall@k``, ``ndcg@k``, ``map@k``, and ``precision@k`` values from
+          :func:`compute_beir_metrics`, averaged over that group's queries.
+
+        A query occurs once per distinct label but can occur in multiple groups.
+        Group counts and scores therefore cannot be summed to recover overall
+        results. A field without labels has an empty ``groups`` mapping. Empty
+        ``qrels`` returns zero coverage and empty groups for each field.
+
+    Raises:
+        ValueError: Propagated from :func:`compute_beir_metrics` when a group is
+            scored and no positive cutoff remains, or a cutoff or relevance
+            grade cannot be converted to an integer.
+        TypeError: Propagated from :func:`compute_beir_metrics` when a cutoff or
+            relevance grade does not support integer conversion, or ranking
+            values cannot be sorted.
+        OverflowError: Propagated from :func:`compute_beir_metrics` when integer
+            conversion of a cutoff or relevance grade overflows.
+
+    Note:
+        Cutoffs and scoring inputs are only validated when a group is scored.
+        If no requested field has a group, the scorer is not called and these
+        errors are not raised.
+    """
+    result: dict[str, Any] = {"schema_version": 1, "query_count": len(qrels), "fields": {}}
+    for name in dict.fromkeys(fields):
+        groups: dict[str, set[str]] = defaultdict(set)
+        covered: set[str] = set()
+        for query_id in qrels:
+            value = query_metadata.get(query_id, {}).get(name)
+            values = [value] if isinstance(value, str) else value if isinstance(value, (list, tuple)) else []
+            labels = {item.strip() for item in values if isinstance(item, str) and item.strip()}
+            for label in labels:
+                groups[label].add(query_id)
+                covered.add(query_id)
+        result["fields"][name] = {
+            "covered_query_count": len(covered),
+            "missing_query_count": len(qrels) - len(covered),
+            "groups": {
+                label: {
+                    "query_count": len(query_ids),
+                    "metrics": compute_beir_metrics(
+                        {qid: qrels[qid] for qid in query_ids},
+                        {qid: run[qid] for qid in query_ids if qid in run},
+                        ks=ks,
+                    ),
+                }
+                for label, query_ids in sorted(groups.items())
+            },
+        }
+    return result
 
 
 def evaluate_lancedb_beir(

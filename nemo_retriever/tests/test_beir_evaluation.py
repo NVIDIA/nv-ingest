@@ -12,6 +12,7 @@ from nemo_retriever.tools.recall.beir import (
     build_qrels_by_query_id,
     build_queries_by_id,
     compute_beir_metrics,
+    compute_beir_breakdowns,
     evaluate_lancedb_beir,
     load_beir_dataset,
     resolve_beir_dataset_options,
@@ -365,6 +366,85 @@ def test_compute_beir_metrics_returns_expected_cutoffs() -> None:
     assert metrics["recall@1"] == 0.5
     assert metrics["recall@2"] == 1.0
     assert metrics["ndcg@1"] == 0.5
+
+
+def test_map_cut_uses_all_relevant_targets_and_precision_uses_cutoff() -> None:
+    # TREC map_cut: (1/1 + 2/3) / 4, not division by min(3, 4).
+    qrels = {"q": {"a": 2, "b": 1, "c": 1, "d": 1}}
+    run = {"q": {"a": 4.0, "miss": 3.0, "b": 2.0}}
+    metrics = compute_beir_metrics(qrels, run, ks=(1, 3, 10, 100))
+    assert metrics["map@1"] == 0.25
+    assert metrics["map@3"] == pytest.approx((1 + 2 / 3) / 4)
+    assert metrics["precision@3"] == pytest.approx(2 / 3)
+    assert metrics["precision@10"] == 0.2
+    assert metrics["precision@100"] == 0.02
+    assert metrics["recall@3"] == 0.5
+    assert metrics["map@100"] == metrics["map@3"]
+
+
+def test_missing_queries_zero_relevance_and_ties_are_deterministic() -> None:
+    qrels = {"hit": {"a": 1}, "missing": {"b": 1}, "zero": {"c": 0}}
+    run = {"hit": {"z": 1.0, "a": 1.0}, "extra": {"a": 9.0}}
+    metrics = compute_beir_metrics(qrels, run, ks=(1, 5))
+    for family in ("map", "precision", "recall", "ndcg"):
+        assert metrics[f"{family}@1"] == pytest.approx(1 / 3)
+    assert metrics["precision@5"] == pytest.approx(1 / 15)
+    assert all(value == 0 for value in compute_beir_metrics(qrels, {}, ks=(1, 100)).values())
+
+
+def test_breakdowns_filter_query_population_and_report_overlap_and_coverage() -> None:
+    qrels = {"q1": {"a": 1}, "q2": {"b": 1}, "q3": {"c": 1}}
+    run = {"q1": {"a": 1.0}, "q3": {"c": 1.0}}
+    metadata = {
+        "q1": {"content_type": ["Text", "Table", "Text"], "language": "en"},
+        "q2": {"content_type": ["Table"]},
+        "extra": {"content_type": ["Table"]},
+    }
+    result = compute_beir_breakdowns(qrels, run, metadata, ks=(1, 10), fields=("content_type", "language"))
+    field = result["fields"]["content_type"]
+    assert result["query_count"] == 3
+    assert field["covered_query_count"] == 2
+    assert field["missing_query_count"] == 1
+    assert field["groups"]["Text"]["query_count"] == 1
+    assert field["groups"]["Table"]["query_count"] == 2
+    assert field["groups"]["Table"]["metrics"] == compute_beir_metrics(
+        {key: qrels[key] for key in ("q1", "q2")},
+        {"q1": run["q1"]},
+        ks=(1, 10),
+    )
+    assert result["fields"]["language"]["groups"]["en"]["metrics"]["map@1"] == 1
+    assert (
+        compute_beir_breakdowns(qrels, run, {}, fields=("modality",))["fields"]["modality"]["missing_query_count"] == 3
+    )
+
+
+def test_csv_metadata_does_not_infer_missing_modality(tmp_path: Path) -> None:
+    path = tmp_path / "annotations.csv"
+    path.write_text("query_id,query,pdf,page,modality\nkept,question,doc,0,chart\nmissing,other,doc,1,\n")
+    dataset = load_beir_dataset("bo767_csv", dataset_name=str(path), doc_id_field="pdf_page")
+    assert dataset.query_metadata == {"kept": {"modality": "chart"}, "missing": {}}
+    assert BeirDataset("legacy", [], [], {}).query_metadata == {}
+
+
+def test_vidore_metadata_follows_language_and_qrel_filtering(monkeypatch) -> None:
+    rows = {
+        "queries": [
+            {"query_id": 1, "query": "English", "language": "en", "content_type": ["Text"]},
+            {"query_id": 2, "query": "French", "language": "fr", "query_format": "keyword"},
+            {"query_id": 3, "query": "Unlabeled", "language": "en"},
+        ],
+        "qrels": [{"query_id": 1, "corpus_id": "c", "score": 2}, {"query_id": 2, "corpus_id": "c", "score": 1}],
+        "corpus": [{"corpus_id": "c", "doc_id": "doc", "page_number_in_doc": 0}],
+    }
+
+    def load(_repo, config, **_kwargs):
+        return rows[config]
+
+    monkeypatch.setitem(sys.modules, "datasets", type("Datasets", (), {"load_dataset": load}))
+    dataset = load_beir_dataset("vidore_hf", dataset_name="test", query_language="en", doc_id_field="pdf_page")
+    assert dataset.query_ids == ["1"]
+    assert dataset.query_metadata == {"1": {"content_type": ["Text"], "language": "en"}}
+    assert dataset.qrels == {"1": {"doc_1": 2}}
 
 
 def test_load_beir_dataset_tries_vidore_config_name_before_data_dir(monkeypatch) -> None:
